@@ -261,6 +261,9 @@ class DemoLoan:
     rate_changes: tuple[tuple[date, int], ...]
     costs: tuple[DemoLoanCost, ...]
     overpayments: tuple[tuple[date, Money, str], ...]
+    drawdown_mode: str = "full_at_origination"
+    interest_only_months: int = 0
+    transfers: tuple[tuple[date, Money, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -722,6 +725,14 @@ def _loan_plan(
             ),
         ),
         overpayments=(),
+        drawdown_mode="tranches",
+        transfers=(
+            (
+                _month_start(reference, -1),
+                convert_amount(Decimal("15000"), currency, whole=True),
+                "",
+            ),
+        ),
     )
     return reference_rates, (mortgage, car)
 

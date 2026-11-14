@@ -13,7 +13,7 @@
 {%- endmacro %}
 
 {% macro loan_status_badge(status) -%}
-<span class="rounded-full px-2 py-0.5 text-xs font-semibold {% if status == 'paid_off' %}bg-success-soft text-success-strong {% elif status == 'archived' %}bg-subtle text-muted {% else %}bg-primary-soft text-primary-ink {% endif %}" data-loan-status-badge="{{ status }}">{% if status == "paid_off" %}{{ _("Paid off") }}{% elif status == "archived" %}{{ _("Archived") }}{% else %}{{ _("Active") }}{% endif %}</span>
+<span class="rounded-full px-2 py-0.5 text-xs font-semibold {% if status == 'paid_off' %}bg-success-soft text-success-strong {% elif status == 'archived' %}bg-subtle text-muted {% elif status == 'not_drawn' %}bg-warning-soft text-warning-strong {% else %}bg-primary-soft text-primary-ink {% endif %}" data-loan-status-badge="{{ status }}">{% if status == "paid_off" %}{{ _("Paid off") }}{% elif status == "archived" %}{{ _("Archived") }}{% elif status == "not_drawn" %}{{ _("Not drawn") }}{% else %}{{ _("Active") }}{% endif %}</span>
 {%- endmacro %}
 
 {% macro loan_progress(percent_bp, locale) -%}
@@ -49,7 +49,7 @@
   </td>
   <td class="whitespace-nowrap sm:px-4 sm:py-3" data-next-payment>
     <span class="mr-1 text-xs text-muted sm:hidden">{{ _("Next payment") }}</span>
-    {% if figures.next_payment_date %}<time datetime="{{ figures.next_payment_date.isoformat() }}">{{ format_day(figures.next_payment_date, locale) }}</time>{% if figures.monthly_installment %}<span class="ml-2 text-xs text-muted tabular-nums sm:ml-0 sm:block">{{ format_money(figures.monthly_installment, locale) }}</span>{% endif %}{% else %}<span class="text-muted">{{ _("Paid off") if row.status == "paid_off" else "—" }}</span>{% endif %}
+    {% if figures.next_payment_date %}<time datetime="{{ figures.next_payment_date.isoformat() }}">{{ format_day(figures.next_payment_date, locale) }}</time>{% if figures.monthly_installment %}<span class="ml-2 text-xs text-muted tabular-nums sm:ml-0 sm:block">{{ format_money(figures.monthly_installment, locale) }}</span>{% endif %}{% else %}<span class="text-muted">{{ _("Paid off") if row.status == "paid_off" else (_("Not drawn") if row.status == "not_drawn" else "—") }}</span>{% endif %}
   </td>
   <td class="hidden sm:table-cell sm:px-4 sm:py-3" data-status>{{ loan_status_badge(row.status) }}</td>
 </tr>

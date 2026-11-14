@@ -11,7 +11,7 @@ from __future__ import annotations
 import calendar
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from enum import StrEnum
 
@@ -40,6 +40,11 @@ class LoanKind(StrEnum):
 class RateMode(StrEnum):
     FIXED = "fixed"
     VARIABLE = "variable"
+
+
+class DrawdownMode(StrEnum):
+    FULL_AT_ORIGINATION = "full_at_origination"
+    TRANCHES = "tranches"
 
 
 class OverpaymentMode(StrEnum):
@@ -320,6 +325,14 @@ class CostPeriod:
 
 
 @dataclass(frozen=True, slots=True)
+class Drawdown:
+    """A transfer of loan money to the target account (a positive increase in the debt)."""
+
+    date: date
+    amount: Money
+
+
+@dataclass(frozen=True, slots=True)
 class OneOffOverpayment:
     date: date
     amount: Money
@@ -349,6 +362,8 @@ class LoanTerms:
     installment_override: Money | None
     overpayment_mode: OverpaymentMode | str
     overpayment_amount: Money | None
+    drawdown_mode: DrawdownMode | str = DrawdownMode.FULL_AT_ORIGINATION
+    interest_only_months: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -360,6 +375,7 @@ class ScheduleRow:
     interest: Money
     principal: Money
     overpayment: Money
+    transfer: Money
     costs: Money
     installment_total: Money
     closing: Money
@@ -369,10 +385,12 @@ class ScheduleRow:
 class Schedule:
     rows: tuple[ScheduleRow, ...]
     starting_balance: Money
+    drawn_principal: Money
     anchor_date: date
     as_of: date
     original_principal: Money | None
     currency: str
+    drawdowns: tuple[Drawdown, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,6 +498,8 @@ def validate_payment_breakdown(
 class LoanScheduleSummary:
     as_of: date
     original_principal: Money
+    drawn_principal: Money
+    undrawn_principal: Money
     paid_principal: Money
     remaining_principal: Money
     next_payment_date: date | None
@@ -489,6 +509,8 @@ class LoanScheduleSummary:
     payoff_date: date | None
     months_remaining: int
     percent_repaid_bp: int
+    percent_remaining_bp: int
+    percent_undrawn_bp: int
     total_interest: Money
     total_costs: Money
     total_overpayments: Money
@@ -528,10 +550,7 @@ def _next_due_date(anchor: date, first_payment_date: date, payment_day: int) -> 
     """
     if first_payment_date > anchor:
         return first_payment_date
-    candidate = _clamped_date(anchor.year, anchor.month, payment_day)
-    if candidate <= anchor:
-        candidate = _add_months(anchor, 1, payment_day)
-    return candidate
+    return nominal_payment_after(anchor, payment_day)
 
 
 def _payment_dates(terms: LoanTerms, anchor_date: date) -> tuple[date, ...]:
@@ -543,6 +562,23 @@ def _payment_dates(terms: LoanTerms, anchor_date: date) -> tuple[date, ...]:
 
 
 _ZERO_MONEY: dict[str, Money] = {}
+
+
+def nominal_payment_after(day: date, payment_day: int) -> date:
+    """The next contractual payment day strictly after ``day`` (month-end clamped)."""
+    candidate = _clamped_date(day.year, day.month, payment_day)
+    if candidate <= day:
+        candidate = _add_months(day, 1, payment_day)
+    return candidate
+
+
+def payment_delayed_after_transfer(
+    first_transfer_date: date, first_payment_date: date, payment_day: int
+) -> bool:
+    """Whether the first payment is later than the next nominal day after the first transfer."""
+    if first_transfer_date >= first_payment_date:
+        return True
+    return nominal_payment_after(first_transfer_date, payment_day) < first_payment_date
 
 
 def _money(value: int, currency: str) -> Money:
@@ -591,6 +627,19 @@ def _validate_terms(terms: LoanTerms) -> LoanKind:
             raise LoanValidationError("overpayment_amount", "invalid_overpayment")
     elif terms.overpayment_amount is None or terms.overpayment_amount.amount_minor <= 0:
         raise LoanValidationError("overpayment_amount", "invalid_overpayment")
+    try:
+        drawdown_mode = DrawdownMode(terms.drawdown_mode)
+    except ValueError:
+        raise LoanValidationError("drawdown_mode", "invalid_drawdown_mode") from None
+    if kind is LoanKind.INSTALLMENT_PLAN and drawdown_mode is not DrawdownMode.FULL_AT_ORIGINATION:
+        raise LoanValidationError("drawdown_mode", "invalid_drawdown_mode")
+    if type(terms.interest_only_months) is not int or terms.interest_only_months < 0:
+        raise LoanValidationError("interest_only_months", "invalid_interest_only")
+    if terms.term_months == 0:
+        if terms.interest_only_months != 0:
+            raise LoanValidationError("interest_only_months", "invalid_interest_only")
+    elif terms.interest_only_months >= terms.term_months:
+        raise LoanValidationError("interest_only_months", "invalid_interest_only")
     return kind
 
 
@@ -681,6 +730,93 @@ def _costs_on(costs: list[CostPeriod], day: date, opening_minor: int, currency: 
     return total
 
 
+def _fixed_costs_on(costs: list[CostPeriod], day: date, currency: str) -> int:
+    total = 0
+    for cost in costs:
+        if not cost_active_on(cost.effective_from, cost.effective_to, day):
+            continue
+        if cost.value.mode == "fixed":
+            assert cost.value.fixed is not None
+            if cost.value.fixed.currency != currency:
+                raise LoanValidationError("costs", "invalid_currency")
+            total += cost.value.fixed.amount_minor
+    return total
+
+
+def _accrued_costs(
+    costs: list[CostPeriod],
+    start: date,
+    end: date,
+    opening_minor: int,
+    transfers: Sequence[Drawdown],
+    currency: str,
+    minor_unit: int,
+) -> int:
+    """Percent costs follow the drawn balance by calendar month; fixed costs stay per row."""
+    if end <= start:
+        raise ScheduleError("invalid_payment_date")
+    events: set[date] = {end}
+    transfer_by_date: dict[date, int] = {}
+    for transfer in transfers:
+        if start < transfer.date < end:
+            events.add(transfer.date)
+            transfer_by_date[transfer.date] = (
+                transfer_by_date.get(transfer.date, 0) + transfer.amount.amount_minor
+            )
+    month = _first_of_next_month(start)
+    while month < end:
+        events.add(month)
+        month = _first_of_next_month(month)
+    for cost in costs:
+        if start < cost.effective_from < end:
+            events.add(cost.effective_from)
+        if cost.effective_to is not None:
+            day_after = cost.effective_to + timedelta(days=1)
+            if start < day_after < end:
+                events.add(day_after)
+    percentage: list[tuple[CostPeriod, int]] = []
+    for cost in costs:
+        if cost.value.mode == "percent":
+            rate_bp = cost.value.rate_bp
+            assert rate_bp is not None
+            percentage.append((cost, rate_bp))
+    totals = [Decimal(0) for _ in percentage]
+    balance = opening_minor
+    cursor = start
+    with localcontext() as context:
+        context.prec = max(context.prec, 40)
+        for event in sorted(events):
+            if event <= start:
+                continue
+            if event >= end:
+                break
+            days = (event - cursor).days
+            if days > 0:
+                for index, (cost, rate_bp) in enumerate(percentage):
+                    if cost_active_on(cost.effective_from, cost.effective_to, cursor):
+                        totals[index] += (
+                            Decimal(balance).scaleb(-minor_unit)
+                            * Decimal(rate_bp)
+                            / Decimal(10_000)
+                            * Decimal(days)
+                            / Decimal(_month_last_day(cursor.year, cursor.month))
+                        )
+            balance += transfer_by_date.get(event, 0)
+            cursor = event
+        days = (end - cursor).days
+        for index, (cost, rate_bp) in enumerate(percentage):
+            if cost_active_on(cost.effective_from, cost.effective_to, cursor):
+                totals[index] += (
+                    Decimal(balance).scaleb(-minor_unit)
+                    * Decimal(rate_bp)
+                    / Decimal(10_000)
+                    * Decimal(days)
+                    / Decimal(_month_last_day(cursor.year, cursor.month))
+                )
+    rounded = sum(_round_minor(value, currency, minor_unit) for value in totals)
+    return rounded + _fixed_costs_on(costs, end, currency)
+
+
 def _validate_one_off_overpayments(
     overpayments: list[OneOffOverpayment], currency: str
 ) -> list[OneOffOverpayment]:
@@ -710,9 +846,12 @@ def _regular_overpayment(
 
 
 def select_anchor(
-    terms: LoanTerms, checkpoints: list[BalanceCheckpoint], as_of: date
+    terms: LoanTerms,
+    checkpoints: list[BalanceCheckpoint],
+    as_of: date,
+    drawdowns: Sequence[Drawdown] = (),
 ) -> ScheduleAnchor:
-    """The latest checkpoint at or before ``as_of``; otherwise the loan's origination."""
+    """The latest checkpoint at or before ``as_of``, else the first transfer or origination."""
     valid_date(as_of, "as_of")
     _require_currency(terms.principal_original, terms.currency, "principal_original")
     if terms.principal_original is not None and terms.principal_original.amount_minor <= 0:
@@ -728,11 +867,142 @@ def select_anchor(
     if usable:
         latest = max(usable, key=lambda row: row.as_of)
         return ScheduleAnchor(date=latest.as_of, balance=latest.remaining_principal)
+    if DrawdownMode(terms.drawdown_mode) is DrawdownMode.TRANCHES:
+        ordered = sorted(drawdowns, key=lambda row: row.date)
+        if not ordered:
+            return ScheduleAnchor(date=as_of, balance=Money(0, terms.currency))
+        first_date = ordered[0].date
+        if first_date > as_of:
+            return ScheduleAnchor(date=as_of, balance=Money(0, terms.currency))
+        first_total = sum(
+            drawdown.amount.amount_minor for drawdown in ordered if drawdown.date == first_date
+        )
+        return ScheduleAnchor(date=first_date, balance=Money(first_total, terms.currency))
     if terms.origination_date is None or terms.principal_original is None:
         raise ScheduleError("no_anchor")
     if terms.principal_original.amount_minor <= 0:
         raise LoanValidationError("principal_original", "invalid_principal")
     return ScheduleAnchor(date=terms.origination_date, balance=terms.principal_original)
+
+
+def _rate_on_day(rate_timeline: Sequence[RatePeriod], day: date) -> int:
+    chosen: int | None = None
+    for period in rate_timeline:
+        if period.effective_from <= day:
+            chosen = period.annual_rate_bp
+    if chosen is None:
+        raise ScheduleError("missing_rate")
+    return chosen
+
+
+def _first_of_next_month(day: date) -> date:
+    if day.month == 12:
+        return date(day.year + 1, 1, 1)
+    return date(day.year, day.month + 1, 1)
+
+
+def _interest_slice(
+    start: date,
+    end: date,
+    balance_minor: int,
+    annual_rate_bp: int,
+    day_count: DayCount,
+    currency: str,
+    minor_unit: int,
+) -> Decimal:
+    days = (end - start).days
+    if days <= 0:
+        return Decimal(0)
+    balance = Decimal(balance_minor).scaleb(-minor_unit)
+    annual = Decimal(annual_rate_bp) / Decimal(10_000)
+    if day_count is DayCount.ACTUAL_365:
+        return balance * annual * Decimal(days) / Decimal(365)
+    return (
+        balance
+        * annual
+        / Decimal(12)
+        * Decimal(days)
+        / Decimal(_month_last_day(start.year, start.month))
+    )
+
+
+def _accrued_interest(
+    start: date,
+    end: date,
+    opening_minor: int,
+    transfers: Sequence[Drawdown],
+    rate_timeline: Sequence[RatePeriod],
+    day_count: DayCount,
+    currency: str,
+    minor_unit: int,
+) -> int:
+    """Interest for one payment period, split at transfers, rate changes and month boundaries."""
+    if end <= start:
+        raise ScheduleError("invalid_payment_date")
+    events: set[date] = {end}
+    transfer_by_date: dict[date, int] = {}
+    for transfer in transfers:
+        if start < transfer.date < end:
+            events.add(transfer.date)
+            transfer_by_date[transfer.date] = (
+                transfer_by_date.get(transfer.date, 0) + transfer.amount.amount_minor
+            )
+    for period in rate_timeline:
+        if start < period.effective_from < end:
+            events.add(period.effective_from)
+    if day_count is DayCount.MONTHLY:
+        month = _first_of_next_month(start)
+        while month < end:
+            events.add(month)
+            month = _first_of_next_month(month)
+    total = Decimal(0)
+    balance = opening_minor
+    cursor = start
+    with localcontext() as context:
+        context.prec = max(context.prec, 40)
+        for event in sorted(events):
+            if event <= start:
+                continue
+            if event >= end:
+                break
+            total += _interest_slice(
+                cursor,
+                event,
+                balance,
+                _rate_on_day(rate_timeline, cursor),
+                day_count,
+                currency,
+                minor_unit,
+            )
+            balance += transfer_by_date.get(event, 0)
+            cursor = event
+        total += _interest_slice(
+            cursor,
+            end,
+            balance,
+            _rate_on_day(rate_timeline, cursor),
+            day_count,
+            currency,
+            minor_unit,
+        )
+    return _round_minor(total, currency, minor_unit)
+
+
+def _validate_drawdowns(drawdowns: Sequence[Drawdown], terms: LoanTerms) -> list[Drawdown]:
+    ordered: list[Drawdown] = []
+    total = 0
+    for drawdown in drawdowns:
+        valid_date(drawdown.date, "date")
+        if terms.origination_date is not None and drawdown.date < terms.origination_date:
+            raise LoanValidationError("date", "transfer_before_start")
+        _require_currency(drawdown.amount, terms.currency, "drawdown")
+        if drawdown.amount.amount_minor <= 0:
+            raise LoanValidationError("amount", "invalid_drawdown")
+        total += drawdown.amount.amount_minor
+        ordered.append(drawdown)
+    if terms.principal_original is not None and total > terms.principal_original.amount_minor:
+        raise LoanValidationError("amount", "drawdown_exceeds_principal")
+    return sorted(ordered, key=lambda row: row.date)
 
 
 def build_schedule(
@@ -744,14 +1014,19 @@ def build_schedule(
     as_of: date,
     strategy: OverpaymentStrategy | str,
     day_count: DayCount | str,
+    drawdowns: Sequence[Drawdown] = (),
 ) -> Schedule:
     """Build a pure monthly loan schedule from ``anchor``.
 
     ``terms.term_months`` is the number of scheduled payments from the anchor. F7.3/F7.5 must
-    pass the remaining months when they re-anchor at a checkpoint. Overpayments after the payoff
+    pass the remaining months when re-anchoring at a checkpoint. Overpayments after the payoff
     are ignored; one dated on or before the anchor is already reflected in the checkpoint.
+
+    In ``tranches`` mode the anchor normally starts at zero; transfers during a period increase
+    the debt and interest is accrued on the balance in force for each day/sub-period.
     """
     kind = _validate_terms(terms)
+    wanted_mode = DrawdownMode(terms.drawdown_mode)
     try:
         wanted_strategy = OverpaymentStrategy(strategy)
     except ValueError:
@@ -770,60 +1045,103 @@ def build_schedule(
         raise LoanValidationError("as_of", "invalid_date")
     _validate_costs(costs, terms.currency)
     one_off = _validate_one_off_overpayments(overpayments, terms.currency)
+    tranched = wanted_mode is DrawdownMode.TRANCHES
+    draws = _validate_drawdowns(drawdowns, terms) if tranched else []
+    future_draws = [drawdown for drawdown in draws if drawdown.date > anchor.date]
 
-    if anchor.balance.amount_minor == 0:
+    if anchor.balance.amount_minor == 0 and not future_draws:
+        drawn = (
+            sum(drawdown.amount.amount_minor for drawdown in draws)
+            if tranched
+            else (terms.principal_original or anchor.balance).amount_minor
+        )
         return Schedule(
             rows=(),
             starting_balance=anchor.balance,
+            drawn_principal=_money(drawn, terms.currency),
             anchor_date=anchor.date,
             as_of=as_of,
             original_principal=terms.principal_original,
             currency=terms.currency,
+            drawdowns=tuple(draws),
         )
 
     rates = _validate_rate_timeline(rate_timeline)
     dates = _payment_dates(terms, anchor.date)
     rows: list[ScheduleRow] = []
-    opening_money = anchor.balance
     balance = anchor.balance.amount_minor
     currency = terms.currency
     minor_unit = minor_unit_for(currency)
-    opening_decimal = Decimal(balance).scaleb(-minor_unit)
-    base_equal_principal = _half_up(balance, 1, terms.term_months)
+    base_equal_principal = (
+        None
+        if tranched or terms.interest_only_months > 0
+        else _half_up(balance, 1, terms.term_months)
+    )
     annuity_payment: Decimal | None = None
-    # Per rate: the ``remaining`` its cached ``(1 + r) ** -remaining`` belongs to. A fixed loan
-    # has a few rates; a variable loan may reprice every month. Growing the power down one month
-    # at a time keeps the work linear in the schedule length instead of building a full-term
-    # table for every distinct rate (which would be quadratic with frequent repricing).
     annuity_growth: dict[int, tuple[int, Decimal]] = {}
     monthly_rates: dict[int, Decimal] = {}
     hold_payment = False
     previous_rate: int | None = None
-    next_rate_index = 0
-    current_rate: int | None = None
     recompute_next = True
     one_off_index = 0
+    draw_index = 0
     previous_date = anchor.date
+    debt_start = (
+        min(drawdown.date for drawdown in draws)
+        if tranched and draws
+        else (terms.origination_date or anchor.date)
+    )
+    interest_only_until = (
+        _add_months(debt_start, terms.interest_only_months, debt_start.day)
+        if terms.interest_only_months > 0
+        else None
+    )
 
     for index, due in enumerate(dates, start=1):
-        if balance <= 0:
+        period_draws = [
+            drawdown for drawdown in future_draws if previous_date < drawdown.date <= due
+        ]
+        transfer_minor = sum(drawdown.amount.amount_minor for drawdown in period_draws)
+        while draw_index < len(future_draws) and future_draws[draw_index].date <= due:
+            draw_index += 1
+        pending_draw = draw_index < len(future_draws)
+        if balance <= 0 and transfer_minor == 0 and not pending_draw:
             break
-        # Dates are ascending, so each rate period is consumed once; scanning the whole
-        # timeline on every row would be quadratic for a frequently repriced variable loan.
-        while next_rate_index < len(rates) and rates[next_rate_index].effective_from <= due:
-            current_rate = rates[next_rate_index].annual_rate_bp
-            next_rate_index += 1
-        if current_rate is None:
-            raise ScheduleError("missing_rate")
-        rate = current_rate
+        rate = _rate_on_day(rates, due)
         days = (due - previous_date).days
         if days <= 0:
             raise ScheduleError("invalid_payment_date")
-        if wanted_day_count is DayCount.MONTHLY:
+        payment_balance = balance + transfer_minor
+        interest_only = interest_only_until is not None and due <= interest_only_until
+
+        if tranched:
+            interest = _accrued_interest(
+                previous_date,
+                due,
+                balance,
+                period_draws,
+                rates,
+                wanted_day_count,
+                currency,
+                minor_unit,
+            )
+        elif wanted_day_count is DayCount.MONTHLY:
             interest = _half_up(balance, rate, 120_000)
         else:
             interest = _half_up(balance, rate * days, 3_650_000)
-        costs_minor = _costs_on(costs, due, balance, currency)
+        costs_minor = (
+            _accrued_costs(
+                costs,
+                previous_date,
+                due,
+                balance,
+                period_draws,
+                currency,
+                minor_unit,
+            )
+            if tranched
+            else _costs_on(costs, due, payment_balance, currency)
+        )
 
         applying: list[OneOffOverpayment] = []
         while one_off_index < len(one_off) and one_off[one_off_index].date <= due:
@@ -835,26 +1153,39 @@ def build_schedule(
 
         last_contractual = index == terms.term_months
         if last_contractual:
-            principal = balance
+            principal = payment_balance
             overpayment = 0
+        elif interest_only:
+            principal = 0
+            regular = _regular_overpayment(
+                terms,
+                overpayment_mode,
+                principal_minor=0,
+                interest_minor=interest,
+                costs_minor=costs_minor,
+            )
+            overpayment = min(regular + one_off_minor, payment_balance)
         else:
+            remaining = max(1, terms.term_months - (index - 1))
+            payment_decimal = Decimal(payment_balance).scaleb(-minor_unit)
             if kind is LoanKind.EQUAL_PRINCIPAL:
-                principal = min(base_equal_principal, balance)
+                if base_equal_principal is None or transfer_minor > 0:
+                    base_equal_principal = _half_up(payment_balance, 1, remaining)
+                principal = min(base_equal_principal, payment_balance)
             else:
                 if terms.installment_override is not None:
                     principal = terms.installment_override.amount_minor - interest
                     recompute_next = False
                 else:
                     rate_changed = previous_rate is not None and previous_rate != rate
-                    if recompute_next or rate_changed or not hold_payment:
-                        remaining = max(1, terms.term_months - (index - 1))
+                    if recompute_next or rate_changed or not hold_payment or transfer_minor > 0:
                         monthly_rate = monthly_rates.get(rate)
                         if monthly_rate is None:
                             monthly_rate = monthly_rates[rate] = _monthly_rate(rate)
                         with localcontext() as context:
                             context.prec = max(context.prec, 40)
                             if monthly_rate == 0:
-                                annuity_payment = opening_decimal / Decimal(remaining)
+                                annuity_payment = payment_decimal / Decimal(remaining)
                             else:
                                 factor = Decimal(1) + monthly_rate
                                 cached = annuity_growth.get(rate)
@@ -869,22 +1200,33 @@ def build_schedule(
                                         growth = factor ** (-remaining)
                                 annuity_growth[rate] = (remaining, growth)
                                 annuity_payment = (
-                                    opening_decimal * monthly_rate / (Decimal(1) - growth)
+                                    payment_decimal * monthly_rate / (Decimal(1) - growth)
                                 )
                         recompute_next = False
                         if rate_changed:
                             hold_payment = False
                     assert annuity_payment is not None
-                    principal = _annuity_principal_minor(
-                        opening_decimal,
-                        monthly_rates[rate],
-                        annuity_payment,
-                        currency,
-                        minor_unit,
-                    )
+                    if tranched:
+                        interest_decimal = Decimal(interest).scaleb(-minor_unit)
+                        principal = _round_minor(
+                            annuity_payment - interest_decimal, currency, minor_unit
+                        )
+                    else:
+                        principal = _annuity_principal_minor(
+                            payment_decimal,
+                            monthly_rates[rate],
+                            annuity_payment,
+                            currency,
+                            minor_unit,
+                        )
                 if principal < 0:
-                    raise ScheduleError("negative_amortization")
-                principal = min(principal, balance)
+                    if tranched and index == 1:
+                        # A first payment later than the next nominal day covers a longer
+                        # period; its extra interest is paid instead of amortized.
+                        principal = 0
+                    else:
+                        raise ScheduleError("negative_amortization")
+                principal = min(principal, payment_balance)
             regular = _regular_overpayment(
                 terms,
                 overpayment_mode,
@@ -892,9 +1234,9 @@ def build_schedule(
                 interest_minor=interest,
                 costs_minor=costs_minor,
             )
-            overpayment = min(regular + one_off_minor, balance - principal)
+            overpayment = min(regular + one_off_minor, payment_balance - principal)
 
-        closing = balance - principal - overpayment
+        closing = payment_balance - principal - overpayment
         if closing < 0:
             raise ScheduleError("negative_closing")
         if not last_contractual and overpayment > 0 and kind is LoanKind.ANNUITY:
@@ -903,36 +1245,43 @@ def build_schedule(
                 hold_payment = False
             else:
                 hold_payment = True
-        closing_money = _money(closing, currency)
         rows.append(
             ScheduleRow(
                 n=index,
                 date=due,
                 annual_rate_bp=rate,
-                opening=opening_money,
+                opening=_money(balance, currency),
                 interest=_money(interest, currency),
                 principal=_money(principal, currency),
                 overpayment=_money(overpayment, currency),
+                transfer=_money(transfer_minor, currency),
                 costs=_money(costs_minor, currency),
                 installment_total=_money(
                     interest + principal + overpayment + costs_minor, currency
                 ),
-                closing=closing_money,
+                closing=_money(closing, currency),
             )
         )
-        opening_money = closing_money
         balance = closing
-        opening_decimal = Decimal(closing).scaleb(-minor_unit)
         previous_rate = rate
         previous_date = due
 
+    if draw_index < len(future_draws):
+        raise ScheduleError("transfer_after_final_payment")
+    drawn = (
+        sum(drawdown.amount.amount_minor for drawdown in draws)
+        if tranched
+        else (terms.principal_original or anchor.balance).amount_minor
+    )
     return Schedule(
         rows=tuple(rows),
         starting_balance=anchor.balance,
+        drawn_principal=_money(drawn, currency),
         anchor_date=anchor.date,
         as_of=as_of,
         original_principal=terms.principal_original,
         currency=currency,
+        drawdowns=tuple(draws),
     )
 
 
@@ -944,13 +1293,40 @@ def summarize_schedule(schedule: Schedule, as_of: date) -> LoanScheduleSummary:
     currency = schedule.currency
     passed = [row for row in schedule.rows if row.date <= as_of]
     future = [row for row in schedule.rows if row.date > as_of]
-    remaining = passed[-1].closing if passed else schedule.starting_balance
+    last_date = passed[-1].date if passed else schedule.anchor_date
+    remaining_minor = (
+        passed[-1].closing.amount_minor if passed else schedule.starting_balance.amount_minor
+    )
+    remaining_minor += sum(
+        drawdown.amount.amount_minor
+        for drawdown in schedule.drawdowns
+        if last_date < drawdown.date <= as_of
+    )
+    remaining = _money(remaining_minor, schedule.currency)
     original = schedule.original_principal or schedule.starting_balance
+    if schedule.drawdowns:
+        drawn = _money(
+            sum(
+                drawdown.amount.amount_minor
+                for drawdown in schedule.drawdowns
+                if drawdown.date <= as_of
+            ),
+            currency,
+        )
+    else:
+        drawn = schedule.drawn_principal
+    paid_minor = max(0, drawn.amount_minor - remaining.amount_minor)
+    undrawn_minor = max(0, original.amount_minor - drawn.amount_minor)
     if original.amount_minor > 0:
-        paid = max(0, original.amount_minor - remaining.amount_minor)
-        percent = min(10_000, _half_up(paid, 10_000, original.amount_minor))
+        percent = min(10_000, _half_up(paid_minor, 10_000, original.amount_minor))
+        remaining_percent = min(
+            10_000, _half_up(remaining.amount_minor, 10_000, original.amount_minor)
+        )
+        undrawn_percent = min(10_000, _half_up(undrawn_minor, 10_000, original.amount_minor))
     else:
         percent = 0
+        remaining_percent = 0
+        undrawn_percent = 0
     total_interest = sum(row.interest.amount_minor for row in schedule.rows)
     total_costs = sum(row.costs.amount_minor for row in schedule.rows)
     total_overpayments = sum(row.overpayment.amount_minor for row in schedule.rows)
@@ -959,7 +1335,9 @@ def summarize_schedule(schedule: Schedule, as_of: date) -> LoanScheduleSummary:
     return LoanScheduleSummary(
         as_of=as_of,
         original_principal=original,
-        paid_principal=_money(max(0, original.amount_minor - remaining.amount_minor), currency),
+        drawn_principal=drawn,
+        undrawn_principal=_money(undrawn_minor, currency),
+        paid_principal=_money(paid_minor, currency),
         remaining_principal=remaining,
         next_payment_date=next_row.date if next_row is not None else None,
         next_installment=next_row.installment_total if next_row is not None else None,
@@ -968,6 +1346,8 @@ def summarize_schedule(schedule: Schedule, as_of: date) -> LoanScheduleSummary:
         payoff_date=schedule.rows[-1].date if schedule.rows else None,
         months_remaining=len(future),
         percent_repaid_bp=percent,
+        percent_remaining_bp=remaining_percent,
+        percent_undrawn_bp=undrawn_percent,
         total_interest=_money(total_interest, currency),
         total_costs=_money(total_costs, currency),
         total_overpayments=_money(total_overpayments, currency),

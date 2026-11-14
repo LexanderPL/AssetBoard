@@ -1,4 +1,4 @@
-# Workspace archive format (v1.6)
+# Workspace archive format (v1.7)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -35,6 +35,7 @@ assetboard-home-20261018-143000Z.zip
 ├── reference_rate_values.csv
 ├── loans.csv
 ├── loan_rate_changes.csv
+├── loan_transfers.csv
 ├── loan_cost_components.csv
 ├── loan_overpayments.csv
 ├── loan_payments.csv
@@ -87,16 +88,18 @@ and the default average cost basis; a 1.4 archive requires every new file (heade
 empty). 1.5 (additive): adds the ten loan files below; a 1.4 archive reads with no loan
 rows, and a 1.5 archive requires every new file (header only when empty). 1.6 (additive):
 `loan_rate_changes.csv` gains `mode`, `reference_rate_id`, `reference_rate` and `margin_bp`;
-a 1.5 archive reads its old rows as fixed. Schedules are not
-archived and are recomputed from the restored terms. Golden archives of all seven versions are
-in `tests/fixtures/`.
+a 1.5 archive reads its old rows as fixed. 1.7 (additive): adds `loan_transfers.csv`;
+`loans.csv` gains `drawdown_mode` and `interest_only_months`, and a 1.6 archive reads every
+loan as `full_at_origination` with no interest-only phase. Schedules are not archived and are
+recomputed from the restored terms. Golden archives of all eight versions are in
+`tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.6",
+  "format_version": "1.7",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -649,6 +652,8 @@ c6d7e8f9-a0b1-46c7-9d39-b4c5d6e7f809,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,
 | `payment_day` | yes | integer 1–31; shorter months use their last day |
 | `rate_mode` | yes | `fixed` \| `variable` |
 | `day_count` | yes | `monthly` \| `actual_365` |
+| `drawdown_mode` | in 1.7 | `full_at_origination` (default for older archives) \| `tranches` |
+| `interest_only_months` | in 1.7 | integer 0–599; must be shorter than `term_months`; 0 for an installment plan or older archives |
 | `margin_bp` | variable only | integer 0–10 000 |
 | `reference_rate_id` | variable only | UUID from `reference_rates.csv` |
 | `reference_rate` | variable only | the series name (must match `reference_rate_id`) |
@@ -666,11 +671,16 @@ margin; a variable loan requires both. Actual payments, checkpoints and planned 
 are separate files. Schedules are never stored: they are rebuilt from these terms.
 
 ```csv
-id,name,kind,currency,principal_original,origination_date,first_payment_date,term_months,payment_day,rate_mode,day_count,margin_bp,reference_rate_id,reference_rate,property_item_id,property_item,auto_record_payments,installment_override,overpayment_mode,overpayment_amount,overpayment_strategy,archived_at
-d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,annuity,EUR,300000.00,2026-01-01,2026-02-01,360,1,fixed,monthly,,,,c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,Car,true,,fixed_extra,100.00,reduce_term,
-e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,annuity,EUR,50000.00,2026-01-15,2026-02-15,24,15,variable,actual_365,150,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,,,false,,none,,reduce_term,
-f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,installment_plan,EUR,3000.00,,2026-04-05,3,5,fixed,monthly,,,,,,false,,none,,reduce_term,
+id,name,kind,currency,principal_original,origination_date,first_payment_date,term_months,payment_day,rate_mode,day_count,drawdown_mode,interest_only_months,margin_bp,reference_rate_id,reference_rate,property_item_id,property_item,auto_record_payments,installment_override,overpayment_mode,overpayment_amount,overpayment_strategy,archived_at
+d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,annuity,EUR,300000.00,2026-01-01,2026-02-01,360,1,fixed,monthly,full_at_origination,0,,,,c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,Car,true,,fixed_extra,100.00,reduce_term,
+e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,annuity,EUR,50000.00,2026-01-15,2026-02-15,24,15,variable,actual_365,tranches,0,150,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,,,false,,none,,reduce_term,
+f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,installment_plan,EUR,3000.00,,2026-04-05,3,5,fixed,monthly,full_at_origination,0,,,,,,false,,none,,reduce_term,
 ```
+
+A `tranches` loan records each transfer in `loan_transfers.csv`; the sum may not exceed
+`principal_original`, and the undrawn part is not a debt. `full_at_origination` treats the
+whole original principal as drawn on `origination_date`. `interest_only_months` is part of
+`term_months`; the first actual transfer starts the interest-only phase.
 
 ## `loan_rate_changes.csv` (restore only)
 
@@ -695,6 +705,25 @@ Export order: loan order, effective date, id.
 id,loan_id,loan,effective_from,rate_bp,mode,reference_rate_id,reference_rate,margin_bp
 a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-01-01,575,fixed,,,
 b1c2d3e4-f5a6-4b1c-928e-a8091a2b3c4d,e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,2027-01-15,,variable,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,150
+```
+
+## `loan_transfers.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID of a `tranches` row in `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `date` | yes | `YYYY-MM-DD`; on or after the loan start and before its final payment |
+| `amount` | yes | decimal > 0; all transfers together may not exceed `principal_original` |
+| `note` | no | up to 200 characters |
+
+Export order: loan order, date, id. Future-dated rows are allowed: they affect projections and
+the schedule but not today's balance.
+
+```csv
+id,loan_id,loan,date,amount,note
+b0c1d2e3-f4a5-4b6c-9d7e-8192a3b4c5d6,e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,2026-01-15,50000.00,First tranche
 ```
 
 ## `loan_cost_components.csv` (restore only)
@@ -835,7 +864,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.6)
+## Not in the archive (format 1.7)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and

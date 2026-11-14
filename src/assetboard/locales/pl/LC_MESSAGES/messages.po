@@ -3728,6 +3728,33 @@ msgstr "Podaj kwotę w walucie obszaru roboczego."
 msgid "Choose a valid interest calculation."
 msgstr "Wybierz prawidłowy sposób naliczania odsetek."
 
+msgid "Choose how the loan is paid out."
+msgstr "Wybierz sposób wypłaty kredytu."
+
+msgid "A tranched loan needs an original principal and original terms."
+msgstr "Kredyt w transzach wymaga pierwotnej kwoty i pierwotnych warunków."
+
+msgid "This loan is not set up in tranches."
+msgstr "Ten kredyt nie jest prowadzony w transzach."
+
+msgid "This loan already tracks tranches."
+msgstr "Ten kredyt już jest prowadzony w transzach."
+
+msgid "The interest-only period must be shorter than the loan term."
+msgstr "Okres spłaty samych odsetek musi być krótszy niż okres kredytu."
+
+msgid "Transfers cannot exceed the loan principal."
+msgstr "Transze nie mogą przekroczyć kwoty kredytu."
+
+msgid "Set the loan principal before adding transfers."
+msgstr "Przed dodaniem transz ustaw kwotę kredytu."
+
+msgid "A transfer cannot start before the loan starts."
+msgstr "Transza nie może przypadać przed rozpoczęciem kredytu."
+
+msgid "A transfer must be before the final scheduled payment."
+msgstr "Transza musi przypadać przed ostatnią zaplanowaną płatnością."
+
 msgid "The loan has no starting balance to build a schedule from."
 msgstr "Kredyt nie ma salda początkowego, od którego można zbudować harmonogram."
 
@@ -3876,6 +3903,18 @@ msgstr "Kredyt zapisany. Dodaj poniżej następny kredyt."
 
 msgid "Loan terms saved."
 msgstr "Warunki kredytu zapisane."
+
+msgid "Transfer added."
+msgstr "Dodano transzę."
+
+msgid "Transfer saved."
+msgstr "Zapisano transzę."
+
+msgid "Transfer deleted."
+msgstr "Usunięto transzę."
+
+msgid "Loan switched to tranches; the opening balance was kept."
+msgstr "Kredyt przełączono na transze; saldo początkowe zostało zachowane."
 
 msgid "Regular overpayment settings saved."
 msgstr "Ustawienia regularnej nadpłaty zapisane."
@@ -8895,6 +8934,9 @@ msgstr "Plan ratalny"
 msgid "Paid off"
 msgstr "Spłacony"
 
+msgid "Not drawn"
+msgstr "Niewypłacony"
+
 msgid "Repaid principal"
 msgstr "Spłacony kapitał"
 
@@ -8955,8 +8997,16 @@ msgid "Starting balance %(amount)s"
 msgstr "Saldo początkowe %(amount)s"
 
 #, python-format
+msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
+msgstr "Wypłacono %(drawn)s z %(approved)s · %(undrawn)s niewypłacone"
+
+#, python-format
 msgid "Payoff %(date)s"
 msgstr "Data spłaty %(date)s"
+
+#, python-format
+msgid "Interest-only for the first %(months)d months."
+msgstr "Przez pierwsze %(months)d mies. spłacane są tylko odsetki."
 
 #, python-format
 msgid "Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains."
@@ -9135,6 +9185,9 @@ msgstr "Termin płatności"
 
 msgid "Opening"
 msgstr "Saldo początkowe"
+
+msgid "Loan transfer"
+msgstr "Transza kredytu"
 
 msgid "Closing"
 msgstr "Saldo końcowe"
@@ -9328,6 +9381,22 @@ msgstr ""
 msgid "Loan type"
 msgstr "Rodzaj kredytu"
 
+msgid "Interest-only months"
+msgstr "Miesiące tylko odsetek"
+
+msgid "Included in the term; 0 starts repaying principal immediately."
+msgstr "Wliczone w okres kredytu; 0 oznacza natychmiastową spłatę kapitału."
+
+#, python-format
+msgid "Payout: %(mode)s. Use Settings → Transfers for tranches."
+msgstr "Wypłata: %(mode)s. Dla transz użyj Ustawienia → Transze."
+
+msgid "Full amount at origination"
+msgstr "Cała kwota przy uruchomieniu"
+
+msgid "Paid out in tranches"
+msgstr "Wypłacany w transzach"
+
 msgid "Interest calculation"
 msgstr "Naliczanie odsetek"
 
@@ -9499,8 +9568,17 @@ msgstr ""
 "Pozostaw puste, aby użyć dnia pierwszej płatności. Krótszy miesiąc używa "
 "ostatniego dnia."
 
+msgid "0 starts repaying principal with the first payment."
+msgstr "0 oznacza spłatę kapitału już od pierwszej płatności."
+
 msgid "Only needed to show how much you have repaid."
 msgstr "Potrzebne tylko do pokazania, ile już spłacono."
+
+msgid "Payout"
+msgstr "Wypłata"
+
+msgid "For tranches, add the first transfer in Settings after saving."
+msgstr "Dla transz dodaj pierwszą transzę w Ustawieniach po zapisaniu."
 
 msgid "Fixed rate"
 msgstr "Stopa stała"
@@ -9615,6 +9693,9 @@ msgstr "Pierwotne warunki"
 msgid "Current balance"
 msgstr "Bieżące saldo"
 
+msgid "Interest-only"
+msgstr "Tylko odsetki"
+
 msgid "Cost components"
 msgstr "Składniki kosztów"
 
@@ -9628,6 +9709,9 @@ msgstr "do %(to)s"
 
 msgid "Calculated first installment"
 msgstr "Obliczona pierwsza rata"
+
+msgid "Calculated after the first transfer."
+msgstr "Obliczane po pierwszej transzy."
 
 msgid "Save loan"
 msgstr "Zapisz kredyt"
@@ -10158,6 +10242,73 @@ msgstr "Usunąć zmianę stopy od %(date)s?"
 msgid "No rate changes yet."
 msgstr "Brak zmian stopy."
 
+msgid "Transfers"
+msgstr "Transze"
+
+msgid ""
+"Money paid out by the lender. Interest is calculated only on the "
+"transferred amount; the undrawn part is not a debt."
+msgstr ""
+"Pieniądze wypłacone przez kredytodawcę. Odsetki naliczane są tylko od "
+"wypłaconej kwoty; niewypłacona część nie jest długiem."
+
+msgid ""
+"This loan treats the full original principal as transferred at "
+"origination."
+msgstr "Ten kredyt traktuje całą pierwotną kwotę jako wypłaconą przy uruchomieniu."
+
+msgid ""
+"Switch this loan to tranches? The current opening balance is kept as the "
+"first transfer."
+msgstr ""
+"Przełączyć kredyt na transze? Bieżące saldo początkowe zostanie zachowane"
+" jako pierwsza transza."
+
+msgid "Track transfers"
+msgstr "Śledź transze"
+
+#, python-format
+msgid "Drawn %(drawn)s of %(approved)s"
+msgstr "Wypłacono %(drawn)s z %(approved)s"
+
+#, python-format
+msgid "%(amount)s undrawn"
+msgstr "%(amount)s niewypłacone"
+
+#, python-format
+msgid "%(amount)s scheduled"
+msgstr "%(amount)s zaplanowane"
+
+msgid ""
+"The first payment falls after the next payment day, so its period covers "
+"the longer gap."
+msgstr ""
+"Pierwsza płatność wypada po najbliższym dniu płatności, więc jej okres "
+"obejmuje dłuższy odstęp."
+
+msgid "Loan transfers"
+msgstr "Transze kredytu"
+
+msgid "Note (optional)"
+msgstr "Notatka (opcjonalnie)"
+
+msgid "future"
+msgstr "przyszła"
+
+#, python-format
+msgid "transfer from %(date)s"
+msgstr "transza z %(date)s"
+
+#, python-format
+msgid "Delete the transfer from %(date)s?"
+msgstr "Usunąć transzę z %(date)s?"
+
+msgid "No transfers yet. Add the first one below."
+msgstr "Nie ma jeszcze transz. Dodaj pierwszą poniżej."
+
+msgid "Add transfer"
+msgstr "Dodaj transzę"
+
 msgid ""
 "Charged every month while active. A percentage applies to the opening "
 "balance; several active costs are added together."
@@ -10269,9 +10420,6 @@ msgstr "Zapisz koszt"
 
 msgid "Edit one-off overpayment"
 msgstr "Edytuj jednorazową nadpłatę"
-
-msgid "Note (optional)"
-msgstr "Notatka (opcjonalnie)"
 
 msgid "This is a planned overpayment. Actual payments are recorded separately."
 msgstr "To planowana nadpłata. Rzeczywiste płatności są rejestrowane osobno."
@@ -10998,9 +11146,6 @@ msgstr "Historia wartości"
 
 msgid "Estimates values between entries"
 msgstr "Szacuje wartości między wpisami"
-
-msgid "future"
-msgstr "przyszła"
 
 msgid "Add a value"
 msgstr "Dodaj wartość"

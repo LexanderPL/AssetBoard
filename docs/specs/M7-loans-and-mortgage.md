@@ -15,8 +15,9 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - The schedule starts from a *current balance* rather than from origination.
 
 **Data model (sketch)**
-- `Loan(id, workspace_id, name, kind[annuity|equal_principal|installment_plan], principal_original Money?, origination_date?, first_payment_date, term_months, payment_day, rate_mode[fixed|variable], margin_bp?, reference_rate_id?, day_count[monthly|actual_365], installment_override Money?, overpayment_mode[none|fixed_extra|target_total], overpayment_amount Money?, overpayment_strategy[reduce_term|reduce_installment], property_instrument_id?, scheduled_item_id?, archived_at)`
+- `Loan(id, workspace_id, name, kind[annuity|equal_principal|installment_plan], principal_original Money?, origination_date?, first_payment_date, term_months, payment_day, rate_mode[fixed|variable], margin_bp?, reference_rate_id?, day_count[monthly|actual_365], drawdown_mode[full_at_origination|tranches], interest_only_months, installment_override Money?, overpayment_mode[none|fixed_extra|target_total], overpayment_amount Money?, overpayment_strategy[reduce_term|reduce_installment], property_instrument_id?, scheduled_item_id?, archived_at)`
 - `LoanRateChange(loan_id, effective_from, mode[fixed|variable], rate_bp?, reference_rate_id?, margin_bp?)` — segment starts; fixed rows carry a rate, variable rows a reference rate plus margin (F7.9).
+- `LoanTransfer(loan_id, date, amount Money, note)` — a drawdown of a tranched loan; increases the debt, never a repayment (F7.10).
 - `ReferenceRate(id, workspace_id, name, notes)`; `ReferenceRateValue(reference_rate_id, effective_from, value_bp)` — user-defined series (WIBOR 1M, WIRON, EURIBOR… the app hardcodes none).
 - `LoanCostComponent(loan_id, name, mode[percent|fixed], rate_bp?/fixed Money?, basis[opening_balance], effective_from, effective_to?)` — uses `PercentOrFixed`; percent is applied monthly to the opening balance.
 - `LoanOverpayment(loan_id, date, amount Money, note)` — one-off planned/actual overpayments.
@@ -571,3 +572,68 @@ period ends I want to add that switch without recreating the loan.
   reference values repricing a segment, missing values, high-rate confirmation, used-by/delete
   guards, archive round-trip and the UI disclosure. The scenario labels now use the request
   locale instead of the workspace locale, fixing a Polish chart legend in an English UI.
+
+---
+
+## F7.10 Partial loan transfers and the interest-only phase
+
+**Story:** my lender pays the mortgage out in tranches, so I want to record each transfer and
+pay interest only on the money actually drawn; during the first years I may pay interest only.
+
+**Acceptance**
+- A loan is either **full at origination** (the existing behaviour, the default) or **tranched**.
+  A tranched loan records dated **transfers** of positive money. Transfers increase the debt;
+  repayments reduce it. The undrawn part of the approved principal is not a debt.
+- Interest accrues only on the outstanding drawn balance. Daily loans use actual/365. Monthly
+  loans split at transfers, rate changes and month boundaries and accrue
+  `balance × rate / 12 × days / days in that calendar month`, rounded once per payment row.
+  Percentage cost components follow the same drawn-balance timeline; fixed costs stay a fixed
+  amount per payment row.
+- **Interest-only months** are part of `term_months` (for example 60 months = 24 interest-only
+  + 36 amortizing). The phase starts on the first actual transfer, never on the origination date
+  of a loan with no transfers; `0` opts out. A tranched loan with no transfers has no debt and
+  no schedule and shows **Not drawn**.
+- The first payment is the next nominal payment day after the first transfer. If the first
+  payment date is later, the UI warns and the first period covers the longer gap; an annuity
+  whose first-period interest exceeds the regular installment pays that interest instead of
+  amortizing negatively.
+- Transfers may not exceed the approved principal; there are no undrawn fees. A transfer must
+  be dated before the final scheduled payment; editing or deleting one is refused if it would
+  invalidate the projection.
+- Transfers are future-dated and editable. Future transfers affect the schedule, projections
+  and charts; only transfers through today affect the current balance, overview figures and net
+  worth.
+- An existing or future full-at-origination loan can be switched to tranches. The switch is
+  neutral: seed one transfer at the latest checkpoint balance (or at origination for the
+  original principal). Reverse conversion is not offered.
+- The loan list and overview measure repaid principal against the **full approved principal**
+  and show the drawn and undrawn amounts separately. Scenario rate shifts and overpayments keep
+  the transfer timeline fixed.
+- A balance checkpoint folds in transfers on or before its date; later transfers add to it.
+- Archive format 1.7 adds `loan_transfers.csv` and `drawdown_mode` +
+  `interest_only_months` to `loans.csv`. A 1.6 archive reads as full at origination with no
+  interest-only phase.
+- Transfers are audited (`loan_transfer.created/updated/deleted`) and refresh scheduled
+  occurrences.
+
+### As built (M7.F7.10)
+
+- `domain/loans.py` adds `DrawdownMode`, `Drawdown`, `LoanTerms.interest_only_months`,
+  `ScheduleRow.transfer` and transfer-aware `build_schedule()`. `select_anchor()` starts a
+  tranched loan at the first transfer (or at today with zero when none has happened);
+  `summarize_schedule()` reports `drawn_principal`, `undrawn_principal`,
+  `percent_remaining_bp` and `percent_undrawn_bp`.
+- `LoanTransfer` (`loan_transfers`) stores the workspace, loan, date, amount and note behind a
+  composite workspace foreign key; `Loan.drawdown_mode` and `Loan.interest_only_months` carry
+  the mode. Migration `0061_f710_loan_tranches` adds both and is reversible.
+- `services/loans.py` owns transfer CRUD, the principal cap, projection validation, conversion,
+  the `not_drawn` status and audit events. `services/loan_schedule.py` maps transfers into the
+  pure engine; the fixed transfer list is reused by scenarios.
+- The wizard asks for payout and interest-only months; Edit terms keeps the interest-only
+  months; Settings has a Transfers card with add/edit/delete, future markers, the drawn/undrawn
+  summary, the first-payment warning and the one-way conversion button. The overview and
+  schedule show drawn/undrawn progress and a Transfer column. `Not drawn` is a translated
+  status badge.
+- Archive export/import and the restore rollback cover `loan_transfers.csv`; the 1.6 golden
+  archive still reads with the documented defaults and a 1.7 golden archive exercises a
+  tranched loan.

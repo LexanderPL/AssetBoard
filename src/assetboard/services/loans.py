@@ -24,6 +24,7 @@ from assetboard.db.models.loans import (
     LoanCostComponent,
     LoanOverpayment,
     LoanRateChange,
+    LoanTransfer,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -35,6 +36,7 @@ from assetboard.db.repositories import (
     LoanOverpaymentRepository,
     LoanRateChangeRepository,
     LoanRepository,
+    LoanTransferRepository,
     NotFound,
     ReferenceRateRepository,
     ReferenceRateValueRepository,
@@ -44,6 +46,7 @@ from assetboard.domain.loans import (
     MAX_LOAN_RATE_BP,
     CostBasis,
     DayCount,
+    DrawdownMode,
     LoanKind,
     LoanValidationError,
     OverpaymentMode,
@@ -51,11 +54,13 @@ from assetboard.domain.loans import (
     RateMode,
     RatePeriod,
     RateSegment,
+    ScheduleError,
     clean_loan_name,
     clean_note,
     first_installment,
     latest_value_on_or_before,
     payment_date_matches_day,
+    payment_delayed_after_transfer,
     requires_high_rate_confirmation,
     valid_date,
     validate_cost_dates,
@@ -126,6 +131,15 @@ class LoanOverpaymentView:
 
 
 @dataclass(frozen=True, slots=True)
+class LoanTransferView:
+    id: UUID
+    date: date
+    amount: Money
+    note: str
+    future: bool
+
+
+@dataclass(frozen=True, slots=True)
 class LoanCheckpointView:
     id: UUID
     as_of: date
@@ -149,6 +163,9 @@ class LoanView:
     payment_day: int
     rate_mode: RateMode
     day_count: DayCount
+    drawdown_mode: DrawdownMode
+    interest_only_months: int
+    transfer_payment_gap: bool
     margin_bp: int | None
     reference_rate_id: UUID | None
     reference_rate_name: str | None
@@ -168,6 +185,7 @@ class LoanView:
     rate_changes: tuple[LoanRateChangeView, ...]
     cost_components: tuple[LoanCostComponentView, ...]
     overpayments: tuple[LoanOverpaymentView, ...]
+    transfers: tuple[LoanTransferView, ...]
     checkpoints: tuple[LoanCheckpointView, ...]
     first_installment: Money | None
 
@@ -178,6 +196,8 @@ class LoanListFigures:
 
     currency: str
     remaining_principal: Money | None
+    drawn_principal: Money | None
+    undrawn_principal: Money | None
     monthly_installment: Money | None
     percent_repaid_bp: int | None
     next_payment_date: date | None
@@ -187,7 +207,7 @@ class LoanListFigures:
     schedule_error: str | None
 
 
-LoanStatus = Literal["active", "paid_off", "archived"]
+LoanStatus = Literal["active", "paid_off", "not_drawn", "archived"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -622,6 +642,7 @@ def _view(
     costs: list[LoanCostComponent],
     overpayments: list[LoanOverpayment],
     checkpoints: list[LoanBalanceCheckpoint],
+    transfers: list[LoanTransfer],
     reference_data: _ReferenceData,
     today: date,
 ) -> LoanView:
@@ -659,6 +680,17 @@ def _view(
         payment_day=loan.payment_day,
         rate_mode=RateMode(loan.rate_mode),
         day_count=DayCount(loan.day_count),
+        drawdown_mode=DrawdownMode(loan.drawdown_mode),
+        interest_only_months=loan.interest_only_months,
+        transfer_payment_gap=(
+            loan.drawdown_mode == DrawdownMode.TRANCHES.value
+            and bool(transfers)
+            and payment_delayed_after_transfer(
+                min(row.date for row in transfers),
+                loan.first_payment_date,
+                loan.payment_day,
+            )
+        ),
         margin_bp=loan.margin_bp,
         reference_rate_id=loan.reference_rate_id,
         reference_rate_name=initial_reference.name if initial_reference is not None else None,
@@ -702,6 +734,16 @@ def _view(
             )
             for row in overpayments
         ),
+        transfers=tuple(
+            LoanTransferView(
+                id=row.id,
+                date=row.date,
+                amount=Money(row.amount_minor, loan.currency),
+                note=row.note,
+                future=row.date > today,
+            )
+            for row in transfers
+        ),
         checkpoints=tuple(
             LoanCheckpointView(
                 id=row.id,
@@ -737,13 +779,16 @@ def _load_loan_view(session: Session, ctx: WorkspaceScope, loan: Loan, today: da
     costs = LoanCostComponentRepository(session, ctx).for_loan(loan.id)
     overpayments = LoanOverpaymentRepository(session, ctx).for_loan(loan.id)
     checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+    transfers = LoanTransferRepository(session, ctx).for_loan(loan.id)
     reference_data = _load_reference_data(session, ctx, loan, changes)
-    return _view(loan, changes, costs, overpayments, checkpoints, reference_data, today)
+    return _view(loan, changes, costs, overpayments, checkpoints, transfers, reference_data, today)
 
 
 def _loan_status(view: LoanView, figures: LoanListFigures) -> LoanStatus:
     if view.archived:
         return "archived"
+    if view.drawdown_mode is DrawdownMode.TRANCHES and not view.transfers:
+        return "not_drawn"
     if figures.paid_off:
         return "paid_off"
     return "active"
@@ -866,6 +911,9 @@ def load_loan_views_in_session(
     checkpoints_by_loan: dict[UUID, list[LoanBalanceCheckpoint]] = defaultdict(list)
     for checkpoint in LoanBalanceCheckpointRepository(session, ctx).for_loans(ids):
         checkpoints_by_loan[checkpoint.loan_id].append(checkpoint)
+    transfers_by_loan: dict[UUID, list[LoanTransfer]] = defaultdict(list)
+    for transfer in LoanTransferRepository(session, ctx).for_loans(ids):
+        transfers_by_loan[transfer.loan_id].append(transfer)
 
     reference_ids: set[UUID] = set()
     for row in rows:
@@ -890,6 +938,7 @@ def load_loan_views_in_session(
             costs_by_loan.get(row.id, []),
             overpayments_by_loan.get(row.id, []),
             checkpoints_by_loan.get(row.id, []),
+            transfers_by_loan.get(row.id, []),
             reference_data,
             today,
         )
@@ -1135,6 +1184,8 @@ def create_loan(
     overpayment_strategy: str,
     costs: Sequence[CostComponentInput] = (),
     day_count: str = "monthly",
+    drawdown_mode: str = "full_at_origination",
+    interest_only_months: int = 0,
 ) -> UUID:
     require_role(ctx, Role.EDITOR)
     if entry_path not in ("original", "current"):
@@ -1186,6 +1237,17 @@ def create_loan(
             currency=currency,
         )
         wanted_day_count = validate_day_count(day_count)
+        try:
+            wanted_drawdown_mode = DrawdownMode(drawdown_mode)
+        except ValueError:
+            raise LoanError("drawdown_mode", "invalid_drawdown_mode") from None
+        if type(interest_only_months) is not int or not 0 <= interest_only_months < term:
+            raise LoanError("interest_only_months", "invalid_interest_only")
+        if wanted_drawdown_mode is DrawdownMode.TRANCHES:
+            if entry_path != "original" or principal_minor is None:
+                raise LoanError("drawdown_mode", "drawdown_requires_original")
+            if wanted_kind is LoanKind.INSTALLMENT_PLAN:
+                raise LoanError("drawdown_mode", "invalid_drawdown_mode")
         rate_bp: int | None
         if wanted_rate_mode is RateMode.FIXED:
             rate_bp = fixed_rate
@@ -1226,6 +1288,8 @@ def create_loan(
             payment_day=day,
             rate_mode=wanted_rate_mode.value,
             day_count=wanted_day_count.value,
+            drawdown_mode=wanted_drawdown_mode.value,
+            interest_only_months=interest_only_months,
             margin_bp=margin,
             reference_rate_id=rate_id,
             installment_override_minor=override_minor,
@@ -1307,6 +1371,7 @@ def update_loan_terms(
     margin_bp: int | None = None,
     high_rate_confirmed: bool = False,
     day_count: str | None = None,
+    interest_only_months: int | None = None,
 ) -> None:
     require_role(ctx, Role.EDITOR)
 
@@ -1358,6 +1423,17 @@ def update_loan_terms(
             if reference_rate_id is not None or margin_bp is not None:
                 raise LoanError("rate_mode", "invalid_rate_mode")
             rate_id, margin = None, None
+        wanted_interest_only = (
+            loan.interest_only_months if interest_only_months is None else interest_only_months
+        )
+        if type(wanted_interest_only) is not int or not 0 <= wanted_interest_only < term:
+            raise LoanError("interest_only_months", "invalid_interest_only")
+        transfers = LoanTransferRepository(session, ctx).for_loan(loan.id)
+        if (
+            principal_minor is not None
+            and sum(row.amount_minor for row in transfers) > principal_minor
+        ):
+            raise LoanError("principal_original", "drawdown_exceeds_principal")
         if entry == "current" and (current_balance is None or balance_date is None):
             raise LoanError("current_balance", "invalid_balance")
         if entry == "current" and len(checkpoints) != 1:
@@ -1374,6 +1450,7 @@ def update_loan_terms(
             balance_date=balance_date if entry == "current" else None,
             first_payment_date=first_date,
             term_months=term,
+            interest_only_months=wanted_interest_only,
             reference_rate_id=rate_id,
             margin_bp=margin,
             reference_rate_values=_value_views(reference_values, today),
@@ -1415,6 +1492,7 @@ def update_loan_terms(
             reference_rate_id=rate_id,
             margin_bp=margin,
             day_count=wanted_day_count.value,
+            interest_only_months=wanted_interest_only,
         )
         _validate_rate_timeline(session, ctx, loan, first_payment_date=first_date)
         _validate_current_target(session, ctx, loan)
@@ -1682,6 +1760,245 @@ def delete_rate_change(
             "loan",
             loan.id,
             {"effective_from": effective_from.isoformat()},
+        )
+        _refresh_loan_occurrences(session, ctx, loan.id)
+
+    _write(factory, write)
+
+
+def _validate_transfer_sum(
+    loan: Loan,
+    transfers: Sequence[LoanTransfer],
+    *,
+    extra_minor: int = 0,
+    exclude_id: UUID | None = None,
+) -> None:
+    if loan.principal_original_minor is None:
+        raise LoanError("amount", "drawdown_requires_principal")
+    total = extra_minor + sum(row.amount_minor for row in transfers if row.id != exclude_id)
+    if total > loan.principal_original_minor:
+        raise LoanError("amount", "drawdown_exceeds_principal")
+
+
+def _validate_transfer_schedule(session: Session, ctx: Context, loan: Loan) -> None:
+    """Build the projection after a transfer write so the final row still clears."""
+    from assetboard.services import loan_schedule
+
+    today = ctx.clock.today(ctx.workspace.timezone)
+    view = _load_loan_view(session, ctx, loan, today)
+    try:
+        inputs = loan_schedule.schedule_inputs_from_view(view, today)
+        loan_schedule.build_inputs_schedule(inputs)
+    except (ScheduleError, LoanValidationError) as exc:
+        code = getattr(exc, "code", "invalid_schedule")
+        raise LoanError("date", code) from None
+
+
+def _validate_transfer_date(
+    loan: Loan, value: date, checkpoints: list[LoanBalanceCheckpoint]
+) -> None:
+    valid_date(value, "date")
+    if value < _loan_start(loan, checkpoints):
+        raise LoanError("date", "transfer_before_start")
+
+
+def add_transfer(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    date_value: date,
+    amount: Money,
+    note: str = "",
+) -> None:
+    require_role(ctx, Role.EDITOR)
+    clean_transfer_note = clean_note(note)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        currency = _locked_workspace_currency(session, ctx)
+        loan = _get_active_loan(session, ctx, loan_id)
+        if loan.drawdown_mode != DrawdownMode.TRANCHES.value:
+            raise LoanError("drawdown_mode", "loan_not_tranched")
+        amount_minor = _require_money(amount, currency, "amount")
+        assert amount_minor is not None
+        if amount_minor <= 0:
+            raise LoanError("amount", "invalid_amount")
+        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+        _validate_transfer_date(loan, date_value, checkpoints)
+        repository = LoanTransferRepository(session, ctx)
+        _validate_transfer_sum(loan, repository.for_loan(loan.id), extra_minor=amount_minor)
+        repository.create(
+            loan_id=loan.id,
+            date=date_value,
+            amount_minor=amount_minor,
+            note=clean_transfer_note,
+        )
+        _validate_transfer_schedule(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        _audit(
+            session,
+            ctx,
+            "loan_transfer.created",
+            "loan",
+            loan.id,
+            {
+                "date": date_value.isoformat(),
+                "amount": str(amount.to_decimal()),
+                "currency": currency,
+            },
+        )
+        _refresh_loan_occurrences(session, ctx, loan.id)
+
+    _write(factory, write)
+
+
+def update_transfer(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    loan_id: UUID,
+    transfer_id: UUID,
+    *,
+    date_value: date,
+    amount: Money,
+    note: str = "",
+) -> None:
+    require_role(ctx, Role.EDITOR)
+    clean_transfer_note = clean_note(note)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        currency = _locked_workspace_currency(session, ctx)
+        loan = _get_active_loan(session, ctx, loan_id)
+        if loan.drawdown_mode != DrawdownMode.TRANCHES.value:
+            raise LoanError("drawdown_mode", "loan_not_tranched")
+        repository = LoanTransferRepository(session, ctx)
+        transfer = repository.get_for_loan(loan.id, transfer_id)
+        if transfer is None:
+            raise NotFound
+        amount_minor = _require_money(amount, currency, "amount")
+        assert amount_minor is not None
+        if amount_minor <= 0:
+            raise LoanError("amount", "invalid_amount")
+        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+        _validate_transfer_date(loan, date_value, checkpoints)
+        _validate_transfer_sum(
+            loan,
+            repository.for_loan(loan.id),
+            extra_minor=amount_minor,
+            exclude_id=transfer.id,
+        )
+        repository.update(
+            transfer.id,
+            date=date_value,
+            amount_minor=amount_minor,
+            note=clean_transfer_note,
+        )
+        _validate_transfer_schedule(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        _audit(
+            session,
+            ctx,
+            "loan_transfer.updated",
+            "loan",
+            loan.id,
+            {
+                "date": date_value.isoformat(),
+                "amount": str(amount.to_decimal()),
+                "currency": currency,
+            },
+        )
+        _refresh_loan_occurrences(session, ctx, loan.id)
+
+    _write(factory, write)
+
+
+def delete_transfer(
+    factory: sessionmaker[Session], ctx: Context, loan_id: UUID, transfer_id: UUID
+) -> None:
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        _locked_workspace_currency(session, ctx)
+        loan = _get_active_loan(session, ctx, loan_id)
+        repository = LoanTransferRepository(session, ctx)
+        transfer = repository.get_for_loan(loan.id, transfer_id)
+        if transfer is None:
+            raise NotFound
+        date_value = transfer.date
+        repository.delete(transfer)
+        _validate_transfer_schedule(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        _audit(
+            session,
+            ctx,
+            "loan_transfer.deleted",
+            "loan",
+            loan.id,
+            {"date": date_value.isoformat()},
+        )
+        _refresh_loan_occurrences(session, ctx, loan.id)
+
+    _write(factory, write)
+
+
+def convert_loan_to_tranched(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> None:
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        currency = _locked_workspace_currency(session, ctx)
+        loan = _get_active_loan(session, ctx, loan_id)
+        if loan.drawdown_mode == DrawdownMode.TRANCHES.value:
+            raise LoanError("drawdown_mode", "already_tranched")
+        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+        latest = max(checkpoints, key=lambda row: (row.as_of, row.id), default=None)
+        if latest is not None:
+            seed_date = latest.as_of
+            seed_minor = latest.remaining_principal_minor
+        elif loan.origination_date is not None and loan.principal_original_minor is not None:
+            seed_date = loan.origination_date
+            seed_minor = loan.principal_original_minor
+        else:
+            raise LoanError("drawdown_mode", "drawdown_requires_original")
+        if seed_minor <= 0:
+            raise LoanError("current_balance", "invalid_balance")
+        principal_minor = loan.principal_original_minor
+        if principal_minor is None:
+            principal_minor = seed_minor
+        LoanRepository(session, ctx).update(
+            loan.id,
+            drawdown_mode=DrawdownMode.TRANCHES.value,
+            principal_original_minor=principal_minor,
+        )
+        LoanTransferRepository(session, ctx).create(
+            loan_id=loan.id,
+            date=seed_date,
+            amount_minor=seed_minor,
+            note="",
+        )
+        _validate_transfer_schedule(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        _audit(
+            session,
+            ctx,
+            "loan.updated",
+            "loan",
+            loan.id,
+            {"fields": "drawdown_mode,principal_original_minor"},
+        )
+        _audit(
+            session,
+            ctx,
+            "loan_transfer.created",
+            "loan",
+            loan.id,
+            {
+                "date": seed_date.isoformat(),
+                "amount": str(Money(seed_minor, currency).to_decimal()),
+                "currency": currency,
+            },
         )
         _refresh_loan_occurrences(session, ctx, loan.id)
 
@@ -2253,6 +2570,7 @@ __all__ = [
     "LoanPortfolioSummary",
     "LoanRateChangeView",
     "LoanStatus",
+    "LoanTransferView",
     "LoanView",
     "ReferenceRateLoanRef",
     "ReferenceRateValueView",
@@ -2262,14 +2580,17 @@ __all__ = [
     "add_overpayment",
     "add_rate_change",
     "add_reference_rate_value",
+    "add_transfer",
     "archive_loan",
     "create_loan",
+    "convert_loan_to_tranched",
     "create_reference_rate",
     "delete_cost_component",
     "delete_overpayment",
     "delete_rate_change",
     "delete_reference_rate",
     "delete_reference_rate_value",
+    "delete_transfer",
     "get_loan",
     "get_reference_rate",
     "list_loans",
@@ -2285,5 +2606,6 @@ __all__ = [
     "update_rate_change",
     "update_reference_rate",
     "update_reference_rate_value",
+    "update_transfer",
     "workspace_has_loans",
 ]

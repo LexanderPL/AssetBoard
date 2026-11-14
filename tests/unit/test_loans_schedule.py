@@ -11,6 +11,8 @@ from assetboard.domain.loans import (
     BalanceCheckpoint,
     CostPeriod,
     DayCount,
+    Drawdown,
+    DrawdownMode,
     LoanKind,
     LoanTerms,
     LoanValidationError,
@@ -60,6 +62,7 @@ def _build(
     as_of: date | None = None,
     strategy: OverpaymentStrategy = OverpaymentStrategy.REDUCE_TERM,
     day_count: DayCount = DayCount.MONTHLY,
+    drawdowns: list[Drawdown] | None = None,
 ) -> Schedule:
     chosen_anchor = anchor or select_anchor(terms, [], as_of or terms.first_payment_date)
     chosen_as_of = as_of or chosen_anchor.date
@@ -72,6 +75,7 @@ def _build(
         chosen_as_of,
         strategy,
         day_count,
+        drawdowns or [],
     )
 
 
@@ -710,3 +714,131 @@ def test_installment_override_is_used_for_an_annuity() -> None:
     assert schedule.rows[0].principal.amount_minor == 2_000
     assert schedule.rows[0].installment_total.amount_minor == 2_000
     assert schedule.rows[-1].closing.amount_minor == 0
+
+
+# 14. Partial transfers and the interest-only phase (F7.10)
+
+
+def _tranched_terms(**overrides: object) -> LoanTerms:
+    values: dict[str, object] = {
+        "principal_original": _money(300_000),
+        "term_months": 6,
+        "first_payment_date": date(2026, 2, 1),
+        "drawdown_mode": DrawdownMode.TRANCHES,
+    }
+    values.update(overrides)
+    return _terms(**values)
+
+
+def test_a_tranched_loan_without_transfers_has_no_debt_or_schedule() -> None:
+    terms = _tranched_terms()
+    schedule = _build(terms, as_of=date(2026, 1, 15))
+    assert schedule.rows == ()
+    summary = summarize_schedule(schedule, date(2026, 1, 15))
+    assert summary.drawn_principal == _money(0)
+    assert summary.undrawn_principal == _money(300_000)
+    assert summary.remaining_principal == _money(0)
+    assert summary.percent_repaid_bp == 0
+    assert summary.percent_undrawn_bp == 10_000
+
+
+def test_interest_is_charged_only_on_the_drawn_balance_after_each_transfer() -> None:
+    terms = _tranched_terms(term_months=4)
+    draws = [
+        Drawdown(date(2026, 1, 1), _money(100_000)),
+        Drawdown(date(2026, 2, 10), _money(50_000)),
+    ]
+    anchor = ScheduleAnchor(date(2026, 1, 1), _money(100_000))
+    schedule = _build(
+        terms,
+        rates=[RatePeriod(date(2026, 1, 1), 3_650)],
+        anchor=anchor,
+        as_of=date(2026, 1, 1),
+        day_count=DayCount.ACTUAL_365,
+        drawdowns=draws,
+    )
+    first, second = schedule.rows[0], schedule.rows[1]
+    assert first.opening == _money(100_000)
+    assert first.transfer == _money(0)
+    assert first.interest == _money(3_100)
+    assert second.transfer == _money(50_000)
+    assert second.opening == first.closing
+    assert second.interest == _money(3_083)
+    assert second.principal.amount_minor == 41_558
+
+
+def test_the_interest_only_phase_ends_after_the_configured_months() -> None:
+    terms = _tranched_terms(term_months=6, interest_only_months=2)
+    schedule = _build(
+        terms,
+        rates=[RatePeriod(date(2026, 1, 1), 0)],
+        anchor=ScheduleAnchor(date(2026, 1, 1), _money(100_000)),
+        as_of=date(2026, 1, 1),
+        drawdowns=[Drawdown(date(2026, 1, 1), _money(100_000))],
+    )
+    assert [row.principal.amount_minor for row in schedule.rows[:3]] == [0, 0, 25_000]
+    assert all(row.overpayment.amount_minor == 0 for row in schedule.rows)
+    assert schedule.rows[-1].closing == _money(0)
+
+
+def test_percent_costs_follow_the_drawn_balance_timeline() -> None:
+    terms = _tranched_terms(term_months=2)
+    cost = CostPeriod(
+        value=PercentOrFixed.percent(100),
+        effective_from=date(2026, 1, 1),
+        effective_to=None,
+    )
+    schedule = _build(
+        terms,
+        rates=[RatePeriod(date(2026, 1, 1), 0)],
+        costs=[cost],
+        anchor=ScheduleAnchor(date(2026, 1, 1), _money(0)),
+        as_of=date(2026, 1, 1),
+        drawdowns=[Drawdown(date(2026, 1, 20), _money(100_000))],
+    )
+    # 1% a month: 19 days on nothing, then 12 days of January and all of February.
+    assert schedule.rows[0].costs == _money(387)
+    assert schedule.rows[0].opening == _money(0)
+    assert schedule.rows[0].transfer == _money(100_000)
+    assert schedule.rows[1].costs == _money(500)
+
+
+def test_a_late_first_payment_covers_the_longer_first_period() -> None:
+    terms = _tranched_terms(
+        term_months=3,
+        first_payment_date=date(2026, 3, 1),
+    )
+    schedule = _build(
+        terms,
+        rates=[RatePeriod(date(2026, 1, 1), 0)],
+        anchor=ScheduleAnchor(date(2026, 1, 10), _money(100_000)),
+        as_of=date(2026, 1, 10),
+        drawdowns=[Drawdown(date(2026, 1, 10), _money(100_000))],
+    )
+    assert schedule.rows[0].date == date(2026, 3, 1)
+    assert schedule.rows[0].interest == _money(0)
+    assert schedule.rows[0].transfer == _money(0)
+    assert [row.date for row in schedule.rows] == [
+        date(2026, 3, 1),
+        date(2026, 4, 1),
+        date(2026, 5, 1),
+    ]
+
+
+def test_a_mid_period_cost_starts_on_its_effective_date() -> None:
+    terms = _tranched_terms(term_months=2)
+    cost = CostPeriod(
+        value=PercentOrFixed.percent(100),
+        effective_from=date(2026, 1, 25),
+        effective_to=None,
+    )
+    schedule = _build(
+        terms,
+        rates=[RatePeriod(date(2026, 1, 1), 0)],
+        costs=[cost],
+        anchor=ScheduleAnchor(date(2026, 1, 1), _money(0)),
+        as_of=date(2026, 1, 1),
+        drawdowns=[Drawdown(date(2026, 1, 20), _money(100_000))],
+    )
+    assert schedule.rows[0].costs == _money(226)
+    assert schedule.rows[1].costs == _money(500)

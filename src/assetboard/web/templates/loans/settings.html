@@ -76,6 +76,74 @@
   </div>
 </section>
 
+<section class="panel mb-6 p-4 sm:p-6" id="transfers" aria-labelledby="transfers-heading" data-loan-transfers-settings>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 id="transfers-heading" class="text-base font-semibold">{{ _("Transfers") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Money paid out by the lender. Interest is calculated only on the transferred amount; the undrawn part is not a debt.") }}</p>
+    </div>
+  </div>
+  {% if loan.drawdown_mode.value == "full_at_origination" %}
+  <p class="mt-3 text-sm" data-transfer-full>{{ _("This loan treats the full original principal as transferred at origination.") }}</p>
+  {% if can_edit and not loan.archived %}
+  <form method="post" action="{{ scoped_url(request, 'loan_convert_to_tranched', loan_id=loan.id) }}" class="mt-3" data-confirm="{{ _('Switch this loan to tranches? The current opening balance is kept as the first transfer.') }}">
+    {{ csrf_input() }}
+    <button type="submit" class="btn" data-convert-to-tranched>{{ _("Track transfers") }}</button>
+  </form>
+  {% endif %}
+  {% else %}
+  {% set drawn = namespace(minor=0) %}
+  {% set scheduled = namespace(minor=0) %}
+  {% for transfer in loan.transfers %}{% if transfer.future %}{% set scheduled.minor = scheduled.minor + transfer.amount.amount_minor %}{% else %}{% set drawn.minor = drawn.minor + transfer.amount.amount_minor %}{% endif %}{% endfor %}
+  <p class="mt-3 text-sm" data-transfer-summary>{{ _("Drawn %(drawn)s of %(approved)s", drawn=format_money(Money(drawn.minor, loan.currency), locale), approved=format_money(loan.principal_original, locale) if loan.principal_original else '—') }}{% if loan.principal_original %} · {{ _("%(amount)s undrawn", amount=format_money(Money(loan.principal_original.amount_minor - drawn.minor, loan.currency), locale)) }}{% endif %}{% if scheduled.minor %} · {{ _("%(amount)s scheduled", amount=format_money(Money(scheduled.minor, loan.currency), locale)) }}{% endif %}</p>
+  {% if loan.transfer_payment_gap %}
+  <p class="mt-2 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-transfer-payment-warning>{{ _("The first payment falls after the next payment day, so its period covers the longer gap.") }}</p>
+  {% endif %}
+  <div class="mt-3 overflow-hidden">
+    <table class="sheet-sm w-full text-sm">
+      <caption class="sr-only">{{ _("Loan transfers") }}</caption>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("Date") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th><th scope="col" class="px-4 py-2 font-semibold">{{ _("Note") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+      <tbody class="divide-y divide-line sm:divide-y-0">
+      {% for transfer in loan.transfers %}
+        {% if transfer_edit and transfer_edit.id == transfer.id %}
+        <tr class="align-top" data-transfer-edit="{{ transfer.id }}"><td colspan="4" class="px-4 py-3">
+          <form method="post" action="{{ scoped_url(request, 'loan_transfer_update', loan_id=loan.id, transfer_id=transfer.id) }}" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
+            {{ csrf_input() }}
+            <label class="grid gap-1 text-xs font-medium">{{ _("Date") }}<input name="date" type="date" required value="{{ transfer_values.get('date', transfer.date.isoformat()) }}"{% if error_field == "date" %} aria-invalid="true" aria-describedby="transfer-date-error"{% endif %} class="form-control px-2 py-1.5 font-normal"></label>
+            <label class="grid gap-1 text-xs font-medium">{{ _("Amount") }}<input name="amount" inputmode="decimal" required value="{{ transfer_values.get('amount', format_amount_input(transfer.amount, locale)) }}"{% if error_field == "amount" %} aria-invalid="true" aria-describedby="transfer-amount-error"{% endif %} class="form-control px-2 py-1.5 font-normal">{% if error_field == "amount" %}<span id="transfer-amount-error" class="text-xs text-danger">{{ error }}</span>{% endif %}</label>
+            <label class="grid gap-1 text-xs font-medium">{{ _("Note (optional)") }}<input name="note" maxlength="{{ max_notes_length | default(200) }}" value="{{ transfer_values.get('note', transfer.note) }}" class="form-control px-2 py-1.5 font-normal"></label>
+            <div class="flex items-center gap-2 sm:pt-5"><button type="submit" class="btn-primary px-3 py-1.5 text-xs">{{ _("Save") }}</button><a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#transfers" class="btn px-3 py-1.5 text-xs">{{ _("Cancel") }}</a></div>
+            {% if error_field == "date" %}<p id="transfer-date-error" class="text-xs text-danger sm:col-span-4">{{ error }}</p>{% endif %}
+          </form>
+        </td></tr>
+        {% else %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-transfer="{{ transfer.id }}">
+          <td class="sm:px-4 sm:py-3">{{ format_day(transfer.date, locale) }}{% if transfer.future %} <span class="text-warning-strong">{{ _("future") }}</span>{% endif %}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_money(transfer.amount, locale) }}</td>
+          <td class="break-words text-muted sm:px-4 sm:py-3">{{ transfer.note }}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="?edit_transfer={{ transfer.id }}#transfers">{{ _("Edit") }}<span class="sr-only"> {{ _("transfer from %(date)s", date=format_day(transfer.date, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_transfer_delete', loan_id=loan.id, transfer_id=transfer.id) }}" data-confirm="{{ _('Delete the transfer from %(date)s?', date=format_day(transfer.date, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("transfer from %(date)s", date=format_day(transfer.date, locale)) }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+        {% endif %}
+      {% else %}
+        <tr><td colspan="4" class="px-4 py-3 text-sm text-muted">{{ _("No transfers yet. Add the first one below.") }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if can_edit and not loan.archived %}
+  <form method="post" action="{{ scoped_url(request, 'loan_transfer_create', loan_id=loan.id) }}" class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate data-transfer-add>
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-xs font-medium">{{ _("Date") }}<input name="date" type="date" required value="{{ transfer_values.get('date', today.isoformat()) }}"{% if error_field == "date" %} aria-invalid="true" aria-describedby="transfer-date-error"{% endif %} class="form-control px-2 py-1.5 font-normal">{% if error_field == "date" %}<span id="transfer-date-error" class="text-xs text-danger">{{ error }}</span>{% endif %}</label>
+    <label class="grid gap-1 text-xs font-medium">{{ _("Amount") }}<input name="amount" inputmode="decimal" required value="{{ transfer_values.get('amount', '') }}"{% if error_field == "amount" %} aria-invalid="true" aria-describedby="transfer-amount-error"{% endif %} class="form-control px-2 py-1.5 font-normal">{% if error_field == "amount" %}<span id="transfer-amount-error" class="text-xs text-danger">{{ error }}</span>{% endif %}</label>
+    <label class="grid gap-1 text-xs font-medium">{{ _("Note (optional)") }}<input name="note" maxlength="{{ max_notes_length | default(200) }}" value="{{ transfer_values.get('note', '') }}" class="form-control px-2 py-1.5 font-normal"></label>
+    <button type="submit" class="btn-primary mt-4 px-3 py-2 text-xs" data-add-transfer>{{ _("Add transfer") }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+
 <section class="panel mb-6 p-4 sm:p-6" id="costs" aria-labelledby="costs-heading" data-loan-costs-settings>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>

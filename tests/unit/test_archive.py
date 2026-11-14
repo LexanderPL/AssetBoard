@@ -35,6 +35,7 @@ from assetboard.domain.archive import (
     LoanRateChangeRow,
     LoanRow,
     LoanScenarioRow,
+    LoanTransferRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
@@ -52,7 +53,8 @@ from assetboard.domain.archive import (
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.6.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.7.zip"
+GOLDEN_V1_6 = FIXTURES / "workspace-archive-v1.6.zip"
 GOLDEN_V1_5 = FIXTURES / "workspace-archive-v1.5.zip"
 GOLDEN_V1_4 = FIXTURES / "workspace-archive-v1.4.zip"
 GOLDEN_V1_3 = FIXTURES / "workspace-archive-v1.3.zip"
@@ -88,6 +90,7 @@ def _rows() -> ArchiveRows:
     fixed_loan_id = "e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b"
     plan_loan_id = "f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c"
     rate_change_id = "a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d"
+    transfer_id = "b0c1d2e3-f4a5-4b6c-9d7e-8192a3b4c5d6"
     cost_component_id = "b1c2d3e4-f5a6-4b1c-828e-091a2b3c4d5e"
     loan_overpayment_id = "c2d3e4f5-a6b7-4c2d-939f-1a2b3c4d5e6f"
     loan_payment_id = "d3e4f5a6-b7c8-4d3e-84a0-2b3c4d5e6f70"
@@ -328,6 +331,8 @@ def _rows() -> ArchiveRows:
                 1,
                 "variable",
                 "monthly",
+                "full_at_origination",
+                0,
                 150,
                 reference_rate_id,
                 "WIBOR",
@@ -352,6 +357,8 @@ def _rows() -> ArchiveRows:
                 15,
                 "fixed",
                 "monthly",
+                "tranches",
+                0,
                 None,
                 None,
                 "",
@@ -376,6 +383,8 @@ def _rows() -> ArchiveRows:
                 5,
                 "fixed",
                 "monthly",
+                "full_at_origination",
+                0,
                 None,
                 None,
                 "",
@@ -391,6 +400,16 @@ def _rows() -> ArchiveRows:
         ),
         loan_rate_changes=(
             LoanRateChangeRow(rate_change_id, fixed_loan_id, "Car loan", "2026-01-15", 650),
+        ),
+        loan_transfers=(
+            LoanTransferRow(
+                transfer_id,
+                fixed_loan_id,
+                "Car loan",
+                "2026-01-15",
+                "50000.00",
+                "First tranche",
+            ),
         ),
         loan_cost_components=(
             LoanCostComponentRow(
@@ -610,7 +629,7 @@ def test_v1_5_workspace_carries_loans_and_reference_rates() -> None:
 
 
 def test_v1_6_workspace_adds_the_rate_segment_type() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    parsed, errors = parse_archive(GOLDEN_V1_6.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.6"
@@ -619,6 +638,31 @@ def test_v1_6_workspace_adds_the_rate_segment_type() -> None:
     assert change.rate_bp == 650
     assert change.reference_rate_id is None
     assert change.margin_bp is None
+    assert [row.drawdown_mode for row in parsed.rows.loans] == [
+        "full_at_origination",
+        "full_at_origination",
+        "full_at_origination",
+    ]
+    assert [row.interest_only_months for row in parsed.rows.loans] == [0, 0, 0]
+    assert parsed.rows.loan_transfers == ()
+
+
+def test_v1_7_workspace_adds_loan_transfers() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.7"
+    assert [row.drawdown_mode for row in parsed.rows.loans] == [
+        "full_at_origination",
+        "tranches",
+        "full_at_origination",
+    ]
+    transfer = parsed.rows.loan_transfers[0]
+    assert transfer.loan_id == parsed.rows.loans[1].id
+    assert transfer.loan == "Car loan"
+    assert transfer.date == "2026-01-15"
+    assert transfer.amount == "50000.00"
+    assert transfer.note == "First tranche"
 
 
 def test_loan_files_are_optional_before_1_5_and_required_in_1_5() -> None:
@@ -714,6 +758,7 @@ def test_investment_and_loan_models_are_archived_in_1_5() -> None:
         "ReferenceRateValue",
         "Loan",
         "LoanRateChange",
+        "LoanTransfer",
         "LoanCostComponent",
         "LoanOverpayment",
         "LoanPayment",
@@ -1580,7 +1625,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 33)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 34)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 32)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 33)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

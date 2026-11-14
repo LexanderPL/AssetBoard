@@ -49,7 +49,7 @@ from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.6"
+FORMAT_VERSION = "1.7"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -212,6 +212,8 @@ CSV_COLUMNS = {
         "payment_day",
         "rate_mode",
         "day_count",
+        "drawdown_mode",
+        "interest_only_months",
         "margin_bp",
         "reference_rate_id",
         "reference_rate",
@@ -235,6 +237,7 @@ CSV_COLUMNS = {
         "reference_rate",
         "margin_bp",
     ),
+    "loan_transfers.csv": ("id", "loan_id", "loan", "date", "amount", "note"),
     "loan_cost_components.csv": (
         "id",
         "loan_id",
@@ -325,6 +328,7 @@ LOAN_CSV_FILES = (
     "loan_scenarios.csv",
     "installment_plans.csv",
 )
+LOAN_TRANSFER_CSV_FILES = ("loan_transfers.csv",)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
 LINK_TYPES = frozenset({"portfolio_asset_class", "portfolio_holding", "loan_balance"})
@@ -351,6 +355,8 @@ def required_files(version: str) -> tuple[str, ...]:
         csv_files += INVESTMENT_CSV_FILES
     if minor >= 5:
         csv_files += LOAN_CSV_FILES
+    if minor >= 7:
+        csv_files += LOAN_TRANSFER_CSV_FILES
     return ("manifest.json", "workspace.json", *csv_files)
 
 
@@ -588,6 +594,8 @@ class LoanRow:
     payment_day: int
     rate_mode: str
     day_count: str
+    drawdown_mode: str
+    interest_only_months: int
     margin_bp: int | None
     reference_rate_id: str | None
     reference_rate: str
@@ -612,6 +620,16 @@ class LoanRateChangeRow:
     reference_rate_id: str | None = None
     reference_rate: str | None = None
     margin_bp: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LoanTransferRow:
+    id: str
+    loan_id: str
+    loan: str
+    date: str
+    amount: str
+    note: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -717,6 +735,7 @@ class ArchiveRows:
     reference_rate_values: tuple[ReferenceRateValueRow, ...] = ()
     loans: tuple[LoanRow, ...] = ()
     loan_rate_changes: tuple[LoanRateChangeRow, ...] = ()
+    loan_transfers: tuple[LoanTransferRow, ...] = ()
     loan_cost_components: tuple[LoanCostComponentRow, ...] = ()
     loan_overpayments: tuple[LoanOverpaymentRow, ...] = ()
     loan_payments: tuple[LoanPaymentRow, ...] = ()
@@ -813,6 +832,7 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         ),
         "loans.csv": csv_bytes("loans.csv", rows.loans),
         "loan_rate_changes.csv": csv_bytes("loan_rate_changes.csv", rows.loan_rate_changes),
+        "loan_transfers.csv": csv_bytes("loan_transfers.csv", rows.loan_transfers),
         "loan_cost_components.csv": csv_bytes(
             "loan_cost_components.csv", rows.loan_cost_components
         ),
@@ -1442,6 +1462,16 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if value != "opening_balance":
             raise ValueError("invalid cost basis")
         return value
+    if column == "drawdown_mode":
+        chosen = value or "full_at_origination"
+        if chosen not in {"full_at_origination", "tranches"}:
+            raise ValueError("invalid drawdown mode")
+        return chosen
+    if column == "interest_only_months":
+        chosen = value or "0"
+        if not re.fullmatch(r"[0-9]{1,3}", chosen) or not 0 <= int(chosen) <= MAX_TERM_MONTHS:
+            raise ValueError("invalid interest-only period")
+        return str(int(chosen))
     if column == "mode":
         if file == "loan_rate_changes.csv":
             return RateMode(value or "fixed").value
@@ -1691,6 +1721,7 @@ _REQUIRED_COLUMNS = {
         "overpayment_strategy",
     },
     "loan_rate_changes.csv": {"id", "loan_id", "loan", "effective_from"},
+    "loan_transfers.csv": {"id", "loan_id", "loan", "date", "amount"},
     "loan_cost_components.csv": {
         "id",
         "loan_id",
@@ -1743,6 +1774,8 @@ def required_columns(version: str) -> dict[str, set[str]]:
         columns["networth_items.csv"].add("estimate_between")
     if major == 1 and minor >= 6:
         columns["loan_rate_changes.csv"].add("mode")
+    if major == 1 and minor >= 7:
+        columns["loans.csv"].update({"drawdown_mode", "interest_only_months"})
     return columns
 
 
@@ -2239,6 +2272,34 @@ def _read_rows(
                     column="first_payment_date",
                 )
             )
+        drawdown_mode = row.get("drawdown_mode", "full_at_origination")
+        interest_only = int(row.get("interest_only_months", "0") or 0)
+        if drawdown_mode not in {"full_at_origination", "tranches"}:
+            errors.append(ArchiveError("loans.csv", "invalid drawdown mode"))
+        if drawdown_mode == "tranches" and not row["principal_original"]:
+            errors.append(
+                ArchiveError(
+                    "loans.csv",
+                    "tranched loan needs a principal",
+                    column="principal_original",
+                )
+            )
+        if term > 0 and interest_only >= term:
+            errors.append(
+                ArchiveError(
+                    "loans.csv",
+                    "invalid interest-only period",
+                    column="interest_only_months",
+                )
+            )
+        if row["kind"] == "installment_plan" and interest_only != 0:
+            errors.append(
+                ArchiveError(
+                    "loans.csv",
+                    "invalid interest-only period",
+                    column="interest_only_months",
+                )
+            )
         if row["rate_mode"] == "fixed":
             if row["reference_rate_id"] or row["margin_bp"]:
                 errors.append(ArchiveError("loans.csv", "invalid loan rate configuration"))
@@ -2307,6 +2368,42 @@ def _read_rows(
             errors.append(
                 ArchiveError("loan_rate_changes.csv", "invalid rate change configuration")
             )
+
+    transfers = tables["loan_transfers.csv"]
+    transfer_ids: set[str] = set()
+    transfer_totals: dict[str, int] = {}
+    for row in transfers:
+        _loan_reference("loan_transfers.csv", row)
+        if row["id"] in transfer_ids:
+            errors.append(ArchiveError("loan_transfers.csv", "duplicate loan transfer id"))
+        transfer_ids.add(row["id"])
+        if len(row["note"]) > 200:
+            errors.append(
+                ArchiveError("loan_transfers.csv", "invalid transfer note", column="note")
+            )
+        loan = loans_by_id.get(row["loan_id"])
+        if loan is None:
+            continue
+        if loan.get("drawdown_mode", "full_at_origination") != "tranches":
+            errors.append(ArchiveError("loan_transfers.csv", "transfer on a non-tranched loan"))
+            continue
+        try:
+            amount = _money_minor(row["amount"], loan["currency"], allow_zero=False)
+        except ValueError:
+            continue
+        transfer_totals[row["loan_id"]] = transfer_totals.get(row["loan_id"], 0) + amount
+        if row["date"] and loan["origination_date"] and row["date"] < loan["origination_date"]:
+            errors.append(
+                ArchiveError("loan_transfers.csv", "transfer before loan start", column="date")
+            )
+    for loan_id, total in transfer_totals.items():
+        loan = loans_by_id[loan_id]
+        if loan["principal_original"]:
+            principal = _money_minor(loan["principal_original"], loan["currency"], allow_zero=False)
+            if total > principal:
+                errors.append(
+                    ArchiveError("loan_transfers.csv", "transfers exceed the loan principal")
+                )
 
     cost_components = tables["loan_cost_components.csv"]
     cost_ids: set[str] = set()
@@ -2652,6 +2749,8 @@ def _read_rows(
                 int(row["payment_day"]),
                 row["rate_mode"],
                 row["day_count"],
+                row.get("drawdown_mode", "full_at_origination"),
+                int(row.get("interest_only_months", "0") or 0),
                 int(row["margin_bp"]) if row["margin_bp"] else None,
                 row["reference_rate_id"] or None,
                 row["reference_rate"],
@@ -2679,6 +2778,17 @@ def _read_rows(
                 margin_bp=int(row["margin_bp"]) if row["margin_bp"] else None,
             )
             for row in rate_changes
+        ),
+        loan_transfers=tuple(
+            LoanTransferRow(
+                id=row["id"],
+                loan_id=row["loan_id"],
+                loan=row["loan"],
+                date=row["date"],
+                amount=row["amount"],
+                note=row["note"],
+            )
+            for row in tables["loan_transfers.csv"]
         ),
         loan_cost_components=tuple(
             LoanCostComponentRow(

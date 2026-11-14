@@ -51,6 +51,8 @@ def _create(team: WorkspaceDb, **overrides):
         "overpayment_mode": "none",
         "overpayment_amount": None,
         "overpayment_strategy": "reduce_term",
+        "drawdown_mode": "full_at_origination",
+        "interest_only_months": 0,
     }
     values.update(overrides)
     return loans.create_loan(team.factory, team.ctx("owner", "owner"), **values)
@@ -135,6 +137,61 @@ def test_variable_rate_values_plus_margin_form_the_timeline(team: WorkspaceDb) -
     assert data.view.reference_rate_values
     assert [row.annual_rate_bp for row in data.schedule.rows[:11]] == [550] * 11
     assert data.schedule.rows[11].annual_rate_bp == 650
+
+
+def test_a_tranched_loan_accrues_interest_only_on_drawn_money(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _create(
+        team,
+        principal_original=_money(50_000_000),
+        origination_date=date(2026, 1, 1),
+        first_payment_date=date(2026, 2, 15),
+        term_months=60,
+        payment_day=15,
+        drawdown_mode="tranches",
+        interest_only_months=24,
+        day_count="actual_365",
+    )
+    for day, amount in (
+        (date(2026, 1, 15), 20_000_000),
+        (date(2026, 3, 10), 15_000_000),
+        (date(2026, 6, 1), 15_000_000),
+    ):
+        loans.add_transfer(
+            team.factory,
+            ctx,
+            loan_id,
+            date_value=day,
+            amount=_money(amount),
+        )
+
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.error_code is None and data.schedule is not None
+    rows = data.schedule.rows
+    assert len(rows) == 60
+    assert [row.transfer.amount_minor for row in rows[:6]] == [
+        0,
+        15_000_000,
+        0,
+        0,
+        15_000_000,
+        0,
+    ]
+    assert rows[0].opening.amount_minor == 20_000_000
+    assert rows[0].interest.amount_minor == 93_425
+    assert rows[0].principal.amount_minor == 0
+    assert rows[1].opening.amount_minor == 20_000_000
+    assert rows[2].opening.amount_minor == 35_000_000
+    assert rows[4].opening.amount_minor == 35_000_000
+    assert rows[5].opening.amount_minor == 50_000_000
+    assert rows[6].opening.amount_minor == 50_000_000
+    assert rows[24].principal.amount_minor > 0
+    assert data.summary is not None
+    assert data.summary.percent_repaid_bp == 0
+    assert data.summary.drawn_principal.amount_minor == 20_000_000
+    assert data.summary.undrawn_principal.amount_minor == 30_000_000
 
 
 def test_a_schedule_error_returns_the_code_and_no_schedule(team: WorkspaceDb) -> None:
