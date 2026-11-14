@@ -293,16 +293,19 @@ def test_stop_after_the_horizon_is_allowed_with_a_warning(team: WorkspaceDb) -> 
     assert detail.scenario.stop_working_age == 95
 
 
-def test_linked_modes_are_stored_but_unavailable_in_f81(team: WorkspaceDb) -> None:
+def test_linked_modes_are_saved_without_a_manual_amount(team: WorkspaceDb) -> None:
     cases = (
         ("income_mode", IncomeMode.TRAILING_12M.value, "income_manual"),
         ("expenses_mode", ExpensesMode.TRAILING_12M.value, "expenses_manual"),
         ("portfolio_mode", PortfolioMode.LINKED_INVESTABLE.value, "portfolio_manual"),
     )
     for field_name, value, amount_field in cases:
-        with pytest.raises(FireError) as exc:
-            _create(team, name=f"Linked {field_name}", **{field_name: value})
-        assert _codes(exc) == (amount_field, "linked_mode_unavailable")
+        scenario_id = _create(team, name=f"Linked {field_name}", **{field_name: value})
+        scenario = fire_scenarios.get_fire_scenario(
+            team.factory, team.ctx("owner", "owner"), scenario_id
+        ).scenario
+        assert getattr(scenario, field_name) == value
+        assert getattr(scenario, amount_field) is None
 
 
 def test_contribution_and_event_windows_and_row_caps(team: WorkspaceDb) -> None:

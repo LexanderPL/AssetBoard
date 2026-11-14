@@ -422,6 +422,37 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("FireEventRepository", method): "test_fire_queries_stay_in_their_workspace"
         for method in ("create", "for_scenario", "counts_by_scenario")
     },
+    **{
+        ("FireExpenseExclusionRepository", method): "test_fire_queries_stay_in_their_workspace"
+        for method in ("create", "for_scenario", "counts_by_category")
+    },
+    **{
+        ("LoanRateChangeRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("for_loans",)
+    },
+    **{
+        ("ReferenceRateRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("by_ids",)
+    },
+    **{
+        ("ReferenceRateValueRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("for_rates",)
+    },
+    **{
+        ("LoanCostComponentRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("for_loans",)
+    },
+    **{
+        ("LoanOverpaymentRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("for_loans",)
+    },
+    **{
+        ("LoanBalanceCheckpointRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("for_loans",)
+    },
+    ("TransactionRepository", "regular_window_totals"): (
+        "test_transaction_queries_stay_in_their_workspace"
+    ),
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

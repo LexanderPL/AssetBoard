@@ -320,15 +320,20 @@ def test_unusual_rates_need_the_confirmation_box(owner) -> None:
     assert scenario_id in _scenario_ids(owner)
 
 
-def test_linked_modes_are_refused_with_a_clear_message(owner) -> None:
+def test_linked_modes_can_be_saved_and_the_manual_amount_is_cleared(owner) -> None:
     response = owner.post(
         "/fire",
         _form(income_mode="trailing_12m"),
         token_from="/fire/new",
     )
-    assert response.status_code == 400
-    assert "later update" in response.text
-    assert _scenario_ids(owner) == []
+    assert response.status_code == 303
+    with owner.db() as session:
+        scenario = session.query(FireScenario).one()
+    assert scenario.income_mode == "trailing_12m"
+    assert scenario.income_manual_minor is None
+    page = owner.client.get(response.headers["location"])
+    assert 'data-fire-blocked="no_income_data"' in page.text
+    assert "No regular income transactions" in page.text
 
 
 def test_duplicate_names_are_marked_on_the_name_field(owner) -> None:

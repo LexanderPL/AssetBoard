@@ -256,8 +256,9 @@ def test_a_blocked_projection_hides_results_and_returns_409_for_csv(owner) -> No
         row.income_manual_minor = None
     page = owner.client.get(f"/fire/{scenario_id}")
     assert page.status_code == 200
-    assert 'data-fire-blocked="missing_starting_value"' in page.text
+    assert 'data-fire-blocked="no_income_data"' in page.text
     assert 'data-fire-blocked-field="income_manual"' in page.text
+    assert "No regular income transactions" in page.text
     assert "data-fire-metrics" not in page.text
     assert "data-chart-json" not in page.text
     assert "data-fire-table" not in page.text
@@ -272,7 +273,7 @@ def test_a_blocked_plan_still_has_the_chart_scripts_a_preview_needs(owner) -> No
         row.income_mode = "trailing_12m"
         row.income_manual_minor = None
     blocked = owner.client.get(f"/fire/{scenario_id}")
-    assert 'data-fire-blocked="missing_starting_value"' in blocked.text
+    assert 'data-fire-blocked="no_income_data"' in blocked.text
     assert "js/charts.js" in blocked.text
     assert "vendor/echarts.min.js" in blocked.text
 

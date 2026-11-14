@@ -282,7 +282,7 @@ def test_a_linked_starting_value_blocks_instead_of_becoming_zero(team: Workspace
     assert results.projection is None
     assert results.blocked is not None
     assert (results.blocked.code, results.blocked.field) == (
-        "missing_starting_value",
+        "no_income_data",
         "income_manual",
     )
 
@@ -318,11 +318,12 @@ def _statements(operation: Callable[[], Any]) -> int:
     return seen
 
 
-def test_the_results_service_uses_three_queries(team: WorkspaceDb) -> None:
+def test_the_results_service_uses_a_bounded_number_of_queries(team: WorkspaceDb) -> None:
     scenario_id = _create(team)
     count = _statements(
         lambda: fire_projection.scenario_results(
             team.factory, team.ctx("viewer", "viewer"), scenario_id
         )
     )
-    assert count == 3
+    # Detail (scenario, contributions, events, exclusions) plus the loan-suggestion load.
+    assert count == 5
