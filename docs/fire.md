@@ -231,7 +231,8 @@ Archived scenarios can be selected and are labelled **Archived**. The scenario o
 table and the chart is the order in the URL.
 
 The table shows each scenario's start age and year, status, FIRE age and year, years to FIRE,
-net worth at FIRE in today's money, and depletion age. A plan that never reaches FIRE before its
+net worth at FIRE in today's money, and depletion age. A scenario name opens its results page
+with the sensitivity grid loaded. A plan that never reaches FIRE before its
 horizon says so. A blocked plan keeps its row and lists every reason with a link back to its
 **Plan inputs**; it is left out of the chart. When no year after income stops falls inside the
 horizon, depletion is shown as **—** with an explanation.

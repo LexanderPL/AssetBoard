@@ -370,7 +370,8 @@ heat-map grid UI.
   currencies return 200 with a translated alert and the selector still usable. The page shows a
   GET checkbox selector (active then archived, hidden basis, max-three note), the comparison
   table with Default/Archived/Linked badges and per-block messages with links to Plan inputs, a
-  nominal/real basis toggle, a mixed-start-year warning, and an ECharts overlay. The chart uses
+  nominal/real basis toggle, a mixed-start-year warning, and an ECharts overlay. A scenario name
+  opens its results page with the sensitivity grid preloaded. The chart uses
   the union of calendar years with gaps outside each series, fixed colour tokens, translated
   series names (archived suffix and duplicate disambiguation), FIRE-year tooltips, formatted
   axes and an accessible plotted-data table. Blocked rows stay in the table and are omitted from

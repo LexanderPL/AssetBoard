@@ -95,7 +95,7 @@
         {% set s = row.scenario %}
         <tr class="border-t border-line" data-fire-comparison-row="{{ s.id }}"{% if row.blocked %} data-fire-comparison-row-blocked{% endif %}{% if row.never %} data-fire-comparison-row-never{% endif %}>
           <th scope="row" class="px-3 py-2 text-left font-medium">
-            <a href="{{ scoped_url(request, 'fire_scenario', scenario_id=s.id) }}" class="underline-offset-2 hover:underline" data-fire-comparison-link="{{ s.id }}">{{ s.name }}</a>
+            <a href="{{ scoped_url(request, 'fire_scenario', scenario_id=s.id) }}?sensitivity=1#sensitivity" class="underline-offset-2 hover:underline" data-fire-comparison-link="{{ s.id }}">{{ s.name }}</a>
             {% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}
             {% if s.archived %}{{ badge(_("Archived")) }}{% endif %}
             {% if s.linked %}{{ badge(_("Linked"), "success") }}{% endif %}

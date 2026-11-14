@@ -173,6 +173,7 @@ def test_two_and_three_selected_scenarios_render_in_query_order(owner) -> None:
     assert _rows(page.text) == [str(third), str(first)]
     chart = _chart(page.text)
     assert [series["name"] for series in chart["series"]] == ["Third", "First"]
+    assert f'href="/fire/{third}?sensitivity=1#sensitivity"' in page.text
     assert "js/charts.js" in page.text
     assert "data-fire-comparison-points" in page.text
 
