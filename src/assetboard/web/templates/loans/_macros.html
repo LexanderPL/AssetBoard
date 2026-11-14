@@ -40,6 +40,7 @@
   <td class="whitespace-nowrap tabular-nums sm:px-4 sm:py-3 sm:text-right" data-remaining>
     <span class="mr-1 text-xs text-muted sm:hidden">{{ _("Remaining") }}</span>
     {% if figures.remaining_principal is not none %}{{ format_money(figures.remaining_principal, locale) }}{% else %}<span class="text-muted">—</span>{% endif %}
+    {% if figures.undrawn_principal is not none and figures.undrawn_principal.amount_minor > 0 %}<span class="block text-xs font-normal text-muted">{{ _("%(amount)s undrawn", amount=format_money(figures.undrawn_principal, locale)) }}</span>{% endif %}
   </td>
   <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3 sm:text-left" data-progress>
     <span class="mr-1 text-xs text-muted sm:hidden">{{ _("%% repaid") }}</span>{{ loan_progress(figures.percent_repaid_bp, locale) }}

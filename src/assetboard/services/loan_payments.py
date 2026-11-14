@@ -38,6 +38,7 @@ from assetboard.domain.loans import (
     Schedule,
     ScheduleAnchor,
     ScheduleError,
+    balance_on,
     clean_note,
     split_loan_payment,
     valid_date,
@@ -681,8 +682,7 @@ def _checkpoint_detail(
             variance=None,
             error_code=exc.code,
         )
-    passed = [item for item in schedule.rows if item.date <= row.as_of]
-    projected = passed[-1].closing if passed else anchor.balance
+    projected = balance_on(schedule, row.as_of)
     balance = Money(row.remaining_principal_minor, view.currency)
     return CheckpointDetailView(
         id=row.id,

@@ -222,7 +222,17 @@ def schedule_from_anchor(
     terms = (
         inputs.terms
         if remaining == inputs.terms.term_months
-        else replace(inputs.terms, term_months=remaining)
+        else replace(
+            inputs.terms,
+            term_months=remaining,
+            # A checkpoint this late is already past the original IO boundary, so the
+            # remaining schedule amorts from the start and the term stays valid.
+            interest_only_months=(
+                0
+                if remaining <= inputs.terms.interest_only_months
+                else inputs.terms.interest_only_months
+            ),
+        )
     )
     return build_inputs_schedule(replace(inputs, anchor=anchor, terms=terms, as_of=as_of))
 

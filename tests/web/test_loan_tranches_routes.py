@@ -86,6 +86,7 @@ def test_a_tranched_loan_shows_drawn_and_undrawn_money_and_its_transfers(owner) 
     assert ">Not drawn</span>" in page.text
 
     overview = owner.client.get(f"/loans/{loan_id}")
+    assert 'data-loan-status-badge="not_drawn"' in overview.text
     assert "data-overview-undrawn" in overview.text
     assert "Interest-only for the first 6 months." in overview.text
 
@@ -116,6 +117,8 @@ def test_a_tranched_loan_shows_drawn_and_undrawn_money_and_its_transfers(owner) 
     overview = owner.client.get(f"/loans/{loan_id}")
     assert "data-overview-undrawn" in overview.text
     assert "undrawn" in overview.text
+    list_page = owner.client.get("/loans")
+    assert "undrawn" in list_page.text
     assert "Interest-only for the first 6 months." in overview.text
 
     schedule = owner.client.get(f"/loans/{loan_id}/schedule")
@@ -171,6 +174,29 @@ def test_a_transfer_can_be_edited_and_deleted(owner) -> None:
     assert response.status_code == 303
     page = owner.client.get(f"/loans/{loan_id}/settings")
     assert "No transfers yet" in page.text
+
+
+def test_transfer_form_errors_are_visible_and_editing_needs_permission(owner) -> None:
+    loan_id = _create(owner, drawdown_mode="tranches")
+    response = owner.post(
+        f"/loans/{loan_id}/transfers",
+        {"date": "2026-01-15", "amount": "10,000.00", "note": "x" * 201},
+        token_from=f"/loans/{loan_id}/settings",
+    )
+    assert response.status_code == 400
+    assert "Enter a shorter note." in response.text
+    assert 'id="transfer-add-note-error"' in response.text
+
+    _add_transfer(owner, loan_id, date(2026, 1, 15), "10,000.00")
+    with owner.db() as session:
+        transfer = (
+            session.query(LoanTransfer).filter(LoanTransfer.workspace_id == owner.home_id).one()
+        )
+        transfer_id = transfer.id
+    owner.set_admin_role("viewer")
+    page = owner.client.get(f"/loans/{loan_id}/settings?edit_transfer={transfer_id}")
+    assert page.status_code == 200
+    assert f'data-transfer-edit="{transfer_id}"' not in page.text
 
 
 def test_a_transfer_over_the_principal_keeps_the_form_open_with_an_error(owner) -> None:

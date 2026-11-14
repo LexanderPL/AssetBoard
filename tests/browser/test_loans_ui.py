@@ -201,7 +201,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             assert "text/csv" in csv.headers["content-type"]
             assert "attachment" in csv.headers["content-disposition"]
             assert csv.text().startswith(
-                "n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency\r\n"
+                "n,date,rate,opening,transfer,interest,principal,overpayment,costs,total,closing,currency\r\n"
             )
             assert "\r\n" in csv.text()
 

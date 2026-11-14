@@ -48,6 +48,7 @@ from assetboard.domain.loans import (
     DayCount,
     DrawdownMode,
     LoanKind,
+    LoanScheduleSummary,
     LoanValidationError,
     OverpaymentMode,
     OverpaymentStrategy,
@@ -62,6 +63,7 @@ from assetboard.domain.loans import (
     payment_date_matches_day,
     payment_delayed_after_transfer,
     requires_high_rate_confirmation,
+    summarize_schedule,
     valid_date,
     validate_cost_dates,
     validate_cost_rate_bp,
@@ -571,9 +573,18 @@ def _validate_current_target(session: Session, ctx: Context, loan: Loan) -> None
     view = _load_loan_view(session, ctx, loan, today)
     timeline = rate_timeline(view)
     checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+    installment: Money | None = None
+    try:
+        from assetboard.services import loan_schedule
+
+        inputs = loan_schedule.schedule_inputs_from_view(view, today)
+        schedule = loan_schedule.build_inputs_schedule(inputs)
+        installment = summarize_schedule(schedule, today).next_installment
+    except (ScheduleError, LoanValidationError):
+        installment = _target_installment(loan, timeline, checkpoints)
     _validate_target(
         Money(loan.overpayment_amount_minor, loan.currency),
-        _target_installment(loan, timeline, checkpoints),
+        installment,
     )
 
 
@@ -770,7 +781,11 @@ def _view(
         current_rate_mode=current_mode,
         current_rate_reference_name=current_name,
         current_rate_margin_bp=current_margin,
-        first_installment=_target_installment(loan, timeline, checkpoints),
+        first_installment=(
+            None
+            if loan.interest_only_months > 0 or loan.drawdown_mode == DrawdownMode.TRANCHES.value
+            else _target_installment(loan, timeline, checkpoints)
+        ),
     )
 
 
@@ -784,12 +799,31 @@ def _load_loan_view(session: Session, ctx: WorkspaceScope, loan: Loan, today: da
     return _view(loan, changes, costs, overpayments, checkpoints, transfers, reference_data, today)
 
 
+def status_from_summary(view: LoanView, summary: LoanScheduleSummary | None) -> LoanStatus:
+    """The display status for a loan from its schedule summary (detail and list agree)."""
+    if view.archived:
+        return "archived"
+    remaining = summary.remaining_principal.amount_minor if summary is not None else 0
+    undrawn = summary.undrawn_principal.amount_minor if summary is not None else 0
+    if view.drawdown_mode is DrawdownMode.TRANCHES and not view.transfers and remaining == 0:
+        return "not_drawn"
+    if summary is not None and remaining == 0 and undrawn == 0:
+        return "paid_off"
+    return "active"
+
+
 def _loan_status(view: LoanView, figures: LoanListFigures) -> LoanStatus:
     if view.archived:
         return "archived"
-    if view.drawdown_mode is DrawdownMode.TRANCHES and not view.transfers:
+    remaining = figures.remaining_principal
+    undrawn = figures.undrawn_principal
+    if (
+        view.drawdown_mode is DrawdownMode.TRANCHES
+        and not view.transfers
+        and (remaining is None or remaining.amount_minor == 0)
+    ):
         return "not_drawn"
-    if figures.paid_off:
+    if figures.paid_off and (undrawn is None or undrawn.amount_minor == 0):
         return "paid_off"
     return "active"
 
@@ -1495,6 +1529,7 @@ def update_loan_terms(
             interest_only_months=wanted_interest_only,
         )
         _validate_rate_timeline(session, ctx, loan, first_payment_date=first_date)
+        _validate_transfer_schedule(session, ctx, loan)
         _validate_current_target(session, ctx, loan)
         _refresh_loan_occurrences(session, ctx, loan.id)
         _audit(session, ctx, "loan.updated", "loan", loan.id, {"kind": wanted_kind.value})
@@ -1780,7 +1815,9 @@ def _validate_transfer_sum(
         raise LoanError("amount", "drawdown_exceeds_principal")
 
 
-def _validate_transfer_schedule(session: Session, ctx: Context, loan: Loan) -> None:
+def _validate_transfer_schedule(
+    session: Session, ctx: Context, loan: Loan, *, date_field: str = "date"
+) -> None:
     """Build the projection after a transfer write so the final row still clears."""
     from assetboard.services import loan_schedule
 
@@ -1791,7 +1828,14 @@ def _validate_transfer_schedule(session: Session, ctx: Context, loan: Loan) -> N
         loan_schedule.build_inputs_schedule(inputs)
     except (ScheduleError, LoanValidationError) as exc:
         code = getattr(exc, "code", "invalid_schedule")
-        raise LoanError("date", code) from None
+        field = (
+            "origination_date"
+            if code == "transfer_before_start"
+            else "term_months"
+            if code == "transfer_after_final_payment"
+            else date_field
+        )
+        raise LoanError(field, code) from None
 
 
 def _validate_transfer_date(
@@ -1954,12 +1998,14 @@ def convert_loan_to_tranched(factory: sessionmaker[Session], ctx: Context, loan_
             raise LoanError("drawdown_mode", "already_tranched")
         checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
         latest = max(checkpoints, key=lambda row: (row.as_of, row.id), default=None)
-        if latest is not None:
-            seed_date = latest.as_of
-            seed_minor = latest.remaining_principal_minor
-        elif loan.origination_date is not None and loan.principal_original_minor is not None:
+        if loan.origination_date is not None and loan.principal_original_minor is not None:
+            # Original terms: seed at the origination so the interest-only clock and the
+            # repaid-principal progress keep their real start. Checkpoints still win on reading.
             seed_date = loan.origination_date
             seed_minor = loan.principal_original_minor
+        elif latest is not None:
+            seed_date = latest.as_of
+            seed_minor = latest.remaining_principal_minor
         else:
             raise LoanError("drawdown_mode", "drawdown_requires_original")
         if seed_minor <= 0:
@@ -2572,6 +2618,7 @@ __all__ = [
     "LoanStatus",
     "LoanTransferView",
     "LoanView",
+    "status_from_summary",
     "ReferenceRateLoanRef",
     "ReferenceRateValueView",
     "ReferenceRateView",

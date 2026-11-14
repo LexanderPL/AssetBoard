@@ -926,12 +926,7 @@ def _detail_context(
         if can_edit and not data.view.archived and page.next_row is not None
         else None
     )
-    if data.view.archived:
-        loan_status = "archived"
-    elif data.summary is not None and data.summary.remaining_principal.amount_minor == 0:
-        loan_status = "paid_off"
-    else:
-        loan_status = "active"
+    loan_status = loans.status_from_summary(data.view, data.summary)
     return {
         "loan": data.view,
         "loan_status": loan_status,

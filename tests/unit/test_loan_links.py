@@ -205,6 +205,52 @@ def test_loan_balance_counts_only_transfers_through_the_requested_date(
     assert after_second.amount_minor > before_second.amount_minor
 
 
+def test_loan_balance_counts_a_transfer_between_payment_rows(team: WorkspaceDb) -> None:
+    loan_id = _create(team, drawdown_mode="tranches", term_months=12)
+    ctx = team.ctx("owner", "owner")
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(10_000_000),
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 4, 15),
+        amount=_money(5_000_000),
+    )
+    with team.factory() as session:
+        before = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 4, 10))
+        after = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 4, 16))
+    assert not isinstance(before, Unavailable)
+    assert not isinstance(after, Unavailable)
+    assert after.amount_minor == before.amount_minor + 5_000_000
+
+
+def test_a_late_checkpoint_keeps_the_interest_only_loan_usable(team: WorkspaceDb) -> None:
+    loan_id = _create(
+        team,
+        term_months=60,
+        interest_only_months=24,
+        first_payment_date=date(2026, 2, 1),
+    )
+    ctx = team.ctx("owner", "owner")
+    with team.factory.begin() as session:
+        loan_payments.LoanBalanceCheckpointRepository(session, ctx).create(
+            loan_id=loan_id,
+            as_of=date(2029, 5, 1),
+            remaining_principal_minor=20_000_000,
+            note="",
+        )
+    with team.factory() as session:
+        balance = loan_links.loan_balance_at(session, ctx, loan_id, date(2029, 6, 1))
+    assert not isinstance(balance, Unavailable)
+    assert balance.amount_minor < 20_000_000
+
+
 def test_loan_balance_includes_an_installment_paid_before_its_due_date(
     team: WorkspaceDb,
 ) -> None:
