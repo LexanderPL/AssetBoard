@@ -2674,6 +2674,9 @@ msgstr ""
 msgid "Enter a valid non-negative amount in the plan currency."
 msgstr ""
 
+msgid "Enter a yearly amount in the plan currency. Enter 0 if the value is zero."
+msgstr ""
+
 msgid "Enter a whole year for every row."
 msgstr ""
 
@@ -2823,6 +2826,21 @@ msgid ""
 "values."
 msgstr ""
 
+msgid "FIRE plan reset. Set up a new plan when you are ready."
+msgstr ""
+
+msgid "About you"
+msgstr ""
+
+msgid "Income and expenses"
+msgstr ""
+
+msgid "Portfolio"
+msgstr ""
+
+msgid "Assumptions and review"
+msgstr ""
+
 msgid "Returns cover expenses"
 msgstr ""
 
@@ -2879,6 +2897,115 @@ msgid ""
 "FIRE at age %(age)d in %(year)d with a real return of %(rate)s and "
 "expenses at %(factor)s of the saved plan."
 msgstr ""
+
+msgid ""
+"No regular income transactions fall in the last 12 full months, so there "
+"is no income suggestion. Enter an amount manually or add income to the "
+"ledger."
+msgstr ""
+
+msgid ""
+"No regular expense transactions fall in the last 12 full months, so there"
+" is no expense suggestion. Enter an amount manually or add expenses to "
+"the ledger."
+msgstr ""
+
+msgid ""
+"Every regular expense category in the window is excluded, so there is no "
+"expense suggestion. Enter an amount manually."
+msgstr ""
+
+msgid ""
+"Some ledger rows in the window use another currency, so there is no "
+"suggestion. Enter an amount manually."
+msgstr ""
+
+msgid ""
+"The workspace base currency no longer matches the plan currency, so there"
+" is no suggestion. Enter an amount manually."
+msgstr ""
+
+msgid ""
+"The workspace base currency no longer matches the plan currency, so there"
+" is no suggestion. Reset the plan and set it up again."
+msgstr ""
+
+msgid ""
+"No investable portfolio classes or investable manual net-worth items were"
+" found, so there is no portfolio suggestion. Add data or enter an amount "
+"manually."
+msgstr ""
+
+msgid ""
+"An investable holding has no current price, so there is no portfolio "
+"suggestion. Add a price or enter an amount manually."
+msgstr ""
+
+msgid ""
+"An investable holding has no FX rate to the plan currency, so there is no"
+" portfolio suggestion. Add a rate or enter an amount manually."
+msgstr ""
+
+msgid ""
+"An investable net-worth item has no value effective today, so there is no"
+" portfolio suggestion. Add a valuation or enter an amount manually."
+msgstr ""
+
+msgid ""
+"An investable net-worth item has no FX rate to the plan currency, so "
+"there is no portfolio suggestion. Add a rate or enter an amount manually."
+msgstr ""
+
+msgid "This suggestion is unavailable. Enter an amount manually."
+msgstr ""
+
+msgid "Review this suggestion before using it."
+msgstr ""
+
+#, python-format
+msgid ""
+"Only %(months)d of the last 12 full months have data. The yearly amount "
+"is scaled from those months."
+msgstr ""
+
+#, python-format
+msgid ""
+"The latest included data is from %(month)s, before the window ends on "
+"%(end)s."
+msgstr ""
+
+#, python-format
+msgid "The plan starts in %(start)d but the data is as of %(current)d."
+msgstr ""
+
+#, python-format
+msgid "The latest price for %(name)s is stale."
+msgstr ""
+
+#, python-format
+msgid "The latest FX rate for %(name)s is stale."
+msgstr ""
+
+msgid ""
+"The portfolio sources sum to zero today. The suggestion is zero; enter a "
+"value manually if that is not what you expect."
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)d non-investable asset class is excluded from the portfolio "
+"suggestion."
+msgid_plural ""
+"%(count)d non-investable asset classes are excluded from the portfolio "
+"suggestion."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(count)d linked net-worth item is skipped to avoid double counting."
+msgid_plural "%(count)d linked net-worth items are skipped to avoid double counting."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "This request came from another site and was blocked."
 msgstr ""
@@ -6048,6 +6175,9 @@ msgstr ""
 msgid "The plan cannot be projected."
 msgstr ""
 
+msgid "Reset plan"
+msgstr ""
+
 msgid ""
 "These adjustments are before the plan's current year (or a saving "
 "override in the current year) and are not applied to the projection. They"
@@ -6118,6 +6248,52 @@ msgstr ""
 msgid "Show sensitivity grid"
 msgstr ""
 
+msgid "per year"
+msgstr ""
+
+#, python-format
+msgid ""
+"Window %(start)s – %(end)s · %(months)d months with data · window total "
+"%(total)s."
+msgstr ""
+
+msgid "Use suggested value"
+msgstr ""
+
+#, python-format
+msgid "for %(label)s"
+msgstr ""
+
+msgid "Expenses by category in the window"
+msgstr ""
+
+msgid "Window total"
+msgstr ""
+
+#, python-format
+msgid ""
+"Loan payments linked to ledger expenses in this window: %(amount)s in "
+"%(months)d months."
+msgstr ""
+
+msgid ""
+"No ledger expenses in this window are linked to recorded loan payments. "
+"If you pay loans, make sure the amount you enter includes those payments."
+msgstr ""
+
+msgid "Suggested starting portfolio"
+msgstr ""
+
+#, python-format
+msgid "Investable assets as of %(day)s."
+msgstr ""
+
+msgid "for the starting portfolio"
+msgstr ""
+
+msgid "Where this value comes from"
+msgstr ""
+
 msgid "Year by year"
 msgstr ""
 
@@ -6160,6 +6336,11 @@ msgstr ""
 msgid ""
 "FIRE rows are highlighted. Rows after income stops are muted; a depleted "
 "row is marked in red."
+msgstr ""
+
+msgid ""
+"Active loans are not listed during setup yet. They will be included in "
+"the plan after you create it."
 msgstr ""
 
 msgid "Choose your FIRE plan"
@@ -6209,18 +6390,62 @@ msgstr ""
 msgid "FIRE plan"
 msgstr ""
 
-msgid "Open your profile"
+msgid "Setup cancelled"
+msgstr ""
+
+msgid "No FIRE plan yet"
+msgstr ""
+
+msgid "No plan was created. You can start the setup again whenever you are ready."
 msgstr ""
 
 msgid ""
-"Projections are illustrative and not financial advice. The starting rates"
-" are examples, not recommendations."
+"The FIRE plan is a current-year projection of your income, expenses and "
+"investable assets."
 msgstr ""
 
-msgid "Create plan"
+msgid "Set up your FIRE plan"
+msgstr ""
+
+msgid "An editor or owner can set up the FIRE plan."
+msgstr ""
+
+msgid "Reset FIRE plan"
+msgstr ""
+
+msgid "Reset the FIRE plan?"
+msgstr ""
+
+#, python-format
+msgid ""
+"This deletes the plan and all %(count)d adjustments (%(archived)d "
+"archived) for good. It cannot be undone, and the app keeps no copy."
+msgstr ""
+
+#, python-format
+msgid ""
+"The plan is in %(plan_currency)s but the workspace uses "
+"%(workspace_currency)s. Resetting lets you set up a new plan in the "
+"workspace currency."
+msgstr ""
+
+msgid "Want a copy first?"
+msgstr ""
+
+msgid "Download a workspace archive from Export and import"
+msgstr ""
+
+msgid "It includes the plan and its adjustments."
+msgstr ""
+
+#, python-format
+msgid "To confirm, type %(word)s:"
 msgstr ""
 
 msgid "Edit plan"
+msgstr ""
+
+msgid "Open your profile"
 msgstr ""
 
 msgid ""
@@ -6261,6 +6486,151 @@ msgstr ""
 msgid ""
 "Income stops after the plan's horizon. The plan is saved, but the "
 "projection has no working years beyond age %(horizon)d."
+msgstr ""
+
+msgid "Steps"
+msgstr ""
+
+#, python-format
+msgid "Step %(step)s of %(total)s: %(label)s"
+msgstr ""
+
+msgid ""
+"Used to turn plan years into ages. Prefilled from your profile; you can "
+"change it for this plan."
+msgstr ""
+
+msgid "Required. Add it to your profile to prefill it next time."
+msgstr ""
+
+msgid ""
+"The age at which income stops; from then on the plan spends from the "
+"portfolio. Enter the age you stop working, not the year."
+msgstr ""
+
+msgid "Required. Enter 0 only if income already stopped."
+msgstr ""
+
+#, python-format
+msgid "You are %(age)d in %(year)d."
+msgstr ""
+
+#, python-format
+msgid "The plan runs from %(first)d to %(last)d."
+msgstr ""
+
+#, python-format
+msgid "Base income stops at age %(age)d, in %(year)d."
+msgstr ""
+
+msgid ""
+"Income already stops at or before your current age, so base income will "
+"be zero."
+msgstr ""
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon; the projection has no working "
+"years beyond age %(horizon)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"Enter yearly amounts in %(currency)s for %(year)d. Use the amounts you "
+"actually receive and spend, after tax."
+msgstr ""
+
+msgid ""
+"Regular income you receive in a year: earnings, dividends and interest. "
+"Use the after-tax amount."
+msgstr ""
+
+msgid "Required. Enter 0 if this does not apply."
+msgstr ""
+
+msgid "Suggested annual income"
+msgstr ""
+
+msgid ""
+"Regular yearly spending, including your loan payments. Savings and "
+"transfers are not expenses."
+msgstr ""
+
+msgid "Suggested annual expenses"
+msgstr ""
+
+msgid ""
+"A suggestion never fills a field by itself. Press Use suggested value to "
+"copy one, then change it if you want."
+msgstr ""
+
+#, python-format
+msgid ""
+"Enter the investable assets you hold today in %(currency)s: investments "
+"and cash savings, not your home."
+msgstr ""
+
+msgid "Review your plan"
+msgstr ""
+
+msgid "Current age"
+msgstr ""
+
+msgid "First and last projected year"
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d, in %(year)d"
+msgstr ""
+
+msgid "Yearly amounts"
+msgstr ""
+
+#, python-format
+msgid "Income %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Expenses %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Portfolio %(amount)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Inflation %(inflation)s · real return %(real_return)s · income growth "
+"%(growth)s"
+msgstr ""
+
+#, python-format
+msgid "withdrawal rate %(swr)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon; the projection has no working "
+"years beyond age %(horizon)d."
+msgstr ""
+
+msgid "Adjustments can be added after the plan is created."
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The starting rates"
+" are examples, not recommendations. The projection assumes constant rates"
+" and does not model taxes separately. Nothing is saved until you press "
+"Create plan."
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Create plan"
 msgstr ""
 
 msgid "Filters"
@@ -6388,9 +6758,6 @@ msgstr ""
 
 #, python-format
 msgid "Page %(number)d of %(pages)d"
-msgstr ""
-
-msgid "Next"
 msgstr ""
 
 msgid ""
@@ -6723,13 +7090,6 @@ msgstr ""
 msgid "Add income"
 msgstr ""
 
-msgid "Steps"
-msgstr ""
-
-#, python-format
-msgid "Step %(step)s of %(total)s: %(label)s"
-msgstr ""
-
 msgid "Which taxes apply to this income?"
 msgstr ""
 
@@ -6742,9 +7102,6 @@ msgid "No taxes are set up yet."
 msgstr ""
 
 msgid "Set up a new tax"
-msgstr ""
-
-msgid "Back"
 msgstr ""
 
 msgid "Where your money comes from and what you will receive next."
@@ -7335,9 +7692,6 @@ msgstr ""
 
 #, fuzzy
 msgid "Go to transactions"
-msgstr ""
-
-msgid "Portfolio"
 msgstr ""
 
 #, python-format
@@ -13131,5 +13485,11 @@ msgstr ""
 #~ "shows the starting portfolio, as in "
 #~ "the original spreadsheet. Its gain is"
 #~ " earned on that portfolio."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The starting rates are"
+#~ " examples, not recommendations."
 #~ msgstr ""
 
