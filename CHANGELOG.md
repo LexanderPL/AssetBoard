@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.6](https://github.com/LexanderPL/AssetBoard/compare/v0.7.5...v0.7.6) (2026-11-15)
+
+
+### Features
+
+* **fire:** add the one-plan view and setup wizard (F8.9) ([#344](https://github.com/LexanderPL/AssetBoard/issues/344)) ([0212261](https://github.com/LexanderPL/AssetBoard/commit/021226109143c6d8362415b63cb4ebaf7626723f))
+* **fire:** make FIRE one plan per workspace and archive 2.0 (F8.8) ([#343](https://github.com/LexanderPL/AssetBoard/issues/343)) ([9bca02b](https://github.com/LexanderPL/AssetBoard/commit/9bca02b93f2c3319f858ef79f060dfc9e74cf8eb))
+* **fire:** split the FIRE plan into read-only view and editor (F8.10) ([#345](https://github.com/LexanderPL/AssetBoard/issues/345)) ([f48c97c](https://github.com/LexanderPL/AssetBoard/commit/f48c97cf081e636a29348ff73c1745e0a281c34a))
+
+
+### Documentation
+
+* **fire:** specify the FIRE planner v2 rework ([#335](https://github.com/LexanderPL/AssetBoard/issues/335)) ([c366c31](https://github.com/LexanderPL/AssetBoard/commit/c366c314f70b709e2467b67811f7c376f92317bb))
+
 ## [0.7.5](https://github.com/LexanderPL/AssetBoard/compare/v0.7.4...v0.7.5) (2026-11-14)
 
 
