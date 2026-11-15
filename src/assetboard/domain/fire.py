@@ -815,7 +815,9 @@ def sensitivity(
 
     Each cell changes only the real return (``base + delta``) and the starting expenses
     (``base * factor / 10000``, rounded half away from zero once); contribution overrides, cash
-    events, income and the expense-change events keep their saved values. The axes must include
+    events, income and the expense-change events keep their saved values. A live loan is part of
+    the expense baseline, so its recurring annual payment is scaled by the same factor with one
+    rounding per loan; its payoff year and included flag stay as projected. The axes must include
     the base cell (delta 0 and factor 10000), are otherwise free, and are validated before any
     projection: exact integers, unique, non-empty, at most nine values each and 81 cells, with
     every effective return inside the projection's hard rate bounds and every scaled starting
@@ -840,6 +842,7 @@ def sensitivity(
     base_expenses = inputs.start_expenses.amount_minor
     currency = inputs.start_expenses.currency
     scaled_expenses: dict[int, int] = {}
+    scaled_loans: dict[int, tuple[ProjectionLoan, ...]] = {}
     for factor in factors:
         if not 0 <= factor <= 100_000:
             raise SensitivityError("expense_factors_bp", "expense_factor_out_of_range")
@@ -847,6 +850,27 @@ def sensitivity(
         if scaled > MAX_AMOUNT_MINOR:
             raise SensitivityError("expense_factors_bp", "expense_too_large")
         scaled_expenses[factor] = scaled
+        loans: list[ProjectionLoan] = []
+        included_total = 0
+        for loan in inputs.loans:
+            annual = round_ratio(loan.annual_payment.amount_minor * factor, 10_000)
+            if annual > MAX_AMOUNT_MINOR:
+                raise SensitivityError("expense_factors_bp", "expense_too_large")
+            if annual <= 0:
+                # A zero factor (or an extremely small one) leaves no payment to drop; the
+                # projection's own validation requires a positive loan payment.
+                continue
+            if loan.included:
+                included_total += annual
+            loans.append(
+                replace(
+                    loan,
+                    annual_payment=Money(annual, loan.annual_payment.currency),
+                )
+            )
+        if included_total > MAX_AMOUNT_MINOR:
+            raise SensitivityError("expense_factors_bp", "expense_too_large")
+        scaled_loans[factor] = tuple(loans)
     for delta in deltas:
         if not RATE_HARD_MIN_BP <= base_return + delta <= RATE_HARD_MAX_BP:
             raise SensitivityError("return_deltas_bp", "return_out_of_range")
@@ -864,6 +888,7 @@ def sensitivity(
                     inputs,
                     real_return_bp=effective_return,
                     start_expenses=Money(scaled_expenses[factor], currency),
+                    loans=scaled_loans[factor],
                 )
             )
             cell = SensitivityCell(

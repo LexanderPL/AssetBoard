@@ -347,6 +347,7 @@ def _restore_counts_for(
     linked = sum(
         _link_target_missing(row, asset_class_ids, instrument_ids) for row in rows.networth_items
     )
+    fire_loan_settings = sum(1 for row in rows.fire_loan_settings if row.included == "false")
     return _restore_counts(
         to_create=(
             len(rows.categories)
@@ -377,7 +378,7 @@ def _restore_counts_for(
             + len(rows.installment_plans)
             + (1 if rows.fire_plan is not None else 0)
             + len(rows.fire_events)
-            + len(rows.fire_loan_settings)
+            + fire_loan_settings
             + (1 if rows.risk_target_policy is not None else 0)
         ),
         categories_created=len(rows.categories),
@@ -413,7 +414,7 @@ def _restore_counts_for(
         loan_balance_checkpoints_created=len(rows.loan_balance_checkpoints),
         loan_scenarios_created=len(rows.loan_scenarios),
         installment_plans_created=len(rows.installment_plans),
-        fire_loan_settings_created=len(rows.fire_loan_settings),
+        fire_loan_settings_created=fire_loan_settings,
     )
 
 
@@ -1596,7 +1597,9 @@ def _restore_report(
     )
     counts["fire_plan_created"] = 1 if archive.rows.fire_plan is not None else 0
     counts["fire_events_created"] = len(archive.rows.fire_events)
-    counts["fire_loan_settings_created"] = len(archive.rows.fire_loan_settings)
+    counts["fire_loan_settings_created"] = sum(
+        1 for row in archive.rows.fire_loan_settings if row.included == "false"
+    )
     counts["invalid"] = len(errors)
     asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
@@ -1702,6 +1705,7 @@ def _plan_restore(
         archive.rows.installment_plans,
         (archive.rows.fire_plan,) if archive.rows.fire_plan is not None else (),
         archive.rows.fire_events,
+        archive.rows.fire_loan_settings,
     ):
         for number, _row in enumerate(rows, start=1):
             if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():

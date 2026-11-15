@@ -656,7 +656,13 @@ def _results_context(
                 results.loans,
                 currency=results.detail.plan.currency,
                 last_year=results.detail.plan.last_year,
-                expenses=results.detail.plan.expenses,
+                # Preview results carry the validated posted amounts; the saved plan is the
+                # fallback when a blocked projection has no inputs to read.
+                expenses=(
+                    results.projection.inputs.start_expenses
+                    if results.projection is not None
+                    else results.detail.plan.expenses
+                ),
                 locale=request.state.locale,
             )
             if results.loans is not None

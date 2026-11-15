@@ -2678,6 +2678,69 @@ msgstr ""
 msgid "Investment gain"
 msgstr ""
 
+msgid "Included"
+msgstr ""
+
+msgid "Ignored"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Paid off"
+msgstr ""
+
+msgid "Not drawn"
+msgstr ""
+
+msgid "Another currency"
+msgstr ""
+
+msgid "Schedule unavailable"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "No payment"
+msgstr ""
+
+msgid "Amount unavailable"
+msgstr ""
+
+msgid "Installment plan"
+msgstr ""
+
+msgid "Archived in Loans; it is not part of the plan."
+msgstr ""
+
+msgid "Paid off; there is no payment to include."
+msgstr ""
+
+msgid "No drawdown yet; there is no payment to include."
+msgstr ""
+
+#, python-format
+msgid "The loan is in %(loan_currency)s, not the plan currency %(plan_currency)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"The loan's schedule cannot be built (%(code)s); it is excluded from the "
+"plan."
+msgstr ""
+
+msgid "No scheduled payment remains; it is excluded from the plan."
+msgstr ""
+
+msgid ""
+"The annual payment is outside the supported amount; it is excluded from "
+"the plan."
+msgstr ""
+
+msgid ""
+"Installment plans do not have a live loan schedule yet; they are excluded"
+" from the plan."
+msgstr ""
+
 msgid "The next payment is interest-only; the payment will change later."
 msgstr ""
 
@@ -6232,6 +6295,12 @@ msgid ""
 msgstr ""
 
 msgid ""
+"These cards show the saved choices and their effect. The preview above "
+"shows the choices and totals from the form before you save; Save changes "
+"applies them."
+msgstr ""
+
+msgid ""
 "Loans cannot be included while the plan currency does not match the "
 "workspace currency. Reset the plan to review them in the current "
 "currency."
@@ -6272,12 +6341,6 @@ msgid "Effect on the plan"
 msgstr ""
 
 msgid "Include in plan"
-msgstr ""
-
-msgid "Included"
-msgstr ""
-
-msgid "Ignored"
 msgstr ""
 
 #, fuzzy, python-format
@@ -6401,6 +6464,12 @@ msgstr ""
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr ""
 
+msgid "Loan choices in this preview:"
+msgstr ""
+
+msgid "Loan choices:"
+msgstr ""
+
 #, python-format
 msgid "Included loans: %(amount)s a year"
 msgstr ""
@@ -6505,9 +6574,6 @@ msgid "Expenses by category in the window"
 msgstr ""
 
 msgid "Window total"
-msgstr ""
-
-msgid "Archived"
 msgstr ""
 
 #, python-format
@@ -8606,15 +8672,6 @@ msgstr ""
 msgid "Equal principal"
 msgstr ""
 
-msgid "Installment plan"
-msgstr ""
-
-msgid "Paid off"
-msgstr ""
-
-msgid "Not drawn"
-msgstr ""
-
 msgid "Repaid principal"
 msgstr ""
 
@@ -8755,9 +8812,6 @@ msgid "No variance yet for this checkpoint."
 msgstr ""
 
 msgid "No actual payments recorded yet."
-msgstr ""
-
-msgid "Schedule unavailable"
 msgstr ""
 
 msgid ""

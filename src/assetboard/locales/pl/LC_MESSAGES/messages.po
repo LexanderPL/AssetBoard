@@ -2808,6 +2808,74 @@ msgstr "Wydatki"
 msgid "Investment gain"
 msgstr "Zysk z inwestycji"
 
+msgid "Included"
+msgstr "Uwzględniony"
+
+msgid "Ignored"
+msgstr "Ignorowany"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Paid off"
+msgstr "Spłacony"
+
+msgid "Not drawn"
+msgstr "Niewypłacony"
+
+msgid "Another currency"
+msgstr "Inna waluta"
+
+msgid "Schedule unavailable"
+msgstr "Harmonogram niedostępny"
+
+msgid "No payment"
+msgstr "Brak płatności"
+
+msgid "Amount unavailable"
+msgstr "Kwota niedostępna"
+
+msgid "Installment plan"
+msgstr "Plan ratalny"
+
+msgid "Archived in Loans; it is not part of the plan."
+msgstr "Zarchiwizowany w Kredytach; nie jest częścią planu."
+
+msgid "Paid off; there is no payment to include."
+msgstr "Spłacony; nie ma płatności do uwzględnienia."
+
+msgid "No drawdown yet; there is no payment to include."
+msgstr "Nie ma jeszcze wypłaty; nie ma płatności do uwzględnienia."
+
+#, python-format
+msgid "The loan is in %(loan_currency)s, not the plan currency %(plan_currency)s."
+msgstr "Kredyt jest w walucie %(loan_currency)s, a nie w walucie planu %(plan_currency)s."
+
+#, python-format
+msgid ""
+"The loan's schedule cannot be built (%(code)s); it is excluded from the "
+"plan."
+msgstr ""
+"Nie można zbudować harmonogramu kredytu (%(code)s); jest wyłączony z "
+"planu."
+
+msgid "No scheduled payment remains; it is excluded from the plan."
+msgstr "Nie pozostała żadna zaplanowana płatność; kredyt jest wyłączony z planu."
+
+msgid ""
+"The annual payment is outside the supported amount; it is excluded from "
+"the plan."
+msgstr ""
+"Roczna rata wykracza poza obsługiwany zakres kwot; kredyt jest wyłączony "
+"z planu."
+
+msgid ""
+"Installment plans do not have a live loan schedule yet; they are excluded"
+" from the plan."
+msgstr ""
+"Plany ratalne nie mają jeszcze harmonogramu kredytu na żywo; są "
+"wyłączone z planu."
+
 msgid "The next payment is interest-only; the payment will change later."
 msgstr ""
 "Następna płatność obejmuje tylko odsetki; wysokość raty zmieni się "
@@ -6759,6 +6827,14 @@ msgstr ""
 "kwotami nominalnymi i nie są indeksowane inflacją."
 
 msgid ""
+"These cards show the saved choices and their effect. The preview above "
+"shows the choices and totals from the form before you save; Save changes "
+"applies them."
+msgstr ""
+"Te karty pokazują zapisane wybory i ich wpływ. Podgląd powyżej pokazuje "
+"wybory i sumy z formularza przed zapisaniem; Zapisz zmiany je zastosuje."
+
+msgid ""
 "Loans cannot be included while the plan currency does not match the "
 "workspace currency. Reset the plan to review them in the current "
 "currency."
@@ -6802,12 +6878,6 @@ msgstr "Wpływ na plan"
 
 msgid "Include in plan"
 msgstr "Uwzględnij w planie"
-
-msgid "Included"
-msgstr "Uwzględniony"
-
-msgid "Ignored"
-msgstr "Ignorowany"
 
 #, python-format
 msgid "%(num)d loan is not included"
@@ -6947,6 +7017,12 @@ msgstr "Nie można prognozować planu."
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr "Zmień poniżej wartości planu; prognoza aktualizuje się podczas edycji."
 
+msgid "Loan choices in this preview:"
+msgstr "Wybory kredytów w tym podglądzie:"
+
+msgid "Loan choices:"
+msgstr "Wybory kredytów:"
+
 #, python-format
 msgid "Included loans: %(amount)s a year"
 msgstr "Uwzględnione kredyty: %(amount)s rocznie"
@@ -7068,9 +7144,6 @@ msgstr "Wydatki według kategorii w oknie"
 
 msgid "Window total"
 msgstr "Suma w oknie"
-
-msgid "Archived"
-msgstr "Zarchiwizowana"
 
 #, python-format
 msgid ""
@@ -9420,15 +9493,6 @@ msgstr "Annuitetowy"
 msgid "Equal principal"
 msgstr "Równy kapitał"
 
-msgid "Installment plan"
-msgstr "Plan ratalny"
-
-msgid "Paid off"
-msgstr "Spłacony"
-
-msgid "Not drawn"
-msgstr "Niewypłacony"
-
 msgid "Repaid principal"
 msgstr "Spłacony kapitał"
 
@@ -9571,9 +9635,6 @@ msgstr "Ten punkt kontrolny nie ma jeszcze odchylenia."
 
 msgid "No actual payments recorded yet."
 msgstr "Nie zarejestrowano jeszcze żadnych płatności."
-
-msgid "Schedule unavailable"
-msgstr "Harmonogram niedostępny"
 
 msgid ""
 "The loan's schedule and charts are hidden until its terms allow a "

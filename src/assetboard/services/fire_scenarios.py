@@ -28,7 +28,6 @@ from assetboard.db.repositories import (
     FireEventRepository,
     FireLoanSettingRepository,
     FireScenarioRepository,
-    LoanRepository,
     NotFound,
 )
 from assetboard.domain.fire import (
@@ -968,9 +967,18 @@ def _reconcile_loan_settings(
     session: Session,
     ctx: Context,
     plan_id: UUID,
+    *,
+    currency: str,
     settings: tuple[LoanSettingInput, ...] | None,
 ) -> None:
-    """Apply posted include/ignore choices; absence of the section leaves settings untouched."""
+    """Apply posted include/ignore choices; absence of the section leaves settings untouched.
+
+    Only a loan the live resolver currently treats as included or ignored can be posted: the
+    editor renders a toggle for those rows alone. A forged or stale toggle for an archived,
+    paid-off, not-drawn, broken, currency-mismatched, amount-invalid or installment-plan loan is
+    rejected without touching its saved setting, so a saved ignore for an archived loan survives
+    archiving until the loan (and its choice) is restored.
+    """
     if settings is None:
         return
     posted: dict[UUID, bool] = {}
@@ -980,10 +988,16 @@ def _reconcile_loan_settings(
         posted[setting.loan_id] = setting.included
     if not posted:
         return
-    loans = LoanRepository(session, ctx).by_ids(posted)
-    if {row.id for row in loans} != set(posted) or any(
-        row.kind == "installment_plan" for row in loans
-    ):
+    from assetboard.services import fire_loans
+
+    data = fire_loans.resolve_fire_loans_in_session(
+        session,
+        ctx,
+        currency=currency,
+        included_overrides=posted,
+    )
+    eligible = {row.loan_id for row in data.eligible_rows}
+    if set(posted) - eligible:
         raise FireError("loans", "invalid_loan")
     repository = FireLoanSettingRepository(session, ctx)
     existing = {row.loan_id: row for row in repository.for_plan(plan_id)}
@@ -1058,7 +1072,13 @@ def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
             needs_review=False,
         )
         _reconcile_events(session, ctx, row.id, validated, existing_rows=saved_rows)
-        _reconcile_loan_settings(session, ctx, row.id, plan.loan_settings)
+        _reconcile_loan_settings(
+            session,
+            ctx,
+            row.id,
+            currency=row.currency,
+            settings=plan.loan_settings,
+        )
         _audit(session, ctx, "fire_plan.updated", row)
         return row.id
 

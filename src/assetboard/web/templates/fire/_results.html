@@ -47,9 +47,13 @@
 
 {% if loan_section and loan_section.rows %}
 <div class="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-sm" data-fire-loans-preview>
+  <span class="font-medium">{% if in_editor %}{{ _("Loan choices in this preview:") }}{% else %}{{ _("Loan choices:") }}{% endif %}</span>
   <span>{{ _("Included loans: %(amount)s a year", amount=loan_section.included_total_label) }}</span>
   <span>{{ _("Ignored loans: %(amount)s a year", amount=loan_section.ignored_total_label) }}</span>
 </div>
+{% if loan_section.expenses_understated %}
+<p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-loans-expense-warning>{{ loan_section.expenses_understated_message }}</p>
+{% endif %}
 {% endif %}
 
 {% if projection %}

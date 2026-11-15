@@ -20,39 +20,45 @@ from assetboard.services.fire_scenarios import FireError, LoanSettingInput
 
 LOAN_TOGGLE_KEY = re.compile(r"^loan_include_([0-9a-fA-F]{8}-[0-9a-fA-F-]{27})$")
 
+
+def _(message: str) -> str:
+    """Marks a message for extraction; it is translated when rendered."""
+    return message
+
+
 STATE_LABELS = {
-    LoanPlanState.INCLUDED: "Included",
-    LoanPlanState.IGNORED: "Ignored",
-    LoanPlanState.ARCHIVED: "Archived",
-    LoanPlanState.PAID_OFF: "Paid off",
-    LoanPlanState.NOT_DRAWN: "Not drawn",
-    LoanPlanState.CURRENCY_MISMATCH: "Another currency",
-    LoanPlanState.SCHEDULE_ERROR: "Schedule unavailable",
-    LoanPlanState.NO_PAYMENT: "No payment",
-    LoanPlanState.AMOUNT_INVALID: "Amount unavailable",
-    LoanPlanState.INSTALLMENT_PLAN: "Installment plan",
+    LoanPlanState.INCLUDED: _("Included"),
+    LoanPlanState.IGNORED: _("Ignored"),
+    LoanPlanState.ARCHIVED: _("Archived"),
+    LoanPlanState.PAID_OFF: _("Paid off"),
+    LoanPlanState.NOT_DRAWN: _("Not drawn"),
+    LoanPlanState.CURRENCY_MISMATCH: _("Another currency"),
+    LoanPlanState.SCHEDULE_ERROR: _("Schedule unavailable"),
+    LoanPlanState.NO_PAYMENT: _("No payment"),
+    LoanPlanState.AMOUNT_INVALID: _("Amount unavailable"),
+    LoanPlanState.INSTALLMENT_PLAN: _("Installment plan"),
 }
 
 REASON_LABELS = {
-    LoanPlanState.ARCHIVED: "Archived in Loans; it is not part of the plan.",
-    LoanPlanState.PAID_OFF: "Paid off; there is no payment to include.",
-    LoanPlanState.NOT_DRAWN: "No drawdown yet; there is no payment to include.",
-    LoanPlanState.CURRENCY_MISMATCH: (
+    LoanPlanState.ARCHIVED: _("Archived in Loans; it is not part of the plan."),
+    LoanPlanState.PAID_OFF: _("Paid off; there is no payment to include."),
+    LoanPlanState.NOT_DRAWN: _("No drawdown yet; there is no payment to include."),
+    LoanPlanState.CURRENCY_MISMATCH: _(
         "The loan is in %(loan_currency)s, not the plan currency %(plan_currency)s."
     ),
-    LoanPlanState.SCHEDULE_ERROR: (
+    LoanPlanState.SCHEDULE_ERROR: _(
         "The loan's schedule cannot be built (%(code)s); it is excluded from the plan."
     ),
-    LoanPlanState.NO_PAYMENT: "No scheduled payment remains; it is excluded from the plan.",
-    LoanPlanState.AMOUNT_INVALID: (
+    LoanPlanState.NO_PAYMENT: _("No scheduled payment remains; it is excluded from the plan."),
+    LoanPlanState.AMOUNT_INVALID: _(
         "The annual payment is outside the supported amount; it is excluded from the plan."
     ),
-    LoanPlanState.INSTALLMENT_PLAN: (
+    LoanPlanState.INSTALLMENT_PLAN: _(
         "Installment plans do not have a live loan schedule yet; they are excluded from the plan."
     ),
 }
 
-SLOW_LOAN_ERROR_CODE = "The loan's schedule cannot be built; it is excluded from the plan."
+UNKNOWN_LOAN_ERROR_CODE = "—"
 
 
 def loan_state_labels(locale: str) -> dict[str, str]:
@@ -164,7 +170,7 @@ def _reason(row: FireLoanRow, locale: str, plan_currency: str) -> str:
             "plan_currency": plan_currency,
         }
     if row.state is LoanPlanState.SCHEDULE_ERROR:
-        return gettext(label, locale) % {"code": row.error_code or SLOW_LOAN_ERROR_CODE}
+        return gettext(label, locale) % {"code": row.error_code or UNKNOWN_LOAN_ERROR_CODE}
     return gettext(label, locale)
 
 

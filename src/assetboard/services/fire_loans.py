@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.db.repositories import InstallmentPlanRepository, LoanRepository
 from assetboard.domain.fire import ProjectionLoan
 from assetboard.domain.loans import (
+    LoanScheduleSummary,
     LoanValidationError,
     ScheduleError,
     ScheduleRow,
@@ -101,7 +102,11 @@ class FireLoanData:
 
     @property
     def first_payoff_year(self) -> int | None:
-        years = [row.payoff_year for row in self.eligible_rows if row.payoff_year is not None]
+        years = [
+            row.payoff_year
+            for row in self.eligible_rows
+            if row.included and row.payoff_year is not None
+        ]
         return min(years) if years else None
 
     def projection_loans(self) -> tuple[ProjectionLoan, ...]:
@@ -128,8 +133,13 @@ def _next_row(rows: tuple[ScheduleRow, ...], today: date) -> ScheduleRow | None:
     return next((row for row in rows if row.date > today), None)
 
 
-def _is_not_drawn(view: loans.LoanView, remaining_minor: int) -> bool:
-    return view.drawdown_mode.value == "tranches" and not view.transfers and remaining_minor == 0
+def _is_not_drawn(view: loans.LoanView, summary: LoanScheduleSummary) -> bool:
+    """A tranche loan with no balance left to amortise and principal still undrawn."""
+    return (
+        view.drawdown_mode.value == "tranches"
+        and summary.remaining_principal.amount_minor == 0
+        and summary.undrawn_principal.amount_minor > 0
+    )
 
 
 def _resolve_loan(
@@ -164,7 +174,7 @@ def _resolve_loan(
         )
 
     remaining = summary.remaining_principal
-    if _is_not_drawn(view, remaining.amount_minor):
+    if _is_not_drawn(view, summary):
         return replace(
             base,
             state=LoanPlanState.NOT_DRAWN,
@@ -258,8 +268,8 @@ def _installment_rows(session: Session, ctx: Context) -> list[FireLoanRow]:
     return result
 
 
-def load_fire_loans(
-    factory: sessionmaker[Session],
+def resolve_fire_loans_in_session(
+    session: Session,
     ctx: Context,
     *,
     currency: str,
@@ -267,7 +277,7 @@ def load_fire_loans(
     included_overrides: Mapping[UUID, bool] | None = None,
     today: date | None = None,
 ) -> FireLoanData:
-    """Resolve every schedule loan in one bounded set of queries; never writes.
+    """Resolve every schedule loan in the caller's transaction; never writes.
 
     ``ignored_loan_ids`` comes from the saved plan (or is empty during setup).
     ``included_overrides`` is the preview's posted map; an absent id keeps its saved/default
@@ -277,20 +287,19 @@ def load_fire_loans(
     require_role(ctx, Role.VIEWER)
     as_of = today or ctx.clock.today(ctx.workspace.timezone)
     overrides = included_overrides or {}
-    with factory() as session:
-        views = loans.load_loan_views_in_session(session, ctx, today=as_of, include_archived=True)
-        rows: list[FireLoanRow] = []
-        for view in views:
-            included = overrides.get(view.id, view.id not in ignored_loan_ids)
-            rows.append(
-                _resolve_loan(
-                    view,
-                    plan_currency=currency,
-                    today=as_of,
-                    included=included,
-                )
+    views = loans.load_loan_views_in_session(session, ctx, today=as_of, include_archived=True)
+    rows: list[FireLoanRow] = []
+    for view in views:
+        included = overrides.get(view.id, view.id not in ignored_loan_ids)
+        rows.append(
+            _resolve_loan(
+                view,
+                plan_currency=currency,
+                today=as_of,
+                included=included,
             )
-        rows.extend(_installment_rows(session, ctx))
+        )
+    rows.extend(_installment_rows(session, ctx))
     rows.sort(key=lambda row: (not row.eligible, row.name.casefold(), str(row.loan_id)))
     included = [row for row in rows if row.eligible and row.included]
     ignored = [row for row in rows if row.eligible and not row.included]
@@ -316,10 +325,33 @@ def load_fire_loans(
     )
 
 
+def load_fire_loans(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    currency: str,
+    ignored_loan_ids: frozenset[UUID] = frozenset(),
+    included_overrides: Mapping[UUID, bool] | None = None,
+    today: date | None = None,
+) -> FireLoanData:
+    """Resolve every live loan in one bounded set of queries; never writes."""
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        return resolve_fire_loans_in_session(
+            session,
+            ctx,
+            currency=currency,
+            ignored_loan_ids=ignored_loan_ids,
+            included_overrides=included_overrides,
+            today=today,
+        )
+
+
 __all__ = [
     "ELIGIBLE_STATES",
     "FireLoanData",
     "FireLoanRow",
     "LoanPlanState",
     "load_fire_loans",
+    "resolve_fire_loans_in_session",
 ]
