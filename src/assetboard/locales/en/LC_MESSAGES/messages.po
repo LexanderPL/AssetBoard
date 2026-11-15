@@ -2829,6 +2829,9 @@ msgstr ""
 msgid "FIRE plan reset. Set up a new plan when you are ready."
 msgstr ""
 
+msgid "The plan values changed. Check the updated review, then press Create plan."
+msgstr ""
+
 msgid "About you"
 msgstr ""
 
@@ -6628,6 +6631,9 @@ msgid "Back"
 msgstr ""
 
 msgid "Next"
+msgstr ""
+
+msgid "Review changes"
 msgstr ""
 
 msgid "Create plan"

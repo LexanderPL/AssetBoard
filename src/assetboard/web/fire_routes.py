@@ -8,8 +8,8 @@ is covered by the router-level ``require_csrf`` dependency.
 
 from __future__ import annotations
 
+import hashlib
 import re
-from dataclasses import replace
 from decimal import Decimal
 from urllib.parse import urlencode
 from uuid import UUID
@@ -152,6 +152,9 @@ NOTICES = {
     "saved": _("FIRE plan saved."),
     "migrated": _("The old FIRE scenario was converted to the one-plan format. Review its values."),
     "reset": _("FIRE plan reset. Set up a new plan when you are ready."),
+    "review_updated": _(
+        "The plan values changed. Check the updated review, then press Create plan."
+    ),
 }
 
 RESET_WORD = "reset"
@@ -371,6 +374,8 @@ def _plan_input(
     values: dict[str, str],
     locale: str,
     currency: str,
+    *,
+    include_events: bool = True,
 ) -> fire_service.FirePlanInput:
     return fire_service.FirePlanInput(
         birth_year=_optional_int(values, "birth_year", "invalid_birth_year"),
@@ -385,7 +390,7 @@ def _plan_input(
         expenses=_plan_money(values, "expenses_manual", locale, currency, "expenses_manual"),
         portfolio=_plan_money(values, "portfolio_manual", locale, currency, "portfolio_manual"),
         extreme_rates_confirmed=values.get("extreme_rates_confirmed") == "1",
-        events=_event_inputs(values, locale, currency),
+        events=_event_inputs(values, locale, currency) if include_events else (),
     )
 
 
@@ -470,7 +475,7 @@ def _wizard_plan_input(
     values: dict[str, str], locale: str, currency: str
 ) -> fire_service.FirePlanInput:
     """The full plan a wizard step posts; event fields are never read."""
-    return replace(_plan_input(values, locale, currency), events=())
+    return _plan_input(values, locale, currency, include_events=False)
 
 
 def _wizard_validate(
@@ -517,6 +522,36 @@ def _wizard_validate(
     return None
 
 
+def _review_signature(
+    validated: fire_service.ValidatedPlan,
+    *,
+    currency: str,
+    current_year: int,
+) -> str:
+    """A stable digest of every value the review shows and Create plan would save.
+
+    The review is rendered when step 3 advances to step 4, but the step-4 fields stay editable.
+    The hidden digest lets Create refuse to write when the fields no longer match the review the
+    user saw; the page then re-renders the current values and the user confirms them again.
+    """
+    parts = (
+        str(current_year),
+        currency,
+        str(validated.birth_year),
+        str(validated.stop_working_age),
+        str(validated.horizon_age),
+        str(validated.income_minor),
+        str(validated.expenses_minor),
+        str(validated.portfolio_minor),
+        str(validated.inflation_bp),
+        str(validated.real_return_bp),
+        str(validated.income_growth_bp),
+        validated.rule.value,
+        "" if validated.swr_bp is None else str(validated.swr_bp),
+    )
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+
+
 def _wizard_review(
     validated: fire_service.ValidatedPlan,
     currency: str,
@@ -528,6 +563,7 @@ def _wizard_review(
         "current_age": current_year - validated.birth_year,
         "first_year": current_year,
         "last_year": validated.birth_year + validated.horizon_age,
+        "currency": currency,
         "stop_working_age": validated.stop_working_age,
         "stop_year": stop_year,
         "income": Money(validated.income_minor, currency),
@@ -541,6 +577,7 @@ def _wizard_review(
         "income_stopped": validated.stop_working_age <= current_year - validated.birth_year,
         "stop_after_horizon": validated.stop_working_age > validated.horizon_age,
         "needs_extreme_confirmation": validated.needs_extreme_confirmation,
+        "signature": _review_signature(validated, currency=currency, current_year=current_year),
     }
 
 
@@ -1100,10 +1137,23 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
         assert validated is not None
         review = _wizard_review(validated, defaults.currency, defaults.current_year)
         return await _render_wizard(request, ctx, 4, values, defaults, review=review)
+    assert validated is not None
+    review = _wizard_review(validated, defaults.currency, defaults.current_year)
     if raw.get("go") != "create":
-        assert validated is not None
-        review = _wizard_review(validated, defaults.currency, defaults.current_year)
         return await _render_wizard(request, ctx, 4, values, defaults, review=review)
+    # The hidden digest is rendered with the review. If a step-4 field changed after that render
+    # (or the workspace currency/year changed), show the review of the submitted values first;
+    # Create plan must never save values the user has not seen summarised.
+    if raw.get("review_signature", "") != review["signature"]:
+        return await _render_wizard(
+            request,
+            ctx,
+            4,
+            values,
+            defaults,
+            review=review,
+            notice=_notice(request, "review_updated"),
+        )
     try:
         plan = _wizard_plan_input(values, request.state.locale, defaults.currency)
         await run_in_threadpool(

@@ -633,6 +633,20 @@ def test_setup_suggestions_loan_portion_is_the_linked_ledger_subset(team: Worksp
     assert suggestions.loan_portion.months_available == 1
 
 
+def test_setup_suggestions_drop_a_blocked_card_instead_of_showing_zero(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "Food")
+    _transaction(team, food, date(2026, 1, 10), 100_000, currency="USD")
+
+    suggestions = _setup(team)
+    assert "ledger_currency_mismatch" in {block.code for block in suggestions.blocks}
+    assert suggestions.expenses is None
+    assert suggestions.loan_portion is None
+    assert suggestions.income is None
+    assert suggestions.portfolio is None
+
+
 def test_setup_suggestions_never_write(team: WorkspaceDb) -> None:
     from sqlalchemy import func, select
 

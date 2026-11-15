@@ -20,7 +20,10 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
-from tests.fire_helpers import create_plan, post_wizard, wizard_values
+from assetboard.services.investment_transactions import create_transaction
+from assetboard.services.investments import create_asset_class, create_instrument
+from assetboard.services.prices import save_manual_price
+from tests.fire_helpers import create_plan, post_wizard, review_signature, wizard_values
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -61,13 +64,21 @@ def _category(owner, name: str, *, kind: str) -> UUID:
         return row.id
 
 
-def _transaction(owner, category_id: UUID, day: date, amount_minor: int, direction: str) -> UUID:
+def _transaction(
+    owner,
+    category_id: UUID,
+    day: date,
+    amount_minor: int,
+    direction: str,
+    *,
+    currency: str = "EUR",
+) -> UUID:
     with owner.app.state.session_factory.begin() as session:
         row = TransactionRepository(session, _context(owner)).create(
             direction=direction,
             day=day,
             amount_minor=amount_minor,
-            currency="EUR",
+            currency=currency,
             category_id=category_id,
             description="Synthetic",
             description_key="synthetic",
@@ -118,6 +129,52 @@ def _seed_portfolio(owner, value_minor: int = 5_000_000) -> UUID:
             currency="EUR",
         )
         return item.id
+
+
+def _seed_asset_class(owner) -> UUID:
+    ctx = _context(owner)
+    factory = owner.app.state.session_factory
+    asset_class = create_asset_class(
+        factory,
+        ctx,
+        name="Stocks test",
+        color="#2563eb",
+        investable=True,
+    )
+    instrument = create_instrument(
+        factory,
+        ctx,
+        name="Fund test",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(asset_class.id, 10_000)],
+        locale="en",
+    )
+    create_transaction(
+        factory,
+        ctx,
+        instrument_id=instrument.id,
+        type_value="buy",
+        date_value="2026-02-27",
+        quantity_value="10",
+        unit_price_value="100",
+        fee_value="0",
+        fx_value="1",
+        note_value="",
+        locale="en",
+    )
+    save_manual_price(
+        factory,
+        ctx,
+        instrument.id,
+        price_id=None,
+        date_value="2026-03-01",
+        price_value="100",
+        locale="en",
+    )
+    return asset_class.id
 
 
 def _link_loan_payment(owner, transaction_id: UUID, total_minor: int) -> UUID:
@@ -221,6 +278,36 @@ def test_wizard_steps_next_back_and_no_writes(owner) -> None:
     assert _state(owner) == (0, 0, 0)
 
 
+def test_each_step_carries_the_other_steps_in_hidden_fields(owner) -> None:
+    values = wizard_values()
+    text = _step(post_wizard(owner, 1, "next", values), 2)
+    for field, value in (
+        ("birth_year", "1985"),
+        ("stop_working_age", "55"),
+        ("horizon_age", "90"),
+        ("inflation", "2.5"),
+        ("portfolio_manual", "1000000"),
+    ):
+        assert f'type="hidden" name="{field}" value="{value}"' in text
+
+    text = _step(post_wizard(owner, 2, "next", values), 3)
+    for field, value in (
+        ("birth_year", "1985"),
+        ("income_manual", "50000"),
+        ("expenses_manual", "30000"),
+    ):
+        assert f'type="hidden" name="{field}" value="{value}"' in text
+
+    text = _step(post_wizard(owner, 3, "next", values), 4)
+    for field, value in (
+        ("income_manual", "50000"),
+        ("expenses_manual", "30000"),
+        ("portfolio_manual", "1000000"),
+    ):
+        assert f'type="hidden" name="{field}" value="{value}"' in text
+    assert _state(owner) == (0, 0, 0)
+
+
 def test_step_validation_keeps_the_values_on_the_owning_step(owner) -> None:
     values = wizard_values(birth_year="")
     response = post_wizard(owner, 1, "next", values)
@@ -295,6 +382,117 @@ def test_the_review_shows_the_entered_values_and_no_metrics(owner) -> None:
     assert "data-fire-chart" not in text
     assert 'name="event_' not in text
     assert 'name="loan_' not in text
+
+
+def test_changing_a_step_four_assumption_refreshes_the_review_before_creating(owner) -> None:
+    values = wizard_values()
+    for step in (1, 2, 3):
+        post_wizard(owner, step, "next", values)
+    text = _step(post_wizard(owner, 3, "next", values), 4)
+    assert "Inflation 2.5%" in text
+
+    changed = wizard_values(inflation="3.5")
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        changed,
+        review_signature=review_signature(text),
+    )
+    assert response.status_code == 200
+    assert "The plan values changed" in response.text
+    assert "Inflation 3.5%" in response.text
+    assert _state(owner) == (0, 0, 0)
+
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        changed,
+        review_signature=review_signature(response.text),
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        row = session.scalars(
+            select(FireScenario).where(FireScenario.workspace_id == owner.home_id)
+        ).one()
+        assert row.inflation_bp == 350
+
+
+def test_the_review_button_refreshes_without_creating(owner) -> None:
+    values = wizard_values()
+    for step in (1, 2, 3):
+        post_wizard(owner, step, "next", values)
+    text = _step(post_wizard(owner, 3, "next", values), 4)
+
+    changed = wizard_values(real_return="6")
+    response = post_wizard(
+        owner,
+        4,
+        "review",
+        changed,
+        review_signature=review_signature(text),
+    )
+    assert response.status_code == 200
+    assert "real return 6%" in response.text
+    assert "data-fire-review" in response.text
+    assert _state(owner) == (0, 0, 0)
+
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        changed,
+        review_signature=review_signature(response.text),
+    )
+    assert response.status_code == 303
+
+
+def test_a_currency_change_between_steps_requires_a_fresh_review(owner) -> None:
+    values = wizard_values()
+    for step in (1, 2, 3):
+        post_wizard(owner, step, "next", values)
+    text = _step(post_wizard(owner, 3, "next", values), 4)
+
+    with owner.db() as session:
+        session.get_one(Workspace, owner.home_id).base_currency = "USD"
+        session.commit()
+
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        values,
+        review_signature=review_signature(text),
+    )
+    assert response.status_code == 200
+    assert "The plan values changed" in response.text
+    assert "$50,000.00" in response.text
+    assert ">USD<" in response.text
+    assert _state(owner) == (0, 0, 0)
+
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        values,
+        review_signature=review_signature(response.text),
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        row = session.scalars(
+            select(FireScenario).where(FireScenario.workspace_id == owner.home_id)
+        ).one()
+        assert row.currency == "USD"
+
+
+def test_a_tampered_step_four_amount_returns_to_the_amount_step(owner) -> None:
+    values = wizard_values(income_manual="")
+    response = post_wizard(owner, 4, "create", values)
+    assert response.status_code == 400
+    assert 'data-fire-wizard="2"' in response.text
+    assert 'data-field-error="income_manual"' in response.text
+    assert _state(owner) == (0, 0, 0)
 
 
 def test_a_double_submit_keeps_one_plan(owner) -> None:
@@ -397,32 +595,68 @@ def test_blocked_suggestions_keep_manual_entry(owner) -> None:
 
 
 def test_portfolio_suggestion_shows_sources_and_use(owner) -> None:
-    _seed_portfolio(owner)
+    item_id = _seed_portfolio(owner)
     values = wizard_values(portfolio_manual="")
     text = _step(post_wizard(owner, 2, "next", values), 3)
     assert 'name="portfolio_manual" value=""' in text
     assert 'data-suggested-minor="5000000"' in text
     assert "Cash test" in text
+    assert f'href="/net-worth?side=asset#item-{item_id}"' in text
+    assert 'data-fire-suggestion-source-link="networth_item"' in text
     assert 'data-use-suggestion="portfolio_manual"' in text
     text = _step(post_wizard(owner, 3, "next", values, use="portfolio_manual"), 3)
     assert 'name="portfolio_manual" value="50000.00"' in text
     assert _state(owner) == (0, 0, 0)
 
 
-def test_forged_event_and_loan_fields_create_no_events(owner) -> None:
+def test_portfolio_suggestion_links_asset_class_sources(owner) -> None:
+    class_id = _seed_asset_class(owner)
+    values = wizard_values(portfolio_manual="")
+    text = _step(post_wizard(owner, 2, "next", values), 3)
+    assert 'data-fire-suggestion-source="portfolio_class"' in text
+    assert f'href="/investments/classes#asset-class-{class_id}"' in text
+    assert 'data-fire-suggestion-source-link="portfolio_class"' in text
+
+
+def test_a_partial_window_shows_the_scaled_months_warning(owner) -> None:
+    income = _category(owner, "One month salary test", kind="income")
+    _transaction(owner, income, date(2026, 2, 1), 500_000, "income")
+    values = wizard_values(income_manual="")
+    text = _step(post_wizard(owner, 1, "next", values), 2)
+    assert 'data-fire-suggestion-warning="scaled_months"' in text
+    assert "Only 1 of the last 12 full months have data." in text
+
+
+def test_a_blocked_expense_suggestion_shows_no_placeholder_zero(owner) -> None:
+    expenses = _category(owner, "USD food test", kind="expense")
+    for day in _twelve_months():
+        _transaction(owner, expenses, day, 200_000, "expense", currency="USD")
+    values = wizard_values(income_manual="", expenses_manual="")
+    text = _step(post_wizard(owner, 1, "next", values), 2)
+    assert 'data-fire-suggestion-block="ledger_currency_mismatch"' in text
+    assert 'data-use-suggestion="expenses_manual"' not in text
+    assert "data-suggested-minor" not in text
+    assert 'name="expenses_manual" value=""' in text
+    assert _state(owner) == (0, 0, 0)
+
+
+def test_forged_event_and_loan_fields_are_ignored(owner) -> None:
     values = wizard_values()
     for step in (1, 2, 3):
         post_wizard(owner, step, "next", values)
+    text = _step(post_wizard(owner, 3, "next", values), 4)
     response = post_wizard(
         owner,
         4,
         "create",
         values,
-        event_year_1="2027",
-        event_kind_1="cash",
-        event_amount_1="1000",
+        review_signature=review_signature(text),
+        event_year_1="not-a-year",
+        event_kind_1="not-a-kind",
+        event_amount_1="not-an-amount",
         event_label_1="Forged",
         loan_id="00000000-0000-0000-0000-000000000000",
+        loan_amount="999",
     )
     assert response.status_code == 303
     with owner.db() as session:
@@ -435,14 +669,27 @@ def test_unusual_rates_need_the_confirmation(owner) -> None:
         post_wizard(owner, step, "next", values)
     text = _step(post_wizard(owner, 3, "next", values), 4)
     assert 'name="extreme_rates_confirmed"' in text
-    response = post_wizard(owner, 4, "create", values)
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        values,
+        review_signature=review_signature(text),
+    )
     assert response.status_code == 400
     assert 'data-fire-wizard="4"' in response.text
     assert _state(owner) == (0, 0, 0)
     confirmed = wizard_values(inflation="20", extreme_rates_confirmed="1")
     for step in (1, 2, 3):
         post_wizard(owner, step, "next", confirmed)
-    response = post_wizard(owner, 4, "create", confirmed)
+    text = _step(post_wizard(owner, 3, "next", confirmed), 4)
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        confirmed,
+        review_signature=review_signature(text),
+    )
     assert response.status_code == 303
     assert _state(owner) == (1, 0, 1)
 

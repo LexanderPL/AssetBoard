@@ -250,6 +250,18 @@ def test_an_update_error_renders_the_combined_page_with_the_form_open(owner) -> 
     assert "horizon" in response.text.lower()
 
 
+def test_an_empty_update_amount_points_at_the_amount_field(owner) -> None:
+    plan_id = _create(owner)
+    response = owner.post(
+        f"/fire/{plan_id}",
+        _form(income_manual=""),
+        token_from="/fire?edit=1",
+    )
+    assert response.status_code == 400
+    assert 'data-field-error="income_manual"' in response.text
+    assert 'aria-invalid="true"' in response.text
+
+
 def test_saving_preserves_the_basis_and_events(owner) -> None:
     plan_id = _create(owner)
     response = owner.post(

@@ -83,10 +83,12 @@
 
     {% if review %}
     <div class="border-t border-line pt-4" data-fire-review>
+      <input type="hidden" name="review_signature" value="{{ review.signature }}">
       <h3 class="text-base font-semibold">{{ _("Review your plan") }}</h3>
       <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
         <div><dt class="text-muted">{{ _("Birth year") }}</dt><dd class="font-medium">{{ review.birth_year }}</dd></div>
         <div><dt class="text-muted">{{ _("Current age") }}</dt><dd class="font-medium">{{ review.current_age }}</dd></div>
+        <div><dt class="text-muted">{{ _("Currency") }}</dt><dd class="font-medium">{{ review.currency }}</dd></div>
         <div><dt class="text-muted">{{ _("First and last projected year") }}</dt><dd class="font-medium">{{ review.first_year }} – {{ review.last_year }}</dd></div>
         <div><dt class="text-muted">{{ _("Income stops") }}</dt><dd class="font-medium">{{ _("Age %(age)d, in %(year)d", age=review.stop_working_age, year=review.stop_year) }}</dd></div>
         <div class="sm:col-span-2"><dt class="text-muted">{{ _("Yearly amounts") }}</dt><dd class="font-medium">{% if review.income is not none %}{{ _("Income %(amount)s", amount=format_money(review.income, locale)) }}{% endif %}{% if review.expenses is not none %} · {{ _("Expenses %(amount)s", amount=format_money(review.expenses, locale)) }}{% endif %}{% if review.portfolio is not none %} · {{ _("Portfolio %(amount)s", amount=format_money(review.portfolio, locale)) }}{% endif %}</dd></div>
@@ -110,6 +112,7 @@
       {% if step < last_step %}
       <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Next") }}</button>
       {% else %}
+      <button type="submit" name="go" value="review" class="btn" data-wizard-review>{{ _("Review changes") }}</button>
       <button type="submit" name="go" value="create" class="btn-primary" data-fire-create>{{ _("Create plan") }}</button>
       {% endif %}
       <a href="{{ cancel_url }}" class="btn" data-fire-cancel>{{ _("Cancel") }}</a>

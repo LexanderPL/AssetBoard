@@ -2985,6 +2985,11 @@ msgstr ""
 "Plan FIRE został zresetowany. Skonfiguruj nowy plan, kiedy będziesz "
 "gotowy."
 
+msgid "The plan values changed. Check the updated review, then press Create plan."
+msgstr ""
+"Wartości planu zmieniły się. Sprawdź zaktualizowane podsumowanie, a następnie naciśnij "
+"Utwórz plan."
+
 msgid "About you"
 msgstr "O Tobie"
 
@@ -7228,6 +7233,9 @@ msgstr "Wstecz"
 
 msgid "Next"
 msgstr "Następny"
+
+msgid "Review changes"
+msgstr "Przejrzyj zmiany"
 
 msgid "Create plan"
 msgstr "Utwórz plan"

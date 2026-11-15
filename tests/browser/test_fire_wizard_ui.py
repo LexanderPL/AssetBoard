@@ -186,6 +186,10 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-wizard]")).to_have_attribute("data-fire-wizard", "4")
             expect(page.locator("[data-fire-review]")).to_be_visible()
             expect(page.locator("[data-fire-wizard-loans]")).to_be_visible()
+            page.locator('input[name="inflation"]').fill("3.5")
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-wizard-review]").click()
+            expect(page.locator("[data-fire-review]")).to_contain_text("Inflation 3.5%")
             page.set_viewport_size({"width": 390, "height": 844})
             _no_page_overflow(page)
             page.set_viewport_size({"width": 1440, "height": 900})

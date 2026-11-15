@@ -367,9 +367,9 @@ def validate_plan_input(
         previous_rates=previous_rates,
     )
 
-    income_minor = validate_amount("income", plan.income, currency)
-    expenses_minor = validate_amount("expenses", plan.expenses, currency)
-    portfolio_minor = validate_amount("portfolio", plan.portfolio, currency)
+    income_minor = validate_amount("income_manual", plan.income, currency)
+    expenses_minor = validate_amount("expenses_manual", plan.expenses, currency)
+    portfolio_minor = validate_amount("portfolio_manual", plan.portfolio, currency)
 
     if rates.needs_extreme_confirmation and not plan.extreme_rates_confirmed and not preview:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")

@@ -87,7 +87,16 @@
     <ul class="mt-2 space-y-1 text-sm" data-fire-suggestion-sources>
       {% for row in portfolio.rows %}
       <li class="flex flex-wrap items-baseline justify-between gap-2" data-fire-suggestion-source="{{ row.source_kind }}">
-        <span class="inline-flex min-w-0 items-center gap-2">{{ swatch(row.color or "#94a3b8") }}<span class="min-w-0 break-words">{{ row.name or _("Unallocated") }}</span></span>
+        <span class="inline-flex min-w-0 items-center gap-2">
+          {{ swatch(row.color or "#94a3b8") }}
+          {% if row.source_id and row.source_kind == "portfolio_class" %}
+          <a href="{{ scoped_url(request, 'investments_classes') }}#asset-class-{{ row.source_id }}" class="min-w-0 break-words font-medium text-primary-ink underline underline-offset-2" data-fire-suggestion-source-link="{{ row.source_kind }}">{{ row.name }}</a>
+          {% elif row.source_id and row.source_kind == "networth_item" %}
+          <a href="{{ scoped_url(request, 'networth') }}?side=asset#item-{{ row.source_id }}" class="min-w-0 break-words font-medium text-primary-ink underline underline-offset-2" data-fire-suggestion-source-link="{{ row.source_kind }}">{{ row.name }}</a>
+          {% else %}
+          <span class="min-w-0 break-words">{{ row.name or _("Unallocated") }}</span>
+          {% endif %}
+        </span>
         <span class="tabular-nums">{{ format_money(row.amount, locale) }}</span>
       </li>
       {% endfor %}

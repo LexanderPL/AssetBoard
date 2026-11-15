@@ -632,8 +632,9 @@ class SetupSuggestions:
     """The F8.9 setup wizard's read-only suggestions.
 
     One resolution for the requested cards, sharing the as-of day, trailing window and warnings.
-    ``loan_portion`` is present only when the expense suggestion resolved; it is the subset of
-    those ledger expenses linked from a recorded loan payment (F8.12 adds live schedules).
+    A card with a block has no series/portfolio value here, so the UI cannot show a placeholder
+    zero. ``loan_portion`` is present only when the expense suggestion resolved; it is the subset
+    of those ledger expenses linked from a recorded loan payment (F8.12 adds live schedules).
     """
 
     as_of: date
@@ -687,18 +688,24 @@ def setup_suggestions_in_session(
         portfolio_mode="linked_investable" if include_portfolio else "manual",
         expense_exclusion_ids=(),
     )
+    blocked_fields = {block.field for block in linked.blocks}
+    # A blocked card has no usable suggestion. Do not keep the resolver's placeholder zero:
+    # the card must explain the block instead of showing an amount the user might trust.
+    income = linked.income if "income_manual" not in blocked_fields else None
+    expenses = linked.expenses if "expenses_manual" not in blocked_fields else None
+    portfolio = linked.portfolio if "portfolio_manual" not in blocked_fields else None
     loan_portion = (
         _loan_portion(session, ctx, currency=currency, window=linked.window)
-        if linked.expenses is not None
+        if expenses is not None
         else None
     )
     return SetupSuggestions(
         as_of=linked.as_of,
         window=linked.window,
         currency=currency,
-        income=linked.income,
-        expenses=linked.expenses,
-        portfolio=linked.portfolio,
+        income=income,
+        expenses=expenses,
+        portfolio=portfolio,
         loan_portion=loan_portion,
         warnings=linked.warnings,
         blocks=linked.blocks,
