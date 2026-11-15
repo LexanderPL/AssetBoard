@@ -51,7 +51,12 @@ from assetboard.web.context import CurrentContext
 from assetboard.web.fire_charts import build_fire_charts
 from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
 from assetboard.web.fire_sensitivity import build_sensitivity_view
-from assetboard.web.fire_suggestions import BLOCK_FALLBACK, block_messages, warning_text
+from assetboard.web.fire_suggestions import (
+    BLOCK_FALLBACK,
+    block_messages,
+    skipped_reason_labels,
+    warning_text,
+)
 from assetboard.web.forms import InvalidPercentOrFixed, signed_percent_to_bp
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
@@ -334,7 +339,11 @@ def _plan_input(
         stop_working_age=_required_int(values, "stop_working_age", "invalid_stop_age"),
         horizon_age=_required_int(values, "horizon_age", "invalid_horizon"),
         rule=values.get("rule", Rule.RETURNS_COVER_EXPENSES.value),
-        swr_bp=_optional_percent(values, "swr", locale),
+        swr_bp=(
+            _optional_percent(values, "swr", locale)
+            if values.get("rule") == Rule.SWR.value
+            else None
+        ),
         income=_plan_money(values, "income_manual", locale, currency, "income_manual"),
         expenses=_plan_money(values, "expenses_manual", locale, currency, "expenses_manual"),
         portfolio=_plan_money(values, "portfolio_manual", locale, currency, "portfolio_manual"),
@@ -373,6 +382,17 @@ def _wizard_values(
         if name in raw:
             values[name] = raw[name].strip()
     return values
+
+
+def _birth_year_source(values: dict[str, str], defaults: fire_service.FirePlanDefaults) -> str:
+    """Where the wizard's birth year came from: profile, empty, changed or missing."""
+    if defaults.birth_year is None:
+        return "missing"
+    if not values.get("birth_year"):
+        return "empty"
+    if values["birth_year"] == str(defaults.birth_year):
+        return "profile"
+    return "changed"
 
 
 def _wizard_summary(values: dict[str, str], current_year: int) -> dict[str, object]:
@@ -692,6 +712,7 @@ def _suggestion_context(
         "suggestion_block_messages": block_messages(locale),
         "suggestion_block_fallback": gettext(BLOCK_FALLBACK, locale),
         "suggestion_warning_text": warning_text,
+        "skipped_reason_labels": skipped_reason_labels(locale),
         "format_day": format_day,
     }
 
@@ -890,6 +911,8 @@ def _wizard_context(
         "currency": defaults.currency,
         "current_year": defaults.current_year,
         "profile_url": request.url_for("account").path,
+        "profile_birth_year": defaults.birth_year,
+        "birth_year_source": _birth_year_source(values, defaults),
         "cancel_url": request.url_for("fire_scenarios").path + "?cancelled=1",
         "suggestions": suggestions,
         "loan_section": loan_section,
@@ -898,6 +921,7 @@ def _wizard_context(
         "suggestion_block_messages": block_messages(locale),
         "suggestion_block_fallback": gettext(BLOCK_FALLBACK, locale),
         "suggestion_warning_text": warning_text,
+        "skipped_reason_labels": skipped_reason_labels(locale),
         "review": review,
         "error": error,
         "error_field": error_field,
