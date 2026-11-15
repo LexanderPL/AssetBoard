@@ -27,7 +27,7 @@
       <dd class="mt-1 text-lg font-semibold tabular-nums">{% if projection.fire_age is not none %}{{ projection.fire_age }} <span class="text-sm font-normal text-muted">({{ projection.fire_year }})</span>{% else %}—{% endif %}</dd>
     </div>
     <div class="border border-line bg-surface p-4" data-fire-years-to-fire>
-      <dt class="text-xs font-medium text-muted">{{ _("Years to FIRE") }} {{ hint(_("The number of plan years from the start year to the FIRE row. The start year counts as 0.")) }}</dt>
+      <dt class="text-xs font-medium text-muted">{{ _("Years to FIRE") }} {{ hint(_("The number of plan years from the current year to the FIRE row. The current year counts as 0.")) }}</dt>
       <dd class="mt-1 text-lg font-semibold tabular-nums" data-fire-years-value>{% if projection.years_to_fire is not none %}{{ projection.years_to_fire }}{% else %}—{% endif %}</dd>
     </div>
     <div class="border border-line bg-surface p-4" data-fire-number data-fire-number-value="{{ projection.fire_number_today.amount_minor if projection.fire_number_today is not none else '' }}">

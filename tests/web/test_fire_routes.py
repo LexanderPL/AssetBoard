@@ -110,12 +110,24 @@ def test_the_nav_link_and_the_create_form(owner) -> None:
         'name="income_manual"',
         'name="expenses_manual"',
         'name="portfolio_manual"',
-        'name="event_year_1"',
     ):
         assert marker in page.text
     assert 'name="name"' not in page.text
     assert 'name="income_mode"' not in page.text
     assert 'name="contribution_amount_1"' not in page.text
+
+
+def test_the_create_page_has_no_adjustments_editor(owner) -> None:
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-events" not in page.text
+    assert "data-event-table" not in page.text
+    assert "data-add-event" not in page.text
+    assert 'name="event_year_1"' not in page.text
+    assert 'name="event_amount_1"' not in page.text
+    assert 'name="event_label_1"' not in page.text
+    assert 'name="event_kind_1"' not in page.text
+    assert 'name="event_id_1"' not in page.text
 
 
 def test_create_redirects_to_the_plan_and_writes_once(owner) -> None:
@@ -149,6 +161,8 @@ def test_events_are_not_allowed_on_create(owner) -> None:
     )
     assert response.status_code == 400
     assert "Create the plan first" in response.text
+    assert "data-fire-events" not in response.text
+    assert 'name="event_year_1"' not in response.text
     assert _scenario_count(owner) == 0
 
 

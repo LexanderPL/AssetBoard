@@ -5864,8 +5864,9 @@ msgstr ""
 
 #, python-format
 msgid ""
-"All amounts are in %(currency)s and in today's money at the start of the "
-"plan. Enter the yearly income and expenses, including loan payments."
+"All amounts are in %(currency)s and in today's money in the plan's first "
+"year, which is the current year. Enter the yearly income and expenses, "
+"including loan payments."
 msgstr ""
 
 msgid "Annual income"
@@ -5965,8 +5966,8 @@ msgid "Years to FIRE"
 msgstr ""
 
 msgid ""
-"The number of plan years from the start year to the FIRE row. The start "
-"year counts as 0."
+"The number of plan years from the current year to the FIRE row. The "
+"current year counts as 0."
 msgstr ""
 
 msgid "FIRE number (today's money)"
@@ -6152,8 +6153,8 @@ msgid "No income"
 msgstr ""
 
 msgid ""
-"In the start year, net saving shows the starting portfolio, as in the "
-"original spreadsheet. Its gain is earned on that portfolio."
+"In the first year, net saving shows the starting portfolio. Its gain is "
+"earned on that portfolio."
 msgstr ""
 
 msgid ""
@@ -13110,5 +13111,25 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "FIRE default scenario promoted"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "All amounts are in %(currency)s and "
+#~ "in today's money at the start of"
+#~ " the plan. Enter the yearly income"
+#~ " and expenses, including loan payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The number of plan years from the"
+#~ " start year to the FIRE row. "
+#~ "The start year counts as 0."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the start year, net saving "
+#~ "shows the starting portfolio, as in "
+#~ "the original spreadsheet. Its gain is"
+#~ " earned on that portfolio."
 #~ msgstr ""
 
