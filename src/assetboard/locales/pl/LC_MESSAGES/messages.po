@@ -2806,6 +2806,9 @@ msgstr "Wybierz, jak plan ma określać niezależność finansową."
 msgid "Enter a valid non-negative amount in the plan currency."
 msgstr "Podaj prawidłową nieujemną kwotę w walucie planu."
 
+msgid "Enter a yearly amount in the plan currency. Enter 0 if the value is zero."
+msgstr "Podaj roczną kwotę w walucie planu. Wpisz 0, jeśli wartość wynosi zero."
+
 msgid "Enter a whole year for every row."
 msgstr "Podaj pełny rok w każdym wierszu."
 
@@ -2977,6 +2980,28 @@ msgstr ""
 "Stary scenariusz FIRE został przekształcony w format jednego planu. "
 "Sprawdź jego wartości."
 
+msgid "FIRE plan reset. Set up a new plan when you are ready."
+msgstr ""
+"Plan FIRE został zresetowany. Skonfiguruj nowy plan, kiedy będziesz "
+"gotowy."
+
+msgid "The plan values changed. Check the updated review, then press Create plan."
+msgstr ""
+"Wartości planu zmieniły się. Sprawdź zaktualizowane podsumowanie, a "
+"następnie naciśnij Utwórz plan."
+
+msgid "About you"
+msgstr "O Tobie"
+
+msgid "Income and expenses"
+msgstr "Dochody i wydatki"
+
+msgid "Portfolio"
+msgstr "Portfel"
+
+msgid "Assumptions and review"
+msgstr "Założenia i przegląd"
+
 msgid "Returns cover expenses"
 msgstr "Zwrot pokrywa wydatki"
 
@@ -3041,6 +3066,160 @@ msgid ""
 msgstr ""
 "FIRE w wieku %(age)d w %(year)d przy realnej stopie zwrotu %(rate)s i "
 "wydatkach na poziomie %(factor)s zapisanego planu."
+
+msgid ""
+"No regular income transactions fall in the last 12 full months, so there "
+"is no income suggestion. Enter an amount manually or add income to the "
+"ledger."
+msgstr ""
+"W ostatnich 12 pełnych miesiącach nie ma regularnych transakcji "
+"dochodowych, więc nie ma propozycji dochodu. Wpisz kwotę ręcznie lub "
+"dodaj dochód do księgi."
+
+msgid ""
+"No regular expense transactions fall in the last 12 full months, so there"
+" is no expense suggestion. Enter an amount manually or add expenses to "
+"the ledger."
+msgstr ""
+"W ostatnich 12 pełnych miesiącach nie ma regularnych transakcji "
+"wydatkowych, więc nie ma propozycji wydatków. Wpisz kwotę ręcznie lub "
+"dodaj wydatki do księgi."
+
+msgid ""
+"Every regular expense category in the window is excluded, so there is no "
+"expense suggestion. Enter an amount manually."
+msgstr ""
+"Wszystkie regularne kategorie wydatków w oknie są wykluczone, więc nie ma"
+" propozycji wydatków. Wpisz kwotę ręcznie."
+
+msgid ""
+"Some ledger rows in the window use another currency, so there is no "
+"suggestion. Enter an amount manually."
+msgstr ""
+"Niektóre wiersze księgi w oknie używają innej waluty, więc nie ma "
+"propozycji. Wpisz kwotę ręcznie."
+
+msgid ""
+"The workspace base currency no longer matches the plan currency, so there"
+" is no suggestion. Enter an amount manually."
+msgstr ""
+"Waluta bazowa obszaru roboczego nie odpowiada już walucie planu, więc nie"
+" ma propozycji. Wpisz kwotę ręcznie."
+
+msgid ""
+"The workspace base currency no longer matches the plan currency, so there"
+" is no suggestion. Reset the plan and set it up again."
+msgstr ""
+"Waluta bazowa obszaru roboczego nie odpowiada już walucie planu, więc nie"
+" ma propozycji. Zresetuj plan i skonfiguruj go ponownie."
+
+msgid ""
+"No investable portfolio classes or investable manual net-worth items were"
+" found, so there is no portfolio suggestion. Add data or enter an amount "
+"manually."
+msgstr ""
+"Nie znaleziono inwestowalnych klas portfela ani inwestowalnych ręcznych "
+"pozycji majątku, więc nie ma propozycji portfela. Dodaj dane lub wpisz "
+"kwotę ręcznie."
+
+msgid ""
+"An investable holding has no current price, so there is no portfolio "
+"suggestion. Add a price or enter an amount manually."
+msgstr ""
+"Inwestowalne aktywo nie ma aktualnej ceny, więc nie ma propozycji "
+"portfela. Dodaj cenę lub wpisz kwotę ręcznie."
+
+msgid ""
+"An investable holding has no FX rate to the plan currency, so there is no"
+" portfolio suggestion. Add a rate or enter an amount manually."
+msgstr ""
+"Inwestowalne aktywo nie ma kursu walutowego do waluty planu, więc nie ma "
+"propozycji portfela. Dodaj kurs lub wpisz kwotę ręcznie."
+
+msgid ""
+"An investable net-worth item has no value effective today, so there is no"
+" portfolio suggestion. Add a valuation or enter an amount manually."
+msgstr ""
+"Inwestowalna pozycja majątku nie ma wartości obowiązującej dziś, więc nie"
+" ma propozycji portfela. Dodaj wycenę lub wpisz kwotę ręcznie."
+
+msgid ""
+"An investable net-worth item has no FX rate to the plan currency, so "
+"there is no portfolio suggestion. Add a rate or enter an amount manually."
+msgstr ""
+"Inwestowalna pozycja majątku nie ma kursu walutowego do waluty planu, "
+"więc nie ma propozycji portfela. Dodaj kurs lub wpisz kwotę ręcznie."
+
+msgid "This suggestion is unavailable. Enter an amount manually."
+msgstr "Ta propozycja jest niedostępna. Wpisz kwotę ręcznie."
+
+msgid "Review this suggestion before using it."
+msgstr "Sprawdź tę propozycję przed użyciem."
+
+#, python-format
+msgid ""
+"Only %(months)d of the last 12 full months have data. The yearly amount "
+"is scaled from those months."
+msgstr ""
+"Dane są dostępne tylko w %(months)d z ostatnich 12 pełnych miesięcy. "
+"Roczna kwota jest przeliczona z tych miesięcy."
+
+#, python-format
+msgid ""
+"The latest included data is from %(month)s, before the window ends on "
+"%(end)s."
+msgstr ""
+"Najnowsze uwzględnione dane pochodzą z %(month)s, przed końcem okna "
+"%(end)s."
+
+#, python-format
+msgid "The plan starts in %(start)d but the data is as of %(current)d."
+msgstr "Plan zaczyna się w %(start)d, ale dane są na %(current)d."
+
+#, python-format
+msgid "The latest price for %(name)s is stale."
+msgstr "Najnowsza cena dla %(name)s jest nieaktualna."
+
+#, python-format
+msgid "The latest FX rate for %(name)s is stale."
+msgstr "Najnowszy kurs walutowy dla %(name)s jest nieaktualny."
+
+msgid ""
+"The portfolio sources sum to zero today. The suggestion is zero; enter a "
+"value manually if that is not what you expect."
+msgstr ""
+"Źródła portfela sumują się dziś do zera. Propozycja wynosi zero; wpisz "
+"wartość ręcznie, jeśli to nie jest oczekiwane."
+
+#, python-format
+msgid ""
+"%(count)d non-investable asset class is excluded from the portfolio "
+"suggestion."
+msgid_plural ""
+"%(count)d non-investable asset classes are excluded from the portfolio "
+"suggestion."
+msgstr[0] ""
+"%(count)d klasa aktywów nieinwestycyjnych jest wykluczona z propozycji "
+"portfela."
+msgstr[1] ""
+"%(count)d klasy aktywów nieinwestycyjnych są wykluczone z propozycji "
+"portfela."
+msgstr[2] ""
+"%(count)d klas aktywów nieinwestycyjnych jest wykluczonych z propozycji "
+"portfela."
+
+#, python-format
+msgid "%(count)d linked net-worth item is skipped to avoid double counting."
+msgid_plural "%(count)d linked net-worth items are skipped to avoid double counting."
+msgstr[0] ""
+"%(count)d powiązana pozycja majątku jest pominięta, aby uniknąć "
+"podwójnego liczenia."
+msgstr[1] ""
+"%(count)d powiązane pozycje majątku są pominięte, aby uniknąć podwójnego "
+"liczenia."
+msgstr[2] ""
+"%(count)d powiązanych pozycji majątku jest pominiętych, aby uniknąć "
+"podwójnego liczenia."
 
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
@@ -6514,6 +6693,9 @@ msgstr "Prognoza jest niedostępna"
 msgid "The plan cannot be projected."
 msgstr "Nie można prognozować planu."
 
+msgid "Reset plan"
+msgstr "Zresetuj plan"
+
 msgid ""
 "These adjustments are before the plan's current year (or a saving "
 "override in the current year) and are not applied to the projection. They"
@@ -6598,6 +6780,59 @@ msgstr ""
 msgid "Show sensitivity grid"
 msgstr "Pokaż siatkę analizy wrażliwości"
 
+msgid "per year"
+msgstr "rocznie"
+
+#, python-format
+msgid ""
+"Window %(start)s – %(end)s · %(months)d months with data · window total "
+"%(total)s."
+msgstr ""
+"Okno %(start)s – %(end)s · %(months)d miesięcy z danymi · suma w oknie "
+"%(total)s."
+
+msgid "Use suggested value"
+msgstr "Użyj proponowanej wartości"
+
+#, python-format
+msgid "for %(label)s"
+msgstr "dla: %(label)s"
+
+msgid "Expenses by category in the window"
+msgstr "Wydatki według kategorii w oknie"
+
+msgid "Window total"
+msgstr "Suma w oknie"
+
+#, python-format
+msgid ""
+"Loan payments linked to ledger expenses in this window: %(amount)s in "
+"%(months)d months."
+msgstr ""
+"Spłaty kredytów powiązane z wydatkami w księdze w tym oknie: %(amount)s w"
+" %(months)d miesiącach."
+
+msgid ""
+"No ledger expenses in this window are linked to recorded loan payments. "
+"If you pay loans, make sure the amount you enter includes those payments."
+msgstr ""
+"Żadne wydatki w księdze w tym oknie nie są powiązane z zapisanymi "
+"spłatami kredytów. Jeśli spłacasz kredyty, upewnij się, że wpisana kwota "
+"je obejmuje."
+
+msgid "Suggested starting portfolio"
+msgstr "Proponowany portfel początkowy"
+
+#, python-format
+msgid "Investable assets as of %(day)s."
+msgstr "Inwestowalne aktywa na %(day)s."
+
+msgid "for the starting portfolio"
+msgstr "dla portfela początkowego"
+
+msgid "Where this value comes from"
+msgstr "Skąd pochodzi ta wartość"
+
 msgid "Year by year"
 msgstr "Rok po roku"
 
@@ -6645,6 +6880,13 @@ msgid ""
 msgstr ""
 "Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
 " wyczerpany wiersz jest oznaczony na czerwono."
+
+msgid ""
+"Active loans are not listed during setup yet. They will be included in "
+"the plan after you create it."
+msgstr ""
+"Aktywne kredyty nie są jeszcze wyświetlane podczas konfiguracji. Zostaną "
+"uwzględnione w planie po jego utworzeniu."
 
 msgid "Choose your FIRE plan"
 msgstr "Wybierz plan FIRE"
@@ -6704,21 +6946,73 @@ msgstr ""
 msgid "FIRE plan"
 msgstr "Plan FIRE"
 
-msgid "Open your profile"
-msgstr "Otwórz swój profil"
+msgid "Setup cancelled"
+msgstr "Anulowano konfigurację"
+
+msgid "No FIRE plan yet"
+msgstr "Nie ma jeszcze planu FIRE"
+
+msgid "No plan was created. You can start the setup again whenever you are ready."
+msgstr ""
+"Nie utworzono planu. Możesz rozpocząć konfigurację ponownie, kiedy "
+"będziesz gotowy."
 
 msgid ""
-"Projections are illustrative and not financial advice. The starting rates"
-" are examples, not recommendations."
+"The FIRE plan is a current-year projection of your income, expenses and "
+"investable assets."
 msgstr ""
-"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
-"Początkowe stopy są przykładami, a nie rekomendacjami."
+"Plan FIRE to prognoza na bieżący rok na podstawie dochodów, wydatków i "
+"inwestowalnych aktywów."
 
-msgid "Create plan"
-msgstr "Utwórz plan"
+msgid "Set up your FIRE plan"
+msgstr "Skonfiguruj plan FIRE"
+
+msgid "An editor or owner can set up the FIRE plan."
+msgstr "Plan FIRE może skonfigurować edytor lub właściciel."
+
+msgid "Reset FIRE plan"
+msgstr "Zresetuj plan FIRE"
+
+msgid "Reset the FIRE plan?"
+msgstr "Zresetować plan FIRE?"
+
+#, python-format
+msgid ""
+"This deletes the plan and all %(count)d adjustments (%(archived)d "
+"archived) for good. It cannot be undone, and the app keeps no copy."
+msgstr ""
+"Spowoduje to trwałe usunięcie planu i wszystkich korekt: %(count)d (w tym"
+" archiwalnych: %(archived)d). Nie można tego cofnąć, a aplikacja nie "
+"zachowuje kopii."
+
+#, python-format
+msgid ""
+"The plan is in %(plan_currency)s but the workspace uses "
+"%(workspace_currency)s. Resetting lets you set up a new plan in the "
+"workspace currency."
+msgstr ""
+"Plan jest w %(plan_currency)s, ale obszar roboczy używa "
+"%(workspace_currency)s. Reset pozwoli skonfigurować nowy plan w walucie "
+"obszaru roboczego."
+
+msgid "Want a copy first?"
+msgstr "Chcesz najpierw kopię?"
+
+msgid "Download a workspace archive from Export and import"
+msgstr "Pobierz archiwum obszaru roboczego na stronie Eksport i import"
+
+msgid "It includes the plan and its adjustments."
+msgstr "Zawiera plan i jego korekty."
+
+#, python-format
+msgid "To confirm, type %(word)s:"
+msgstr "Aby potwierdzić, wpisz %(word)s:"
 
 msgid "Edit plan"
 msgstr "Edytuj plan"
+
+msgid "Open your profile"
+msgstr "Otwórz swój profil"
 
 msgid ""
 "This plan was converted from the old format. Review its values and save "
@@ -6769,6 +7063,182 @@ msgid ""
 msgstr ""
 "Dochód kończy się po horyzoncie planu. Plan jest zapisany, ale prognoza "
 "nie ma lat pracy po wieku %(horizon)d."
+
+msgid "Steps"
+msgstr "Kroki"
+
+#, python-format
+msgid "Step %(step)s of %(total)s: %(label)s"
+msgstr "Krok %(step)s z %(total)s: %(label)s"
+
+msgid ""
+"Used to turn plan years into ages. Prefilled from your profile; you can "
+"change it for this plan."
+msgstr ""
+"Służy do zamiany lat planu na wiek. Jest wstępnie wypełniany z profilu; "
+"możesz go zmienić dla tego planu."
+
+msgid "Required. Add it to your profile to prefill it next time."
+msgstr ""
+"Wymagane. Dodaj je do profilu, aby następnym razem było wstępnie "
+"wypełnione."
+
+msgid ""
+"The age at which income stops; from then on the plan spends from the "
+"portfolio. Enter the age you stop working, not the year."
+msgstr ""
+"Wiek, w którym kończy się dochód; od tego momentu plan korzysta z "
+"portfela. Podaj wiek zakończenia pracy, a nie rok."
+
+msgid "Required. Enter 0 only if income already stopped."
+msgstr "Wymagane. Wpisz 0 tylko wtedy, gdy dochód już się zakończył."
+
+#, python-format
+msgid "You are %(age)d in %(year)d."
+msgstr "W %(year)d: wiek %(age)d."
+
+#, python-format
+msgid "The plan runs from %(first)d to %(last)d."
+msgstr "Plan obejmuje lata %(first)d–%(last)d."
+
+#, python-format
+msgid "Base income stops at age %(age)d, in %(year)d."
+msgstr "Dochód bazowy kończy się w wieku %(age)d, w %(year)d."
+
+msgid ""
+"Income already stops at or before your current age, so base income will "
+"be zero."
+msgstr ""
+"Dochód kończy się już w Twoim wieku lub wcześniej, więc dochód bazowy "
+"wyniesie zero."
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon; the projection has no working "
+"years beyond age %(horizon)s."
+msgstr ""
+"Dochód kończy się po horyzoncie planu; prognoza nie ma lat pracy po wieku"
+" %(horizon)s."
+
+#, python-format
+msgid ""
+"Enter yearly amounts in %(currency)s for %(year)d. Use the amounts you "
+"actually receive and spend, after tax."
+msgstr ""
+"Podaj roczne kwoty w %(currency)s na rok %(year)d. Użyj kwot, które "
+"faktycznie otrzymujesz i wydajesz, po podatkach."
+
+msgid ""
+"Regular income you receive in a year: earnings, dividends and interest. "
+"Use the after-tax amount."
+msgstr ""
+"Regularny dochód otrzymywany w ciągu roku: zarobki, dywidendy i odsetki. "
+"Użyj kwoty po podatkach."
+
+msgid "Required. Enter 0 if this does not apply."
+msgstr "Wymagane. Wpisz 0, jeśli nie dotyczy."
+
+msgid "Suggested annual income"
+msgstr "Proponowany roczny dochód"
+
+msgid ""
+"Regular yearly spending, including your loan payments. Savings and "
+"transfers are not expenses."
+msgstr ""
+"Regularne roczne wydatki, w tym spłaty kredytów. Oszczędności i przelewy "
+"nie są wydatkami."
+
+msgid "Suggested annual expenses"
+msgstr "Proponowane roczne wydatki"
+
+msgid ""
+"A suggestion never fills a field by itself. Press Use suggested value to "
+"copy one, then change it if you want."
+msgstr ""
+"Propozycja nigdy nie wypełnia pola samodzielnie. Kliknij Użyj "
+"proponowanej wartości, aby ją skopiować, a potem zmień ją, jeśli chcesz."
+
+#, python-format
+msgid ""
+"Enter the investable assets you hold today in %(currency)s: investments "
+"and cash savings, not your home."
+msgstr ""
+"Podaj inwestowalne aktywa, które posiadasz dziś, w %(currency)s: "
+"inwestycje i oszczędności gotówkowe, bez domu."
+
+msgid "Review your plan"
+msgstr "Przejrzyj plan"
+
+msgid "Current age"
+msgstr "Obecny wiek"
+
+msgid "First and last projected year"
+msgstr "Pierwszy i ostatni prognozowany rok"
+
+#, python-format
+msgid "Age %(age)d, in %(year)d"
+msgstr "Wiek %(age)d, w %(year)d"
+
+msgid "Yearly amounts"
+msgstr "Roczne kwoty"
+
+#, python-format
+msgid "Income %(amount)s"
+msgstr "Dochód %(amount)s"
+
+#, python-format
+msgid "Expenses %(amount)s"
+msgstr "Wydatki %(amount)s"
+
+#, python-format
+msgid "Portfolio %(amount)s"
+msgstr "Portfel %(amount)s"
+
+#, python-format
+msgid ""
+"Inflation %(inflation)s · real return %(real_return)s · income growth "
+"%(growth)s"
+msgstr ""
+"Inflacja %(inflation)s · realny zwrot %(real_return)s · wzrost dochodu "
+"%(growth)s"
+
+#, python-format
+msgid "withdrawal rate %(swr)s"
+msgstr "stopa wypłat %(swr)s"
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon; the projection has no working "
+"years beyond age %(horizon)d."
+msgstr ""
+"Dochód kończy się po horyzoncie planu; prognoza nie ma lat pracy po wieku"
+" %(horizon)d."
+
+msgid "Adjustments can be added after the plan is created."
+msgstr "Korekty można dodać po utworzeniu planu."
+
+msgid ""
+"Projections are illustrative and not financial advice. The starting rates"
+" are examples, not recommendations. The projection assumes constant rates"
+" and does not model taxes separately. Nothing is saved until you press "
+"Create plan."
+msgstr ""
+"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
+"Początkowe stopy są przykładami, a nie rekomendacjami. Prognoza zakłada "
+"stałe stopy i nie modeluje podatków osobno. Nic nie zostanie zapisane, "
+"dopóki nie klikniesz Utwórz plan."
+
+msgid "Back"
+msgstr "Wstecz"
+
+msgid "Next"
+msgstr "Następny"
+
+msgid "Review changes"
+msgstr "Przejrzyj zmiany"
+
+msgid "Create plan"
+msgstr "Utwórz plan"
 
 msgid "Filters"
 msgstr "Filtry"
@@ -6907,9 +7377,6 @@ msgstr "Poprzedni"
 #, python-format
 msgid "Page %(number)d of %(pages)d"
 msgstr "Strona %(number)d z %(pages)d"
-
-msgid "Next"
-msgstr "Następny"
 
 msgid ""
 "Tick entries in the list, or change all entries that match the filters. "
@@ -7268,13 +7735,6 @@ msgstr "Zarchiwizować źródło przychodu %(name)s?"
 msgid "Add income"
 msgstr "Dodaj przychód"
 
-msgid "Steps"
-msgstr "Kroki"
-
-#, python-format
-msgid "Step %(step)s of %(total)s: %(label)s"
-msgstr "Krok %(step)s z %(total)s: %(label)s"
-
 msgid "Which taxes apply to this income?"
 msgstr "Które podatki dotyczą tego przychodu?"
 
@@ -7290,9 +7750,6 @@ msgstr "Nie ma jeszcze żadnych podatków."
 
 msgid "Set up a new tax"
 msgstr "Dodaj nowy podatek"
-
-msgid "Back"
-msgstr "Wstecz"
 
 msgid "Where your money comes from and what you will receive next."
 msgstr "Skąd pochodzą twoje pieniądze i co otrzymasz w najbliższym czasie."
@@ -7951,9 +8408,6 @@ msgstr "Brak transakcji inwestycyjnych z datą. Zapisz zakup, aby zobaczyć wyni
 
 msgid "Go to transactions"
 msgstr "Przejdź do transakcji"
-
-msgid "Portfolio"
-msgstr "Portfel"
 
 #, python-format
 msgid "Valued on %(date)s in %(currency)s"

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "fire/_macros.html" import field_attrs, field_error, hint with context %}
+{% from "fire/_suggestion.html" import amount_suggestion, portfolio_suggestion with context %}
+{% block title %}{{ _("Set up your FIRE plan") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Set up your FIRE plan") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+<ol class="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="{{ _('Steps') }}" data-wizard-steps>
+  {% for label in steps %}
+  <li class="flex items-center gap-2 {% if loop.index == step %}font-semibold text-ink {% else %}text-muted {% endif %}"{% if loop.index == step %} aria-current="step"{% endif %}>
+    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold {% if loop.index == step %}bg-primary text-on-primary {% elif loop.index < step %}bg-primary-soft text-primary-ink {% else %}border border-line {% endif %}" aria-hidden="true">{{ loop.index }}</span>{{ label }}
+  </li>
+  {% endfor %}
+</ol>
+<section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading" data-fire-wizard="{{ step }}">
+  <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
+  {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+  {% if error and not error_is_field %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form id="fire-wizard" method="post" action="{{ scoped_url(request, 'fire_wizard_step') }}" class="grid gap-6" data-fire-wizard-form novalidate>
+    {{ csrf_input() }}
+    <input type="hidden" name="step" value="{{ step }}">
+    {% for name in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ values.get(name, '') }}">{% endfor %}
+
+    {% if step == 1 %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Birth year") }} {{ hint(_("Used to turn plan years into ages. Prefilled from your profile; you can change it for this plan.")) }}<input name="birth_year" value="{{ values.get('birth_year', '') }}" inputmode="numeric" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "birth_year") }}>{{ field_error(error_field, "birth_year", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Add it to your profile to prefill it next time.") }} <a href="{{ profile_url }}" class="underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a></span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Horizon age") }} {{ hint(_("The last age shown in the projection. It defaults from your profile's life expectancy.")) }}<input name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>{{ field_error(error_field, "horizon_age", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Income stops at age") }} {{ hint(_("The age at which income stops; from then on the plan spends from the portfolio. Enter the age you stop working, not the year.")) }}<input name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>{{ field_error(error_field, "stop_working_age", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Enter 0 only if income already stopped.") }}</span></label>
+    </div>
+    <div class="border border-line bg-subtle px-4 py-3 text-sm" data-fire-wizard-summary>
+      <p class="font-medium">{{ _("The projection always starts in the current calendar year.") }}</p>
+      <p class="mt-1 text-muted">
+        {% if current_age is not none %}{{ _("You are %(age)d in %(year)d.", age=current_age, year=current_year) }}{% endif %}
+        {% if last_year %}{{ _("The plan runs from %(first)d to %(last)d.", first=current_year, last=last_year) }}{% endif %}
+        {% if stop_year %}{{ _("Base income stops at age %(age)d, in %(year)d.", age=values.get('stop_working_age', ''), year=stop_year) }}{% endif %}
+      </p>
+      {% if horizon_warning %}<p role="status" class="mt-2 border border-warning-line bg-warning-soft px-3 py-2 text-warning-strong" data-fire-horizon-warning>{{ _("The horizon age must be older than your current age.") }}</p>{% endif %}
+      {% if income_stopped %}<p role="status" class="mt-2 border border-warning-line bg-warning-soft px-3 py-2 text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income will be zero.") }}</p>{% endif %}
+      {% if stop_after_horizon %}<p role="status" class="mt-2 border border-warning-line bg-warning-soft px-3 py-2 text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon; the projection has no working years beyond age %(horizon)s.", horizon=values.get('horizon_age', '')) }}</p>{% endif %}
+    </div>
+
+    {% elif step == 2 %}
+    <p class="text-sm text-muted">{{ _("Enter yearly amounts in %(currency)s for %(year)d. Use the amounts you actually receive and spend, after tax.", currency=currency, year=current_year) }}</p>
+    <div class="grid gap-5 lg:grid-cols-2">
+      <div class="grid content-start gap-3">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual income") }} {{ hint(_("Regular income you receive in a year: earnings, dividends and interest. Use the after-tax amount.")) }}<input name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_manual") }}>{{ field_error(error_field, "income_manual", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Enter 0 if this does not apply.") }}</span></label>
+        {% if suggestions %}{{ amount_suggestion(suggestions, "income_manual", "income", _("Suggested annual income"), locale, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text) }}{% endif %}
+      </div>
+      <div class="grid content-start gap-3">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending, including your loan payments. Savings and transfers are not expenses.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Enter 0 if this does not apply.") }}</span></label>
+        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text) }}{% endif %}
+      </div>
+    </div>
+    <p class="border border-line bg-subtle px-4 py-3 text-sm text-muted">{{ _("A suggestion never fills a field by itself. Press Use suggested value to copy one, then change it if you want.") }}</p>
+
+    {% elif step == 3 %}
+    <p class="text-sm text-muted">{{ _("Enter the investable assets you hold today in %(currency)s: investments and cash savings, not your home.", currency=currency) }}</p>
+    <div class="grid gap-5 lg:grid-cols-2">
+      <div class="grid content-start gap-3">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets today: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Enter 0 if this does not apply.") }}</span></label>
+      </div>
+      <div class="grid content-start gap-3">
+        {% if suggestions %}{{ portfolio_suggestion(suggestions, "portfolio_manual", locale, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text) }}{% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Inflation (%%)") }} {{ hint(_("The yearly rise in prices. It reduces what the portfolio can buy.")) }}<input name="inflation" value="{{ values.get('inflation', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "inflation") }}>{{ field_error(error_field, "inflation", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Real return (%%)") }} {{ hint(_("The yearly investment return above inflation. It is not a promise of future returns.")) }}<input name="real_return" value="{{ values.get('real_return', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "real_return") }}>{{ field_error(error_field, "real_return", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Income growth (%%)") }} {{ hint(_("How much your income grows each year until it stops.")) }}<input name="income_growth" value="{{ values.get('income_growth', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_growth") }}>{{ field_error(error_field, "income_growth", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Independence rule") }} {{ hint(_("Returns cover expenses: independent when the portfolio's return pays the inflated expenses. Withdrawal rate: independent when the portfolio is large enough for a chosen safe withdrawal rate.")) }}<select name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ field_error(error_field, "rule", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Withdrawal rate (%%)") }} {{ hint(_("Only used with the withdrawal-rate rule. The share of the portfolio withdrawn in the first year of retirement. 4%% is a common example, not a rule.")) }}<input name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr") }}>{{ field_error(error_field, "swr", error) }}</label>
+    </div>
+    {% set show_extreme = (review and review.needs_extreme_confirmation) or error_field == "extreme_rates_confirmed" %}
+    {% if show_extreme %}
+    <div class="border-t border-line pt-4">
+      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="extreme_rates_confirmed" value="1"{% if values.get('extreme_rates_confirmed') == '1' %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{{ field_attrs(error_field, "extreme_rates_confirmed") }}> <span>{{ _("I confirm these unusual rates are intentional") }}<span class="block text-xs text-muted">{{ _("Unusual means inflation outside 0–10%%, real return outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</span></span></label>
+      {{ field_error(error_field, "extreme_rates_confirmed", error) }}
+    </div>
+    {% endif %}
+
+    {% if review %}
+    <div class="border-t border-line pt-4" data-fire-review>
+      <input type="hidden" name="review_signature" value="{{ review.signature }}">
+      <h3 class="text-base font-semibold">{{ _("Review your plan") }}</h3>
+      <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt class="text-muted">{{ _("Birth year") }}</dt><dd class="font-medium">{{ review.birth_year }}</dd></div>
+        <div><dt class="text-muted">{{ _("Current age") }}</dt><dd class="font-medium">{{ review.current_age }}</dd></div>
+        <div><dt class="text-muted">{{ _("Currency") }}</dt><dd class="font-medium">{{ review.currency }}</dd></div>
+        <div><dt class="text-muted">{{ _("First and last projected year") }}</dt><dd class="font-medium">{{ review.first_year }} – {{ review.last_year }}</dd></div>
+        <div><dt class="text-muted">{{ _("Income stops") }}</dt><dd class="font-medium">{{ _("Age %(age)d, in %(year)d", age=review.stop_working_age, year=review.stop_year) }}</dd></div>
+        <div class="sm:col-span-2"><dt class="text-muted">{{ _("Yearly amounts") }}</dt><dd class="font-medium">{% if review.income is not none %}{{ _("Income %(amount)s", amount=format_money(review.income, locale)) }}{% endif %}{% if review.expenses is not none %} · {{ _("Expenses %(amount)s", amount=format_money(review.expenses, locale)) }}{% endif %}{% if review.portfolio is not none %} · {{ _("Portfolio %(amount)s", amount=format_money(review.portfolio, locale)) }}{% endif %}</dd></div>
+        <div class="sm:col-span-2"><dt class="text-muted">{{ _("Assumptions") }}</dt><dd class="font-medium">{{ _("Inflation %(inflation)s · real return %(real_return)s · income growth %(growth)s", inflation=format_rate_short(review.inflation_bp, locale), real_return=format_rate_short(review.real_return_bp, locale), growth=format_rate_short(review.income_growth_bp, locale)) }}{% if review.swr_bp is not none %} · {{ _("withdrawal rate %(swr)s", swr=format_rate_short(review.swr_bp, locale)) }}{% endif %} · {{ rule_labels.get(review.rule.value, review.rule.value) }}</dd></div>
+      </dl>
+      {% if review.income_stopped %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income will be zero.") }}</p>{% endif %}
+      {% if review.stop_after_horizon %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon; the projection has no working years beyond age %(horizon)d.", horizon=review.last_year - review.birth_year) }}</p>{% endif %}
+      <p class="mt-3 text-sm text-muted">{{ _("Adjustments can be added after the plan is created.") }}</p>
+    </div>
+    {% endif %}
+
+    {% include "fire/_wizard_loans.html" %}
+
+    <p class="border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The starting rates are examples, not recommendations. The projection assumes constant rates and does not model taxes separately. Nothing is saved until you press Create plan.") }}</p>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-3">
+      {% if step > 1 %}
+      <button type="submit" name="go" value="back" formnovalidate class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle" data-wizard-back>{{ _("Back") }}</button>
+      {% endif %}
+      {% if step < last_step %}
+      <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Next") }}</button>
+      {% else %}
+      <button type="submit" name="go" value="review" class="btn" data-wizard-review>{{ _("Review changes") }}</button>
+      <button type="submit" name="go" value="create" class="btn-primary" data-fire-create>{{ _("Create plan") }}</button>
+      {% endif %}
+      <a href="{{ cancel_url }}" class="btn" data-fire-cancel>{{ _("Cancel") }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent
 from assetboard.services.context import Role
+from tests.fire_helpers import create_plan
 
 
 def _form(**overrides: str) -> dict[str, str]:
@@ -38,17 +39,7 @@ def _form(**overrides: str) -> dict[str, str]:
 
 
 def _create(owner, **overrides: str) -> UUID:
-    response = owner.post("/fire", _form(), token_from="/fire")
-    assert response.status_code == 303, response.text
-    plan_id = UUID(response.headers["location"].split("?")[0].rsplit("/", 1)[-1])
-    if overrides:
-        response = owner.post(
-            f"/fire/{plan_id}",
-            _form(**overrides),
-            token_from=f"/fire/{plan_id}?edit=1",
-        )
-        assert response.status_code == 303, response.text
-    return plan_id
+    return create_plan(owner, **overrides)
 
 
 def _fire_age(html: str) -> str:
@@ -84,14 +75,19 @@ def _snapshot(owner, plan_id: UUID) -> tuple[Any, tuple[UUID, ...], int]:
 
 
 def test_the_combined_page_shows_results_first_then_the_collapsible_inputs(owner) -> None:
-    plan_id = _create(
-        owner,
-        event_year_1="2028",
-        event_kind_1="expense_change",
-        event_amount_1="-1200",
-        event_label_1="Mortgage repaid",
+    plan_id = _create(owner)
+    response = owner.post(
+        f"/fire/{plan_id}",
+        _form(
+            event_year_1="2028",
+            event_kind_1="expense_change",
+            event_amount_1="-1200",
+            event_label_1="Mortgage repaid",
+        ),
+        token_from="/fire?edit=1",
     )
-    page = owner.client.get(f"/fire/{plan_id}")
+    assert response.status_code == 303, response.text
+    page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-overview" in page.text
     assert "data-fire-results" in page.text
@@ -121,8 +117,8 @@ def test_the_combined_page_shows_results_first_then_the_collapsible_inputs(owner
 
 
 def test_the_basis_toggle_switches_the_table_and_chart_to_real_values(owner) -> None:
-    plan_id = _create(owner)
-    page = owner.client.get(f"/fire/{plan_id}?basis=real")
+    _create(owner)
+    page = owner.client.get("/fire?basis=real")
     assert page.status_code == 200
     assert 'data-fire-basis="real"' in page.text
     assert re.search(
@@ -138,7 +134,7 @@ def test_a_preview_posts_the_chosen_basis_with_unsaved_values_and_writes_nothing
     response = owner.post(
         f"/fire/{plan_id}/preview",
         _form(basis="real", income_manual="60000"),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 200
     assert "Preview of unsaved changes" in response.text
@@ -149,7 +145,7 @@ def test_a_preview_posts_the_chosen_basis_with_unsaved_values_and_writes_nothing
 
 
 def test_never_reached_and_depletion_states_are_explained(owner) -> None:
-    plan_id = _create(
+    _create(
         owner,
         real_return="-5",
         income_manual="10000",
@@ -157,7 +153,7 @@ def test_never_reached_and_depletion_states_are_explained(owner) -> None:
         portfolio_manual="100000",
         extreme_rates_confirmed="1",
     )
-    page = owner.client.get(f"/fire/{plan_id}")
+    page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-sustainability" in page.text
     assert "runs out at age" in page.text or "never" in page.text.lower()
@@ -179,7 +175,7 @@ def test_a_blocked_projection_hides_results_and_returns_409_for_csv(owner) -> No
     with owner.db() as session:
         session.get_one(FireScenario, plan_id).currency = "USD"
         session.commit()
-    page = owner.client.get(f"/fire/{plan_id}")
+    page = owner.client.get("/fire")
     assert page.status_code == 200
     assert 'data-fire-blocked="plan_currency_mismatch"' in page.text
     assert "data-fire-metrics" not in page.text
@@ -189,11 +185,11 @@ def test_a_blocked_projection_hides_results_and_returns_409_for_csv(owner) -> No
 
 def test_preview_returns_only_the_fragment_with_changed_metrics(owner) -> None:
     plan_id = _create(owner)
-    saved = owner.client.get(f"/fire/{plan_id}").text
+    saved = owner.client.get("/fire").text
     response = owner.post(
         f"/fire/{plan_id}/preview",
         _form(expenses_manual="40000"),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 200
     assert "data-fire-metrics" in response.text
@@ -205,7 +201,7 @@ def test_an_invalid_preview_keeps_saved_results_and_names_the_field(owner) -> No
     response = owner.post(
         f"/fire/{plan_id}/preview",
         _form(income_manual="-1"),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 200
     assert "data-fire-preview-error" in response.text
@@ -222,7 +218,7 @@ def test_preview_requires_csrf_an_editor_and_the_live_plan(owner) -> None:
         response = owner.post(
             f"/fire/{plan_id}/preview",
             _form(),
-            token_from=f"/fire/{plan_id}?edit=1",
+            token_from="/fire?edit=1",
         )
         assert response.status_code == 403
     finally:
@@ -230,10 +226,10 @@ def test_preview_requires_csrf_an_editor_and_the_live_plan(owner) -> None:
 
 
 def test_viewers_are_read_only(owner) -> None:
-    plan_id = _create(owner)
+    _create(owner)
     owner.set_admin_role(Role.VIEWER.value)
     try:
-        page = owner.client.get(f"/fire/{plan_id}")
+        page = owner.client.get("/fire")
         assert page.status_code == 200
         assert "data-fire-form" not in page.text
         assert "data-fire-edit" not in page.text
@@ -246,12 +242,24 @@ def test_an_update_error_renders_the_combined_page_with_the_form_open(owner) -> 
     response = owner.post(
         f"/fire/{plan_id}",
         _form(horizon_age="41"),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 400
     assert "data-fire-form" in response.text
     assert 'id="inputs"' in response.text
     assert "horizon" in response.text.lower()
+
+
+def test_an_empty_update_amount_points_at_the_amount_field(owner) -> None:
+    plan_id = _create(owner)
+    response = owner.post(
+        f"/fire/{plan_id}",
+        _form(income_manual=""),
+        token_from="/fire?edit=1",
+    )
+    assert response.status_code == 400
+    assert 'data-field-error="income_manual"' in response.text
+    assert 'aria-invalid="true"' in response.text
 
 
 def test_saving_preserves_the_basis_and_events(owner) -> None:
@@ -265,7 +273,7 @@ def test_saving_preserves_the_basis_and_events(owner) -> None:
             event_amount_1="-2000",
             event_label_1="Sabbatical",
         ),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 303
     assert "basis=real" in response.headers["location"]
@@ -279,7 +287,7 @@ def test_the_edit_route_redirects_to_the_inputs_anchor(owner) -> None:
     plan_id = _create(owner)
     response = owner.client.get(f"/fire/{plan_id}/edit", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == f"/fire/{plan_id}?edit=1#inputs"
+    assert response.headers["location"] == "/fire?edit=1#inputs"
 
 
 def test_another_workspace_is_a_404(owner) -> None:
@@ -300,6 +308,6 @@ def test_archived_adjustments_are_shown_read_only(owner) -> None:
                 label="Old bonus",
             )
         )
-    page = owner.client.get(f"/fire/{plan_id}")
+    page = owner.client.get("/fire")
     assert "Archived adjustments" in page.text
     assert "Old bonus" in page.text

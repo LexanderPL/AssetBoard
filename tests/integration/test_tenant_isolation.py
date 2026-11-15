@@ -1347,6 +1347,63 @@ def test_transaction_queries_stay_in_their_workspace(
         )
         == []
     )
+    assert (
+        in_a.regular_window_loan_totals(
+            start=date(2026, 10, 1), end=date(2026, 10, 31), currency="EUR"
+        )
+        == []
+    )
+
+    from assetboard.db.repositories import LoanPaymentRepository, LoanRepository
+
+    def linked_payment(ctx: Any, transaction_id: UUID | None) -> None:
+        loan = LoanRepository(db_session, ctx).create(
+            name="Plan loan",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=None,
+            origination_date=None,
+            first_payment_date=date(2026, 1, 1),
+            term_months=12,
+            payment_day=1,
+            rate_mode="fixed",
+            day_count="monthly",
+            margin_bp=None,
+            reference_rate_id=None,
+            installment_override_minor=None,
+            overpayment_mode="none",
+            overpayment_amount_minor=None,
+            overpayment_strategy="reduce_term",
+            archived_at=None,
+        )
+        LoanPaymentRepository(db_session, ctx).create(
+            loan_id=loan.id,
+            date=date(2026, 10, 7),
+            kind="installment",
+            total_minor=1000,
+            principal_minor=1000,
+            interest_minor=0,
+            costs_minor=0,
+            overpayment_minor=0,
+            note="",
+            source="manual",
+            transaction_id=transaction_id,
+        )
+
+    linked_payment(ctx_a, a_row.id)
+    linked_payment(ctx_b, None)
+    assert [
+        (row.category_id, row.amount_minor)
+        for row in in_a.regular_window_loan_totals(
+            start=date(2026, 10, 1), end=date(2026, 10, 31), currency="EUR"
+        )
+    ] == [(food_a.id, 1250)]
+    assert (
+        in_b.regular_window_loan_totals(
+            start=date(2026, 10, 1), end=date(2026, 10, 31), currency="EUR"
+        )
+        == []
+    )
     b_row = make(in_b, food_b.id, "Lidl")
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from assetboard.db.models.fire import FireScenario
 from assetboard.db.models.identity import User, Workspace
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
+from tests.fire_helpers import create_plan
 
 
 def _form(**overrides: str) -> dict[str, str]:
@@ -36,17 +37,7 @@ def _form(**overrides: str) -> dict[str, str]:
 
 
 def _create(owner, **overrides: str) -> UUID:
-    response = owner.post("/fire", _form(), token_from="/fire")
-    assert response.status_code == 303, response.text
-    plan_id = UUID(response.headers["location"].split("?")[0].rsplit("/", 1)[-1])
-    if overrides:
-        response = owner.post(
-            f"/fire/{plan_id}",
-            _form(**overrides),
-            token_from=f"/fire/{plan_id}?edit=1",
-        )
-        assert response.status_code == 303, response.text
-    return plan_id
+    return create_plan(owner, **overrides)
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -92,14 +83,14 @@ def _base_age(html: str) -> str:
 
 def test_the_results_page_offers_an_on_demand_htmx_load_with_a_no_js_fallback(owner) -> None:
     scenario_id = _create(owner)
-    page = owner.client.get(f"/fire/{scenario_id}")
+    page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-sensitivity" in page.text
     assert "data-fire-sensitivity-load" in page.text
     assert f'hx-get="/fire/{scenario_id}/sensitivity"' in page.text
     assert 'hx-target="#fire-sensitivity"' in page.text
     assert 'hx-swap="innerHTML"' in page.text
-    assert f'href="/fire/{scenario_id}?sensitivity=1#sensitivity"' in page.text
+    assert 'href="/fire?sensitivity=1#sensitivity"' in page.text
     assert "Based on the saved plan; unsaved changes are not included." in page.text
     assert "data-fire-sensitivity-grid" not in page.text
 
@@ -112,7 +103,7 @@ def test_the_results_page_offers_an_on_demand_htmx_load_with_a_no_js_fallback(ow
 
 def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owner) -> None:
     scenario_id = _create(owner)
-    results = owner.client.get(f"/fire/{scenario_id}").text
+    results = owner.client.get("/fire").text
     fragment = owner.client.get(f"/fire/{scenario_id}/sensitivity")
     assert fragment.status_code == 200
     assert "<html" not in fragment.text
@@ -149,20 +140,20 @@ def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owne
     assert "<caption" in fragment.text
     assert "data-fire-sensitivity-refresh" in fragment.text
     assert f'hx-get="/fire/{scenario_id}/sensitivity"' in fragment.text
-    assert f'href="/fire/{scenario_id}?sensitivity=1#sensitivity"' in fragment.text
+    assert 'href="/fire?sensitivity=1#sensitivity"' in fragment.text
     assert _base_age(fragment.text) == _fire_age(results)
     assert "Sheet progress" not in fragment.text
 
 
 def test_sensitivity_uses_the_saved_plan_and_not_an_unsaved_preview(owner) -> None:
     scenario_id = _create(owner)
-    page = owner.client.get(f"/fire/{scenario_id}?sensitivity=1").text
+    page = owner.client.get("/fire?sensitivity=1").text
     assert "data-fire-sensitivity-grid" in page
     saved_base = _base_age(page)
     preview = owner.post(
         f"/fire/{scenario_id}/preview",
         _form(expenses_manual="80000"),
-        token_from=f"/fire/{scenario_id}",
+        token_from="/fire",
     )
     assert preview.status_code == 200
     assert "data-fire-sensitivity" not in preview.text
@@ -171,8 +162,8 @@ def test_sensitivity_uses_the_saved_plan_and_not_an_unsaved_preview(owner) -> No
 
 
 def test_no_js_fallback_server_renders_the_loaded_grid(owner) -> None:
-    scenario_id = _create(owner)
-    page = owner.client.get(f"/fire/{scenario_id}?sensitivity=1")
+    _create(owner)
+    page = owner.client.get("/fire?sensitivity=1")
     assert page.status_code == 200
     assert "data-fire-sensitivity-grid" in page.text
     assert "data-fire-sensitivity-load" not in page.text
@@ -192,7 +183,7 @@ def test_a_saving_override_changes_the_base_cell(owner) -> None:
             event_amount_1="-5000000",
             event_label_1="Sabbatical",
         ),
-        token_from=f"/fire/{plan_id}?edit=1",
+        token_from="/fire?edit=1",
     )
     assert response.status_code == 303
     after = _base_age(owner.client.get(f"/fire/{plan_id}/sensitivity").text)

@@ -195,6 +195,20 @@ class PlanEntry:
     plan: FirePlanView | None
     legacy: tuple[LegacyScenarioView, ...] = ()
     migration: FirePlanMigrationResult | None = None
+    # The fully loaded plan and events, so the view page never loads the plan twice (F8.9).
+    detail: FirePlanDetail | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedRates:
+    """The plan's rate fields after validation; the caller applies the confirmation gate."""
+
+    inflation_bp: int
+    real_return_bp: int
+    income_growth_bp: int
+    rule: Rule
+    swr_bp: int | None
+    needs_extreme_confirmation: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,12 +248,90 @@ def _rate(value: object, field: str, code: str) -> int:
     return rate
 
 
-def _amount(field: str, amount: Money | None, currency: str) -> int:
-    if amount is None or amount.currency != currency:
+def validate_amount(
+    field: str, amount: Money | None, currency: str, *, required: bool = False
+) -> int:
+    """One non-negative manual amount; the wizard requires a value, the saved plan has one."""
+    if amount is None:
+        raise FireError(field, "amount_required" if required else "invalid_amount")
+    if amount.currency != currency:
         raise FireError(field, "invalid_amount")
     if not 0 <= amount.amount_minor <= MAX_AMOUNT_MINOR:
         raise FireError(field, "invalid_amount")
     return amount.amount_minor
+
+
+def validate_ages(
+    birth_year: object | None,
+    horizon_age: object | None,
+    stop_working_age: object,
+    *,
+    current_year: int,
+    default_horizon: int,
+) -> tuple[int, int, int]:
+    """Birth year, horizon and stop age, shared by the saved plan and the wizard steps."""
+    if birth_year is None:
+        raise FireError("birth_year", "birth_year_required")
+    year = _integer(birth_year, "birth_year", "invalid_birth_year")
+    if not MIN_YEAR <= year <= MAX_YEAR or year > current_year:
+        raise FireError("birth_year", "invalid_birth_year")
+    age = age_at_start(current_year, year)
+
+    horizon = _integer(
+        horizon_age if horizon_age is not None else default_horizon,
+        "horizon_age",
+        "invalid_horizon",
+    )
+    if not MIN_HORIZON_AGE <= horizon <= MAX_HORIZON_AGE:
+        raise FireError("horizon_age", "invalid_horizon")
+    if horizon <= age:
+        raise FireError("horizon_age", "horizon_not_after_age")
+    if year + horizon > MAX_YEAR:
+        raise FireError("horizon_age", "invalid_horizon")
+
+    stop_age = _integer(stop_working_age, "stop_working_age", "invalid_stop_age")
+    if not 0 <= stop_age <= MAX_STOP_WORKING_AGE:
+        raise FireError("stop_working_age", "invalid_stop_age")
+    return year, horizon, stop_age
+
+
+def validate_rates(
+    *,
+    inflation_bp: object,
+    real_return_bp: object,
+    income_growth_bp: object,
+    rule: str,
+    swr_bp: int | None,
+    previous_rates: RateTuple | None = None,
+) -> ValidatedRates:
+    """The four rate fields and their hard bounds; the confirmation gate stays with the caller."""
+    inflation = _rate(inflation_bp, "inflation", "invalid_rate")
+    real_return = _rate(real_return_bp, "real_return", "invalid_rate")
+    income_growth = _rate(income_growth_bp, "income_growth", "invalid_rate")
+    try:
+        independence_rule = Rule(rule)
+    except ValueError:
+        raise FireError("rule", "invalid_rule") from None
+    swr: int | None = None
+    if independence_rule is Rule.SWR:
+        swr = _integer(swr_bp, "swr", "invalid_swr")
+        if not SWR_HARD_MIN_BP <= swr <= SWR_HARD_MAX_BP:
+            raise FireError("swr", "invalid_swr")
+    needs_confirmation = extreme_rate_change(
+        inflation_bp=inflation,
+        real_return_bp=real_return,
+        income_growth_bp=income_growth,
+        swr_bp=swr,
+        previous=previous_rates,
+    )
+    return ValidatedRates(
+        inflation_bp=inflation,
+        real_return_bp=real_return,
+        income_growth_bp=income_growth,
+        rule=independence_rule,
+        swr_bp=swr,
+        needs_extreme_confirmation=needs_confirmation,
+    )
 
 
 def validate_plan_input(
@@ -259,57 +351,27 @@ def validate_plan_input(
     past (or a saving override that became the current year after rollover) stay on the form
     without blocking an unrelated save; a new row still may not be created in the past.
     """
-    if plan.birth_year is None:
-        raise FireError("birth_year", "birth_year_required")
-    birth_year = _integer(plan.birth_year, "birth_year", "invalid_birth_year")
-    if not MIN_YEAR <= birth_year <= MAX_YEAR or birth_year > current_year:
-        raise FireError("birth_year", "invalid_birth_year")
-    age = age_at_start(current_year, birth_year)
-
-    horizon_age = _integer(
-        plan.horizon_age if plan.horizon_age is not None else default_horizon,
-        "horizon_age",
-        "invalid_horizon",
+    birth_year, horizon_age, stop_working_age = validate_ages(
+        plan.birth_year,
+        plan.horizon_age,
+        plan.stop_working_age,
+        current_year=current_year,
+        default_horizon=default_horizon,
     )
-    if not MIN_HORIZON_AGE <= horizon_age <= MAX_HORIZON_AGE:
-        raise FireError("horizon_age", "invalid_horizon")
-    if horizon_age <= age:
-        raise FireError("horizon_age", "horizon_not_after_age")
-    if birth_year + horizon_age > MAX_YEAR:
-        raise FireError("horizon_age", "invalid_horizon")
-
-    stop_working_age = _integer(plan.stop_working_age, "stop_working_age", "invalid_stop_age")
-    if not 0 <= stop_working_age <= MAX_STOP_WORKING_AGE:
-        raise FireError("stop_working_age", "invalid_stop_age")
-
-    inflation_bp = _rate(plan.inflation_bp, "inflation", "invalid_rate")
-    real_return_bp = _rate(plan.real_return_bp, "real_return", "invalid_rate")
-    income_growth_bp = _rate(plan.income_growth_bp, "income_growth", "invalid_rate")
-
-    try:
-        rule = Rule(plan.rule)
-    except ValueError:
-        raise FireError("rule", "invalid_rule") from None
-    swr_bp: int | None = None
-    if rule is Rule.SWR:
-        swr_bp = _integer(plan.swr_bp, "swr", "invalid_swr")
-        if not SWR_HARD_MIN_BP <= swr_bp <= SWR_HARD_MAX_BP:
-            raise FireError("swr", "invalid_swr")
-    else:
-        swr_bp = None
-
-    income_minor = _amount("income", plan.income, currency)
-    expenses_minor = _amount("expenses", plan.expenses, currency)
-    portfolio_minor = _amount("portfolio", plan.portfolio, currency)
-
-    needs_confirmation = extreme_rate_change(
-        inflation_bp=inflation_bp,
-        real_return_bp=real_return_bp,
-        income_growth_bp=income_growth_bp,
-        swr_bp=swr_bp,
-        previous=previous_rates,
+    rates = validate_rates(
+        inflation_bp=plan.inflation_bp,
+        real_return_bp=plan.real_return_bp,
+        income_growth_bp=plan.income_growth_bp,
+        rule=plan.rule,
+        swr_bp=plan.swr_bp,
+        previous_rates=previous_rates,
     )
-    if needs_confirmation and not plan.extreme_rates_confirmed and not preview:
+
+    income_minor = validate_amount("income_manual", plan.income, currency)
+    expenses_minor = validate_amount("expenses_manual", plan.expenses, currency)
+    portfolio_minor = validate_amount("portfolio_manual", plan.portfolio, currency)
+
+    if rates.needs_extreme_confirmation and not plan.extreme_rates_confirmed and not preview:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")
 
     if not allow_events and plan.events:
@@ -366,16 +428,16 @@ def validate_plan_input(
         birth_year=birth_year,
         horizon_age=horizon_age,
         stop_working_age=stop_working_age,
-        inflation_bp=inflation_bp,
-        real_return_bp=real_return_bp,
-        income_growth_bp=income_growth_bp,
-        rule=rule,
-        swr_bp=swr_bp,
+        inflation_bp=rates.inflation_bp,
+        real_return_bp=rates.real_return_bp,
+        income_growth_bp=rates.income_growth_bp,
+        rule=rates.rule,
+        swr_bp=rates.swr_bp,
         income_minor=income_minor,
         expenses_minor=expenses_minor,
         portfolio_minor=portfolio_minor,
         events=tuple(events),
-        needs_extreme_confirmation=needs_confirmation,
+        needs_extreme_confirmation=rates.needs_extreme_confirmation,
     )
 
 
@@ -572,7 +634,7 @@ def _plan_entry_in_session(session: Session, ctx: Context, *, current_year: int)
         detail = _detail_in_session(
             session, ctx, live, current_year=current_year, base_currency=base_currency
         )
-        return PlanEntry(plan=detail.plan)
+        return PlanEntry(plan=detail.plan, detail=detail)
     legacy_rows = sorted(repository.legacy(), key=_legacy_rank)
     if not legacy_rows:
         return PlanEntry(plan=None)
@@ -959,6 +1021,7 @@ __all__ = [
     "PlanEntry",
     "RateTuple",
     "ValidatedPlan",
+    "ValidatedRates",
     "create_fire_plan",
     "delete_fire_plan",
     "event_is_active",
@@ -968,5 +1031,8 @@ __all__ = [
     "plan_defaults",
     "plan_entry",
     "update_fire_plan",
+    "validate_ages",
+    "validate_amount",
     "validate_plan_input",
+    "validate_rates",
 ]

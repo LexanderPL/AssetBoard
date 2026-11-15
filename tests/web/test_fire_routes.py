@@ -1,43 +1,15 @@
-"""The F8.8 one-plan FIRE entry, create form and chooser."""
+"""The F8.9 one-plan entry, view, chooser and legacy URLs."""
 
 from __future__ import annotations
 
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
 from assetboard.db.models.fire import FireScenario
 from assetboard.services.context import Role
-
-
-def _form(**overrides: str) -> dict[str, str]:
-    data = {
-        "birth_year": "1985",
-        "inflation": "2.5",
-        "real_return": "5",
-        "income_growth": "3",
-        "stop_working_age": "55",
-        "horizon_age": "90",
-        "rule": "returns_cover_expenses",
-        "swr": "4",
-        "income_manual": "50000",
-        "expenses_manual": "30000",
-        "portfolio_manual": "1000000",
-        "event_id_1": "",
-        "event_year_1": "",
-        "event_kind_1": "cash",
-        "event_amount_1": "",
-        "event_label_1": "",
-    }
-    data.update(overrides)
-    return data
-
-
-def _create(owner, **overrides: str) -> UUID:
-    response = owner.post("/fire", _form(**overrides), token_from="/fire")
-    assert response.status_code == 303, response.text
-    return UUID(response.headers["location"].split("?")[0].rsplit("/", 1)[-1])
+from tests.fire_helpers import create_plan
 
 
 def _scenario_count(owner) -> int:
@@ -89,92 +61,61 @@ def _legacy(owner, name: str, *, is_default: bool, archived: bool = False) -> UU
         return row.id
 
 
-def test_the_nav_link_and_the_create_form(owner) -> None:
+def test_the_nav_link_and_the_wizard_entry(owner) -> None:
     home = owner.client.get("/").text
     assert 'href="/fire"' in home and "data-fire-link" in home
     assert "Unavailable" not in home
 
     page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert "Create your FIRE plan" in page.text
-    assert "not financial advice" in page.text
+    assert 'data-fire-wizard="1"' in page.text
+    assert "Set up your FIRE plan" in page.text
     for marker in (
         'name="birth_year"',
         'name="horizon_age"',
         'name="stop_working_age"',
-        'name="inflation"',
-        'name="real_return"',
-        'name="income_growth"',
-        'name="rule"',
-        'name="swr"',
-        'name="income_manual"',
-        'name="expenses_manual"',
-        'name="portfolio_manual"',
+        "data-fire-wizard-form",
     ):
         assert marker in page.text
     assert 'name="name"' not in page.text
     assert 'name="income_mode"' not in page.text
-    assert 'name="contribution_amount_1"' not in page.text
 
 
-def test_the_create_page_has_no_adjustments_editor(owner) -> None:
+def test_the_entry_renders_the_view_for_a_plan(owner) -> None:
+    plan_id = create_plan(owner)
     page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert "data-fire-events" not in page.text
-    assert "data-event-table" not in page.text
-    assert "data-add-event" not in page.text
-    assert 'name="event_year_1"' not in page.text
-    assert 'name="event_amount_1"' not in page.text
-    assert 'name="event_label_1"' not in page.text
-    assert 'name="event_kind_1"' not in page.text
-    assert 'name="event_id_1"' not in page.text
-
-
-def test_create_redirects_to_the_plan_and_writes_once(owner) -> None:
-    plan_id = _create(owner)
-    page = owner.client.get(f"/fire/{plan_id}")
-    assert page.status_code == 200
-    assert "FIRE plan" in page.text
     assert "data-fire-overview" in page.text
-    assert _scenario_count(owner) == 1
-    assert owner.client.get("/fire", follow_redirects=False).status_code == 303
+    assert "data-fire-results" in page.text
+    assert 'href="/fire?edit=1#inputs"' in page.text
+    assert f"/fire/{plan_id}/results.csv" in page.text
+    assert "data-fire-reset" in page.text
+    assert "data-fire-edit" in page.text
 
 
-def test_a_second_create_is_refused(owner) -> None:
-    _create(owner)
-    response = owner.post("/fire", _form(), token_from="/fire")
-    assert response.status_code == 400
-    assert "already has a FIRE plan" in response.text
-    assert _scenario_count(owner) == 1
+def test_the_id_url_redirects_to_the_view(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.client.get(f"/fire/{plan_id}", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire"
+    response = owner.client.get(f"/fire/{plan_id}?basis=real&sensitivity=1", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire?basis=real&sensitivity=1#sensitivity"
+    assert owner.client.get(f"/fire/{uuid4()}").status_code == 404
+    assert owner.client.get("/fire/not-a-uuid").status_code == 404
 
 
-def test_events_are_not_allowed_on_create(owner) -> None:
-    response = owner.post(
-        "/fire",
-        _form(
-            event_year_1="2027",
-            event_kind_1="cash",
-            event_amount_1="100",
-            event_label_1="Bonus",
-        ),
-        token_from="/fire",
-    )
-    assert response.status_code == 400
-    assert "Create the plan first" in response.text
-    assert "data-fire-events" not in response.text
-    assert 'name="event_year_1"' not in response.text
-    assert _scenario_count(owner) == 0
-
-
-def test_a_viewer_reads_but_cannot_create(owner) -> None:
+def test_a_viewer_reads_the_view_without_edit_or_reset(owner) -> None:
+    create_plan(owner)
     owner.set_admin_role(Role.VIEWER.value)
     try:
         page = owner.client.get("/fire")
         assert page.status_code == 200
-        assert "Create your FIRE plan" in page.text
-        response = owner.post("/fire", _form(), token_from="/fire")
-        assert response.status_code == 403
-        assert _scenario_count(owner) == 0
+        assert "data-fire-overview" in page.text
+        assert "data-fire-edit" not in page.text
+        assert "data-fire-reset" not in page.text
+        assert "data-fire-form" not in page.text
+        assert owner.client.get("/fire/reset").status_code == 403
     finally:
         owner.set_admin_role(Role.OWNER.value)
 
@@ -184,6 +125,7 @@ def test_one_legacy_plan_auto_migrates_for_an_editor(owner) -> None:
     page = owner.client.get("/fire", follow_redirects=True)
     assert page.status_code == 200
     assert "converted to the one-plan format" in page.text
+    assert "data-fire-overview" in page.text
     with owner.db() as session:
         row = session.get_one(FireScenario, legacy_id)
         assert row.is_live is True
@@ -205,6 +147,7 @@ def test_multiple_legacy_plans_show_the_chooser_and_delete_the_others(owner) -> 
         token_from="/fire",
     )
     assert response.status_code == 303
+    assert response.headers["location"] == "/fire?notice=migrated"
     with owner.db() as session:
         assert session.get(FireScenario, first) is None
         assert session.get_one(FireScenario, second).is_live is True
@@ -236,8 +179,14 @@ def test_a_viewer_sees_the_chooser_without_controls(owner) -> None:
         owner.set_admin_role(Role.OWNER.value)
 
 
+def test_the_old_create_post_is_gone(owner) -> None:
+    response = owner.post("/fire", {"birth_year": "1985"}, token_from="/fire")
+    assert response.status_code == 405
+    assert _scenario_count(owner) == 0
+
+
 def test_compare_redirects_and_old_actions_are_gone(owner) -> None:
-    plan_id = _create(owner)
+    plan_id = create_plan(owner)
     compare = owner.client.get("/fire/compare", follow_redirects=False)
     assert compare.status_code == 303
     assert compare.headers["location"] == "/fire"
@@ -248,26 +197,50 @@ def test_compare_redirects_and_old_actions_are_gone(owner) -> None:
         f"/fire/{plan_id}/restore",
         f"/fire/{plan_id}/loan-payoff",
     ):
-        response = owner.post(path, {}, token_from=f"/fire/{plan_id}")
+        response = owner.post(path, {}, token_from="/fire")
         assert response.status_code in (404, 405)
 
 
-def test_a_currency_mismatch_blocks_the_page(owner) -> None:
-    plan_id = _create(owner)
+def test_the_view_has_no_legacy_controls(owner) -> None:
+    create_plan(owner)
+    page = owner.client.get("/fire").text
+    for marker in (
+        "data-fire-compare",
+        "data-fire-duplicate",
+        "data-fire-default",
+        "data-fire-archive",
+        "data-fire-restore",
+        "Compare scenarios",
+        "Duplicate scenario",
+        "Make default",
+    ):
+        assert marker not in page
+
+
+def test_a_currency_mismatch_blocks_the_page_and_offers_reset(owner) -> None:
+    plan_id = create_plan(owner)
     with owner.db() as session:
         session.get_one(FireScenario, plan_id).currency = "USD"
         session.commit()
-    page = owner.client.get(f"/fire/{plan_id}")
+    page = owner.client.get("/fire")
     assert page.status_code == 200
     assert 'data-fire-blocked="plan_currency_mismatch"' in page.text
     assert "The projection is unavailable" in page.text
+    assert "data-fire-blocked-reset" in page.text
+    assert "data-fire-reset" in page.text
 
 
-def test_the_needs_review_banner_links_to_the_inputs(owner) -> None:
-    plan_id = _create(owner)
+def test_the_needs_review_banner_links_to_the_view_edit(owner) -> None:
+    plan_id = create_plan(owner)
     with owner.db() as session:
         session.get_one(FireScenario, plan_id).needs_review = True
         session.commit()
-    page = owner.client.get(f"/fire/{plan_id}")
+    page = owner.client.get("/fire")
     assert "data-fire-needs-review" in page.text
-    assert f"/fire/{plan_id}?edit=1#inputs" in page.text
+    assert "/fire?edit=1#inputs" in page.text
+
+
+def test_the_new_alias_redirects(owner) -> None:
+    response = owner.client.get("/fire/new", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire"

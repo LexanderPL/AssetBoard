@@ -13,6 +13,8 @@ from assetboard.db.repositories import (
     CategoryRepository,
     FxRateRepository,
     ItemValuationRepository,
+    LoanPaymentRepository,
+    LoanRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     TransactionRepository,
@@ -73,9 +75,9 @@ def _transaction(
     *,
     direction: str = "expense",
     currency: str = "EUR",
-) -> None:
+) -> UUID:
     with team.factory.begin() as session:
-        TransactionRepository(session, _ctx(team)).create(
+        row = TransactionRepository(session, _ctx(team)).create(
             direction=direction,
             day=day,
             amount_minor=amount_minor,
@@ -86,6 +88,7 @@ def _transaction(
             source="manual",
             created_by_user_id=None,
         )
+        return row.id
 
 
 def _series(team: WorkspaceDb, **overrides: object):
@@ -525,3 +528,181 @@ def test_scenario_currency_mismatch_blocks_all_linked_modes(team: WorkspaceDb) -
 
 
 # Exclusions
+
+# Setup wizard suggestions (F8.9)
+
+
+def _setup(team: WorkspaceDb, **overrides: object):
+    values = {
+        "currency": "EUR",
+        "include_income": True,
+        "include_expenses": True,
+        "include_portfolio": True,
+    }
+    values.update(overrides)
+    with team.factory() as session:
+        return fire_linked.setup_suggestions_in_session(
+            session,
+            _ctx(team),
+            **values,  # type: ignore[arg-type]
+        )
+
+
+def _linked_loan_payment(team: WorkspaceDb, transaction_id: UUID, total_minor: int) -> UUID:
+    with team.factory.begin() as session:
+        loan = LoanRepository(session, _ctx(team)).create(
+            name="Mortgage",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=None,
+            origination_date=None,
+            first_payment_date=date(2026, 1, 1),
+            term_months=12,
+            payment_day=1,
+            rate_mode="fixed",
+            day_count="monthly",
+            margin_bp=None,
+            reference_rate_id=None,
+            installment_override_minor=None,
+            overpayment_mode="none",
+            overpayment_amount_minor=None,
+            overpayment_strategy="reduce_term",
+            archived_at=None,
+        )
+        payment = LoanPaymentRepository(session, _ctx(team)).create(
+            loan_id=loan.id,
+            date=date(2026, 1, 1),
+            kind="installment",
+            total_minor=total_minor,
+            principal_minor=total_minor,
+            interest_minor=0,
+            costs_minor=0,
+            overpayment_minor=0,
+            note="",
+            source="manual",
+            transaction_id=transaction_id,
+        )
+        return payment.id
+
+
+def test_setup_suggestions_resolve_the_requested_cards(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    salary = _category(team, "Salary", kind="income")
+    _transaction(team, food, date(2025, 12, 10), 100_000)
+    _transaction(team, food, date(2026, 2, 10), 200_000)
+    _transaction(team, salary, date(2026, 1, 1), 500_000, direction="income")
+    _networth_item(team, name="Cash savings", value_minor=50_000)
+
+    suggestions = _setup(team)
+    assert suggestions.blocks == ()
+    assert suggestions.as_of == date(2026, 3, 1)
+    assert suggestions.window.first_day == date(2025, 3, 1)
+    assert suggestions.window.last_day == date(2026, 2, 28)
+    assert suggestions.income is not None and suggestions.expenses is not None
+    assert suggestions.portfolio is not None
+    assert suggestions.income.annual_total == _money(6_000_000)
+    assert suggestions.expenses.annual_total == _money(1_800_000)
+    assert suggestions.portfolio.total == _money(50_000)
+    assert suggestions.loan_portion is not None
+    assert suggestions.loan_portion.has_data is False
+    assert suggestions.loan_portion.window_total == _money(0)
+    assert {warning.code for warning in suggestions.warnings} == {
+        "linked_data_older",
+        "scaled_months",
+    }
+
+    only_income = _setup(team, include_expenses=False, include_portfolio=False)
+    assert only_income.income is not None
+    assert only_income.expenses is None and only_income.portfolio is None
+    assert only_income.loan_portion is None
+    assert only_income.blocks == ()
+
+
+def test_setup_suggestions_loan_portion_is_the_linked_ledger_subset(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    first = _transaction(team, food, date(2026, 1, 10), 100_000)
+    _transaction(team, food, date(2026, 2, 10), 250_000)
+    _linked_loan_payment(team, first, 90_000)
+
+    suggestions = _setup(team)
+    assert suggestions.expenses is not None
+    assert suggestions.expenses.raw_total == _money(350_000)
+    assert suggestions.loan_portion is not None
+    assert suggestions.loan_portion.has_data is True
+    assert suggestions.loan_portion.window_total == _money(100_000)
+    assert suggestions.loan_portion.months_available == 1
+
+
+def test_setup_suggestions_drop_a_blocked_card_instead_of_showing_zero(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "Food")
+    _transaction(team, food, date(2026, 1, 10), 100_000, currency="USD")
+
+    suggestions = _setup(team)
+    assert "ledger_currency_mismatch" in {block.code for block in suggestions.blocks}
+    assert suggestions.expenses is None
+    assert suggestions.loan_portion is None
+    assert suggestions.income is None
+    assert suggestions.portfolio is None
+
+
+def test_setup_suggestions_never_write(team: WorkspaceDb) -> None:
+    from sqlalchemy import func, select
+
+    from assetboard.db.models.fire import FireEvent, FireScenario
+    from assetboard.db.models.identity import AuditEvent
+    from assetboard.db.models.ledger import Transaction
+    from assetboard.db.models.loans import LoanPayment
+
+    food = _category(team, "Food")
+    transaction_id = _transaction(team, food, date(2026, 1, 10), 100_000)
+    _linked_loan_payment(team, transaction_id, 90_000)
+
+    def counts() -> tuple[int, int, int, int, int]:
+        with team.factory() as session:
+            return (
+                session.scalar(select(func.count()).select_from(FireScenario)) or 0,
+                session.scalar(select(func.count()).select_from(FireEvent)) or 0,
+                session.scalar(select(func.count()).select_from(AuditEvent)) or 0,
+                session.scalar(select(func.count()).select_from(Transaction)) or 0,
+                session.scalar(select(func.count()).select_from(LoanPayment)) or 0,
+            )
+
+    before = counts()
+    _setup(team)
+    assert counts() == before
+
+
+def test_setup_suggestions_query_budget_does_not_grow_with_data(team: WorkspaceDb) -> None:
+    from sqlalchemy import event
+
+    food = _category(team, "Food")
+    salary = _category(team, "Salary", kind="income")
+    _transaction(team, food, date(2026, 1, 10), 100_000)
+    _transaction(team, salary, date(2026, 1, 1), 500_000, direction="income")
+    _networth_item(team, name="Cash", value_minor=50_000)
+
+    def count(operation) -> int:
+        seen = 0
+
+        def before(*_args: object) -> None:
+            nonlocal seen
+            seen += 1
+
+        event.listen(team.engine, "before_cursor_execute", before)
+        try:
+            operation()
+        finally:
+            event.remove(team.engine, "before_cursor_execute", before)
+        return seen
+
+    quiet = count(lambda: _setup(team))
+    for index in range(40):
+        _transaction(team, food, date(2025, 4 + (index % 4), 1 + (index % 20)), 1_000 + index)
+    food_categories = [_category(team, f"Food {index}") for index in range(20)]
+    for index, category in enumerate(food_categories):
+        _transaction(team, category, date(2025, 6, 1 + (index % 20)), 2_000)
+    loud = count(lambda: _setup(team))
+    assert loud == quiet
+    assert quiet <= 24
