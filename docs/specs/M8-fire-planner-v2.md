@@ -425,6 +425,42 @@ and loan-payoff events, and archive format 2.0. Keep the app green and the archi
 No wizard, view/edit split or live-loan UI yet.
 ```
 
+### As built (M8.F8.8)
+
+- The `fire_scenarios` table is rebuilt in place: one live plan per workspace, `needs_review`,
+  a currency snapshot and the three manual amounts. The temporary `is_live` and `legacy` columns
+  keep old scenarios readable until the chooser runs; `uq_fire_scenarios_live_workspace` is a
+  partial unique index while the migration window is open. A later cleanup revision will drop
+  the temporary columns and replace it with a plain unique `workspace_id`.
+- `fire_contributions` and `fire_expense_exclusions` are removed. Contribution rows become
+  `saving_override` events labelled **Saving override**; one-click loan-payoff events are
+  deleted and `source_loan_id` is gone. Events keep calendar years and the four kinds.
+- `0063_f88_one_fire_plan` copies the data in Python and rebuilds the FIRE tables, which keeps
+  the change portable to SQLite and PostgreSQL. The downgrade is structural and lossy for
+  scenarios deleted by the chooser.
+- A single legacy scenario auto-migrates on the first editor visit to `/fire`; several rows show
+  a one-time chooser. The chosen row is migrated, the others are hard-deleted and the action is
+  audited without amounts. Viewers see the chooser but cannot convert it.
+- The projection anchor is the injected clock's current year. Past adjustments are stored as
+  archived history and are not applied; a saving override that becomes the current year is
+  archived and the rest of the plan can still be saved.
+- The current results/inputs page is adapted to one plan. Compare, the scenario list, duplicate,
+  default, archive/restore, linked-mode selection, exclusions and loan suggestions are removed;
+  sensitivity, CSV, charts, preview and the nominal/real view remain until F8.13.
+- Archive format 2.0 adds `fire_plan.csv` and the new `fire_events.csv`, and removes the four
+  1.8 FIRE files. Export while several legacy rows await the choice writes the default/first
+  scenario, resolves linked inputs at export time, sets `needs_review=true` and records
+  `fire_legacy_scenarios_skipped`. The reader upgrades 1.8 archives in memory (default/first,
+  fallbacks, contribution conversion, loan-payoff removal, skipped-scenario warnings). A 2.0
+  restore preserves `needs_review`.
+- `fire_linked` resolution internals remain for the migration/export and F8.9 suggestions;
+  expense-exclusion validation and loan-payoff code are gone.
+- A currency mismatch blocks projection and saving with a notice; reset/recreate is left to
+  F8.9. The reload/restore UI is also F8.9; F8.8 provides the service and audit.
+- Tests cover the migration chooser, partial unique index, manual/linked/blocked mappings,
+  contribution conversion, archived events, year rollover, deletion audit, archive round trip,
+  1.8 imports, tenancy, roles and query budgets.
+
 ### F8.9 — One-plan UX and setup wizard
 
 **Acceptance**
