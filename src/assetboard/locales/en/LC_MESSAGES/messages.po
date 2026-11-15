@@ -2666,9 +2666,6 @@ msgstr ""
 msgid "Portfolio depleted"
 msgstr ""
 
-msgid "Net worth in today's money"
-msgstr ""
-
 msgid "Loan payments end this year"
 msgstr ""
 
@@ -2945,8 +2942,8 @@ msgid "The sensitivity axes must include the saved plan."
 msgstr ""
 
 msgid ""
-"The real-return range would leave the supported -20 to 50 percent bounds."
-" Adjust the plan's return and try again."
+"The return-above-inflation range would leave the supported -20 to 50 "
+"percent bounds. Adjust the plan's return and try again."
 msgstr ""
 
 msgid ""
@@ -3011,29 +3008,33 @@ msgid "%(value)s pp"
 msgstr ""
 
 #, python-format
-msgid "Never before age %(horizon)d; real return %(rate)s; expenses %(factor)s"
+msgid ""
+"Never before age %(horizon)d; return above inflation %(rate)s; expenses "
+"%(factor)s"
 msgstr ""
 
 #, python-format
 msgid ""
-"No FIRE before age %(horizon)d with a real return of %(rate)s and "
-"expenses at %(factor)s of the saved plan."
-msgstr ""
-
-#, python-format
-msgid "Age %(age)d in %(year)d; real return %(rate)s; expenses %(factor)s"
+"No FIRE before age %(horizon)d with a return above inflation of %(rate)s "
+"and expenses at %(factor)s of the saved plan."
 msgstr ""
 
 #, python-format
 msgid ""
-"Base case: FIRE at age %(age)d in %(year)d with a real return of %(rate)s"
+"Age %(age)d in %(year)d; return above inflation %(rate)s; expenses "
+"%(factor)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Base case: FIRE at age %(age)d in %(year)d with a return above inflation "
+"of %(rate)s and expenses at %(factor)s of the saved plan."
+msgstr ""
+
+#, python-format
+msgid ""
+"FIRE at age %(age)d in %(year)d with a return above inflation of %(rate)s"
 " and expenses at %(factor)s of the saved plan."
-msgstr ""
-
-#, python-format
-msgid ""
-"FIRE at age %(age)d in %(year)d with a real return of %(rate)s and "
-"expenses at %(factor)s of the saved plan."
 msgstr ""
 
 msgid ""
@@ -6117,10 +6118,7 @@ msgstr ""
 msgid "Net worth over time"
 msgstr ""
 
-msgid "In today's money."
-msgstr ""
-
-msgid "In each year's money."
+msgid "Amounts are nominal: each year's own money, not adjusted for inflation."
 msgstr ""
 
 msgid "Plotted data"
@@ -6136,8 +6134,8 @@ msgid "Expenses versus investment gain"
 msgstr ""
 
 msgid ""
-"Both lines are in each year's money, because the independence rule "
-"compares nominal values."
+"Both lines are nominal, because the independence rule compares each "
+"year's actual values."
 msgstr ""
 
 msgid "Plotted expenses and gain data"
@@ -6194,12 +6192,13 @@ msgid "The yearly rise in prices. It reduces what the portfolio can buy."
 msgstr ""
 
 #, python-format
-msgid "Real return (%%)"
+msgid "Return above inflation (%%)"
 msgstr ""
 
 msgid ""
-"The yearly investment return above inflation. It is not a promise of "
-"future returns."
+"The yearly investment return above inflation. The projection adds it to "
+"inflation to get the nominal gain rate. It is not a promise of future "
+"returns."
 msgstr ""
 
 #, python-format
@@ -6234,8 +6233,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Unusual means inflation outside 0–10%%, real return outside −2–8%%, "
-"income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
+"Unusual means inflation outside 0–10%%, return above inflation outside "
+"−2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
 msgstr ""
 
 msgid "Starting amounts"
@@ -6243,9 +6242,10 @@ msgstr ""
 
 #, python-format
 msgid ""
-"All amounts are in %(currency)s and in today's money in the plan's first "
-"year, which is the current year. Enter your after-tax income and "
-"expenses, including the taxes you actually pay and your loan payments."
+"All amounts are in %(currency)s and in the current year's money. Later "
+"years are projected in their own nominal money. Enter your after-tax "
+"income and expenses, including the taxes you actually pay and your loan "
+"payments."
 msgstr ""
 
 msgid "Annual income"
@@ -6367,6 +6367,11 @@ msgstr ""
 msgid "Key metrics"
 msgstr ""
 
+msgid ""
+"All amounts are nominal: the actual money of each year, not adjusted for "
+"inflation."
+msgstr ""
+
 msgid "FIRE age"
 msgstr ""
 
@@ -6383,18 +6388,26 @@ msgid ""
 "current year counts as 0."
 msgstr ""
 
-msgid "FIRE number (today's money)"
+msgid "FIRE number"
 msgstr ""
 
 msgid ""
-"The portfolio needed today for the plan's rule to cover its first year's "
-"expenses. It is expressed in today's money."
+"The nominal expenses in the FIRE year divided by the rate the "
+"independence rule uses: the withdrawal rate, or the nominal gain rate "
+"when returns must cover expenses. This is the portfolio the plan needs in"
+" that year."
 msgstr ""
 
-msgid "Not defined with these rates."
+msgid "Not defined: the plan's gain rate is not positive."
 msgstr ""
 
 msgid "Sustainability"
+msgstr ""
+
+msgid ""
+"Nominal amounts. The first age after income stops when the projected "
+"portfolio falls below zero, and the lowest net worth from then to the "
+"horizon."
 msgstr ""
 
 #, python-format
@@ -6411,18 +6424,16 @@ msgstr ""
 msgid "Not checked: no years after income stops fall inside the horizon."
 msgstr ""
 
-msgid "Sheet progress"
+msgid "Plan progress"
 msgstr ""
 
+#, python-format
 msgid ""
-"Start net worth divided by net worth at FIRE, as in the original "
-"spreadsheet."
+"Starting portfolio divided by the projected net worth at FIRE. 100%% "
+"means the plan has reached its FIRE net-worth target."
 msgstr ""
 
-msgid "Today's-money progress"
-msgstr ""
-
-msgid "Start portfolio divided by the FIRE number, both in today's money."
+msgid "Not defined: net worth at FIRE is not positive."
 msgstr ""
 
 #, python-format
@@ -6441,18 +6452,6 @@ msgstr ""
 msgid ""
 "A changed rate is outside the usual range. Tick the confirmation box "
 "before saving."
-msgstr ""
-
-msgid "Money basis"
-msgstr ""
-
-msgid "Each year's money"
-msgstr ""
-
-msgid "Today's money"
-msgstr ""
-
-msgid "A view preference; it is not saved with the plan."
 msgstr ""
 
 msgid "The projection is unavailable"
@@ -6480,8 +6479,8 @@ msgstr ""
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
-"assumes constant rates and does not model taxes separately; real life "
-"will differ."
+"assumes constant rates and does not model taxes separately; actual "
+"results will differ."
 msgstr ""
 
 msgid "Based on the saved plan; unsaved changes are not included."
@@ -6493,7 +6492,9 @@ msgstr ""
 msgid "Sensitivity grid"
 msgstr ""
 
-msgid "FIRE age by real return and expenses as a percentage of the saved plan"
+msgid ""
+"FIRE age by return above inflation and expenses as a percentage of the "
+"saved plan"
 msgstr ""
 
 #, python-format
@@ -6533,8 +6534,8 @@ msgid "Sensitivity"
 msgstr ""
 
 msgid ""
-"See how the FIRE age changes when the real return moves in one-"
-"percentage-point steps or expenses move in ten-percent steps."
+"See how the FIRE age changes when the return above inflation moves in "
+"one-percentage-point steps or expenses move in ten-percent steps."
 msgstr ""
 
 msgid "Show sensitivity grid"
@@ -6609,23 +6610,15 @@ msgstr ""
 msgid "Year by year"
 msgstr ""
 
-msgid "Every amount is in today's money."
-msgstr ""
-
-msgid "Every amount is in that year's money."
+msgid ""
+"Every amount is nominal: the actual money of that year, not adjusted for "
+"inflation."
 msgstr ""
 
 msgid "Year-by-year projection"
 msgstr ""
 
-#, python-format
-msgid "Year-by-year projection, %(basis)s"
-msgstr ""
-
-msgid "today's money"
-msgstr ""
-
-msgid "each year's money"
+msgid "Year-by-year projection in nominal money"
 msgstr ""
 
 msgid "Loan payments"
@@ -6859,7 +6852,7 @@ msgstr ""
 msgid "Inflation"
 msgstr ""
 
-msgid "Real return"
+msgid "Return above inflation"
 msgstr ""
 
 msgid "Income growth"
@@ -6971,8 +6964,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Inflation %(inflation)s · real return %(real_return)s · income growth "
-"%(growth)s"
+"Inflation %(inflation)s · return above inflation %(real_return)s · income"
+" growth %(growth)s"
 msgstr ""
 
 #, python-format
@@ -12939,9 +12932,6 @@ msgstr ""
 #~ msgid "Income growth"
 #~ msgstr ""
 
-#~ msgid "Entered manually in today's money, in %(currency)s."
-#~ msgstr ""
-
 #~ msgid "No overrides. Every year uses income minus expenses."
 #~ msgstr ""
 
@@ -13286,13 +13276,6 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid ""
-#~ "All amounts are in %(currency)s and "
-#~ "in today's money. Enter the yearly "
-#~ "income and expenses at the start "
-#~ "of the plan."
-#~ msgstr ""
-
-#~ msgid ""
 #~ "Regular income in the start year: "
 #~ "earnings, dividends and interest, before "
 #~ "tax and other deductions. Linked income"
@@ -13504,22 +13487,10 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid ""
-#~ "Paying a loan off frees its "
-#~ "contractual instalments from the payoff "
-#~ "year onward. The amount is the "
-#~ "next up to 12 contractual payments "
-#~ "(interest, principal and costs, without "
-#~ "overpayments), in today's money."
-#~ msgstr ""
-
-#~ msgid ""
 #~ "Suggestions use the saved plan and "
 #~ "the loan schedules as of this page"
 #~ " load; unsaved Plan-input changes do"
 #~ " not update them."
-#~ msgstr ""
-
-#~ msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
 #~ msgstr ""
 
 #~ msgid "Based on the next %(months)d contractual instalments."
@@ -13613,20 +13584,10 @@ msgstr ""
 #~ msgid "Open the FIRE planner"
 #~ msgstr ""
 
-#~ msgid ""
-#~ "These scenarios start in different "
-#~ "years. Today's-money values are anchored "
-#~ "to each scenario's start year, so "
-#~ "compare them with care."
-#~ msgstr ""
-
 #~ msgid "FIRE results by scenario"
 #~ msgstr ""
 
 #~ msgid "Start"
-#~ msgstr ""
-
-#~ msgid "Net worth at FIRE (today's money)"
 #~ msgstr ""
 
 #~ msgid "Depletion age"
@@ -13645,12 +13606,6 @@ msgstr ""
 #~ "No years after income stops fall "
 #~ "inside the horizon, so depletion was "
 #~ "not checked."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Net worth at FIRE is always in "
-#~ "today's money. The chart follows the "
-#~ "selected basis."
 #~ msgstr ""
 
 #~ msgid "Net worth over time by scenario"
@@ -13690,9 +13645,6 @@ msgstr ""
 #~ msgstr[1] ""
 
 #~ msgid "Horizon"
-#~ msgstr ""
-
-#~ msgid "Real return"
 #~ msgstr ""
 
 #~ msgid "Inflation"
@@ -13766,23 +13718,9 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid ""
-#~ "All amounts are in %(currency)s and "
-#~ "in today's money at the start of"
-#~ " the plan. Enter the yearly income"
-#~ " and expenses, including loan payments."
-#~ msgstr ""
-
-#~ msgid ""
 #~ "The number of plan years from the"
 #~ " start year to the FIRE row. "
 #~ "The start year counts as 0."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "In the start year, net saving "
-#~ "shows the starting portfolio, as in "
-#~ "the original spreadsheet. Its gain is"
-#~ " earned on that portfolio."
 #~ msgstr ""
 
 #~ msgid ""
@@ -13825,14 +13763,6 @@ msgstr ""
 #~ "The horizon age is not after your"
 #~ " current age. Raise it in Plan "
 #~ "inputs to project the plan."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "All amounts are in %(currency)s and "
-#~ "in today's money in the plan's "
-#~ "first year, which is the current "
-#~ "year. Enter the yearly income and "
-#~ "expenses, including loan payments."
 #~ msgstr ""
 
 #~ msgid ""
@@ -13923,5 +13853,31 @@ msgstr ""
 #~ "Live loans are not part of the "
 #~ "plan yet. Enter yearly expenses that "
 #~ "include your loan payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The real-return range would leave "
+#~ "the supported -20 to 50 percent "
+#~ "bounds. Adjust the plan's return and "
+#~ "try again."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Both lines are in each year's "
+#~ "money, because the independence rule "
+#~ "compares nominal values."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The yearly investment return above "
+#~ "inflation. It is not a promise of"
+#~ " future returns."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The projection assumes "
+#~ "constant rates and does not model "
+#~ "taxes separately; real life will differ."
 #~ msgstr ""
 
