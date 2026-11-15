@@ -379,12 +379,13 @@ def validate_plan_input(
     )
 
 
-def _active(event: FireEvent | EventView, current_year: int, last_year: int) -> bool:
-    if event.year > last_year:
+def event_is_active(year: int, kind: str, current_year: int, last_year: int) -> bool:
+    """Whether an event applies to the projection; past events stay as archived history."""
+    if year > last_year:
         return False
-    if event.kind == EventKind.SAVING_OVERRIDE.value:
-        return event.year >= current_year + 1
-    return event.year >= current_year
+    if kind == EventKind.SAVING_OVERRIDE.value:
+        return year >= current_year + 1
+    return year >= current_year
 
 
 def _event_views(
@@ -399,7 +400,7 @@ def _event_views(
             kind=row.kind,
             amount=Money(row.amount_minor, currency),
             label=row.label,
-            archived=not _active(row, current_year, last_year),
+            archived=not event_is_active(row.year, row.kind, current_year, last_year),
         )
         (archived if view.archived else active).append(view)
     return tuple(active), tuple(archived)
@@ -915,7 +916,12 @@ def migrate_legacy_plan(
         archived_count = sum(
             1
             for event in event_rows
-            if not _active(event, current_year, chosen.birth_year + chosen.horizon_age)
+            if not event_is_active(
+                event.year,
+                event.kind,
+                current_year,
+                chosen.birth_year + chosen.horizon_age,
+            )
         )
         _audit(
             session,
@@ -955,6 +961,7 @@ __all__ = [
     "ValidatedPlan",
     "create_fire_plan",
     "delete_fire_plan",
+    "event_is_active",
     "get_fire_plan",
     "get_fire_plan_if_any",
     "migrate_legacy_plan",

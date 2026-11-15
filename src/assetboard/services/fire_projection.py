@@ -97,10 +97,11 @@ def inputs_from_validated(
 ) -> ProjectionInputs:
     """Map a validated unsaved form to the pure projection's input."""
     # Imported here to avoid a circular import in annotations.
-    from assetboard.services.fire_scenarios import ValidatedPlan
+    from assetboard.services.fire_scenarios import ValidatedPlan, event_is_active
 
     assert isinstance(validated, ValidatedPlan)
     currency = plan.currency
+    last_year = validated.birth_year + validated.horizon_age
     return ProjectionInputs(
         currency=currency,
         birth_year=validated.birth_year,
@@ -122,6 +123,7 @@ def inputs_from_validated(
                 amount=Money(row.amount_minor, currency),
             )
             for row in validated.events
+            if event_is_active(row.year, row.kind, current_year, last_year)
         ),
     )
 
@@ -176,6 +178,8 @@ def preview_plan_results(
     """Validate and project a posted form without writing; editors only."""
     require_role(ctx, Role.EDITOR)
     saved = detail.plan
+    if saved.currency_mismatch:
+        raise FireError("currency", "plan_currency_mismatch")
     saved_events = {event.id: event.year for event in detail.events}
     validated = validate_plan_input(
         plan_input,

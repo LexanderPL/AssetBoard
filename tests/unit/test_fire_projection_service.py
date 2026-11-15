@@ -157,6 +157,53 @@ def test_past_events_are_archived_and_not_applied(team: WorkspaceDb) -> None:
     assert results.projection.rows[0].cash == _money(0)
 
 
+def test_a_preview_ignores_archived_events_like_the_saved_projection(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    with team.factory.begin() as session:
+        old = FireEvent(
+            workspace_id=team.workspace_id,
+            scenario_id=plan_id,
+            year=2020,
+            kind="cash",
+            amount_minor=100_000,
+            label="Old bonus",
+        )
+        override = FireEvent(
+            workspace_id=team.workspace_id,
+            scenario_id=plan_id,
+            year=2026,
+            kind="saving_override",
+            amount_minor=200_000,
+            label="Became current",
+        )
+        session.add_all((old, override))
+        session.flush()
+        old_id, override_id = old.id, override.id
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    saved = fire_projection.results_from_detail(detail)
+    assert saved.projection is not None
+    assert [row.year for row in detail.archived_events] == [2020, 2026]
+    preview = fire_projection.preview_plan_results(
+        team.ctx("editor", "editor"),
+        detail,
+        _input(
+            events=(
+                EventInput(
+                    id=old_id, year=2020, kind="cash", amount_minor=100_000, label="Old bonus"
+                ),
+                EventInput(
+                    id=override_id,
+                    year=2026,
+                    kind="saving_override",
+                    amount_minor=200_000,
+                    label="Became current",
+                ),
+            )
+        ),
+    )
+    assert preview.projection == saved.projection
+
+
 def test_a_preview_with_unchanged_inputs_equals_the_saved_projection(team: WorkspaceDb) -> None:
     _create(team)
     detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
@@ -218,6 +265,10 @@ def test_a_currency_mismatch_blocks_the_projection(team: WorkspaceDb) -> None:
     assert results.projection is None
     assert results.blocked is not None
     assert results.blocked.code == "plan_currency_mismatch"
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    with pytest.raises(FireError) as error:
+        fire_projection.preview_plan_results(team.ctx("editor", "editor"), detail, _input())
+    assert error.value.code == "plan_currency_mismatch"
 
 
 def test_an_invalid_saved_plan_is_a_block_not_a_server_error(team: WorkspaceDb) -> None:
