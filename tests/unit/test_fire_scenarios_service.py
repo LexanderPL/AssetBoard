@@ -707,6 +707,27 @@ def test_create_never_accepts_events_or_removals(team: WorkspaceDb) -> None:
     assert removal.value.code == "events_not_allowed_on_create"
 
 
+def test_one_update_writes_one_audit_event_without_amounts(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    _add_event(team, plan_id, 2020, 100_000, label="Old")
+    with team.factory() as session:
+        before = session.query(AuditEvent).filter_by(action="fire_plan.updated").count()
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(events=(EventInput(year=2027, kind="cash", amount_minor=1, label="New"),)),
+    )
+    with team.factory() as session:
+        audits = (
+            session.query(AuditEvent)
+            .filter_by(action="fire_plan.updated")
+            .order_by(AuditEvent.ts)
+            .all()
+        )
+        assert len(audits) == before + 1
+        assert audits[-1].data == {}
+
+
 def test_event_ids_from_another_plan_are_refused(team: WorkspaceDb) -> None:
     plan_id = _create(team)
     other_event = uuid4()
