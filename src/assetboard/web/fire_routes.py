@@ -385,11 +385,11 @@ def _wizard_values(
 
 
 def _birth_year_source(values: dict[str, str], defaults: fire_service.FirePlanDefaults) -> str:
-    """Where the wizard's birth year came from: profile, empty, changed or missing."""
-    if defaults.birth_year is None:
-        return "missing"
+    """Where the wizard's birth year came from: profile, empty, changed, entered or missing."""
     if not values.get("birth_year"):
-        return "empty"
+        return "empty" if defaults.birth_year is not None else "missing"
+    if defaults.birth_year is None:
+        return "entered"
     if values["birth_year"] == str(defaults.birth_year):
         return "profile"
     return "changed"

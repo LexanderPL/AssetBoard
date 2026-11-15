@@ -6863,6 +6863,11 @@ msgid ""
 msgstr ""
 
 msgid ""
+"This plan stores its own birth year. Add it to your profile to prefill it"
+" next time."
+msgstr ""
+
+msgid ""
 "From your profile. This plan stores its own birth year; changing your "
 "profile later does not change this plan."
 msgstr ""

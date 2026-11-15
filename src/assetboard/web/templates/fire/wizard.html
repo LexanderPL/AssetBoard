@@ -34,6 +34,8 @@
         <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="empty">{{ _("Enter your birth year. Your profile has %(year)d.", year=profile_birth_year) }} <a href="{{ profile_url }}" class="underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a></span>
         {% elif birth_year_source == "changed" %}
         <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="changed">{{ _("Changed for this plan. Your profile still has %(year)d; changing it later does not change this plan.", year=profile_birth_year) }}</span>
+        {% elif birth_year_source == "entered" %}
+        <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="entered">{{ _("This plan stores its own birth year. Add it to your profile to prefill it next time.") }} <a href="{{ profile_url }}" class="underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a></span>
         {% else %}
         <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="profile">{{ _("From your profile. This plan stores its own birth year; changing your profile later does not change this plan.") }}</span>
         {% endif %}

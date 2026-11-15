@@ -860,11 +860,12 @@ unchanged.
 ### As built (M8.F8.14)
 
 - **Birth year.** New plans prefill from the profile. The wizard shows one supporting line with
-  `data-fire-birth-year-source` (`profile`, `empty`, `changed`, `missing`): the profile link
-  appears only when the field is empty or missing, and an edited wizard year says the profile
-  still has the saved value. The edit form explains that the plan keeps its saved birth year;
-  changing the profile never rewrites an existing plan. The field is required with explicit
-  `id`/`for` and ARIA wiring. No profile model, service or M6 risk change.
+  `data-fire-birth-year-source` (`profile`, `empty`, `changed`, `entered`, `missing`): the
+  profile link appears only when the field is empty or missing, an edited wizard year says the
+  profile still has the saved value, and a year entered without a profile says the plan keeps
+  its own value. The edit form explains that the plan keeps its saved birth year; changing the
+  profile never rewrites an existing plan. The field is required with explicit `id`/`for` and
+  ARIA wiring. No profile model, service or M6 risk change.
 - **Hints.** The four non-obvious assumptions keep a focusable question-mark note beside the
   label — return above inflation, independence rule, withdrawal rate and annual expenses
   (taxes/loan treatment). Every other FIRE field hint and every “Required. Enter 0…” /

@@ -796,6 +796,16 @@ def test_the_wizard_explains_a_birth_year_changed_for_this_plan(owner) -> None:
     assert "data-fire-profile-link" not in response.text
 
 
+def test_the_wizard_keeps_a_birth_year_entered_without_a_profile(owner) -> None:
+    response = post_wizard(owner, 1, "back", wizard_values(birth_year="1985"))
+    assert response.status_code == 200
+    assert 'name="birth_year" value="1985"' in response.text
+    assert 'data-fire-birth-year-source="entered"' in response.text
+    assert "This plan stores its own birth year." in response.text
+    assert "data-fire-profile-link" in response.text
+    assert "Enter your birth year." not in response.text
+
+
 def test_the_wizard_has_no_required_boilerplate_or_suggestion_paragraph(owner) -> None:
     values = wizard_values()
     text = _step(owner.client.get("/fire"), 1)
