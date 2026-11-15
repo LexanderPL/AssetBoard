@@ -17,6 +17,7 @@ from assetboard.db.repositories.budget_line import BudgetLineRepository, LineUsa
 from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.fire import (
     FireEventRepository,
+    FireLoanSettingRepository,
     FireScenarioRepository,
 )
 from assetboard.db.repositories.import_batch import ImportBatchRepository
@@ -94,6 +95,7 @@ __all__ = [
     "NotificationChannelRepository",
     "NotificationLogRepository",
     "FireEventRepository",
+    "FireLoanSettingRepository",
     "FireScenarioRepository",
     "FxRateRepository",
     "PricePointRepository",

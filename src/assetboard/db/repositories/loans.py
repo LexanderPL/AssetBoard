@@ -34,6 +34,14 @@ class LoanRepository(ScopedRepository[Loan]):
             statement = statement.where(Loan.archived_at.is_(None))
         return list(self._session.scalars(statement.order_by(Loan.name, Loan.id)))
 
+    def by_ids(self, loan_ids: Collection[UUID]) -> list[Loan]:
+        """The caller's loans among ``loan_ids``; other workspaces look missing."""
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = self._scoped_select().where(Loan.id.in_(ids)).order_by(Loan.id)
+        return list(self._session.scalars(statement))
+
 
 class LoanRateChangeRepository(ScopedRepository[LoanRateChange]):
     model = LoanRateChange

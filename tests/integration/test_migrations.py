@@ -46,6 +46,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "categories",
         "email_tokens",
         "fire_events",
+        "fire_loan_settings",
         "fire_scenarios",
         "import_batches",
         "import_category_mappings",
@@ -2485,6 +2486,39 @@ def test_0063_f88_one_plan_migration_backfills_and_is_lossily_reversible(
             ).one()
             assert contribution[0] == 120000
         upgrade_database(settings)
+        assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0064_fire_loan_settings_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'fire_loan_settings.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0063_f88_one_fire_plan")
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "fire_loan_settings" not in set(inspect(engine).get_table_names())
+        command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("fire_loan_settings")}
+        assert {"id", "workspace_id", "scenario_id", "loan_id", "included"} <= columns
+        unique = {
+            constraint["name"]
+            for constraint in inspector.get_unique_constraints("fire_loan_settings")
+        }
+        assert "uq_fire_loan_settings_plan_loan" in unique
+        foreign_keys = {
+            (tuple(key["constrained_columns"]), key["referred_table"])
+            for key in inspector.get_foreign_keys("fire_loan_settings")
+        }
+        assert (("workspace_id", "scenario_id"), "fire_scenarios") in foreign_keys
+        assert (("workspace_id", "loan_id"), "loans") in foreign_keys
+        command.downgrade(alembic_config(settings), "0063_f88_one_fire_plan")
+        assert "fire_loan_settings" not in set(inspect(engine).get_table_names())
+        command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
         assert database_is_at_head(settings)
     finally:
         engine.dispose()

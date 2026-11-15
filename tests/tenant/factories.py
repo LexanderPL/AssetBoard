@@ -17,9 +17,10 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from assetboard.db.models.fire import FireEvent, FireScenario
+from assetboard.db.models.fire import FireEvent, FireLoanSetting, FireScenario
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
@@ -778,6 +779,44 @@ def make_fire_event(session: Session, workspace_id: UUID) -> FireEvent:
     )
 
 
+def make_fire_loan_setting(session: Session, workspace_id: UUID) -> FireLoanSetting:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    plan = session.scalars(
+        select(FireScenario).where(
+            FireScenario.workspace_id == workspace_id, FireScenario.is_live.is_(True)
+        )
+    ).first()
+    if plan is None:
+        plan = FireScenario(
+            workspace_id=workspace_id,
+            currency="EUR",
+            birth_year=1985,
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            stop_working_age=55,
+            horizon_age=90,
+            rule="returns_cover_expenses",
+            swr_bp=None,
+            income_minor=500_000,
+            expenses_minor=300_000,
+            portfolio_minor=10_000_000,
+            needs_review=False,
+            is_live=True,
+            legacy=None,
+        )
+        session.add(plan)
+        session.flush()
+    return FireLoanSetting(
+        workspace_id=workspace_id,
+        scenario_id=plan.id,
+        loan_id=loan.id,
+        included=False,
+    )
+
+
 def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
     category = make_networth_category(session, workspace_id)
     session.add(category)
@@ -916,4 +955,5 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     InstallmentPlan: TenantCase(make_installment_plan, update_values={"remaining_count": 9}),
     FireScenario: TenantCase(make_fire_scenario, update_values={"income_minor": 600_000}),
     FireEvent: TenantCase(make_fire_event, update_values={"label": "Updated event"}),
+    FireLoanSetting: TenantCase(make_fire_loan_setting, update_values={"included": True}),
 }

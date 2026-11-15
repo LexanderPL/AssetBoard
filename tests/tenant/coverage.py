@@ -353,7 +353,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("LoanRepository", method): "test_loan_queries_stay_in_their_workspace"
-        for method in ("create", "ordered")
+        for method in ("create", "ordered", "by_ids")
     },
     **{
         ("LoanRateChangeRepository", method): "test_loan_queries_stay_in_their_workspace"
@@ -421,6 +421,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "counts_by_scenario",
             "saving_override_years",
         )
+    },
+    **{
+        ("FireLoanSettingRepository", method): "test_fire_queries_stay_in_their_workspace"
+        for method in ("create", "for_plan")
     },
     **{
         ("LoanRateChangeRepository", method): "test_loan_queries_stay_in_their_workspace"

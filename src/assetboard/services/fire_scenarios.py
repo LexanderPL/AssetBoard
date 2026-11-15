@@ -26,7 +26,9 @@ from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
     FireEventRepository,
+    FireLoanSettingRepository,
     FireScenarioRepository,
+    LoanRepository,
     NotFound,
 )
 from assetboard.domain.fire import (
@@ -111,6 +113,14 @@ class SavedEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class LoanSettingInput:
+    """One posted include/ignore choice; absence from the form keeps the saved choice."""
+
+    loan_id: UUID
+    included: bool
+
+
+@dataclass(frozen=True, slots=True)
 class FirePlanInput:
     birth_year: int | None = None
     inflation_bp: int = ILLUSTRATIVE_INFLATION_BP
@@ -127,6 +137,8 @@ class FirePlanInput:
     events: tuple[EventInput, ...] = ()
     # Saved rows the user explicitly removed; empty means no removal.
     removed_event_ids: tuple[UUID, ...] = ()
+    # Posted loan toggles; ``None`` means the loan section was not part of the request.
+    loan_settings: tuple[LoanSettingInput, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +210,7 @@ class FirePlanDetail:
     events: tuple[EventView, ...]
     active_events: tuple[EventView, ...]
     archived_events: tuple[EventView, ...]
+    ignored_loan_ids: frozenset[UUID] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -658,6 +671,7 @@ def _detail_in_session(
     active, archived = _event_views(
         event_rows, current_year, row.birth_year + row.horizon_age, row.currency
     )
+    settings = FireLoanSettingRepository(session, ctx).for_plan(row.id)
     return FirePlanDetail(
         plan=_view(
             row,
@@ -669,6 +683,7 @@ def _detail_in_session(
         events=active + archived,
         active_events=active,
         archived_events=archived,
+        ignored_loan_ids=frozenset(setting.loan_id for setting in settings if not setting.included),
     )
 
 
@@ -949,6 +964,45 @@ def _reconcile_events(
             )
 
 
+def _reconcile_loan_settings(
+    session: Session,
+    ctx: Context,
+    plan_id: UUID,
+    settings: tuple[LoanSettingInput, ...] | None,
+) -> None:
+    """Apply posted include/ignore choices; absence of the section leaves settings untouched."""
+    if settings is None:
+        return
+    posted: dict[UUID, bool] = {}
+    for setting in settings:
+        if setting.loan_id in posted:
+            raise FireError("loans", "duplicate_loan")
+        posted[setting.loan_id] = setting.included
+    if not posted:
+        return
+    loans = LoanRepository(session, ctx).by_ids(posted)
+    if {row.id for row in loans} != set(posted) or any(
+        row.kind == "installment_plan" for row in loans
+    ):
+        raise FireError("loans", "invalid_loan")
+    repository = FireLoanSettingRepository(session, ctx)
+    existing = {row.loan_id: row for row in repository.for_plan(plan_id)}
+    for loan_id, included in posted.items():
+        current = existing.get(loan_id)
+        if included:
+            if current is not None:
+                repository.delete(current)
+            continue
+        if current is None:
+            repository.create(
+                scenario_id=plan_id,
+                loan_id=loan_id,
+                included=False,
+            )
+        elif current.included:
+            repository.update(current.id, included=False)
+
+
 def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePlanInput) -> UUID:
     """Replace the live plan's inputs and event list; clears ``needs_review``."""
     require_role(ctx, Role.EDITOR)
@@ -1004,6 +1058,7 @@ def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
             needs_review=False,
         )
         _reconcile_events(session, ctx, row.id, validated, existing_rows=saved_rows)
+        _reconcile_loan_settings(session, ctx, row.id, plan.loan_settings)
         _audit(session, ctx, "fire_plan.updated", row)
         return row.id
 
