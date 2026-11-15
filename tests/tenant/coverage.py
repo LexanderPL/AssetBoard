@@ -449,6 +449,9 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     ("TransactionRepository", "regular_window_totals"): (
         "test_transaction_queries_stay_in_their_workspace"
     ),
+    ("TransactionRepository", "regular_window_loan_totals"): (
+        "test_transaction_queries_stay_in_their_workspace"
+    ),
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

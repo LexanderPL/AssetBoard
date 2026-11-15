@@ -602,3 +602,52 @@ def test_year_rollover_moves_the_anchor_and_archives_events(team: WorkspaceDb) -
     assert results.projection is not None
     assert results.projection.inputs.start_year == 2027
     assert results.projection.rows[0].year == 2027
+
+
+def test_plan_entry_returns_the_loaded_detail_for_the_view_page(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    _add_event(team, plan_id, 2027, 100_000)
+    entry = fire_scenarios.plan_entry(team.factory, team.ctx("viewer", "viewer"))
+    assert entry.plan is not None and entry.plan.id == plan_id
+    assert entry.detail is not None
+    assert entry.detail.plan.id == plan_id
+    assert [row.year for row in entry.detail.active_events] == [2027]
+    assert entry.migration is None
+
+
+def test_validate_amount_distinguishes_a_missing_wizard_value(team: WorkspaceDb) -> None:
+    assert fire_scenarios.validate_amount("income", _money(0), "EUR", required=True) == 0
+    with pytest.raises(FireError) as missing:
+        fire_scenarios.validate_amount("income", None, "EUR", required=True)
+    assert missing.value.code == "amount_required"
+    with pytest.raises(FireError) as saved:
+        fire_scenarios.validate_amount("income", None, "EUR")
+    assert saved.value.code == "invalid_amount"
+
+
+def test_validate_ages_and_rates_keep_the_existing_codes(team: WorkspaceDb) -> None:
+    assert fire_scenarios.validate_ages(1985, 90, 55, current_year=2026, default_horizon=90) == (
+        1985,
+        90,
+        55,
+    )
+    with pytest.raises(FireError) as horizon:
+        fire_scenarios.validate_ages(1985, 40, 55, current_year=2026, default_horizon=90)
+    assert horizon.value.code == "horizon_not_after_age"
+    rates = fire_scenarios.validate_rates(
+        inflation_bp=250,
+        real_return_bp=500,
+        income_growth_bp=300,
+        rule=Rule.RETURNS_COVER_EXPENSES.value,
+        swr_bp=None,
+    )
+    assert rates.needs_extreme_confirmation is False
+    with pytest.raises(FireError) as swr:
+        fire_scenarios.validate_rates(
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            rule=Rule.SWR.value,
+            swr_bp=None,
+        )
+    assert swr.value.code == "invalid_swr"

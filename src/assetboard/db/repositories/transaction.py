@@ -24,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.sql.elements import UnaryExpression
 
 from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.loans import LoanPayment
 from assetboard.db.repositories.base import ScopedRepository
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import SortOrder, TransactionFilter
@@ -360,6 +361,62 @@ class TransactionRepository(ScopedRepository[Transaction]):
                 amount_minor=int(total),
             )
             for category_id, row_year, row_month, currency, total in self._session.execute(
+                statement
+            )
+        ]
+
+    def regular_window_loan_totals(
+        self, *, start: date, end: date, currency: str
+    ) -> list[RegularWindowTotal]:
+        """Regular expense totals in the window whose row is linked from a loan payment.
+
+        The FIRE wizard's loan portion (F8.9) is the part of the ledger expense suggestion that
+        the app knows are loan payments: expense rows referenced by
+        ``loan_payments.transaction_id``. The filters match :meth:`regular_window_totals`, so the
+        result is a subset of the trailing expense rows. A transaction linked from more than one
+        payment counts once (the ``IN`` subquery, not a join).
+        """
+        linked = select(LoanPayment.transaction_id).where(
+            LoanPayment.workspace_id == self._workspace_id,
+            LoanPayment.transaction_id.is_not(None),
+        )
+        year = cast(extract("year", Transaction.date), Integer)
+        month = cast(extract("month", Transaction.date), Integer)
+        statement = (
+            select(
+                Transaction.category_id,
+                year,
+                month,
+                Transaction.currency,
+                func.sum(Transaction.amount_minor),
+            )
+            .join(
+                Category,
+                and_(
+                    Category.workspace_id == Transaction.workspace_id,
+                    Category.id == Transaction.category_id,
+                ),
+            )
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.id.in_(linked),
+                Transaction.deleted_at.is_(None),
+                Transaction.direction == "expense",
+                Transaction.currency == currency,
+                Transaction.date >= start,
+                Transaction.date <= end,
+                Category.treatment == "regular",
+            )
+            .group_by(Transaction.category_id, year, month, Transaction.currency)
+        )
+        return [
+            RegularWindowTotal(
+                category_id=category_id,
+                month=YearMonth(int(row_year), int(row_month)),
+                currency=row_currency,
+                amount_minor=int(total),
+            )
+            for category_id, row_year, row_month, row_currency, total in self._session.execute(
                 statement
             )
         ]

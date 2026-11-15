@@ -609,15 +609,137 @@ def linked_inputs(
         )
 
 
+@dataclass(frozen=True, slots=True)
+class LoanPortion:
+    """The part of the ledger expense suggestion recorded as loan payments.
+
+    ``window_total`` is a raw window total, like :attr:`TrailingSeries.categories`, so it lines
+    up with the category breakdown. ``months_available`` is the number of distinct months with
+    linked rows; zero means no ledger expense in the window is linked to a loan payment, and the
+    wizard explains that instead of claiming a zero loan portion.
+    """
+
+    window_total: Money
+    months_available: int
+
+    @property
+    def has_data(self) -> bool:
+        return self.months_available > 0
+
+
+@dataclass(frozen=True, slots=True)
+class SetupSuggestions:
+    """The F8.9 setup wizard's read-only suggestions.
+
+    One resolution for the requested cards, sharing the as-of day, trailing window and warnings.
+    ``loan_portion`` is present only when the expense suggestion resolved; it is the subset of
+    those ledger expenses linked from a recorded loan payment (F8.12 adds live schedules).
+    """
+
+    as_of: date
+    window: TrailingWindow
+    currency: str
+    income: TrailingSeries | None
+    expenses: TrailingSeries | None
+    portfolio: LinkedPortfolio | None
+    loan_portion: LoanPortion | None
+    warnings: tuple[LinkedWarning, ...]
+    blocks: tuple[ResultsBlock, ...]
+
+
+def _loan_portion(
+    session: Session,
+    ctx: Context,
+    *,
+    currency: str,
+    window: TrailingWindow,
+) -> LoanPortion:
+    rows = TransactionRepository(session, ctx).regular_window_loan_totals(
+        start=window.first_day,
+        end=window.last_day,
+        currency=currency,
+    )
+    return LoanPortion(
+        window_total=Money(sum(row.amount_minor for row in rows), currency),
+        months_available=len({row.month for row in rows}),
+    )
+
+
+def setup_suggestions_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    currency: str,
+    include_income: bool = True,
+    include_expenses: bool = True,
+    include_portfolio: bool = True,
+) -> SetupSuggestions:
+    """Resolve only the suggestion cards a wizard step shows; nothing is written."""
+    _require_viewer(ctx)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    linked = linked_inputs_in_session(
+        session,
+        ctx,
+        currency=currency,
+        start_year=today.year,
+        income_mode="trailing_12m" if include_income else "manual",
+        expenses_mode="trailing_12m" if include_expenses else "manual",
+        portfolio_mode="linked_investable" if include_portfolio else "manual",
+        expense_exclusion_ids=(),
+    )
+    loan_portion = (
+        _loan_portion(session, ctx, currency=currency, window=linked.window)
+        if linked.expenses is not None
+        else None
+    )
+    return SetupSuggestions(
+        as_of=linked.as_of,
+        window=linked.window,
+        currency=currency,
+        income=linked.income,
+        expenses=linked.expenses,
+        portfolio=linked.portfolio,
+        loan_portion=loan_portion,
+        warnings=linked.warnings,
+        blocks=linked.blocks,
+    )
+
+
+def setup_suggestions(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    currency: str,
+    include_income: bool = True,
+    include_expenses: bool = True,
+    include_portfolio: bool = True,
+) -> SetupSuggestions:
+    """The public read wrapper for :func:`setup_suggestions_in_session`."""
+    _require_viewer(ctx)
+    with factory() as session:
+        return setup_suggestions_in_session(
+            session,
+            ctx,
+            currency=currency,
+            include_income=include_income,
+            include_expenses=include_expenses,
+            include_portfolio=include_portfolio,
+        )
+
+
 __all__ = [
     "CategoryTotal",
     "LinkedError",
     "LinkedInputs",
     "LinkedPortfolio",
     "LinkedWarning",
+    "LoanPortion",
     "PortfolioSourceRow",
     "ResultsBlock",
+    "SetupSuggestions",
     "TrailingSeries",
     "linked_inputs",
     "linked_inputs_in_session",
+    "setup_suggestions",
+    "setup_suggestions_in_session",
 ]
