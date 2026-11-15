@@ -354,6 +354,53 @@ def test_roles_and_tenant_checks(team: WorkspaceDb) -> None:
     assert plan_id
 
 
+def test_the_chooser_cannot_migrate_another_workspaces_scenario(team: WorkspaceDb) -> None:
+    other = team.add_workspace("Other")
+    team.add_member("other-owner", "owner", workspace_id=other)
+    other_ctx = team.ctx("other-owner", "owner", workspace_id=other)
+    payload = {
+        "v": 1,
+        "name": "Their plan",
+        "name_key": "their plan",
+        "start_year": 2026,
+        "is_default": True,
+        "archived_at": None,
+        "income_mode": "manual",
+        "expenses_mode": "manual",
+        "portfolio_mode": "manual",
+        "income_manual_minor": 5_000_000,
+        "expenses_manual_minor": 3_000_000,
+        "portfolio_manual_minor": 100_000_000,
+        "expense_exclusion_ids": [],
+    }
+    with team.factory.begin() as session:
+        other_id = (
+            FireScenarioRepository(session, other_ctx)
+            .create(
+                currency="EUR",
+                birth_year=1985,
+                inflation_bp=250,
+                real_return_bp=500,
+                income_growth_bp=300,
+                stop_working_age=55,
+                horizon_age=90,
+                rule="returns_cover_expenses",
+                swr_bp=None,
+                income_minor=5_000_000,
+                expenses_minor=3_000_000,
+                portfolio_minor=100_000_000,
+                needs_review=True,
+                is_live=False,
+                legacy=json.dumps(payload, sort_keys=True),
+            )
+            .id
+        )
+    with pytest.raises(NotFound):
+        fire_scenarios.migrate_legacy_plan(team.factory, team.ctx("editor", "editor"), other_id)
+    with team.factory() as session:
+        assert session.get_one(FireScenario, other_id).is_live is False
+
+
 def test_a_single_legacy_plan_auto_migrates_on_an_editor_visit(team: WorkspaceDb) -> None:
     legacy_id = _legacy(team, name="Only old plan", is_default=True)
     entry = plan_entry(team.factory, team.ctx("editor", "editor"))
@@ -385,6 +432,7 @@ def test_multiple_legacy_rows_show_a_chooser_and_the_choice_deletes_the_others(
 ) -> None:
     first = _legacy(team, name="First plan", is_default=True)
     second = _legacy(team, name="Second plan")
+    first_event = _add_event(team, first, 2030, 100_000)
     entry = plan_entry(team.factory, team.ctx("editor", "editor"))
     assert entry.migration is None
     assert {row.id for row in entry.legacy} == {first, second}
@@ -392,6 +440,7 @@ def test_multiple_legacy_rows_show_a_chooser_and_the_choice_deletes_the_others(
     assert result.deleted_count == 1
     with team.factory() as session:
         assert session.get(FireScenario, first) is None
+        assert session.get(FireEvent, first_event) is None
         live = session.get_one(FireScenario, second)
         assert live.is_live is True
         audit = session.query(AuditEvent).filter_by(action="fire_plan.migrated").one()
