@@ -50,9 +50,10 @@ first; **Create plan** never saves values that differ from the review you last s
    as-of date and a list of the sources (portfolio classes and manual net-worth items) that link
    to the page where each source lives.
 4. **Assumptions and review:** inflation, real return, income growth and the independence rule.
-   The review shows the entered values, the projected window and the warnings; **Create plan**
-   writes the plan once. Adjustments are added after creation, and active loans are listed in the
-   plan after a later update.
+   The review shows the entered values, the projected window, the warnings and a read-only list
+   of active loans with their annual payment, payoff year and included state. **Create plan**
+   writes the plan once. Adjustments and loan include/ignore choices are changed after creation
+   in edit mode.
 
 A blocked suggestion explains why it is unavailable (no data, another ledger currency, a missing
 price/FX rate or value) and leaves the field editable; the app never shows a fake zero. The
@@ -69,6 +70,8 @@ The plan page shows the saved plan without any inputs or preview controls:
 - the **Adjustments** applied to the plan, with before-the-current-year adjustments in a collapsed
   **Archived adjustments** section;
 - the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
+- the **Loans** panel with each active loan's annual payment, payoff year, included/ignored
+  state and effect on the plan;
 - the **Download CSV** action when the projection is available.
 
 A converted plan shows a review banner until an editor or owner saves it in edit mode. The page
@@ -103,9 +106,46 @@ suggestion explains why and leaves the field for manual entry. Suggestions are r
 never write.
 
 The adjustments row editor is available in edit mode; a saved adjustment before the current year
-stays archived history and is not applied. A later update adds the live loan schedules; until
-then, enter expenses that include your loan payments. If you edit the same plan in two tabs, the
-last save wins; reload the other tab before saving.
+stays archived history and is not applied. The loan section reads the current loan schedules
+live; its include/ignore choices are saved with **Save changes**. If you edit the same plan in
+two tabs, the last save wins; reload the other tab before saving.
+
+## Live loans
+
+The plan reads the active loan schedules from **Loans** every time it is viewed or previewed. It
+does not save a loan-payoff event and there is no button to create one: changing a loan's rate,
+term or overpayment plan changes the next FIRE calculation.
+
+- **Annual payment** is the next scheduled monthly payment times twelve. It includes interest,
+  principal, costs and the loan's regular overpayment. A future one-off overpayment changes the
+  projected payoff date only; it is not part of the recurring annual payment. The planner does
+  not sum the remaining twelve months and does not prorate a payoff inside a year.
+- **Included** loans are part of the expenses the plan already contains. From the projected
+  payoff year onward the planner removes their annual payment, so the expense line and the FIRE
+  metrics reflect the lower spending. A payoff in the current year removes the full annual
+  payment from that year.
+- **Ignored** loans are shown in the plan but produce no expense drop; their payment stays in the
+  baseline through the horizon. Ignore a loan only when its payment is not part of the expenses
+  you entered, or when you deliberately do not want its payoff to affect the forecast.
+- The loan choice is saved per plan with **Save changes**; **Discard changes** restores the saved
+  choice and a preview never writes. Existing plans treat every loan as included until you
+  change it.
+- Multiple loans are summed, each with its own payoff year. The year-by-year table has a **Loan
+  payments** column showing the part of that year's expenses still attributable to loans, and a
+  badge on the payoff year. The charts mark included loan payoffs.
+- Loans in another currency, archived loans, paid-off and not-drawn loans, broken schedules and
+  installment plans are listed with a reason and are not included. They are never silently
+  treated as zero.
+- If the scheduled loan payments are larger than the entered annual expenses, the page warns
+  that the expenses may not include them. The planner does not cap the drop or block the
+  projection.
+- Loan payments are fixed nominal amounts; the rest of the expense line inflates with the plan's
+  inflation rate. This is an approximation, especially for a loan whose rate or payment changes
+  in the future. Sensitivity scaling applies to the whole expense line, including the loan
+  component; payoff years stay as projected.
+- A final contractual row that contains a balloon payment is annualised as the next scheduled
+  payment times twelve, as specified; the page can therefore overstate the recurring payment in
+  that final period.
 
 ## Reset plan
 
@@ -146,7 +186,8 @@ check the values and save to clear the review banner.
   you actually pay. The projection does not model income-tax disappearance or capital-gains tax
   separately.
 - Expenses are expected to include your loan payments. The planner removes an included loan's
-  payment after its projected payoff when live loans are shown in a later update.
+  recurring annual payment from its projected payoff year onward; an ignored loan stays in the
+  forecast through the horizon.
 
 ## Rates
 
@@ -210,11 +251,12 @@ reason instead of a grid, and never a fake zero.
 
 ## Archive and restore
 
-The workspace archive uses format **2.0**. It has one `fire_plan.csv` row (header-only when
-there is no plan) and `fire_events.csv`; there are no scenario, contribution or exclusion files.
-Archive export includes the plan currency, manual amounts, `needs_review` and every adjustment,
-including archived history. Suggested values, live loan data and projection results are derived
-and are not archived.
+The workspace archive uses format **2.1**. It has one `fire_plan.csv` row (header-only when
+there is no plan), `fire_events.csv` and `fire_loan_settings.csv`; there are no scenario,
+contribution or exclusion files. A 2.0 archive still restores with every loan included.
+Archive export includes the plan currency, manual amounts, `needs_review`, every adjustment
+(including archived history) and the plan's ignored-loan choices. Suggested values, live loan
+schedules and projection results are derived and are not archived.
 
 A 1.8 archive still imports. It keeps the default active scenario, else the first active, else
 the first archived one; linked values use the exported fallbacks; contribution overrides become

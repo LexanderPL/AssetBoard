@@ -93,8 +93,9 @@ Restore writes, all at once:
    archived ids when the target database does not already use them, so linked net-worth items
    and installment-plan references keep pointing at the right loan;
 9. the saved risk targets and the investment cost basis;
-10. The FIRE plan and its adjustments. A 2.0 archive carries one plan with manual amounts and
-    `needs_review`. A 1.8 archive is upgraded: one scenario is kept (default active, else first
+10. The FIRE plan, its adjustments and its ignored-loan choices. A 2.1 archive carries one plan
+    with manual amounts, `needs_review` and the loan choices; a 2.0 archive carries the plan
+    without loan choices, so every loan is included. A 1.8 archive is upgraded: one scenario is kept (default active, else first
     active, else first archived), linked values use the archived fallbacks, contribution
     overrides become saving overrides, one-click loan-payoff events are dropped, and the other
     scenarios are reported as skipped. A blank linked fallback becomes 0 with a warning. Export
@@ -176,7 +177,8 @@ A lone reference-rate-values file creates a series named by the file when it doe
 For an existing series, the same series and effective date makes an identical value a duplicate
 (`already_imported`) and a different value a conflict (`reference_rate_value_differs`); the
 stored value is kept. The other loan archive files and every FIRE archive file are restore-only:
-`loans.csv`, `fire_plan.csv` and `fire_events.csv` have no standalone importer.
+`loans.csv`, `fire_plan.csv`, `fire_events.csv` and `fire_loan_settings.csv` have no standalone
+importer.
 
 Investment transactions are matched by instrument name. A name that matches an active instrument
 is mapped automatically; an unknown name needs the **Instrument mapping** step: map it to an

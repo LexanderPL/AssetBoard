@@ -94,7 +94,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M5 | NetWorthCategory, NetWorthItem, ItemValuation, NetWorthSnapshot |
 | M6 | AssetClass, Instrument, InstrumentAllocation, InvestmentTransaction, PricePoint, FxRate, PriceSourceConfig, BondTerms |
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
-| M8 | FireScenario (one plan per workspace in v2), FireEvent; FireContribution is migrated into saving-override events and removed |
+| M8 | FireScenario (one plan per workspace in v2), FireEvent, FireLoanSetting; FireContribution is migrated into saving-override events and removed |
 | M9 | ApiToken, BackupRun, DashboardPreference |
 | M10 | none (reports read existing rows) |
 
