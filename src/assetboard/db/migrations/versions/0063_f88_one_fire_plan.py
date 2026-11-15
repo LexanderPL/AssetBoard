@@ -824,9 +824,13 @@ def downgrade() -> None:
     op.drop_table("fire_scenarios")
     _old_tables()
 
-    now_year = datetime.now(UTC).year
     scenario_rows: list[dict[str, Any]] = []
     for row in scenarios:
+        # The downgrade has no clock. Fill the removed start year from the ages the v2 row
+        # keeps, so the downgraded row still satisfies the old start-year checks.
+        derived_start_year = row["birth_year"] + max(
+            0, min(row["horizon_age"] - 1, row["stop_working_age"])
+        )
         legacy: dict[str, Any] = {}
         if row["legacy"]:
             try:
@@ -836,7 +840,7 @@ def downgrade() -> None:
         if legacy:
             name = str(legacy.get("name") or "FIRE plan")
             name_key = str(legacy.get("name_key") or name.casefold())
-            start_year = int(legacy.get("start_year") or now_year)
+            start_year = int(legacy.get("start_year") or derived_start_year)
             is_default = bool(legacy.get("is_default"))
             archived_at = None
             archived_text = legacy.get("archived_at")
