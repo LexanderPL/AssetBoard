@@ -10,13 +10,50 @@ recommendations, and the projection assumes constant rates and no separate tax m
 
 ## One plan
 
-**FIRE projection** opens the plan. If the workspace has no plan, the page offers **Create your
-FIRE plan**. A workspace has at most one plan; creating another is refused.
+**FIRE projection** opens the plan. If the workspace has no plan, the page starts the four-step
+**setup wizard**. A workspace has at most one plan; creating another is refused.
 
 The plan keeps a **currency snapshot** from the workspace base currency when it is created or
 migrated. If the workspace base currency changes later, the page shows a blocking notice and
-does not reinterpret the saved amounts. Reset the plan and create a new one in the new currency
-when that option is available.
+does not reinterpret the saved amounts. **Reset plan** deletes the plan and lets you create a new
+one in the current currency.
+
+A viewer sees the plan read-only. A viewer in a workspace with no plan sees an empty state and
+is told that an editor or owner can set it up.
+
+## Setting up the plan
+
+The wizard writes nothing until the last step. **Next** validates the current step and its
+earlier steps; **Back** returns without saving; **Cancel** leaves the wizard and no plan exists.
+The step values travel with the form, so leaving the wizard discards them. If the workspace base
+currency changes while you are in the wizard, the amounts are not converted; check them before
+**Create plan**.
+
+1. **About you:** birth year (prefilled from your profile, editable for this plan), horizon age
+   (prefilled from your profile's life expectancy) and the age at which income stops. The page
+   shows your current age and the first and last projected years.
+2. **Income and expenses:** empty by default. Each field has a suggestion card: **Use suggested
+   value** copies the suggestion into the field, but a suggestion never fills a field by itself.
+   The income and expense suggestions use the last 12 full calendar months, with the window,
+   months with data and any warnings shown. The expense card also shows the category breakdown
+   (window totals) and the loan payments that are linked to ledger expenses.
+3. **Portfolio:** the starting portfolio, with the current investable-assets suggestion, its
+   as-of date and a list of the sources (portfolio classes and manual net-worth items).
+4. **Assumptions and review:** inflation, real return, income growth and the independence rule.
+   The review shows the entered values, the projected window and the warnings; **Create plan**
+   writes the plan once. Adjustments are added after creation, and active loans are listed in the
+   plan after a later update.
+
+A blocked suggestion explains why it is unavailable (no data, another ledger currency, a missing
+price/FX rate or value) and leaves the field editable; the app never shows a fake zero. The
+starting rates are illustrative examples, not recommendations.
+
+## Reset plan
+
+Editors and owners can **Reset plan** from the plan page. The reset page shows how many
+adjustments will be deleted, offers a link to the workspace archive for a copy, and asks you to
+type **reset** to confirm. A wrong or empty confirmation deletes nothing. A successful reset is
+recorded in the audit log and returns to the setup wizard.
 
 ## Old scenarios
 
@@ -87,7 +124,7 @@ The results page shows:
 - the sustainability check: the depletion age and the lowest net worth after income stops;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth;
 - a net-worth chart and an expenses-versus-gain chart;
-- a collapsible **Plan inputs** panel and a **Download CSV** export.
+- a collapsible **Plan inputs** panel, **Download CSV** and **Reset plan**.
 
 Changing an input previews the new results without saving. Press **Save changes** to persist and
 clear the review banner, or **Discard changes** to return to the saved values. The
@@ -113,6 +150,6 @@ FIRE CSV import.
 
 ## Roles
 
-Every member can read the plan and its results. Editors and owners can create, edit, convert old
-scenarios and delete the plan. All write pages are CSRF-protected, and a cross-workspace plan is
-reported as not found.
+Every member can read the plan and its results. Editors and owners can set up the plan, edit it,
+convert old scenarios and reset the plan. All write pages are CSRF-protected, and a
+cross-workspace plan is reported as not found.
