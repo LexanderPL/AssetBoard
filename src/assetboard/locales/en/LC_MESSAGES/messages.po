@@ -2744,6 +2744,9 @@ msgstr ""
 msgid "Confirm that the other old FIRE scenarios will be deleted."
 msgstr ""
 
+msgid "The adjustment rows are missing. Reload the page and try again."
+msgstr ""
+
 msgid ""
 "The workspace base currency no longer matches the plan's currency. Reset "
 "the plan and create a new one in the current currency."
@@ -2832,6 +2835,9 @@ msgstr ""
 msgid "The plan values changed. Check the updated review, then press Create plan."
 msgstr ""
 
+msgid "Unsaved changes discarded."
+msgstr ""
+
 msgid "About you"
 msgstr ""
 
@@ -2862,13 +2868,10 @@ msgstr ""
 msgid "Saving override"
 msgstr ""
 
-msgid "annual income"
+msgid "Reset plan"
 msgstr ""
 
-msgid "annual expenses"
-msgstr ""
-
-msgid "starting portfolio"
+msgid "Edit the plan"
 msgstr ""
 
 #, python-format
@@ -5848,6 +5851,71 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "Archived"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "this adjustment"
+msgstr ""
+
+msgid "Adjustments"
+msgstr ""
+
+msgid ""
+"A one-off cash flow is added to net worth in that year. An expense or "
+"income change alters the annual series from that year onward. A saving "
+"override replaces that year's net saving and is unique per year. Negative"
+" amounts reduce, positive amounts increase."
+msgstr ""
+
+#, python-format
+msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
+msgstr ""
+
+msgid ""
+"Adjustments before the current year are kept as archived history and are "
+"not applied to the projection."
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "Add an adjustment"
+msgstr ""
+
+msgid ""
+"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
+"repaid; 500 per year of extra rental income; a whole-year net saving "
+"override."
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d adjustment"
+msgid_plural "%(num)d adjustments"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Adjustments applied to the projection"
+msgstr ""
+
+msgid "No adjustments yet."
+msgstr ""
+
+msgid "Add them in edit mode."
+msgstr ""
+
+msgid "An editor or owner can add them."
+msgstr ""
+
+msgid ""
+"These adjustments are before the plan's current year (or a saving "
+"override in the current year) and are not applied to the projection. They"
+" stay in the plan as history."
+msgstr ""
+
 msgid "Charts"
 msgstr ""
 
@@ -5883,15 +5951,6 @@ msgid ""
 msgstr ""
 
 msgid "Plotted expenses and gain data"
-msgstr ""
-
-msgid "Archived"
-msgstr ""
-
-msgid "Description"
-msgstr ""
-
-msgid "this adjustment"
 msgstr ""
 
 msgid "Plan"
@@ -5995,16 +6054,19 @@ msgstr ""
 #, python-format
 msgid ""
 "All amounts are in %(currency)s and in today's money in the plan's first "
-"year, which is the current year. Enter the yearly income and expenses, "
-"including loan payments."
+"year, which is the current year. Enter your after-tax income and "
+"expenses, including the taxes you actually pay and your loan payments."
 msgstr ""
 
 msgid "Annual income"
 msgstr ""
 
 msgid ""
-"Regular income in the current year: earnings, dividends and interest, "
-"before tax and other deductions."
+"Regular income you receive in the current year: earnings, dividends and "
+"interest. Use the after-tax amount."
+msgstr ""
+
+msgid "Suggested annual income"
 msgstr ""
 
 msgid "Annual expenses"
@@ -6012,8 +6074,11 @@ msgstr ""
 
 msgid ""
 "Regular yearly spending in the current year, excluding savings and "
-"transfers. Include your loan payments; the planner will remove an "
-"included loan's payment after its payoff later."
+"transfers. Include the taxes you actually pay and your loan payments; the"
+" planner will remove an included loan's payment after its payoff later."
+msgstr ""
+
+msgid "Suggested annual expenses"
 msgstr ""
 
 msgid "Starting portfolio"
@@ -6022,59 +6087,15 @@ msgstr ""
 msgid "Investable assets today: investments and cash savings, not your home."
 msgstr ""
 
-msgid "Adjustments"
+msgid ""
+"A suggestion never fills a field by itself. Press Use suggested value to "
+"copy one, then change it if you want. The saved amount changes only when "
+"you press Save changes."
 msgstr ""
 
 msgid ""
-"A one-off cash flow is added to net worth in that year. An expense or "
-"income change alters the annual series from that year onward. A saving "
-"override replaces that year's net saving and is unique per year. Negative"
-" amounts reduce, positive amounts increase."
-msgstr ""
-
-#, python-format
-msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
-msgstr ""
-
-msgid ""
-"Adjustments before the current year are kept as archived history and are "
-"not applied to the projection."
-msgstr ""
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr ""
-
-msgid "Add an adjustment"
-msgstr ""
-
-msgid ""
-"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
-"repaid; 500 per year of extra rental income; a whole-year net saving "
-"override."
-msgstr ""
-
-msgid "Plan inputs"
-msgstr ""
-
-msgid "Change an input to preview the results, then save when you are happy."
-msgstr ""
-
-msgid "Read-only inputs."
-msgstr ""
-
-msgid ""
-"Changes preview automatically and are not saved until you press Save "
-"changes."
-msgstr ""
-
-msgid "Save changes"
-msgstr ""
-
-msgid "Discard changes"
-msgstr ""
-
-msgid "Your role can read this plan but not change it."
+"Live loans are not part of the plan yet. Enter yearly expenses that "
+"include your loan payments."
 msgstr ""
 
 #, python-format
@@ -6156,8 +6177,8 @@ msgid "Preview of unsaved changes."
 msgstr ""
 
 msgid ""
-"A changed rate is outside the usual range. Tick the confirmation box in "
-"Plan inputs before saving."
+"A changed rate is outside the usual range. Tick the confirmation box "
+"before saving."
 msgstr ""
 
 msgid "Money basis"
@@ -6178,27 +6199,19 @@ msgstr ""
 msgid "The plan cannot be projected."
 msgstr ""
 
-msgid "Reset plan"
-msgstr ""
-
-msgid ""
-"These adjustments are before the plan's current year (or a saving "
-"override in the current year) and are not applied to the projection. They"
-" stay in the plan as history."
+msgid "Change the plan values below; the projection updates as you edit."
 msgstr ""
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
-"assumes constant rates and no taxes; real life will differ."
+"assumes constant rates and does not model taxes separately; real life "
+"will differ."
 msgstr ""
 
 msgid "Based on the saved plan; unsaved changes are not included."
 msgstr ""
 
 msgid "The sensitivity grid is unavailable while the projection is blocked."
-msgstr ""
-
-msgid "Open plan inputs"
 msgstr ""
 
 msgid "Sensitivity grid"
@@ -6251,6 +6264,23 @@ msgstr ""
 msgid "Show sensitivity grid"
 msgstr ""
 
+#, python-format
+msgid "Saved: %(amount)s. This matches the suggestion."
+msgstr ""
+
+#, python-format
+msgid ""
+"Saved: %(amount)s. This differs from the suggestion; the saved amount "
+"changes only when you save."
+msgstr ""
+
+msgid "Use suggested value"
+msgstr ""
+
+#, python-format
+msgid "for %(label)s"
+msgstr ""
+
 msgid "per year"
 msgstr ""
 
@@ -6260,11 +6290,8 @@ msgid ""
 "%(total)s."
 msgstr ""
 
-msgid "Use suggested value"
-msgstr ""
-
 #, python-format
-msgid "for %(label)s"
+msgid "Data as of %(day)s."
 msgstr ""
 
 msgid "Expenses by category in the window"
@@ -6291,7 +6318,7 @@ msgstr ""
 msgid "Investable assets as of %(day)s."
 msgstr ""
 
-msgid "for the starting portfolio"
+msgid "the starting portfolio"
 msgstr ""
 
 msgid "Where this value comes from"
@@ -6304,9 +6331,6 @@ msgid "Every amount is in today's money."
 msgstr ""
 
 msgid "Every amount is in that year's money."
-msgstr ""
-
-msgid "Download CSV"
 msgstr ""
 
 msgid "Year-by-year projection"
@@ -6390,7 +6414,61 @@ msgid ""
 "planner can be used."
 msgstr ""
 
+msgid "Edit FIRE plan"
+msgstr ""
+
+msgid "View plan"
+msgstr ""
+
+msgid ""
+"This plan was converted from the old format. Check the values below and "
+"save to confirm them."
+msgstr ""
+
 msgid "FIRE plan"
+msgstr ""
+
+#, python-format
+msgid "First year %(year)d · age %(age)d · currency %(currency)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d archived"
+msgid_plural "%(num)d archived"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"The horizon age is not after your current age. Raise it below to project "
+"the plan."
+msgstr ""
+
+msgid ""
+"Income already stops at or before your current age, so base income is "
+"zero. The plan still spends from the portfolio."
+msgstr ""
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon. The plan is saved, but the "
+"projection has no working years beyond age %(horizon)d."
+msgstr ""
+
+msgid "Plan inputs"
+msgstr ""
+
+msgid ""
+"Changes preview automatically and are not saved until you press Save "
+"changes."
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Discard changes"
+msgstr ""
+
+msgid "Unsaved changes"
 msgstr ""
 
 msgid "Setup cancelled"
@@ -6445,6 +6523,9 @@ msgstr ""
 msgid "To confirm, type %(word)s:"
 msgstr ""
 
+msgid "Download CSV"
+msgstr ""
+
 msgid "Edit plan"
 msgstr ""
 
@@ -6459,36 +6540,43 @@ msgstr ""
 msgid "Review the plan inputs"
 msgstr ""
 
-#, python-format
-msgid "First year %(year)d · age %(age)d · currency %(currency)s"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d adjustment"
-msgid_plural "%(num)d adjustments"
-msgstr[0] ""
-msgstr[1] ""
-
-#, fuzzy, python-format
-msgid "%(num)d archived"
-msgid_plural "%(num)d archived"
-msgstr[0] ""
-msgstr[1] ""
-
 msgid ""
-"The horizon age is not after your current age. Raise it in Plan inputs to"
-" project the plan."
+"This plan was converted from the old format. An editor or owner must "
+"review its values and save to confirm them."
 msgstr ""
 
 msgid ""
-"Income already stops at or before your current age, so base income is "
-"zero. The plan still spends from the portfolio."
+"The horizon age is not after your current age. Raise it in edit mode to "
+"project the plan."
+msgstr ""
+
+msgid "Plan values"
+msgstr ""
+
+msgid ""
+"The assumptions saved in the plan. Income and expenses are after-tax cash"
+" flows; the projection does not model taxes separately. Editors and "
+"owners can change them in edit mode."
 msgstr ""
 
 #, python-format
-msgid ""
-"Income stops after the plan's horizon. The plan is saved, but the "
-"projection has no working years beyond age %(horizon)d."
+msgid "Age %(age)d, in %(year)d"
+msgstr ""
+
+msgid "Horizon"
+msgstr ""
+
+msgid "Inflation"
+msgstr ""
+
+msgid "Real return"
+msgstr ""
+
+msgid "Income growth"
+msgstr ""
+
+#, python-format
+msgid "withdrawal rate %(swr)s"
 msgstr ""
 
 msgid "Steps"
@@ -6551,15 +6639,9 @@ msgstr ""
 msgid "Required. Enter 0 if this does not apply."
 msgstr ""
 
-msgid "Suggested annual income"
-msgstr ""
-
 msgid ""
 "Regular yearly spending, including your loan payments. Savings and "
 "transfers are not expenses."
-msgstr ""
-
-msgid "Suggested annual expenses"
 msgstr ""
 
 msgid ""
@@ -6582,10 +6664,6 @@ msgstr ""
 msgid "First and last projected year"
 msgstr ""
 
-#, python-format
-msgid "Age %(age)d, in %(year)d"
-msgstr ""
-
 msgid "Yearly amounts"
 msgstr ""
 
@@ -6605,10 +6683,6 @@ msgstr ""
 msgid ""
 "Inflation %(inflation)s · real return %(real_return)s · income growth "
 "%(growth)s"
-msgstr ""
-
-#, python-format
-msgid "withdrawal rate %(swr)s"
 msgstr ""
 
 #, python-format
@@ -13497,5 +13571,94 @@ msgstr ""
 #~ "Projections are illustrative and not "
 #~ "financial advice. The starting rates are"
 #~ " examples, not recommendations."
+#~ msgstr ""
+
+#~ msgid "annual income"
+#~ msgstr ""
+
+#~ msgid "annual expenses"
+#~ msgstr ""
+
+#~ msgid "starting portfolio"
+#~ msgstr ""
+
+#~ msgid "Change an input to preview the results, then save when you are happy."
+#~ msgstr ""
+
+#~ msgid "Read-only inputs."
+#~ msgstr ""
+
+#~ msgid "Your role can read this plan but not change it."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A changed rate is outside the "
+#~ "usual range. Tick the confirmation box"
+#~ " in Plan inputs before saving."
+#~ msgstr ""
+
+#~ msgid "Open plan inputs"
+#~ msgstr ""
+
+#~ msgid "for the starting portfolio"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The horizon age is not after your"
+#~ " current age. Raise it in Plan "
+#~ "inputs to project the plan."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "All amounts are in %(currency)s and "
+#~ "in today's money in the plan's "
+#~ "first year, which is the current "
+#~ "year. Enter the yearly income and "
+#~ "expenses, including loan payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular income in the current year: "
+#~ "earnings, dividends and interest, before "
+#~ "tax and other deductions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular yearly spending in the current"
+#~ " year, excluding savings and transfers. "
+#~ "Include your loan payments; the planner"
+#~ " will remove an included loan's "
+#~ "payment after its payoff later."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The projection assumes "
+#~ "constant rates and no taxes; real "
+#~ "life will differ."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Editors and owners can change them "
+#~ "in edit mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Amounts are the money you actually "
+#~ "receive and spend, after tax; taxes "
+#~ "are not modelled separately. Editors and"
+#~ " owners can change them in edit "
+#~ "mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Amounts are the money you actually "
+#~ "receive and spend, after tax. The "
+#~ "projection does not model taxes "
+#~ "separately. Editors and owners can "
+#~ "change them in edit mode."
 #~ msgstr ""
 

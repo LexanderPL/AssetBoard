@@ -18,7 +18,21 @@
 {% endfor %}
 {% endmacro %}
 
-{% macro amount_suggestion(suggestions, field, kind, title, locale, show_categories=false, messages={}, fallback="", warning_text=none) %}
+{% macro saved_note(saved, suggested, locale) %}
+{% if saved is not none and suggested is not none %}
+<p class="mt-2 text-xs text-muted" data-fire-suggestion-differs="{{ '1' if saved.amount_minor != suggested.amount_minor else '0' }}" data-fire-suggestion-saved-minor="{{ saved.amount_minor }}" data-fire-suggested-minor="{{ suggested.amount_minor }}">{% if saved.amount_minor == suggested.amount_minor %}{{ _("Saved: %(amount)s. This matches the suggestion.", amount=format_money(saved, locale)) }}{% else %}{{ _("Saved: %(amount)s. This differs from the suggestion; the saved amount changes only when you save.", amount=format_money(saved, locale)) }}{% endif %}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro use_button(field, title, copy_input=none) %}
+{% if copy_input %}
+<button type="button" class="btn-sm mt-3" data-use-suggestion="{{ field }}" data-suggested-input="{{ copy_input }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for %(label)s", label=title) }}</span></button>
+{% else %}
+<button type="submit" name="use" value="{{ field }}" formnovalidate class="btn-sm mt-3" data-use-suggestion="{{ field }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for %(label)s", label=title) }}</span></button>
+{% endif %}
+{% endmacro %}
+
+{% macro amount_suggestion(suggestions, field, kind, title, locale, show_categories=false, messages={}, fallback="", warning_text=none, saved=none, copy_input=none) %}
 {% set series = suggestions.income if kind == "income" else suggestions.expenses %}
 {% set warning_series = "income" if kind == "income" else "expense" %}
 {% set blocked = suggestions.blocks | selectattr("field", "equalto", field) | list %}
@@ -31,14 +45,14 @@
   </div>
   {% if series %}
   <p class="mt-1 text-xs text-muted" data-fire-suggestion-window>{{ _("Window %(start)s – %(end)s · %(months)d months with data · window total %(total)s.", start=format_day(series.window.first_day, locale), end=format_day(series.window.last_day, locale), months=series.months_available, total=format_money(series.raw_total, locale)) }}</p>
+  <p class="mt-1 text-xs text-muted" data-fire-suggestion-as-of>{{ _("Data as of %(day)s.", day=format_day(suggestions.as_of, locale)) }}</p>
   {% endif %}
   {{ suggestion_blocks(suggestions, field, messages, fallback) }}
   {{ suggestion_warnings(suggestions, warning_series, warning_text) }}
-  {% if series and not blocked %}
-  <button type="submit" name="use" value="{{ field }}" formnovalidate class="btn-sm mt-3" data-use-suggestion="{{ field }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for %(label)s", label=title) }}</span></button>
-  {% endif %}
+  {% if series and not blocked %}{{ use_button(field, title, copy_input) }}{% endif %}
+  {% if saved is not none and series and not blocked %}{{ saved_note(saved, series.annual_total, locale) }}{% endif %}
   {% if show_categories and series %}
-  <div class="mt-4 overflow-x-auto">
+  <div class="relative mt-4 overflow-x-auto">
     <table class="sheet w-full text-sm" data-fire-suggestion-categories>
       <caption class="sr-only">{{ _("Expenses by category in the window") }}</caption>
       <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Category") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Window total") }}</th></tr></thead>
@@ -63,7 +77,7 @@
 </section>
 {% endmacro %}
 
-{% macro portfolio_suggestion(suggestions, field, locale, messages={}, fallback="", warning_text=none) %}
+{% macro portfolio_suggestion(suggestions, field, locale, messages={}, fallback="", warning_text=none, saved=none, copy_input=none) %}
 {% set portfolio = suggestions.portfolio %}
 {% set blocked = suggestions.blocks | selectattr("field", "equalto", field) | list %}
 <section class="border border-line bg-subtle p-4" aria-labelledby="suggestion-portfolio-heading" data-fire-suggestion="portfolio">
@@ -78,9 +92,8 @@
   {% endif %}
   {{ suggestion_blocks(suggestions, field, messages, fallback) }}
   {{ suggestion_warnings(suggestions, "portfolio", warning_text) }}
-  {% if portfolio and not blocked %}
-  <button type="submit" name="use" value="{{ field }}" formnovalidate class="btn-sm mt-3" data-use-suggestion="{{ field }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for the starting portfolio") }}</span></button>
-  {% endif %}
+  {% if portfolio and not blocked %}{{ use_button(field, _("the starting portfolio"), copy_input) }}{% endif %}
+  {% if saved is not none and portfolio and not blocked %}{{ saved_note(saved, portfolio.total, locale) }}{% endif %}
   {% if portfolio and portfolio.rows %}
   <details class="mt-4 border-t border-line pt-3">
     <summary class="cursor-pointer text-sm font-medium">{{ _("Where this value comes from") }}</summary>

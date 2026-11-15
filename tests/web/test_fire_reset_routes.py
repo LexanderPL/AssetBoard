@@ -25,6 +25,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "income_manual": "50000",
         "expenses_manual": "30000",
         "portfolio_manual": "1000000",
+        "adjustments_present": "1",
         "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",
@@ -43,7 +44,7 @@ def _form(**overrides: str) -> dict[str, str]:
 def _plan_with_events(owner) -> UUID:
     plan_id = create_plan(owner)
     response = owner.post(
-        f"/fire/{plan_id}",
+        "/fire/edit",
         _form(
             event_year_1="2027",
             event_kind_1="cash",
@@ -54,7 +55,7 @@ def _plan_with_events(owner) -> UUID:
             event_amount_2="-200",
             event_label_2="Repaid",
         ),
-        token_from="/fire?edit=1",
+        token_from="/fire/edit",
     )
     assert response.status_code == 303, response.text
     return plan_id

@@ -541,7 +541,7 @@ editing form beyond the wizard and no live-loan calculation changes.
   view header adds **Reset plan** (editors only) and moves Edit, the needs-review link and the
   sensitivity page/inputs links to the id-free `/fire` URL. The currency-mismatch panel links to
   Reset. `PlanEntry` now returns the already-loaded detail so the view page does not load the
-  plan and events twice. The needs-review banner still links editors to `/fire?edit=1#inputs`.
+  plan and events twice. The needs-review banner links editors to `/fire/edit#amounts`.
 - **Tests.** Wizard entry/steps/back/cancel/validation/no-write/create-once/double-submit,
   hidden-field carry, suggestions and no prefill, Use copying, category breakdown, loan portion,
   blocked suggestions without a zero, portfolio source links (asset class and net-worth item), no
@@ -577,6 +577,50 @@ Implement F8.10 from docs/specs/M8-fire-planner-v2.md: explicit view/edit modes,
 server-side live recalculation and manual inputs with explicit suggestion buttons and expense
 breakdown. No client-side projection.
 ```
+
+### As built (M8.F8.10)
+
+- **Modes.** `GET /fire` is read-only for every role: results, charts, the year-by-year table, a
+  read-only **Plan values** summary, active and archived adjustments, the loans placeholder and
+  the saved-plan sensitivity panel. It has no form, no inputs and no preview hooks, and does not
+  load `fire.js`. Editors see **Edit plan** (not on a currency mismatch); viewers see no edit or
+  reset control. CSV and sensitivity stay viewer-accessible; CSV is hidden when the projection is
+  blocked.
+- **Editor.** `GET /fire/edit` is editor-only and always separate. It shows the overview/results
+  first, then one form with every plan field, the three amount suggestion cards and the existing
+  adjustments table. `POST /fire/edit/preview` returns the results fragment for the HTMX live
+  recalculation; it loads no suggestions and never writes. `POST /fire/edit` re-validates under the
+  workspace lock, persists, audits `fire_plan.updated`, clears `needs_review` and redirects to
+  `/fire?notice=saved` (preserving `basis`). Errors render the full edit page with posted values,
+  inline messages and `data-fire-dirty="1"`; a truncated save without the adjustment-section
+  marker is rejected before the service so it cannot delete all events, while an intentional empty
+  adjustment list (marker present, every row removed) still saves. The amount copy states the
+  approved after-tax default from §10.
+- **Discard and dirty guard.** **Discard changes** is `GET /fire/edit?discarded=1`, stays in edit
+  mode, reloads the saved values and shows a notice. **View plan** leaves; while the form is dirty,
+  `fire.js` sets `data-fire-dirty=1`, shows a translated **Unsaved changes** status and uses the
+  native `beforeunload` prompt. Basis changes are not dirty. The server-rendered error page starts
+  dirty.
+- **Suggestions.** The edit page calls `services.fire_linked.setup_suggestions` once for income,
+  expenses and portfolio; the F8.9 cards gained the data as-of line and an optional saved-value
+  note and copy button. **Use suggested value** copies a server-formatted `data-suggested-input`
+  string into the field; no server route, no JS number parsing, no automatic overwrite. Blocked
+  cards keep their reason, hide Use and never show a zero. Suggestions resolve on page load and
+  error renders, not on every preview, and never write.
+- **URLs.** Canonical URLs are id-free: `/fire/edit`, `/fire/edit/preview`, `/fire/sensitivity`,
+  `/fire/results.csv`. Old GET id URLs (`/fire/{id}`, `/fire/{id}/edit`, `/fire/{id}/sensitivity`,
+  `/fire/{id}/results.csv`) verify the live plan and redirect; the old POST preview/save id routes
+  are gone. `/fire?edit=1` redirects to the editor for a live plan and is ignored otherwise.
+  `/fire/edit` never migrates legacy rows; it redirects to `/fire` for no plan, legacy rows or a
+  currency mismatch. The CSV filename is `fire-plan.csv`.
+- **Scope.** No schema, migration, projection-math or dependency changes. The F8.8 adjustments
+  table stays editable-with-badge until F8.11; the loans section is a placeholder until F8.12; the
+  nominal/real basis remains until F8.13. Cross-tab last-write-wins is accepted for this feature.
+- **Tests.** View/edit permissions, no-form view, save/discard/needs-review, error preservation,
+  dirty marker, preview/no-writes, malformed partial save, suggestion cards/as-of/differs/copy and
+  blocked cards, id-free/legacy URLs, currency mismatch, legacy redirect, CSV/sensitivity,
+  query-budget constants, CSP, Polish rendering and Chrome coverage (live preview, copy, dirty
+  guard, discard, save, blocked preview, 390/1440 widths). All tests ran single-core.
 
 ### F8.11 — Unified adjustments
 

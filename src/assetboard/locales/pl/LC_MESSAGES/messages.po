@@ -2887,6 +2887,9 @@ msgstr "Potwierdź, że plan zostanie usunięty."
 msgid "Confirm that the other old FIRE scenarios will be deleted."
 msgstr "Potwierdź, że pozostałe stare scenariusze FIRE zostaną usunięte."
 
+msgid "The adjustment rows are missing. Reload the page and try again."
+msgstr "Brakuje wierszy korekt. Odśwież stronę i spróbuj ponownie."
+
 msgid ""
 "The workspace base currency no longer matches the plan's currency. Reset "
 "the plan and create a new one in the current currency."
@@ -2990,6 +2993,9 @@ msgstr ""
 "Wartości planu zmieniły się. Sprawdź zaktualizowane podsumowanie, a "
 "następnie naciśnij Utwórz plan."
 
+msgid "Unsaved changes discarded."
+msgstr "Niezapisane zmiany zostały odrzucone."
+
 msgid "About you"
 msgstr "O Tobie"
 
@@ -3020,14 +3026,11 @@ msgstr "Zmiana rocznych dochodów"
 msgid "Saving override"
 msgstr "Korekta oszczędności"
 
-msgid "annual income"
-msgstr "roczne dochody"
+msgid "Reset plan"
+msgstr "Zresetuj plan"
 
-msgid "annual expenses"
-msgstr "roczne wydatki"
-
-msgid "starting portfolio"
-msgstr "portfel początkowy"
+msgid "Edit the plan"
+msgstr "Edytuj plan"
 
 #, python-format
 msgid "%(value)s pp"
@@ -6308,6 +6311,84 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Description"
+msgstr "Opis"
+
+msgid "this adjustment"
+msgstr "tę korektę"
+
+msgid "Adjustments"
+msgstr "Korekty"
+
+msgid ""
+"A one-off cash flow is added to net worth in that year. An expense or "
+"income change alters the annual series from that year onward. A saving "
+"override replaces that year's net saving and is unique per year. Negative"
+" amounts reduce, positive amounts increase."
+msgstr ""
+"Jednorazowy przepływ gotówki jest dodawany do majątku w danym roku. "
+"Zmiana wydatków lub dochodów zmienia roczną serię od tego roku. Korekta "
+"oszczędności zastępuje oszczędności netto w danym roku i jest unikalna "
+"dla roku. Kwoty ujemne zmniejszają, dodatnie zwiększają."
+
+#, python-format
+msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
+msgstr "Lata %(start)d–%(end)d; korekta oszczędności zaczyna się w %(override)d"
+
+msgid ""
+"Adjustments before the current year are kept as archived history and are "
+"not applied to the projection."
+msgstr ""
+"Korekty sprzed bieżącego roku są zachowywane jako historia i nie są "
+"stosowane do prognozy."
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
+
+msgid "Add an adjustment"
+msgstr "Dodaj korektę"
+
+msgid ""
+"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
+"repaid; 500 per year of extra rental income; a whole-year net saving "
+"override."
+msgstr ""
+"Przykłady: jednorazowy wpływ 20 000; −1 200 rocznie po spłacie kredytu; "
+"500 rocznie dodatkowego dochodu z najmu; korekta oszczędności na cały "
+"rok."
+
+#, python-format
+msgid "%(num)d adjustment"
+msgid_plural "%(num)d adjustments"
+msgstr[0] "%(num)d korekta"
+msgstr[1] "%(num)d korekty"
+msgstr[2] "%(num)d korekt"
+
+msgid "Adjustments applied to the projection"
+msgstr "Korekty zastosowane w prognozie"
+
+msgid "No adjustments yet."
+msgstr "Brak korekt."
+
+msgid "Add them in edit mode."
+msgstr "Dodaj je w trybie edycji."
+
+msgid "An editor or owner can add them."
+msgstr "Może je dodać edytor lub właściciel."
+
+msgid ""
+"These adjustments are before the plan's current year (or a saving "
+"override in the current year) and are not applied to the projection. They"
+" stay in the plan as history."
+msgstr ""
+"Te korekty są sprzed bieżącego roku planu (lub korekta oszczędności w "
+"bieżącym roku) i nie są stosowane do prognozy. Pozostają w planie jako "
+"historia."
+
 msgid "Charts"
 msgstr "Wykresy"
 
@@ -6348,15 +6429,6 @@ msgstr ""
 
 msgid "Plotted expenses and gain data"
 msgstr "Dane wykresu wydatków i zysku"
-
-msgid "Archived"
-msgstr "Zarchiwizowana"
-
-msgid "Description"
-msgstr "Opis"
-
-msgid "this adjustment"
-msgstr "tę korektę"
 
 msgid "Plan"
 msgstr "Plan"
@@ -6475,34 +6547,40 @@ msgstr "Kwoty początkowe"
 #, python-format
 msgid ""
 "All amounts are in %(currency)s and in today's money in the plan's first "
-"year, which is the current year. Enter the yearly income and expenses, "
-"including loan payments."
+"year, which is the current year. Enter your after-tax income and "
+"expenses, including the taxes you actually pay and your loan payments."
 msgstr ""
 "Wszystkie kwoty są w %(currency)s i w dzisiejszych pieniądzach w "
-"pierwszym roku planu, czyli w bieżącym roku. Wpisz roczny dochód i "
-"wydatki, w tym spłaty kredytów."
+"pierwszym roku planu, czyli w bieżącym roku. Wpisz dochód po podatkach "
+"oraz wydatki, w tym faktycznie płacone podatki i spłaty kredytów."
 
 msgid "Annual income"
 msgstr "Roczne dochody"
 
 msgid ""
-"Regular income in the current year: earnings, dividends and interest, "
-"before tax and other deductions."
+"Regular income you receive in the current year: earnings, dividends and "
+"interest. Use the after-tax amount."
 msgstr ""
-"Regularny dochód w bieżącym roku: zarobki, dywidendy i odsetki, przed "
-"podatkami i innymi potrąceniami."
+"Regularny dochód otrzymywany w bieżącym roku: zarobki, dywidendy i "
+"odsetki. Użyj kwoty po podatkach."
+
+msgid "Suggested annual income"
+msgstr "Proponowany roczny dochód"
 
 msgid "Annual expenses"
 msgstr "Roczne wydatki"
 
 msgid ""
 "Regular yearly spending in the current year, excluding savings and "
-"transfers. Include your loan payments; the planner will remove an "
-"included loan's payment after its payoff later."
+"transfers. Include the taxes you actually pay and your loan payments; the"
+" planner will remove an included loan's payment after its payoff later."
 msgstr ""
 "Regularne roczne wydatki w bieżącym roku, bez oszczędności i przelewów. "
-"Uwzględnij spłaty kredytów; plan usunie spłatę uwzględnionego kredytu po "
-"jego spłacie."
+"Uwzględnij faktycznie płacone podatki i spłaty kredytów; plan usunie "
+"spłatę uwzględnionego kredytu po jego spłacie."
+
+msgid "Suggested annual expenses"
+msgstr "Proponowane roczne wydatki"
 
 msgid "Starting portfolio"
 msgstr "Portfel początkowy"
@@ -6510,73 +6588,21 @@ msgstr "Portfel początkowy"
 msgid "Investable assets today: investments and cash savings, not your home."
 msgstr "Inwestowalne aktywa dziś: inwestycje i oszczędności gotówkowe, bez domu."
 
-msgid "Adjustments"
-msgstr "Korekty"
+msgid ""
+"A suggestion never fills a field by itself. Press Use suggested value to "
+"copy one, then change it if you want. The saved amount changes only when "
+"you press Save changes."
+msgstr ""
+"Propozycja nigdy nie wypełnia pola samodzielnie. Kliknij Użyj "
+"proponowanej wartości, aby ją skopiować, a potem zmień ją, jeśli chcesz. "
+"Zapisana kwota zmienia się dopiero po kliknięciu Zapisz zmiany."
 
 msgid ""
-"A one-off cash flow is added to net worth in that year. An expense or "
-"income change alters the annual series from that year onward. A saving "
-"override replaces that year's net saving and is unique per year. Negative"
-" amounts reduce, positive amounts increase."
+"Live loans are not part of the plan yet. Enter yearly expenses that "
+"include your loan payments."
 msgstr ""
-"Jednorazowy przepływ gotówki jest dodawany do majątku w danym roku. "
-"Zmiana wydatków lub dochodów zmienia roczną serię od tego roku. Korekta "
-"oszczędności zastępuje oszczędności netto w danym roku i jest unikalna "
-"dla roku. Kwoty ujemne zmniejszają, dodatnie zwiększają."
-
-#, python-format
-msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
-msgstr "Lata %(start)d–%(end)d; korekta oszczędności zaczyna się w %(override)d"
-
-msgid ""
-"Adjustments before the current year are kept as archived history and are "
-"not applied to the projection."
-msgstr ""
-"Korekty sprzed bieżącego roku są zachowywane jako historia i nie są "
-"stosowane do prognozy."
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
-
-msgid "Add an adjustment"
-msgstr "Dodaj korektę"
-
-msgid ""
-"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
-"repaid; 500 per year of extra rental income; a whole-year net saving "
-"override."
-msgstr ""
-"Przykłady: jednorazowy wpływ 20 000; −1 200 rocznie po spłacie kredytu; "
-"500 rocznie dodatkowego dochodu z najmu; korekta oszczędności na cały "
-"rok."
-
-msgid "Plan inputs"
-msgstr "Dane planu"
-
-msgid "Change an input to preview the results, then save when you are happy."
-msgstr ""
-"Zmień dane, aby zobaczyć podgląd wyników, a następnie zapisz, gdy będą "
-"odpowiednie."
-
-msgid "Read-only inputs."
-msgstr "Dane tylko do odczytu."
-
-msgid ""
-"Changes preview automatically and are not saved until you press Save "
-"changes."
-msgstr ""
-"Zmiany są automatycznie podglądane i nie zostaną zapisane, dopóki nie "
-"naciśniesz Zapisuj zmiany."
-
-msgid "Save changes"
-msgstr "Zapisz zmiany"
-
-msgid "Discard changes"
-msgstr "Odrzuć zmiany"
-
-msgid "Your role can read this plan but not change it."
-msgstr "Twoja rola pozwala czytać ten plan, ale nie zmieniać go."
+"Kredyty nie są jeszcze częścią planu. Wpisz roczne wydatki wraz z ratami "
+"kredytów."
 
 #, python-format
 msgid "Bar capped at 100%%, exact value %(value)s"
@@ -6669,11 +6695,11 @@ msgid "Preview of unsaved changes."
 msgstr "Podgląd niezapisanych zmian."
 
 msgid ""
-"A changed rate is outside the usual range. Tick the confirmation box in "
-"Plan inputs before saving."
+"A changed rate is outside the usual range. Tick the confirmation box "
+"before saving."
 msgstr ""
 "Zmieniona stopa wykracza poza zwykły zakres. Przed zapisaniem zaznacz "
-"pole potwierdzenia w danych planu."
+"pole potwierdzenia."
 
 msgid "Money basis"
 msgstr "Podstawa pieniężna"
@@ -6693,24 +6719,17 @@ msgstr "Prognoza jest niedostępna"
 msgid "The plan cannot be projected."
 msgstr "Nie można prognozować planu."
 
-msgid "Reset plan"
-msgstr "Zresetuj plan"
-
-msgid ""
-"These adjustments are before the plan's current year (or a saving "
-"override in the current year) and are not applied to the projection. They"
-" stay in the plan as history."
-msgstr ""
-"Te korekty są sprzed bieżącego roku planu (lub korekta oszczędności w "
-"bieżącym roku) i nie są stosowane do prognozy. Pozostają w planie jako "
-"historia."
+msgid "Change the plan values below; the projection updates as you edit."
+msgstr "Zmień poniżej wartości planu; prognoza aktualizuje się podczas edycji."
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
-"assumes constant rates and no taxes; real life will differ."
+"assumes constant rates and does not model taxes separately; real life "
+"will differ."
 msgstr ""
 "Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
-"Prognoza zakłada stałe stopy i brak podatków; rzeczywistość będzie inna."
+"Prognoza zakłada stałe stopy i nie modeluje podatków osobno; "
+"rzeczywistość będzie inna."
 
 msgid "Based on the saved plan; unsaved changes are not included."
 msgstr "Na podstawie zapisanego planu; niezapisane zmiany nie są uwzględniane."
@@ -6719,9 +6738,6 @@ msgid "The sensitivity grid is unavailable while the projection is blocked."
 msgstr ""
 "Siatka analizy wrażliwości jest niedostępna, dopóki prognoza jest "
 "zablokowana."
-
-msgid "Open plan inputs"
-msgstr "Otwórz dane planu"
 
 msgid "Sensitivity grid"
 msgstr "Siatka analizy wrażliwości"
@@ -6780,6 +6796,25 @@ msgstr ""
 msgid "Show sensitivity grid"
 msgstr "Pokaż siatkę analizy wrażliwości"
 
+#, python-format
+msgid "Saved: %(amount)s. This matches the suggestion."
+msgstr "Zapisano: %(amount)s. To odpowiada propozycji."
+
+#, python-format
+msgid ""
+"Saved: %(amount)s. This differs from the suggestion; the saved amount "
+"changes only when you save."
+msgstr ""
+"Zapisano: %(amount)s. To różni się od propozycji; zapisana kwota zmienia "
+"się dopiero po zapisaniu."
+
+msgid "Use suggested value"
+msgstr "Użyj proponowanej wartości"
+
+#, python-format
+msgid "for %(label)s"
+msgstr "dla: %(label)s"
+
 msgid "per year"
 msgstr "rocznie"
 
@@ -6791,12 +6826,9 @@ msgstr ""
 "Okno %(start)s – %(end)s · %(months)d miesięcy z danymi · suma w oknie "
 "%(total)s."
 
-msgid "Use suggested value"
-msgstr "Użyj proponowanej wartości"
-
 #, python-format
-msgid "for %(label)s"
-msgstr "dla: %(label)s"
+msgid "Data as of %(day)s."
+msgstr "Dane na dzień %(day)s."
 
 msgid "Expenses by category in the window"
 msgstr "Wydatki według kategorii w oknie"
@@ -6827,8 +6859,8 @@ msgstr "Proponowany portfel początkowy"
 msgid "Investable assets as of %(day)s."
 msgstr "Inwestowalne aktywa na %(day)s."
 
-msgid "for the starting portfolio"
-msgstr "dla portfela początkowego"
+msgid "the starting portfolio"
+msgstr "portfela początkowego"
 
 msgid "Where this value comes from"
 msgstr "Skąd pochodzi ta wartość"
@@ -6841,9 +6873,6 @@ msgstr "Każda kwota jest w dzisiejszych pieniądzach."
 
 msgid "Every amount is in that year's money."
 msgstr "Każda kwota jest w pieniądzach danego roku."
-
-msgid "Download CSV"
-msgstr "Pobierz CSV"
 
 msgid "Year-by-year projection"
 msgstr "Prognoza rok po roku"
@@ -6943,8 +6972,73 @@ msgstr ""
 "Edytor lub właściciel musi wybrać jeden z tych scenariuszy, zanim będzie "
 "można używać planera FIRE."
 
+msgid "Edit FIRE plan"
+msgstr "Edytuj plan FIRE"
+
+msgid "View plan"
+msgstr "Zobacz plan"
+
+msgid ""
+"This plan was converted from the old format. Check the values below and "
+"save to confirm them."
+msgstr ""
+"Ten plan został przekształcony ze starego formatu. Sprawdź poniższe "
+"wartości i zapisz, aby je potwierdzić."
+
 msgid "FIRE plan"
 msgstr "Plan FIRE"
+
+#, python-format
+msgid "First year %(year)d · age %(age)d · currency %(currency)s"
+msgstr "Pierwszy rok %(year)d · wiek %(age)d · waluta %(currency)s"
+
+#, python-format
+msgid "%(num)d archived"
+msgid_plural "%(num)d archived"
+msgstr[0] "%(num)d zarchiwizowana"
+msgstr[1] "%(num)d zarchiwizowane"
+msgstr[2] "%(num)d zarchiwizowanych"
+
+msgid ""
+"The horizon age is not after your current age. Raise it below to project "
+"the plan."
+msgstr ""
+"Wiek końcowy nie jest starszy niż Twój obecny wiek. Zwiększ go poniżej, "
+"aby prognozować plan."
+
+msgid ""
+"Income already stops at or before your current age, so base income is "
+"zero. The plan still spends from the portfolio."
+msgstr ""
+"Dochód kończy się już w Twoim wieku lub wcześniej, więc dochód bazowy "
+"wynosi zero. Plan nadal korzysta z portfela."
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon. The plan is saved, but the "
+"projection has no working years beyond age %(horizon)d."
+msgstr ""
+"Dochód kończy się po horyzoncie planu. Plan jest zapisany, ale prognoza "
+"nie ma lat pracy po wieku %(horizon)d."
+
+msgid "Plan inputs"
+msgstr "Dane planu"
+
+msgid ""
+"Changes preview automatically and are not saved until you press Save "
+"changes."
+msgstr ""
+"Zmiany są automatycznie podglądane i nie zostaną zapisane, dopóki nie "
+"naciśniesz Zapisuj zmiany."
+
+msgid "Save changes"
+msgstr "Zapisz zmiany"
+
+msgid "Discard changes"
+msgstr "Odrzuć zmiany"
+
+msgid "Unsaved changes"
+msgstr "Niezapisane zmiany"
 
 msgid "Setup cancelled"
 msgstr "Anulowano konfigurację"
@@ -7008,6 +7102,9 @@ msgstr "Zawiera plan i jego korekty."
 msgid "To confirm, type %(word)s:"
 msgstr "Aby potwierdzić, wpisz %(word)s:"
 
+msgid "Download CSV"
+msgstr "Pobierz CSV"
+
 msgid "Edit plan"
 msgstr "Edytuj plan"
 
@@ -7024,45 +7121,51 @@ msgstr ""
 msgid "Review the plan inputs"
 msgstr "Sprawdź dane planu"
 
-#, python-format
-msgid "First year %(year)d · age %(age)d · currency %(currency)s"
-msgstr "Pierwszy rok %(year)d · wiek %(age)d · waluta %(currency)s"
-
-#, python-format
-msgid "%(num)d adjustment"
-msgid_plural "%(num)d adjustments"
-msgstr[0] "%(num)d korekta"
-msgstr[1] "%(num)d korekty"
-msgstr[2] "%(num)d korekt"
-
-#, python-format
-msgid "%(num)d archived"
-msgid_plural "%(num)d archived"
-msgstr[0] "%(num)d zarchiwizowana"
-msgstr[1] "%(num)d zarchiwizowane"
-msgstr[2] "%(num)d zarchiwizowanych"
+msgid ""
+"This plan was converted from the old format. An editor or owner must "
+"review its values and save to confirm them."
+msgstr ""
+"Ten plan został przekształcony ze starego formatu. Edytor lub właściciel "
+"musi sprawdzić jego wartości i zapisać, aby je potwierdzić."
 
 msgid ""
-"The horizon age is not after your current age. Raise it in Plan inputs to"
-" project the plan."
+"The horizon age is not after your current age. Raise it in edit mode to "
+"project the plan."
 msgstr ""
-"Wiek końcowy nie jest starszy niż Twój obecny wiek. Zwiększ go w danych "
-"planu, aby prognozować plan."
+"Wiek końcowy nie jest starszy niż Twój obecny wiek. Zwiększ go w trybie "
+"edycji, aby prognozować plan."
+
+msgid "Plan values"
+msgstr "Wartości planu"
 
 msgid ""
-"Income already stops at or before your current age, so base income is "
-"zero. The plan still spends from the portfolio."
+"The assumptions saved in the plan. Income and expenses are after-tax cash"
+" flows; the projection does not model taxes separately. Editors and "
+"owners can change them in edit mode."
 msgstr ""
-"Dochód kończy się już w Twoim wieku lub wcześniej, więc dochód bazowy "
-"wynosi zero. Plan nadal korzysta z portfela."
+"Założenia zapisane w planie. Dochody i wydatki to przepływy po "
+"opodatkowaniu; prognoza nie modeluje podatków osobno. Edytorzy i "
+"właściciele mogą je zmienić w trybie edycji."
 
 #, python-format
-msgid ""
-"Income stops after the plan's horizon. The plan is saved, but the "
-"projection has no working years beyond age %(horizon)d."
-msgstr ""
-"Dochód kończy się po horyzoncie planu. Plan jest zapisany, ale prognoza "
-"nie ma lat pracy po wieku %(horizon)d."
+msgid "Age %(age)d, in %(year)d"
+msgstr "Wiek %(age)d, w %(year)d"
+
+msgid "Horizon"
+msgstr "Wiek końcowy"
+
+msgid "Inflation"
+msgstr "Inflacja"
+
+msgid "Real return"
+msgstr "Realna stopa zwrotu"
+
+msgid "Income growth"
+msgstr "Wzrost dochodów"
+
+#, python-format
+msgid "withdrawal rate %(swr)s"
+msgstr "stopa wypłat %(swr)s"
 
 msgid "Steps"
 msgstr "Kroki"
@@ -7138,18 +7241,12 @@ msgstr ""
 msgid "Required. Enter 0 if this does not apply."
 msgstr "Wymagane. Wpisz 0, jeśli nie dotyczy."
 
-msgid "Suggested annual income"
-msgstr "Proponowany roczny dochód"
-
 msgid ""
 "Regular yearly spending, including your loan payments. Savings and "
 "transfers are not expenses."
 msgstr ""
 "Regularne roczne wydatki, w tym spłaty kredytów. Oszczędności i przelewy "
 "nie są wydatkami."
-
-msgid "Suggested annual expenses"
-msgstr "Proponowane roczne wydatki"
 
 msgid ""
 "A suggestion never fills a field by itself. Press Use suggested value to "
@@ -7175,10 +7272,6 @@ msgstr "Obecny wiek"
 msgid "First and last projected year"
 msgstr "Pierwszy i ostatni prognozowany rok"
 
-#, python-format
-msgid "Age %(age)d, in %(year)d"
-msgstr "Wiek %(age)d, w %(year)d"
-
 msgid "Yearly amounts"
 msgstr "Roczne kwoty"
 
@@ -7201,10 +7294,6 @@ msgid ""
 msgstr ""
 "Inflacja %(inflation)s · realny zwrot %(real_return)s · wzrost dochodu "
 "%(growth)s"
-
-#, python-format
-msgid "withdrawal rate %(swr)s"
-msgstr "stopa wypłat %(swr)s"
 
 #, python-format
 msgid ""
@@ -14361,4 +14450,37 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "FIRE default scenario promoted"
 #~ msgstr "Awansowano domyślny scenariusz FIRE"
+
+#~ msgid "annual income"
+#~ msgstr "roczne dochody"
+
+#~ msgid "annual expenses"
+#~ msgstr "roczne wydatki"
+
+#~ msgid "starting portfolio"
+#~ msgstr "portfel początkowy"
+
+#~ msgid "Change an input to preview the results, then save when you are happy."
+#~ msgstr ""
+#~ "Zmień dane, aby zobaczyć podgląd "
+#~ "wyników, a następnie zapisz, gdy będą"
+#~ " odpowiednie."
+
+#~ msgid "Read-only inputs."
+#~ msgstr "Dane tylko do odczytu."
+
+#~ msgid "Your role can read this plan but not change it."
+#~ msgstr "Twoja rola pozwala czytać ten plan, ale nie zmieniać go."
+
+#~ msgid "Open plan inputs"
+#~ msgstr "Otwórz dane planu"
+
+#~ msgid ""
+#~ "Regular income in the current year: "
+#~ "earnings, dividends and interest, before "
+#~ "tax and other deductions."
+#~ msgstr ""
+#~ "Regularny dochód w bieżącym roku: "
+#~ "zarobki, dywidendy i odsetki, przed "
+#~ "podatkami i innymi potrąceniami."
 

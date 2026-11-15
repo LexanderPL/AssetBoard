@@ -17,12 +17,12 @@
     <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
     {% endfor %}
   </ul>
-  <a href="{{ sensitivity_inputs_url }}" class="btn-sm mt-3">{{ _("Open plan inputs") }}</a>
+  {% if can_edit %}<a href="{{ sensitivity_inputs_url }}" class="btn-sm mt-3">{{ sensitivity_inputs_label }}</a>{% endif %}
 </div>
 {% elif sensitivity_error %}
 <p role="alert" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-sensitivity-error data-fire-sensitivity-error-code="{{ sensitivity_error_code }}">{{ sensitivity_error }}</p>
 {% elif sensitivity %}
-<div class="mt-4 overflow-x-auto" tabindex="0" role="region" aria-label="{{ _('Sensitivity grid') }}" data-fire-sensitivity-scroll>
+<div class="relative mt-4 overflow-x-auto" tabindex="0" role="region" aria-label="{{ _('Sensitivity grid') }}" data-fire-sensitivity-scroll>
   <table class="sheet w-full text-sm" aria-describedby="sensitivity-legend" data-fire-sensitivity-grid>
     <caption class="sr-only">{{ _("FIRE age by real return and expenses as a percentage of the saved plan") }}</caption>
     <thead>
