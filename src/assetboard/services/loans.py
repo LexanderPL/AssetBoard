@@ -768,12 +768,17 @@ def _view(
     )
     try:
         timeline = rate_timeline(view)
-    except LoanValidationError:
+    except (LoanValidationError, LoanError):
         timeline = []
     initial_on = loan.origination_date or (
         min(row.as_of for row in checkpoints) if checkpoints else None
     )
-    current_mode, current_name, current_margin = _current_rate_source(view, today)
+    try:
+        current_mode, current_name, current_margin = _current_rate_source(view, today)
+    except (LoanValidationError, LoanError):
+        current_mode = RateMode(loan.rate_mode)
+        current_name = initial_reference.name if initial_reference is not None else None
+        current_margin = loan.margin_bp
     return replace(
         view,
         current_rate_bp=_rate_on_or_none(timeline, today),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from fractions import Fraction
 from math import ceil, floor
 
@@ -17,6 +18,7 @@ from assetboard.domain.fire import (
     EventKind,
     ProjectionEvent,
     ProjectionInputs,
+    ProjectionLoan,
     Rule,
     project,
 )
@@ -166,6 +168,7 @@ def test_real_values_are_the_nominal_line_deflated_by_inflation(
         for nominal, real in (
             (row.income, row.real_income),
             (row.expenses, row.real_expenses),
+            (row.loan_payment, row.real_loan_payment),
             (row.net, row.real_net),
             (row.gain, row.real_gain),
             (row.cash, row.real_cash),
@@ -174,3 +177,25 @@ def test_real_values_are_the_nominal_line_deflated_by_inflation(
             assert real.amount_minor == _deflate(
                 nominal.amount_minor, inputs.inflation_bp, offset
             ), (row.year, nominal, real)
+
+
+@settings(max_examples=50, deadline=None)
+@given(inputs=_projection_inputs(with_overrides=False, with_events=False))
+def test_an_included_loan_never_increases_expenses_and_drops_at_payoff(
+    inputs: ProjectionInputs,
+) -> None:
+    annual = 1_000_000
+    payoff_year = inputs.start_year + 2
+    loaned = replace(
+        inputs,
+        loans=(ProjectionLoan(Money(annual, "EUR"), payoff_year, True),),
+    )
+    before = project(inputs)
+    after = project(loaned)
+    for plain, with_loan in zip(before.rows, after.rows, strict=True):
+        if with_loan.year < payoff_year:
+            assert with_loan.expenses == plain.expenses
+            assert with_loan.loan_payment == Money(annual, "EUR")
+        else:
+            assert with_loan.expenses.amount_minor == plain.expenses.amount_minor - annual
+            assert with_loan.loan_payment == Money(0, "EUR")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -13,9 +14,14 @@ from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.repositories import NotFound
 from assetboard.domain.fire import Rule
 from assetboard.domain.money import Money
-from assetboard.services import fire_projection, fire_scenarios
+from assetboard.services import fire_projection, fire_scenarios, loans
 from assetboard.services.context import PermissionDenied
-from assetboard.services.fire_scenarios import EventInput, FireError, FirePlanInput
+from assetboard.services.fire_scenarios import (
+    EventInput,
+    FireError,
+    FirePlanInput,
+    LoanSettingInput,
+)
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -59,6 +65,36 @@ def _create(team: WorkspaceDb, **overrides: object) -> UUID:
 def _update(team: WorkspaceDb, plan_id: UUID, **overrides: object) -> UUID:
     return fire_scenarios.update_fire_plan(
         team.factory, team.ctx("owner", "owner"), _input(**overrides)
+    )
+
+
+def _create_loan(team: WorkspaceDb, **overrides: object) -> UUID:
+    values: dict[str, Any] = {
+        "entry_path": "original",
+        "name": "Mortgage",
+        "kind": "annuity",
+        "principal_original": _money(5_000_000),
+        "current_balance": None,
+        "balance_date": None,
+        "origination_date": date(2026, 1, 1),
+        "first_payment_date": date(2026, 2, 1),
+        "term_months": 24,
+        "payment_day": 1,
+        "rate_mode": "fixed",
+        "fixed_rate_bp": 600,
+        "reference_rate_id": None,
+        "margin_bp": None,
+        "high_rate_confirmed": False,
+        "installment_override": None,
+        "overpayment_mode": "none",
+        "overpayment_amount": None,
+        "overpayment_strategy": "reduce_term",
+        "drawdown_mode": "full_at_origination",
+        "interest_only_months": 0,
+    }
+    values.update(overrides)
+    return loans.create_loan(  # type: ignore[arg-type]
+        team.factory, team.ctx("owner", "owner"), **values
     )
 
 
@@ -380,4 +416,112 @@ def test_the_results_service_uses_a_bounded_number_of_queries(team: WorkspaceDb)
     statements = _statements(
         team, lambda: fire_projection.scenario_results(team.factory, ctx, plan_id)
     )
-    assert statements <= 6
+    assert statements <= 12
+
+
+def _event_count(team: WorkspaceDb) -> int:
+    with team.factory() as session:
+        return session.scalar(select(func.count()).select_from(FireEvent)) or 0
+
+
+def test_a_live_loan_is_in_expenses_and_drops_at_its_payoff_year(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    results = fire_projection.scenario_results(team.factory, team.ctx("viewer", "viewer"), plan_id)
+    assert results.projection is not None
+    assert results.loans is not None
+    row = next(item for item in results.loans.rows if item.loan_id == loan_id)
+    assert row.annual_payment is not None
+    annual = row.annual_payment.amount_minor
+    by_year = {item.year: item for item in results.projection.rows}
+    assert by_year[2026].loan_payment.amount_minor == annual
+    assert by_year[2027].loan_payment.amount_minor == annual
+    assert by_year[2028].loan_payment.amount_minor == 0
+    drop = by_year[2027].expenses.amount_minor - by_year[2028].expenses.amount_minor
+    assert 0 < drop < annual
+    assert drop > annual * 9 // 10
+
+
+def test_ignoring_a_loan_keeps_its_payment_in_the_projection(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),))
+    results = fire_projection.scenario_results(team.factory, team.ctx("viewer", "viewer"), plan_id)
+    assert results.projection is not None
+    assert results.loans is not None
+    row = next(item for item in results.loans.rows if item.loan_id == loan_id)
+    assert row.state.value == "ignored"
+    assert row.annual_payment is not None
+    annual = row.annual_payment.amount_minor
+    assert all(item.loan_payment.amount_minor == annual for item in results.projection.rows)
+    assert results.loans.included_annual_total.amount_minor == 0
+    assert results.loans.ignored_annual_total.amount_minor == annual
+
+
+def test_loan_settings_are_saved_cleared_and_do_not_touch_events(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    before = _event_count(team)
+    _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),))
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert detail.ignored_loan_ids == frozenset({loan_id})
+    assert _event_count(team) == before
+    _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=True),))
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert detail.ignored_loan_ids == frozenset()
+    assert _event_count(team) == before
+
+
+def test_changing_a_loan_changes_the_next_projection_without_an_event(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    ctx = team.ctx("viewer", "viewer")
+    before = fire_projection.scenario_results(team.factory, ctx, plan_id)
+    assert before.loans is not None
+    before_row = next(item for item in before.loans.rows if item.loan_id == loan_id)
+    before_payoff = before_row.payoff_year
+    events_before = _event_count(team)
+    loans.add_overpayment(
+        team.factory,
+        team.ctx("owner", "owner"),
+        loan_id,
+        date_value=date(2026, 9, 1),
+        amount=_money(1_500_000),
+        note="Bonus",
+    )
+    after = fire_projection.scenario_results(team.factory, ctx, plan_id)
+    assert after.loans is not None
+    after_row = next(item for item in after.loans.rows if item.loan_id == loan_id)
+    assert after_row.payoff_year is not None and before_payoff is not None
+    assert after_row.payoff_year < before_payoff
+    assert _event_count(team) == events_before
+
+
+def test_preview_uses_posted_loan_toggles_and_never_writes(team: WorkspaceDb) -> None:
+    _create(team)
+    loan_id = _create_loan(team)
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    before = _event_count(team)
+    result = fire_projection.preview_plan_results(
+        team.ctx("editor", "editor"),
+        detail,
+        _input(loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),)),
+        factory=team.factory,
+    )
+    assert result.loans is not None
+    row = next(item for item in result.loans.rows if item.loan_id == loan_id)
+    assert row.state.value == "ignored"
+    assert _event_count(team) == before
+    assert detail.ignored_loan_ids == frozenset()
+
+
+def test_the_results_query_count_does_not_grow_with_loans(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    _create_loan(team)
+    ctx = team.ctx("viewer", "viewer")
+    one = _statements(team, lambda: fire_projection.scenario_results(team.factory, ctx, plan_id))
+    _create_loan(team, name="Second")
+    _create_loan(team, name="Third")
+    many = _statements(team, lambda: fire_projection.scenario_results(team.factory, ctx, plan_id))
+    assert one == many
+    assert many <= 16

@@ -70,6 +70,9 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
 
     income_exact = Fraction(inputs.start_income.amount_minor)
     expenses_exact = Fraction(inputs.start_expenses.amount_minor)
+    loans = tuple(
+        (loan.annual_payment.amount_minor, loan.payoff_year, loan.included) for loan in inputs.loans
+    )
     rows: list[ProjectionRow] = []
     fire_index: int | None = None
     previous_net_worth = 0
@@ -86,10 +89,17 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
         for event_year, amount in income_changes.items():
             if event_year <= year:
                 income += _half_up(Fraction(amount) * growth**offset)
-        expenses = _half_up(expenses_exact)
+        gross_expenses = _half_up(expenses_exact)
         for event_year, amount in expense_changes.items():
             if event_year <= year:
-                expenses += _half_up(Fraction(amount) * inflation**offset)
+                gross_expenses += _half_up(Fraction(amount) * inflation**offset)
+        loan_drop = sum(
+            amount for amount, payoff_year, included in loans if included and payoff_year <= year
+        )
+        loan_payment = sum(
+            amount for amount, payoff_year, included in loans if not included or payoff_year > year
+        )
+        expenses = gross_expenses - loan_drop
 
         if offset == 0:
             net = inputs.start_portfolio.amount_minor
@@ -117,12 +127,14 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
                 age=age,
                 income=_eur(income),
                 expenses=_eur(expenses),
+                loan_payment=_eur(loan_payment),
                 net=_eur(net),
                 gain=_eur(gain),
                 cash=_eur(cash_amount),
                 net_worth=_eur(net_worth),
                 real_income=_eur(_deflate_oracle(income, inflation, offset)),
                 real_expenses=_eur(_deflate_oracle(expenses, inflation, offset)),
+                real_loan_payment=_eur(_deflate_oracle(loan_payment, inflation, offset)),
                 real_net=_eur(_deflate_oracle(net, inflation, offset)),
                 real_gain=_eur(_deflate_oracle(gain, inflation, offset)),
                 real_cash=_eur(_deflate_oracle(cash_amount, inflation, offset)),
@@ -184,12 +196,14 @@ _ROW_FIELDS = (
     "age",
     "income",
     "expenses",
+    "loan_payment",
     "net",
     "gain",
     "cash",
     "net_worth",
     "real_income",
     "real_expenses",
+    "real_loan_payment",
     "real_net",
     "real_gain",
     "real_cash",

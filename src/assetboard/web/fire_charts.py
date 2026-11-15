@@ -71,6 +71,15 @@ def _depletion_index(rows: tuple[ProjectionRow, ...], depletion_age: int | None)
     )
 
 
+def _loan_payoff_years(projection: Projection) -> set[int]:
+    years = {row.year for row in projection.rows}
+    return {
+        loan.payoff_year
+        for loan in projection.inputs.loans
+        if loan.included and loan.payoff_year in years
+    }
+
+
 def _markers(projection: Projection, locale: str) -> list[dict[str, object]]:
     entries: list[tuple[int, str, str]] = []
     if projection.fire_index is not None:
@@ -81,6 +90,15 @@ def _markers(projection: Projection, locale: str) -> list[dict[str, object]]:
                 gettext("FIRE", locale),
                 gettext("FIRE at age %(age)d (%(year)d)", locale)
                 % {"age": projection.fire_age, "year": projection.fire_year},
+            )
+        )
+    first_row_year = projection.rows[0].year if projection.rows else 0
+    for year in sorted(_loan_payoff_years(projection)):
+        entries.append(
+            (
+                year - first_row_year,
+                gettext("Loan paid off", locale),
+                gettext("Loan payments end in %(year)d", locale) % {"year": year},
             )
         )
     stop_index = _first_income_stop(projection.rows)
@@ -181,8 +199,13 @@ def _expenses_gain_data(
     expense_amounts = [_amount(value, currency, locale) for value in expenses]
     gain_amounts = [_amount(value, currency, locale) for value in gains]
     low, high, step, axis_labels = money_axis((*expenses, *gains), currency, locale)
+    payoff_years = _loan_payoff_years(projection)
     tooltips: list[list[str]] = [
-        [gettext("FIRE year", locale)] if row.is_fire else [] for row in projection.rows
+        [
+            *([gettext("FIRE year", locale)] if row.is_fire else []),
+            *([gettext("Loan payments end this year", locale)] if row.year in payoff_years else []),
+        ]
+        for row in projection.rows
     ]
     markers = []
     if projection.fire_index is not None:
@@ -192,6 +215,15 @@ def _expenses_gain_data(
                 gettext("FIRE", locale),
                 gettext("FIRE at age %(age)d (%(year)d)", locale)
                 % {"age": projection.fire_age, "year": projection.fire_year},
+            )
+        )
+    first_year = projection.rows[0].year if projection.rows else 0
+    for year in sorted(payoff_years):
+        markers.append(
+            _marker(
+                year - first_year,
+                gettext("Loan paid off", locale),
+                gettext("Loan payments end in %(year)d", locale) % {"year": year},
             )
         )
     data: dict[str, object] = {
