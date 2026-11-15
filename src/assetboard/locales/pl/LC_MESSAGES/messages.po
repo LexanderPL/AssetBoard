@@ -2738,6 +2738,27 @@ msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później
 msgid "Too many requests from your network. Try again later."
 msgstr "Zbyt wiele żądań z Twojej sieci. Spróbuj ponownie później."
 
+msgid "One-off cash flow"
+msgstr "Jednorazowy przepływ gotówki"
+
+msgid "Annual expense change"
+msgstr "Zmiana rocznych wydatków"
+
+msgid "Annual income change"
+msgstr "Zmiana rocznych dochodów"
+
+msgid "Saving override"
+msgstr "Korekta oszczędności"
+
+msgid "Before the current year"
+msgstr "Przed bieżącym rokiem"
+
+msgid "After the plan's last year"
+msgstr "Po ostatnim roku planu"
+
+msgid "Saving override in the current year"
+msgstr "Korekta oszczędności w bieżącym roku"
+
 msgid "FIRE"
 msgstr "FIRE"
 
@@ -3028,6 +3049,9 @@ msgstr "Korekta oszczędności"
 
 msgid "Reset plan"
 msgstr "Zresetuj plan"
+
+msgid "annual income"
+msgstr "roczne dochody"
 
 msgid "Edit the plan"
 msgstr "Edytuj plan"

@@ -2608,6 +2608,27 @@ msgstr ""
 msgid "Too many requests from your network. Try again later."
 msgstr ""
 
+msgid "One-off cash flow"
+msgstr ""
+
+msgid "Annual expense change"
+msgstr ""
+
+msgid "Annual income change"
+msgstr ""
+
+msgid "Saving override"
+msgstr ""
+
+msgid "Before the current year"
+msgstr ""
+
+msgid "After the plan's last year"
+msgstr ""
+
+msgid "Saving override in the current year"
+msgstr ""
+
 msgid "FIRE"
 msgstr ""
 
@@ -2869,6 +2890,9 @@ msgid "Saving override"
 msgstr ""
 
 msgid "Reset plan"
+msgstr ""
+
+msgid "annual income"
 msgstr ""
 
 msgid "Edit the plan"
