@@ -2987,8 +2987,8 @@ msgstr ""
 
 msgid "The plan values changed. Check the updated review, then press Create plan."
 msgstr ""
-"Wartości planu zmieniły się. Sprawdź zaktualizowane podsumowanie, a następnie naciśnij "
-"Utwórz plan."
+"Wartości planu zmieniły się. Sprawdź zaktualizowane podsumowanie, a "
+"następnie naciśnij Utwórz plan."
 
 msgid "About you"
 msgstr "O Tobie"
