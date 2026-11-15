@@ -180,6 +180,11 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-plan-values]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments-view]")).to_be_visible()
             expect(page.locator("[data-fire-loans]")).to_be_visible()
+            expect(page.locator("[data-fire-progress='plan']")).to_be_visible()
+            expect(page.locator("[data-fire-progress='today']")).to_have_count(0)
+            expect(page.locator("[data-fire-basis-toggle]")).to_have_count(0)
+            expect(page.get_by_text("Plan progress")).to_be_visible()
+            expect(page.get_by_text("Sheet progress")).to_have_count(0)
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
             ).to_have_attribute("data-chart-ready", "true")
@@ -195,11 +200,9 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             assert page.locator('input[name="income_manual"]').input_value() == "50000.00"
             edit_url = page.url
 
-            # A basis switch is a view preference, not an edit: it previews but stays clean.
-            page.locator('label:has(input[data-fire-basis="real"])').click()
-            expect(page.locator("[data-fire-preview-note]")).to_be_visible()
-            expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "0")
-            expect(page.locator("[data-fire-dirty-status]")).to_be_hidden()
+            expect(page.locator("[data-fire-basis-toggle]")).to_have_count(0)
+            expect(page.get_by_text("Return above inflation (%)")).to_be_visible()
+            expect(page.get_by_text("Real return")).to_have_count(0)
 
             # Every change recalculates server-side in place and never navigates or writes.
             expenses = page.locator('input[name="expenses_manual"]')
