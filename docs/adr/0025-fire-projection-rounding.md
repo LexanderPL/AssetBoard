@@ -1,6 +1,6 @@
 # ADR-0025: FIRE projection numeric representation and rounding
 
-**Status:** Accepted
+**Status:** Accepted; the real-value display consequence is superseded by M8 F8.13.
 **Date:** 2026-11-13
 
 ## Context
@@ -16,8 +16,8 @@ has to be fixed, documented and testable against an independent oracle.
 - All money is `Money(amount_minor: int, currency)`; every rate is integer basis points (1 bp =
   0.01%); ages and years are integers. The projection engine uses no floating point.
 - There is **one half-up rounding per computed line**: base income and expense growth, each event
-  component, the annual gain, each real (deflated) field, the FIRE number and the progress ratios.
-  `net`, `net_worth`, cash sums and other totals are exact additions of already-rounded integers.
+  component, the annual gain, the FIRE number and the progress ratios. `net`, `net_worth`, cash
+  sums and other totals are exact additions of already-rounded integers.
 - `round_ratio(n, d)` rounds half **away from zero**: `(2n + d) // (2d)` when `n >= 0`, and
   `-((-2n + d) // (2d))` when `n < 0`. The denominator must be positive. Negative values are
   never clamped to zero.
@@ -60,7 +60,8 @@ has to be fixed, documented and testable against an independent oracle.
   golden test against a `Fraction` oracle accepts exactly the rule above.
 - The additive gain and the strict-`<` FIRE row are parity choices. Changing either is a product
   decision and needs a spec change, a new ADR and new golden data.
-- Real values are display-only; F8.3 and F8.5 must label them as today's money rather than use
-  them to rebuild the nominal recurrence.
+- Real values were display-only in F8.3 and F8.5. M8 v2 decision 8 and F8.13 remove them:
+  the planner now shows nominal values only, so this display requirement no longer applies.
+  The nominal projection, gain rounding and metric rounding rules above are unchanged.
 - Closed-form powers create large intermediate integers, but a 120-year horizon keeps the work
   negligible for a household plan.

@@ -792,6 +792,43 @@ make every result nominal, rename the progress metric and remove spreadsheet wor
 the UI and user docs.
 ```
 
+### As built (M8.F8.13)
+
+- **Domain.** `ProjectionRow` lost `real_income`, `real_expenses`, `real_loan_payment`,
+  `real_net`, `real_gain`, `real_cash` and `real_net_worth`; `_deflate` was deleted.
+  `Projection` lost `real_networth_at_fire`, `fire_number_today`, `progress_sheet_bp` and
+  `progress_today_bp`, and gained `fire_number` and `plan_progress_bp`. `ProjectionInputs`
+  keeps `real_return_bp` as the stored return-above-inflation assumption.
+- **Metrics.** FIRE number is the FIRE row's nominal expenses divided by the rule's rate
+  (the withdrawal rate, or `inflation + real return` under returns-cover-expenses), rounded
+  once. It is `None` when FIRE is never reached or the rate is not positive; zero expenses
+  with a positive rate give zero. Plan progress is the starting portfolio divided by the
+  nominal net worth at FIRE, rounded once; it is `None` when FIRE is never reached or that
+  net worth is not positive. Both use nominal values only. Sustainability still reports the
+  nominal depletion age and lowest net worth after income stops.
+- **Results.** The basis toggle, `basis` query parameter and all basis links/radios/hidden
+  fields and redirect plumbing were removed; an old `?basis=real` request renders the nominal
+  page, and legacy id redirects drop the parameter. Charts always use `net_worth` and the
+  table always shows nominal columns. CSV format is `year, age, income, expenses,
+  loan_payment, net, gain, cash, net_worth, is_fire, income_stopped, currency`. F8.12's
+  `loan_payment` remains; `real_loan_payment` is gone. `Plan progress` replaces the two old
+  progress cards.
+- **Copy and sensitivity.** Visible labels say **Return above inflation** while the internal
+  `real_return_bp` field and form name stay unchanged. **FIRE number** is shown with the FIRE
+  year and a plain-language definition. The sensitivity grid still shows FIRE age only,
+  uses the saved plan, and has no amounts; its visible “real return” wording was replaced.
+  FIRE UI and `docs/fire.md` no longer use spreadsheet, sheet-progress or today's-money
+  wording. The internal `sheet` CSS class was kept.
+- **Compatibility.** No model, migration, archive-format, dependency or loan-math change.
+  F8.10 view/edit, F8.11 adjustments, F8.12 live loans, roles, CSRF, query budgets and tenant
+  isolation are unchanged. Existing archives remain 2.1-compatible.
+- **Tests and docs.** Unit tests cover the new row/metric shape, golden FIRE number/progress,
+  undefined states, zero expenses, loan-driven metric changes, nominal charts and CSV, and
+  property invariants. Web tests cover the removed controls/query/links, metric copy, Polish
+  catalogs, sensitivity wording and the static template scan. Chromium covers view metrics,
+  the editor and the wizard copy. `docs/fire.md`, this as-built section and ADR-0025's
+  superseded note were updated. All tests ran single-core.
+
 ---
 
 ## 12. Cross-cutting requirements
