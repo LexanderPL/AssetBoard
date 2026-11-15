@@ -163,19 +163,30 @@ are illustrative examples, not recommendations.
 
 ## Adjustments
 
-The plan's **Adjustments** table holds four kinds of event, stored as calendar years:
+The plan's **Adjustments** list holds four kinds of event, stored as calendar years:
 
-- **One-off cash flow** adds to net worth in that year.
-- **Annual income change** changes the income series from that year onward.
-- **Annual expense change** changes the expense series from that year onward.
+- **One-off cash flow** adds to net worth in that year; a negative amount is a withdrawal.
+- **Annual income change** changes the income series from that year onward and grows with
+  income growth.
+- **Annual expense change** changes the expense series from that year onward and grows with
+  inflation.
 - **Saving override** replaces that year's net saving. A year can have only one override, and a
   new override starts in the next year because the current row uses the starting portfolio.
 
-Negative amounts reduce, positive amounts increase. Cash, income-change and expense-change
-events may repeat in a year and are summed by kind. Adjustments from before the current year,
-and a saving override that has become the current year after a year rollover, are kept as
-**Archived adjustments**: they stay visible as history but are not applied to the projection.
-Adjustments are edited on the separate edit page.
+In edit mode, adjustments are added one row at a time and edited in place. There is no bulk-paste
+box. Rows of the same kind and year are added together. A zero amount is allowed; negative amounts
+reduce, positive amounts increase. All adjustment changes, together with the plan fields, are
+saved by **Save changes** in one transaction; **Discard changes** leaves the saved adjustments
+untouched.
+
+To remove an adjustment, tick its **Remove** checkbox and save. A saved row is never deleted just
+because it is missing from a request; the app reloads the rows and asks you to try again.
+
+Adjustments from before the current year, after the plan's last year, and a saving override that
+has become the current year after a year rollover are kept as **Archived adjustments**. They stay
+visible in a collapsed section with the reason, are read-only, and are not applied to the
+projection. Editors and owners can delete an archived adjustment by ticking **Remove** and saving;
+viewers cannot. Archived history is never edited in place or moved to another year.
 
 ## Results
 
@@ -184,6 +195,7 @@ The plan page shows:
 - **FIRE age** and year, **years to FIRE**, the **FIRE number** and **progress** definitions;
 - the sustainability check: the depletion age and the lowest net worth after income stops;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth;
+- the **Adjustments** list, with archived history collapsed and read-only;
 - a net-worth chart and an expenses-versus-gain chart;
 - **Download CSV** and, for editors and owners, **Edit plan** and **Reset plan**.
 
