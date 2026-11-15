@@ -154,6 +154,17 @@ def sorted_events(events: Iterable[EventView]) -> tuple[EventView, ...]:
     return tuple(sorted(events, key=event_sort_key))
 
 
+def next_adjustment_index(rows: Iterable[AdjustmentRow]) -> str:
+    """The next numeric form index; ``new`` never becomes a saved row's index."""
+    numeric = [int(row.index) for row in rows if row.index != "new"]
+    return str(max(numeric, default=0) + 1)
+
+
+def saved_active_count(rows: Iterable[AdjustmentRow]) -> int:
+    """How many rows came from the saved plan (new or blank rows do not count)."""
+    return sum(1 for row in rows if row.id is not None)
+
+
 def adjustment_values(values: Mapping[str, str]) -> list[dict[str, str]]:
     """The posted adjustment rows in form order, with ``new`` last."""
     indexes = sorted(
@@ -214,9 +225,13 @@ def parse_adjustments(values: Mapping[str, str], locale: str, currency: str) -> 
 
 
 def active_rows_from_detail(
-    detail: FirePlanDetail, locale: str, *, error: FireError | None = None
+    detail: FirePlanDetail,
+    locale: str,
+    *,
+    error: FireError | None = None,
+    include_blank: bool = True,
 ) -> tuple[AdjustmentRow, ...]:
-    """Saved active rows plus the trailing blank row for a fresh edit render."""
+    """Saved active rows and, for the editor, the trailing blank row."""
     rows: list[AdjustmentRow] = []
     for position, event in enumerate(sorted_events(detail.active_events), start=1):
         index = str(position)
@@ -236,7 +251,8 @@ def active_rows_from_detail(
                 error_column=_row_error_column(error, index),
             )
         )
-    rows.append(_blank_row(len(rows) + 1))
+    if include_blank:
+        rows.append(_blank_row(len(rows) + 1))
     return tuple(rows)
 
 
@@ -403,6 +419,8 @@ __all__ = [
     "checked_archived_ids",
     "event_sort_key",
     "kind_labels",
+    "next_adjustment_index",
     "parse_adjustments",
+    "saved_active_count",
     "sorted_events",
 ]

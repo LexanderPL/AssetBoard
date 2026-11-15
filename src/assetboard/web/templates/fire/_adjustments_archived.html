@@ -1,0 +1,30 @@
+{% from "fire/_macros.html" import badge with context %}
+{% if archived_adjustment_rows %}
+<details class="mt-5 border-t border-line pt-4" data-fire-archived-adjustments{% if archived_open|default(false) %} open{% endif %}>
+  <summary class="cursor-pointer text-sm font-semibold">{{ _("Archived adjustments") }} <span class="font-normal text-muted">({{ archived_adjustment_rows|length }})</span></summary>
+  <p class="mt-2 text-sm text-muted">{{ _("These adjustments are before the plan's current year, after its last year, or a saving override in the current year. They are history and are not applied to the projection.") }}{% if adjustments_editable %} {{ _("Select Remove and save changes to delete one.") }}{% endif %}</p>
+  <ul class="mt-3 divide-y divide-line text-sm">
+    {% for row in archived_adjustment_rows %}
+    <li class="flex flex-wrap items-center justify-between gap-3 py-2" data-fire-archived-adjustment="{{ row.id }}">
+      <div class="min-w-0">
+        <span class="font-medium tabular-nums">{{ row.year }}</span>
+        <span class="text-muted"> · {{ adjustment_kind_labels.get(row.kind, row.kind) }} · </span>
+        <span>{{ row.label }}</span>
+        {% if row.reason_label %}{{ badge(row.reason_label, "neutral") }}{% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="tabular-nums text-muted">{{ format_money(row.amount, locale) }}</span>
+        {% if adjustments_editable %}
+        <label class="inline-flex items-center gap-1.5 text-xs font-medium">
+          <input type="checkbox" name="archived_remove_{{ row.index }}" value="{{ row.id }}"{% if row.remove %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary" data-adjustment-archived-remove>
+          <span>{{ _("Remove") }}</span>
+          <span class="sr-only">{{ _("the archived adjustment from %(year)d", year=row.year) }}</span>
+        </label>
+        <span class="text-xs text-danger" data-adjustment-removed-note{% if not row.remove %} hidden{% endif %}>{{ _("Will be deleted when you save.") }}</span>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
