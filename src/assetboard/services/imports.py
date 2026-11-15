@@ -1826,11 +1826,7 @@ def _rollback_restore(
             "loans_deleted": len(plan.loan_rows.get("loans", ())),
             "loan_rows_deleted": sum(len(rows) for rows in plan.loan_rows.values()),
             "fire_scenarios_deleted": len(plan.fire_rows.get("fire_scenarios", ())),
-            "fire_contributions_deleted": len(plan.fire_rows.get("fire_contributions", ())),
             "fire_events_deleted": len(plan.fire_rows.get("fire_events", ())),
-            "fire_expense_exclusions_deleted": len(
-                plan.fire_rows.get("fire_expense_exclusions", ())
-            ),
             "fire_rows_deleted": sum(len(rows) for rows in plan.fire_rows.values()),
             "settings_restored": ",".join(
                 sorted(

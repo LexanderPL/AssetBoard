@@ -15,7 +15,9 @@ from typing import Any, Literal
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
+from assetboard.db.models.identity import AuditEvent
 from assetboard.db.repositories import FireEventRepository, FireScenarioRepository
 from assetboard.domain.archive import (
     FILE_ORDER,
@@ -244,6 +246,22 @@ def test_2_0_round_trip_keeps_plan_events_and_projection(db: WorkspaceDb, data_d
     assert _data_files(original)["fire_events.csv"] == _data_files(content)["fire_events.csv"]
 
 
+def test_a_restored_plan_keeps_its_currency_snapshot_and_blocks_on_a_mismatch(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = replace(_rows(), fire_plan=replace(_plan_row(needs_review="false"), currency="USD"))
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_plan_created"] == 1
+    with db.factory() as session:
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.currency == "USD"
+        assert plan.needs_review is False
+    results = scenario_results(db.factory, ctx)
+    assert results.projection is None
+    assert results.blocks[0].code == "plan_currency_mismatch"
+
+
 def test_no_plan_writes_header_only_fire_files(db: WorkspaceDb, data_dir: Path) -> None:
     rows = replace(_rows(), fire_plan=None, fire_events=())
     content = _archive(rows)
@@ -468,6 +486,15 @@ def test_restore_rollback_removes_plan_and_events(db: WorkspaceDb, data_dir: Pat
     with db.factory() as session:
         assert FireScenarioRepository(session, ctx).list() == []
         assert FireEventRepository(session, ctx).list() == []
+        audit = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "import.rolled_back")
+        ).one()
+        assert audit.data["fire_scenarios_deleted"] == 1
+        assert audit.data["fire_events_deleted"] == 3
+        assert audit.data["fire_rows_deleted"] == 4
+        # The removed 1.8 tables must not survive as always-zero audit keys.
+        assert "fire_contributions_deleted" not in audit.data
+        assert "fire_expense_exclusions_deleted" not in audit.data
 
 
 def test_merge_ignores_fire_files_with_one_warning(db: WorkspaceDb, data_dir: Path) -> None:
