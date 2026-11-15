@@ -2861,6 +2861,15 @@ msgstr ""
 "Korekta oszczędności zaczyna się w następnym roku; bieżący rok korzysta z"
 " portfela początkowego."
 
+msgid ""
+"This adjustment is in the past or after the plan's horizon. It is kept as"
+" history and can be removed, but not changed. Reload the page and try "
+"again."
+msgstr ""
+"Ta korekta dotyczy przeszłości lub wykracza poza horyzont planu. Jest "
+"zachowana jako historia; można ją usunąć, ale nie zmienić. Odśwież stronę"
+" i spróbuj ponownie."
+
 msgid "Create the plan first, then add adjustments."
 msgstr "Najpierw utwórz plan, a potem dodaj korekty."
 
@@ -3035,23 +3044,8 @@ msgstr "Zwrot pokrywa wydatki"
 msgid "Withdrawal rate"
 msgstr "Stopa wypłat"
 
-msgid "One-off cash flow"
-msgstr "Jednorazowy przepływ gotówki"
-
-msgid "Annual expense change"
-msgstr "Zmiana rocznych wydatków"
-
-msgid "Annual income change"
-msgstr "Zmiana rocznych dochodów"
-
-msgid "Saving override"
-msgstr "Korekta oszczędności"
-
 msgid "Reset plan"
 msgstr "Zresetuj plan"
-
-msgid "annual income"
-msgstr "roczne dochody"
 
 msgid "Edit the plan"
 msgstr "Edytuj plan"
@@ -6335,14 +6329,44 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
-msgid "Archived"
-msgstr "Zarchiwizowana"
+msgid ""
+"These adjustments are before the plan's current year, after its last "
+"year, or a saving override in the current year. They are history and are "
+"not applied to the projection."
+msgstr ""
+"Te korekty są sprzed bieżącego roku planu, po jego ostatnim roku lub "
+"dotyczą korekty oszczędności w bieżącym roku. Stanowią historię i nie są "
+"stosowane do prognozy."
+
+msgid "Select Remove and save changes to delete one."
+msgstr "Zaznacz Usuń i zapisz zmiany, aby ją usunąć."
+
+#, python-format
+msgid "the archived adjustment from %(year)d"
+msgstr "zarchiwizowaną korektę z roku %(year)d"
+
+msgid "Will be deleted when you save."
+msgstr "Zostanie usunięta po zapisaniu."
+
+msgid "New adjustment"
+msgstr "Nowa korekta"
+
+#, python-format
+msgid "Adjustment %(num)d"
+msgstr "Korekta %(num)d"
 
 msgid "Description"
 msgstr "Opis"
 
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
+
 msgid "this adjustment"
 msgstr "tę korektę"
+
+msgid "Will be removed when you save."
+msgstr "Zostanie usunięta po zapisaniu."
 
 msgid "Adjustments"
 msgstr "Korekty"
@@ -6359,31 +6383,58 @@ msgstr ""
 "dla roku. Kwoty ujemne zmniejszają, dodatnie zwiększają."
 
 #, python-format
-msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
-msgstr "Lata %(start)d–%(end)d; korekta oszczędności zaczyna się w %(override)d"
-
-msgid ""
-"Adjustments before the current year are kept as archived history and are "
-"not applied to the projection."
-msgstr ""
-"Korekty sprzed bieżącego roku są zachowywane jako historia i nie są "
-"stosowane do prognozy."
+msgid "Years %(start)d to %(end)d. A saving override starts in %(override)d."
+msgstr "Lata %(start)d–%(end)d. Korekta oszczędności zaczyna się w %(override)d."
 
 #, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
+msgid ""
+"Years %(start)d to %(end)d. A saving override is not available in this "
+"plan window."
+msgstr ""
+"Lata %(start)d–%(end)d. Korekta oszczędności nie jest dostępna w tym "
+"oknie planu."
+
+msgid ""
+"Add one row at a time. Rows of the same type and year are added together."
+" Adjustments before the current year, after the plan's last year, or a "
+"saving override in the current year are kept as archived history and are "
+"not applied."
+msgstr ""
+"Dodawaj po jednym wierszu. Wiersze tego samego typu i roku są sumowane. "
+"Korekty sprzed bieżącego roku, po ostatnim roku planu lub korekta "
+"oszczędności w bieżącym roku są zachowywane jako historia i nie są "
+"stosowane."
+
+msgid "Added to net worth in that year; a negative amount is a withdrawal."
+msgstr "Dodawana do wartości netto w tym roku; kwota ujemna oznacza wypłatę."
+
+msgid "Changes annual income from that year onward and grows with income growth."
+msgstr "Zmienia roczne dochody od tego roku; rosną zgodnie ze wzrostem dochodów."
+
+msgid "Changes annual expenses from that year onward and grows with inflation."
+msgstr "Zmienia roczne wydatki od tego roku; rosną zgodnie z inflacją."
+
+msgid "Replaces that year's net saving; a year can have only one override."
+msgstr ""
+"Zastępuje oszczędności netto w tym roku; w jednym roku może być tylko "
+"jedna korekta."
+
+msgid ""
+"No adjustments yet. Use the new row below to model a one-off cash flow or"
+" a permanent change."
+msgstr ""
+"Nie ma jeszcze korekt. Użyj nowego wiersza poniżej, aby dodać jednorazowy"
+" przepływ gotówki lub trwałą zmianę."
+
+#, python-format
+msgid "Adjustment %(num)s"
+msgstr "Korekta %(num)s"
+
+msgid "Adjustment added."
+msgstr "Dodano korektę."
 
 msgid "Add an adjustment"
 msgstr "Dodaj korektę"
-
-msgid ""
-"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
-"repaid; 500 per year of extra rental income; a whole-year net saving "
-"override."
-msgstr ""
-"Przykłady: jednorazowy wpływ 20 000; −1 200 rocznie po spłacie kredytu; "
-"500 rocznie dodatkowego dochodu z najmu; korekta oszczędności na cały "
-"rok."
 
 #, python-format
 msgid "%(num)d adjustment"
@@ -6403,15 +6454,6 @@ msgstr "Dodaj je w trybie edycji."
 
 msgid "An editor or owner can add them."
 msgstr "Może je dodać edytor lub właściciel."
-
-msgid ""
-"These adjustments are before the plan's current year (or a saving "
-"override in the current year) and are not applied to the projection. They"
-" stay in the plan as history."
-msgstr ""
-"Te korekty są sprzed bieżącego roku planu (lub korekta oszczędności w "
-"bieżącym roku) i nie są stosowane do prognozy. Pozostają w planie jako "
-"historia."
 
 msgid "Charts"
 msgstr "Wykresy"
@@ -6859,6 +6901,9 @@ msgstr "Wydatki według kategorii w oknie"
 
 msgid "Window total"
 msgstr "Suma w oknie"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
 
 #, python-format
 msgid ""
@@ -13715,12 +13760,6 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "Another active scenario already has this name."
 #~ msgstr "Inny aktywny scenariusz ma już tę nazwę."
 
-#~ msgid "Each contribution year can appear only once."
-#~ msgstr "Każdy rok składki może wystąpić tylko raz."
-
-#~ msgid "A scenario can have at most 120 contribution rows."
-#~ msgstr "Scenariusz może mieć najwyżej 120 wierszy składek."
-
 #~ msgid "Archived scenarios are read-only. Restore the scenario first."
 #~ msgstr ""
 #~ "Zarchiwizowane scenariusze są tylko do "
@@ -13873,9 +13912,6 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "Loan payoff added to the plan."
 #~ msgstr "Dodano spłatę kredytu do planu."
 
-#~ msgid "this contribution row"
-#~ msgstr "ten wiersz składki"
-
 #~ msgid "this event"
 #~ msgstr "to zdarzenie"
 
@@ -13948,9 +13984,6 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "No regular expense categories are available yet."
 #~ msgstr "Nie ma jeszcze zwykłych kategorii wydatków."
 
-#~ msgid "Contribution overrides"
-#~ msgstr "Nadpisania składek"
-
 #~ msgid ""
 #~ "A positive amount is net saving in"
 #~ " that year; a negative amount is "
@@ -13965,30 +13998,8 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "Years %(start)d to %(end)d"
 #~ msgstr "Lata %(start)d–%(end)d"
 
-#~ msgid ""
-#~ "Optional explicit net savings for "
-#~ "individual years. Paste a column from"
-#~ " a spreadsheet or add rows one "
-#~ "by one."
-#~ msgstr ""
-#~ "Opcjonalne jawne oszczędności netto dla "
-#~ "poszczególnych lat. Wklej kolumnę z "
-#~ "arkusza albo dodawaj wiersze po kolei."
-
-#~ msgid "Paste a column (amounts, or year and amount)"
-#~ msgstr "Wklej kolumnę (kwoty albo rok i kwota)"
-
 #~ msgid "2029, 15000"
 #~ msgstr "2029, 15000"
-
-#~ msgid "Paste a column first."
-#~ msgstr "Najpierw wklej kolumnę."
-
-#~ msgid "Rows filled from the pasted column."
-#~ msgstr "Wiersze wypełnione z wklejonej kolumny."
-
-#~ msgid "Fill rows from the pasted column"
-#~ msgstr "Wypełnij wiersze z wklejonej kolumny"
 
 #~ msgid ""
 #~ "Bare amounts fill consecutive years from"
@@ -14007,9 +14018,6 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Net saving (%(currency)s)"
 #~ msgstr "Oszczędności netto (%(currency)s)"
-
-#~ msgid "Add a contribution row"
-#~ msgstr "Dodaj wiersz składki"
 
 #~ msgid ""
 #~ "Optional one-off inflows or outflows,"
@@ -14406,12 +14414,6 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "Inflation"
 #~ msgstr "Inflacja"
 
-#~ msgid "%(num)d contribution override"
-#~ msgid_plural "%(num)d contribution overrides"
-#~ msgstr[0] "%(num)d nadpisanie składki"
-#~ msgstr[1] "%(num)d nadpisania składek"
-#~ msgstr[2] "%(num)d nadpisań składek"
-
 #~ msgid "%(num)d event"
 #~ msgid_plural "%(num)d events"
 #~ msgstr[0] "%(num)d zdarzenie"
@@ -14456,9 +14458,6 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "FIRE scenarios"
 #~ msgstr "Scenariusze FIRE"
-
-#~ msgid "FIRE contributions"
-#~ msgstr "Składki FIRE"
 
 #~ msgid "FIRE expense exclusions"
 #~ msgstr "Wykluczenia wydatków FIRE"
@@ -14507,4 +14506,25 @@ msgstr "Usuń obszar roboczy…"
 #~ "Regularny dochód w bieżącym roku: "
 #~ "zarobki, dywidendy i odsetki, przed "
 #~ "podatkami i innymi potrąceniami."
+
+#~ msgid ""
+#~ "Adjustments before the current year are"
+#~ " kept as archived history and are "
+#~ "not applied to the projection."
+#~ msgstr ""
+#~ "Korekty sprzed bieżącego roku są "
+#~ "zachowywane jako historia i nie są "
+#~ "stosowane do prognozy."
+
+#~ msgid ""
+#~ "Examples: a one-off 20 000 cash"
+#~ " inflow; −1 200 per year when a"
+#~ " loan is repaid; 500 per year "
+#~ "of extra rental income; a whole-"
+#~ "year net saving override."
+#~ msgstr ""
+#~ "Przykłady: jednorazowy wpływ 20 000; −1"
+#~ " 200 rocznie po spłacie kredytu; 500"
+#~ " rocznie dodatkowego dochodu z najmu; "
+#~ "korekta oszczędności na cały rok."
 

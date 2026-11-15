@@ -2727,6 +2727,12 @@ msgid ""
 "starting portfolio."
 msgstr ""
 
+msgid ""
+"This adjustment is in the past or after the plan's horizon. It is kept as"
+" history and can be removed, but not changed. Reload the page and try "
+"again."
+msgstr ""
+
 msgid "Create the plan first, then add adjustments."
 msgstr ""
 
@@ -2877,22 +2883,7 @@ msgstr ""
 msgid "Withdrawal rate"
 msgstr ""
 
-msgid "One-off cash flow"
-msgstr ""
-
-msgid "Annual expense change"
-msgstr ""
-
-msgid "Annual income change"
-msgstr ""
-
-msgid "Saving override"
-msgstr ""
-
 msgid "Reset plan"
-msgstr ""
-
-msgid "annual income"
 msgstr ""
 
 msgid "Edit the plan"
@@ -5875,13 +5866,41 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
-msgid "Archived"
+msgid ""
+"These adjustments are before the plan's current year, after its last "
+"year, or a saving override in the current year. They are history and are "
+"not applied to the projection."
+msgstr ""
+
+msgid "Select Remove and save changes to delete one."
+msgstr ""
+
+#, python-format
+msgid "the archived adjustment from %(year)d"
+msgstr ""
+
+msgid "Will be deleted when you save."
+msgstr ""
+
+#, fuzzy
+msgid "New adjustment"
+msgstr ""
+
+#, python-format
+msgid "Adjustment %(num)d"
 msgstr ""
 
 msgid "Description"
 msgstr ""
 
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
 msgid "this adjustment"
+msgstr ""
+
+msgid "Will be removed when you save."
 msgstr ""
 
 msgid "Adjustments"
@@ -5895,25 +5914,47 @@ msgid ""
 msgstr ""
 
 #, python-format
-msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
-msgstr ""
-
-msgid ""
-"Adjustments before the current year are kept as archived history and are "
-"not applied to the projection."
+msgid "Years %(start)d to %(end)d. A saving override starts in %(override)d."
 msgstr ""
 
 #, python-format
-msgid "Amount (%(currency)s)"
-msgstr ""
-
-msgid "Add an adjustment"
+msgid ""
+"Years %(start)d to %(end)d. A saving override is not available in this "
+"plan window."
 msgstr ""
 
 msgid ""
-"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
-"repaid; 500 per year of extra rental income; a whole-year net saving "
-"override."
+"Add one row at a time. Rows of the same type and year are added together."
+" Adjustments before the current year, after the plan's last year, or a "
+"saving override in the current year are kept as archived history and are "
+"not applied."
+msgstr ""
+
+msgid "Added to net worth in that year; a negative amount is a withdrawal."
+msgstr ""
+
+msgid "Changes annual income from that year onward and grows with income growth."
+msgstr ""
+
+msgid "Changes annual expenses from that year onward and grows with inflation."
+msgstr ""
+
+msgid "Replaces that year's net saving; a year can have only one override."
+msgstr ""
+
+msgid ""
+"No adjustments yet. Use the new row below to model a one-off cash flow or"
+" a permanent change."
+msgstr ""
+
+#, python-format
+msgid "Adjustment %(num)s"
+msgstr ""
+
+msgid "Adjustment added."
+msgstr ""
+
+msgid "Add an adjustment"
 msgstr ""
 
 #, fuzzy, python-format
@@ -5932,12 +5973,6 @@ msgid "Add them in edit mode."
 msgstr ""
 
 msgid "An editor or owner can add them."
-msgstr ""
-
-msgid ""
-"These adjustments are before the plan's current year (or a saving "
-"override in the current year) and are not applied to the projection. They"
-" stay in the plan as history."
 msgstr ""
 
 msgid "Charts"
@@ -6322,6 +6357,9 @@ msgid "Expenses by category in the window"
 msgstr ""
 
 msgid "Window total"
+msgstr ""
+
+msgid "Archived"
 msgstr ""
 
 #, python-format
@@ -12554,9 +12592,6 @@ msgstr ""
 #~ "net worth is assets minus liabilities."
 #~ msgstr ""
 
-#~ msgid "Add an item below, or paste a list of items."
-#~ msgstr ""
-
 #~ msgid "Reschedule this one"
 #~ msgstr ""
 
@@ -12564,9 +12599,6 @@ msgstr ""
 #~ "No income yet. Add your salary or"
 #~ " contract work to see what you "
 #~ "will receive next."
-#~ msgstr ""
-
-#~ msgid "Use Add item in the header, or paste a list of items below."
 #~ msgstr ""
 
 #~ msgid "The nominal day for later months. A shorter month uses its last day."
@@ -12871,15 +12903,6 @@ msgstr ""
 #~ msgid "Another active scenario already has this name."
 #~ msgstr ""
 
-#~ msgid "Every contribution and event year must fall inside the plan's window."
-#~ msgstr ""
-
-#~ msgid "Each contribution year can appear only once."
-#~ msgstr ""
-
-#~ msgid "A scenario can have at most 120 contribution rows."
-#~ msgstr ""
-
 #~ msgid "A scenario can have at most 200 events."
 #~ msgstr ""
 
@@ -13019,9 +13042,6 @@ msgstr ""
 #~ msgid "Loan payoff added to the plan."
 #~ msgstr ""
 
-#~ msgid "this contribution row"
-#~ msgstr ""
-
 #~ msgid "this event"
 #~ msgstr ""
 
@@ -13116,9 +13136,6 @@ msgstr ""
 #~ msgid "No regular expense categories are available yet."
 #~ msgstr ""
 
-#~ msgid "Contribution overrides"
-#~ msgstr ""
-
 #~ msgid ""
 #~ "A positive amount is net saving in"
 #~ " that year; a negative amount is "
@@ -13129,26 +13146,7 @@ msgstr ""
 #~ msgid "Years %(start)d to %(end)d"
 #~ msgstr ""
 
-#~ msgid ""
-#~ "Optional explicit net savings for "
-#~ "individual years. Paste a column from"
-#~ " a spreadsheet or add rows one "
-#~ "by one."
-#~ msgstr ""
-
-#~ msgid "Paste a column (amounts, or year and amount)"
-#~ msgstr ""
-
 #~ msgid "2029, 15000"
-#~ msgstr ""
-
-#~ msgid "Paste a column first."
-#~ msgstr ""
-
-#~ msgid "Rows filled from the pasted column."
-#~ msgstr ""
-
-#~ msgid "Fill rows from the pasted column"
 #~ msgstr ""
 
 #~ msgid ""
@@ -13161,9 +13159,6 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Net saving (%(currency)s)"
-#~ msgstr ""
-
-#~ msgid "Add a contribution row"
 #~ msgstr ""
 
 #~ msgid ""
@@ -13496,11 +13491,6 @@ msgstr ""
 #~ msgid "Inflation"
 #~ msgstr ""
 
-#~ msgid "%(num)d contribution override"
-#~ msgid_plural "%(num)d contribution overrides"
-#~ msgstr[0] ""
-#~ msgstr[1] ""
-
 #~ msgid "Make default"
 #~ msgstr ""
 
@@ -13548,9 +13538,6 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "FIRE scenarios"
-#~ msgstr ""
-
-#~ msgid "FIRE contributions"
 #~ msgstr ""
 
 #~ msgid "FIRE expense exclusions"
@@ -13684,5 +13671,30 @@ msgstr ""
 #~ "projection does not model taxes "
 #~ "separately. Editors and owners can "
 #~ "change them in edit mode."
+#~ msgstr ""
+
+#~ msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Adjustments before the current year are"
+#~ " kept as archived history and are "
+#~ "not applied to the projection."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Examples: a one-off 20 000 cash"
+#~ " inflow; −1 200 per year when a"
+#~ " loan is repaid; 500 per year "
+#~ "of extra rental income; a whole-"
+#~ "year net saving override."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "These adjustments are before the plan's"
+#~ " current year (or a saving override"
+#~ " in the current year) and are "
+#~ "not applied to the projection. They "
+#~ "stay in the plan as history."
 #~ msgstr ""
 
