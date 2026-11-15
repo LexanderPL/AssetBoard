@@ -712,6 +712,7 @@ def test_the_wizard_page_has_no_adjustment_editor(owner) -> None:
     assert "data-fire-events" not in text
     assert 'name="event_' not in text
     assert "data-add-event" not in text
+    assert "data-add-adjustment" not in text
 
 
 def test_the_wizard_and_reset_render_in_polish(owner) -> None:

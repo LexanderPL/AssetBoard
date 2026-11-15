@@ -91,6 +91,8 @@ def test_a_viewer_sees_no_edit_or_reset_and_no_form(owner) -> None:
         assert "data-fire-edit" not in page.text
         assert "data-fire-reset" not in page.text
         assert "data-fire-form" not in page.text
+        assert 'name="archived_remove' not in page.text
+        assert "data-adjustment-remove" not in page.text
     finally:
         owner.set_admin_role("owner")
 
@@ -128,6 +130,45 @@ def test_archived_adjustments_are_shown_read_only(owner) -> None:
     assert "Old bonus" in page.text
     assert "data-fire-archived-adjustments" in page.text
     assert "data-fire-adjustments-empty" in page.text
+    assert 'name="archived_remove' not in page.text
+    assert 'name="event_' not in page.text
+
+
+def test_archived_adjustments_show_their_reason(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.add_all(
+            (
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2020,
+                    kind="cash",
+                    amount_minor=100_000,
+                    label="Past bonus",
+                ),
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2080,
+                    kind="cash",
+                    amount_minor=200_000,
+                    label="After horizon",
+                ),
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2026,
+                    kind="saving_override",
+                    amount_minor=300_000,
+                    label="Current override",
+                ),
+            )
+        )
+    page = owner.client.get("/fire").text
+    assert "Before the current year" in page
+    assert "After the plan" in page and "last year" in page
+    assert "Saving override in the current year" in page
 
 
 def test_the_view_has_no_suggestion_cards(owner) -> None:

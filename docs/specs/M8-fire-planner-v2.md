@@ -645,6 +645,40 @@ archived-event behaviour, including saving_override. Remove the remaining contri
 and bulk-paste code.
 ```
 
+### As built (M8.F8.11)
+
+- **One editor.** The edit page has a single **Adjustments** section with all four kinds. Rows are
+  added one at a time, edited in place and removed with a checked **Remove** box; there is no
+  bulk-paste, contribution or DOM-deletion path. The trailing blank row is the no-JavaScript
+  starting point; the add button clones it before that row and focuses the new year field.
+- **Save-all.** Save changes writes the plan fields and every adjustment change in one
+  transaction. A checked Remove box is posted with the saved UUID; archived rows use a checkbox
+  whose value is the UUID. The service deletes removed ids first, then creates/updates, and leaves
+  every other saved row untouched. A missing saved active row is an error, never a deletion; the
+  form's `adjustments_present` marker rejects a truncated request before the service.
+- **Archived history.** Archived rows are read-only and collapsed with a reason tag: before the
+  current year, after the plan's last year, or a saving override in the current year. They are
+  not editable or movable; editors and owners can delete one only by ticking Remove and saving.
+  Unchanged events may keep a year outside a changed horizon: shrinking archives them, expanding
+  restores them, and the preview includes newly active preserved events unchanged. The editor says
+  so in the archived section instead of claiming they can never apply, and the empty hint changes
+  to **No current adjustments** when only history remains and disappears once a row is added.
+- **Validation.** The service owns the four kinds, year windows, one saving override per plan/year,
+  the current-year start rule and the F8.8 rollover exception, labels, signed amounts, zero and
+  the 200-event limit. `FireError.row`/`column` drive inline row errors; the preview names the
+  exact input so `fire.js` can mark it without moving focus. The parser lives in
+  `web/fire_adjustments.py`; the route only parses/wires and the projection never writes on
+  preview.
+- **View mode.** The view page shows the active adjustments as a wrapping read-only list and the
+  same archived section with no controls; no form or editor JavaScript is loaded.
+- **Tests and docs.** Unit tests cover the parser, all four kinds, explicit removal, archived
+  preservation/deletion, strict partial posts, rollover, horizon shrink/expand, uniqueness,
+  row errors, limits, audit and query budgets. Web tests cover the editor, preview, save-all,
+  archived deletion, read-only view, viewer/CSRF, i18n and CSP; Chromium covers add/edit/remove,
+  archive deletion, focus/announcement, dirty state and 390/1440 widths. `docs/fire.md` is
+  updated. No schema, migration, projection-math or dependency changes; no age→year helper was
+  added.
+
 ### F8.12 — Live loans
 
 **Acceptance**

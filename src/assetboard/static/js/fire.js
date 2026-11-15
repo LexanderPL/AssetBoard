@@ -1,44 +1,9 @@
-// F8.10: the FIRE editor's adjustment rows, suggestion copy and unsaved-changes guard. The
-// client only clones a template and copies server-formatted strings; every amount is parsed and
-// validated by the server, and the projection stays server-side.
+// F8.11: the FIRE editor's unified adjustments, suggestion copy and unsaved-changes guard.
+// The client only clones a template, toggles removal markers and copies server-formatted strings;
+// every amount is parsed and validated by the server, and the projection stays server-side.
 (function () {
   "use strict";
 
-  function notifyChange() {
-    const form = document.querySelector("[data-fire-form]");
-    if (form instanceof HTMLElement) {
-      form.dispatchEvent(new CustomEvent("fire:changed", { bubbles: true }));
-    }
-  }
-
-  function rowsFor(kind) {
-    return document.querySelector(`[data-${kind}-rows]`);
-  }
-
-  function templateFor(kind) {
-    return document.querySelector(`[data-${kind}-template]`);
-  }
-
-  function addRow(kind) {
-    const rows = rowsFor(kind);
-    const template = templateFor(kind);
-    if (!(rows instanceof HTMLElement) || !(template instanceof HTMLTemplateElement)) {
-      return null;
-    }
-    const index = Number(rows.dataset.nextIndex || "1");
-    rows.dataset.nextIndex = String(index + 1);
-    const holder = document.createElement("tbody");
-    holder.innerHTML = template.innerHTML.replaceAll("__index__", String(index));
-    const row = holder.firstElementChild;
-    if (!(row instanceof HTMLElement)) return null;
-    rows.appendChild(row);
-    const first = row.querySelector("input");
-    if (first instanceof HTMLElement) first.focus();
-    return row;
-  }
-
-  // The unsaved-changes indicator and the native beforeunload prompt. A basis change is a view
-  // preference, not an edit, so it never marks the form dirty.
   const form = document.querySelector("[data-fire-form]");
   const status = document.querySelector("[data-fire-dirty-status]");
   let dirty = form instanceof HTMLElement && form.dataset.fireDirty === "1";
@@ -47,6 +12,57 @@
     dirty = value;
     if (form instanceof HTMLElement) form.dataset.fireDirty = value ? "1" : "0";
     if (status instanceof HTMLElement) status.hidden = !value;
+  }
+
+  function notifyChange() {
+    if (form instanceof HTMLElement) {
+      form.dispatchEvent(new CustomEvent("fire:changed", { bubbles: true }));
+    }
+  }
+
+  function announce(message) {
+    const live = document.querySelector("[data-adjustment-status]");
+    if (live instanceof HTMLElement) live.textContent = message;
+  }
+
+  function setRemovedState(checkbox) {
+    const row = checkbox.closest("[data-adjustment-row], [data-fire-archived-adjustment]");
+    if (!(row instanceof HTMLElement)) return;
+    const note = row.querySelector("[data-adjustment-removed-note]");
+    if (note instanceof HTMLElement) note.hidden = !checkbox.checked;
+    row.setAttribute("data-removed", checkbox.checked ? "1" : "0");
+  }
+
+  function addAdjustment(button) {
+    const rows = document.querySelector("[data-adjustment-rows]");
+    const template = document.querySelector("[data-adjustment-template]");
+    if (!(rows instanceof HTMLElement) || !(template instanceof HTMLTemplateElement)) return;
+    const blank = rows.querySelector("[data-new-adjustment-row]");
+    const index = Number(rows.dataset.nextIndex || "1");
+    rows.dataset.nextIndex = String(index + 1);
+    const holder = document.createElement("ol");
+    holder.innerHTML = template.innerHTML.replaceAll("__index__", String(index));
+    const row = holder.firstElementChild;
+    if (!(row instanceof HTMLElement)) return;
+    if (blank instanceof HTMLElement) rows.insertBefore(row, blank);
+    else rows.appendChild(row);
+    const legend = row.querySelector("[data-adjustment-legend]");
+    if (legend instanceof HTMLElement) {
+      const count = rows.querySelectorAll(
+        "[data-adjustment-row]:not([data-new-adjustment-row])"
+      ).length;
+      legend.textContent = button.dataset.adjustmentLegend.replace(
+        "__NUM__",
+        String(count)
+      );
+    }
+    const first = row.querySelector("[data-adjustment-year]");
+    if (first instanceof HTMLElement) first.focus();
+    const empty = document.querySelector("[data-fire-adjustments-empty]");
+    if (empty instanceof HTMLElement) empty.hidden = true;
+    announce(button.dataset.addedMessage || "");
+    notifyChange();
+    row.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   if (form instanceof HTMLElement) {
@@ -58,6 +74,14 @@
     form.addEventListener("change", (event) => {
       const target = event.target;
       if (target instanceof HTMLInputElement && target.name === "basis") return;
+      if (
+        target instanceof HTMLInputElement &&
+        (target.matches("[data-adjustment-remove]") ||
+          target.matches("[data-adjustment-archived-remove]"))
+      ) {
+        setRemovedState(target);
+        notifyChange();
+      }
       setDirty(true);
     });
     form.addEventListener("fire:changed", () => setDirty(true));
@@ -88,15 +112,9 @@
     const target = event.target;
     if (!(target instanceof Element)) return;
 
-    if (target.closest("[data-add-event]")) {
-      addRow("event");
-      notifyChange();
-      return;
-    }
-    const remove = target.closest("[data-remove-row]");
-    if (remove) {
-      remove.closest("[data-editor-row]")?.remove();
-      notifyChange();
+    const add = target.closest("[data-add-adjustment]");
+    if (add instanceof HTMLElement) {
+      addAdjustment(add);
       return;
     }
     const discard = target.closest("[data-fire-discard]");
@@ -123,7 +141,7 @@
     if (!name) return;
     let field = form.querySelector(`[name="${CSS.escape(name)}"]`);
     if (!field && name === "events") {
-      field = form.querySelector("[data-event-table]");
+      field = form.querySelector("[data-fire-adjustments]");
     }
     if (field instanceof HTMLElement) field.setAttribute("aria-invalid", "true");
   }

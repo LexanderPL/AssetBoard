@@ -12,7 +12,6 @@ wizard's step checks, reset and the current-year projection live in ``services.f
 from __future__ import annotations
 
 import hashlib
-import re
 from decimal import Decimal
 from urllib.parse import urlencode
 from uuid import UUID
@@ -25,12 +24,10 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.fire import (
     DEFAULT_EXPENSE_FACTORS_BP,
     DEFAULT_RETURN_DELTAS_BP,
-    EventKind,
     Rule,
     SensitivityError,
     age_at_start,
     sensitivity,
-    signed_amount_minor,
 )
 from assetboard.domain.money import Money
 from assetboard.domain.transactions import EntryError, amount_minor
@@ -47,6 +44,7 @@ from assetboard.services import fire_linked as fire_linked_service
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
+from assetboard.web import fire_adjustments
 from assetboard.web.context import CurrentContext
 from assetboard.web.fire_charts import build_fire_charts
 from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
@@ -87,6 +85,10 @@ ERRORS = {
     "duplicate_saving_override": _("A year can have only one saving override."),
     "saving_override_current_year": _(
         "A saving override starts in the next year; the current year uses the starting portfolio."
+    ),
+    "archived_event_read_only": _(
+        "This adjustment is in the past or after the plan's horizon. It is kept as history and "
+        "can be removed, but not changed. Reload the page and try again."
     ),
     "events_not_allowed_on_create": _("Create the plan first, then add adjustments."),
     "extreme_rate_confirmation_required": _(
@@ -205,16 +207,6 @@ RULE_LABELS = {
     Rule.RETURNS_COVER_EXPENSES.value: _("Returns cover expenses"),
     Rule.SWR.value: _("Withdrawal rate"),
 }
-EVENT_KIND_LABELS = {
-    EventKind.CASH.value: _("One-off cash flow"),
-    EventKind.EXPENSE_CHANGE.value: _("Annual expense change"),
-    EventKind.INCOME_CHANGE.value: _("Annual income change"),
-    EventKind.SAVING_OVERRIDE.value: _("Saving override"),
-}
-
-
-_EVENT_KEY = re.compile(r"^event_(id|year|kind|amount|label)_([0-9]+)$")
-_EVENT_FIELDS = ("id", "year", "kind", "amount", "label")
 
 
 def _t(request: Request, message: str) -> str:
@@ -234,6 +226,13 @@ def _notice(request: Request, code: str | None) -> str | None:
     return _t(request, message) if message is not None else None
 
 
+def _preview_error_field(exc: fire_service.FireError) -> str:
+    """Name the exact row control for a preview error; ``events`` marks the whole section."""
+    if exc.row is not None and exc.column is not None:
+        return f"event_{exc.column}_{exc.row}"
+    return exc.field
+
+
 def _uuid(value: str) -> UUID:
     try:
         return UUID(value)
@@ -249,46 +248,20 @@ def _rate_input(rate_bp: int, locale: str) -> str:
     return format_quantity_input(Decimal(rate_bp).scaleb(-2), locale)
 
 
-def _editor_rows(
-    values: dict[str, str],
-    pattern: re.Pattern[str],
-    prefix: str,
-    fields: tuple[str, ...],
-) -> list[dict[str, str]]:
-    indexes = sorted({int(match.group(2)) for key in values if (match := pattern.match(key))})
-    return [
-        {
-            "index": str(index),
-            **{field: values.get(f"{prefix}_{field}_{index}", "") for field in fields},
-        }
-        for index in indexes
-    ]
-
-
-def _row_year(text: str, field: str) -> int:
-    value = text.strip()
-    try:
-        return int(value)
-    except ValueError:
-        raise fire_service.FireError(field, "invalid_year") from None
-
-
 def _money_from_text(
     text: str,
     locale: str,
     currency: str,
     *,
-    signed: bool,
     field: str,
 ) -> Money:
     try:
         amount = parse_amount(text, locale)
-        if not signed and amount < 0:
+        if amount < 0:
             raise ValueError("negative")
         if amount == 0:
             return Money(0, currency)
-        minor = signed_amount_minor(amount, currency) if signed else amount_minor(amount, currency)
-        return Money(minor, currency)
+        return Money(amount_minor(amount, currency), currency)
     except (ValueError, EntryError):
         raise fire_service.FireError(field, "invalid_amount") from None
 
@@ -299,7 +272,7 @@ def _plan_money(
     text = values.get(key, "").strip()
     if not text:
         return None
-    return _money_from_text(text, locale, currency, signed=False, field=field)
+    return _money_from_text(text, locale, currency, field=field)
 
 
 def _percent(values: dict[str, str], key: str, locale: str) -> int:
@@ -338,39 +311,6 @@ def _optional_int(values: dict[str, str], key: str, code: str) -> int | None:
         raise fire_service.FireError(key, code) from None
 
 
-def _optional_uuid(values: dict[str, str], key: str, field: str) -> UUID | None:
-    text = values.get(key, "").strip()
-    if not text:
-        return None
-    try:
-        return UUID(text)
-    except ValueError:
-        raise fire_service.FireError(field, "invalid_event") from None
-
-
-def _event_inputs(
-    values: dict[str, str], locale: str, currency: str
-) -> tuple[fire_service.EventInput, ...]:
-    rows: list[fire_service.EventInput] = []
-    for row in _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS):
-        if not any(row[field].strip() for field in ("year", "amount", "label")):
-            continue
-        year = _row_year(row["year"], "events")
-        amount = _money_from_text(
-            row["amount"].strip(), locale, currency, signed=True, field="events"
-        )
-        rows.append(
-            fire_service.EventInput(
-                year=year,
-                kind=row["kind"].strip(),
-                amount_minor=amount.amount_minor,
-                label=row["label"].strip(),
-                id=_optional_uuid(row, "id", "events"),
-            )
-        )
-    return tuple(rows)
-
-
 def _plan_input(
     values: dict[str, str],
     locale: str,
@@ -378,6 +318,11 @@ def _plan_input(
     *,
     include_events: bool = True,
 ) -> fire_service.FirePlanInput:
+    parsed = (
+        fire_adjustments.parse_adjustments(values, locale, currency)
+        if include_events
+        else fire_adjustments.ParsedAdjustments(events=(), removed_event_ids=())
+    )
     return fire_service.FirePlanInput(
         birth_year=_optional_int(values, "birth_year", "invalid_birth_year"),
         inflation_bp=_percent(values, "inflation", locale),
@@ -391,7 +336,8 @@ def _plan_input(
         expenses=_plan_money(values, "expenses_manual", locale, currency, "expenses_manual"),
         portfolio=_plan_money(values, "portfolio_manual", locale, currency, "portfolio_manual"),
         extreme_rates_confirmed=values.get("extreme_rates_confirmed") == "1",
-        events=_event_inputs(values, locale, currency) if include_events else (),
+        events=parsed.events,
+        removed_event_ids=parsed.removed_event_ids,
     )
 
 
@@ -602,27 +548,9 @@ def _detail_values(detail: fire_service.FirePlanDetail, locale: str) -> dict[str
     }
 
 
-def _event_rows(detail: fire_service.FirePlanDetail, locale: str) -> list[dict[str, str]]:
-    return [
-        {
-            "index": str(index),
-            "id": str(row.id),
-            "year": str(row.year),
-            "kind": row.kind,
-            "amount": format_amount_input(row.amount, locale),
-            "label": row.label,
-            "archived": "1" if row.archived else "",
-        }
-        for index, row in enumerate(detail.events, start=1)
-    ]
-
-
-def _blank_row(index: int, fields: tuple[str, ...]) -> dict[str, str]:
-    return {"index": str(index), **dict.fromkeys(fields, "")}
-
-
-def _row_index(rows: list[dict[str, str]]) -> int:
-    return max((int(row["index"]) for row in rows), default=0) + 1
+def _adjustment_error_messages(request: Request) -> dict[str, str]:
+    """Translated messages for the adjustment row errors the service and parser can raise."""
+    return {code: _t(request, message) for code, message in ERRORS.items()}
 
 
 def _form_context(
@@ -631,36 +559,52 @@ def _form_context(
     *,
     detail: fire_service.FirePlanDetail,
     values: dict[str, str] | None,
-    event_rows: list[dict[str, str]] | None,
+    adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
+    adjustment_error: fire_service.FireError | None = None,
 ) -> dict[str, object]:
     locale = request.state.locale
+    posted = values is not None
     if values is None:
         values = _detail_values(detail, locale)
-    if event_rows is None:
-        event_rows = _event_rows(detail, locale)
-    current_year = detail.plan.current_year
-    window_end: int | None = None
-    try:
-        birth_year = int(values.get("birth_year", ""))
-        horizon_age = int(values.get("horizon_age", ""))
-        window_end = birth_year + horizon_age
-    except ValueError:
-        window_end = None
     currency = detail.plan.currency
+    if adjustment_rows is None:
+        if posted:
+            adjustment_rows = fire_adjustments.active_rows_from_values(
+                values, locale, currency, error=adjustment_error
+            )
+        else:
+            adjustment_rows = fire_adjustments.active_rows_from_detail(detail, locale)
+    removed_archived: tuple[UUID, ...] = ()
+    if posted:
+        try:
+            removed_archived = fire_adjustments.checked_archived_ids(values)
+        except fire_service.FireError:
+            removed_archived = ()
+    archived_adjustment_rows = fire_adjustments.archived_rows(
+        detail, locale, removed_ids=removed_archived
+    )
+    window = fire_adjustments.adjustment_window(detail)
+    active_count = fire_adjustments.saved_active_count(adjustment_rows)
     return {
         "values": values,
-        "current_year": current_year,
+        "current_year": detail.plan.current_year,
         "currency": currency,
-        "window_end": window_end,
-        "event_rows": event_rows,
-        "empty_event": _blank_row(_row_index(event_rows), _EVENT_FIELDS),
+        "adjustment_rows": adjustment_rows,
+        "archived_adjustment_rows": archived_adjustment_rows,
+        "adjustment_window": window,
+        "next_adjustment_index": fire_adjustments.next_adjustment_index(adjustment_rows),
+        "active_adjustment_count": active_count,
+        "adjustments_empty": active_count == 0
+        and not fire_adjustments.has_pending_adjustment(adjustment_rows),
+        "archived_open": any(row.remove for row in archived_adjustment_rows),
+        "adjustment_kind_labels": fire_adjustments.kind_labels(locale),
+        "adjustment_error_messages": _adjustment_error_messages(request),
+        "adjustment_error": adjustment_error,
+        "adjustments_editable": True,
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
-        "event_kind_labels": {
-            code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
-        },
         "profile_url": request.url_for("account").path,
         "error": error,
         "error_code": error_code,
@@ -745,10 +689,11 @@ def _edit_context(
     suggestions: fire_linked_service.SetupSuggestions,
     basis: str,
     values: dict[str, str] | None = None,
-    event_rows: list[dict[str, str]] | None = None,
+    adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None = None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
+    adjustment_error: fire_service.FireError | None = None,
     notice: str | None = None,
     dirty: bool = False,
 ) -> dict[str, object]:
@@ -757,10 +702,11 @@ def _edit_context(
         ctx,
         detail=results.detail,
         values=values,
-        event_rows=event_rows,
+        adjustment_rows=adjustment_rows,
         error=error,
         error_code=error_code,
         error_field=error_field,
+        adjustment_error=adjustment_error,
     )
     context.update(
         _results_context(
@@ -803,9 +749,15 @@ def _view_context(
             "error": error,
             "error_code": error_code,
             "profile_url": request.url_for("account").path,
-            "event_kind_labels": {
-                code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
-            },
+            "adjustment_rows": fire_adjustments.active_rows_from_detail(
+                results.detail, request.state.locale, include_blank=False
+            ),
+            "archived_adjustment_rows": fire_adjustments.archived_rows(
+                results.detail, request.state.locale
+            ),
+            "adjustment_kind_labels": fire_adjustments.kind_labels(request.state.locale),
+            "active_adjustment_count": len(results.detail.active_events),
+            "adjustments_editable": False,
             "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
             "format_day": format_day,
             "sensitivity_loaded": sensitivity_loaded,
@@ -1121,10 +1073,11 @@ async def _render_edit(
     *,
     basis: str,
     values: dict[str, str] | None = None,
-    event_rows: list[dict[str, str]] | None = None,
+    adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None = None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
+    adjustment_error: fire_service.FireError | None = None,
     notice: str | None = None,
     dirty: bool = False,
     status_code: int = 200,
@@ -1144,10 +1097,11 @@ async def _render_edit(
         suggestions=suggestions,
         basis=basis,
         values=values,
-        event_rows=event_rows,
+        adjustment_rows=adjustment_rows,
         error=error,
         error_code=error_code,
         error_field=error_field,
+        adjustment_error=adjustment_error,
         notice=notice,
         dirty=dirty,
     )
@@ -1184,7 +1138,7 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
             editable_results=True,
             in_editor=True,
             preview_error=_error(request, exc.code),
-            preview_error_field=exc.field,
+            preview_error_field=_preview_error_field(exc),
         )
         return render_template(request, "fire/_results.html", context=context)
     context = await run_in_threadpool(
@@ -1205,7 +1159,6 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
     values = await _form_data(request)
     basis = _basis(values.get("basis"))
-    event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     detail = await run_in_threadpool(
         fire_service.get_fire_plan_if_any, request.app.state.session_factory, ctx
     )
@@ -1220,7 +1173,6 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             detail,
             basis=basis,
             values=values,
-            event_rows=event_rows,
             error=_error(request, "missing_adjustments"),
             error_code="missing_adjustments",
             error_field="events",
@@ -1246,10 +1198,10 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             detail,
             basis=basis,
             values=values,
-            event_rows=event_rows,
             error=_error(request, exc.code),
             error_code=exc.code,
             error_field=exc.field,
+            adjustment_error=exc,
             dirty=True,
             status_code=400,
         )
