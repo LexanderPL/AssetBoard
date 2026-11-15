@@ -465,6 +465,11 @@ def test_skipped_portfolio_rows_do_not_add_queries(team: WorkspaceDb) -> None:
     assert linked.portfolio is not None
     assert len(linked.portfolio.skipped) == 40
     assert linked.portfolio.total == _money(150_000)
+    reasons = [row.reason for row in linked.portfolio.skipped]
+    assert reasons == ["non_investable_class"] * 20 + ["linked_item_double_count"] * 20
+    for rows in (linked.portfolio.skipped[:20], linked.portfolio.skipped[20:]):
+        names = [row.name for row in rows]
+        assert names == sorted(names, key=str.casefold)
 
 
 def test_linked_portfolio_converts_a_manual_item_with_fx_once(team: WorkspaceDb) -> None:
