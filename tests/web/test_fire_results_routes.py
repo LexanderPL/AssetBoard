@@ -6,7 +6,7 @@ import re
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 
 from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent
@@ -169,6 +169,59 @@ def test_the_csv_is_id_free_and_writes_nothing(owner) -> None:
         assert owner.client.get("/fire/results.csv").status_code == 200
     finally:
         owner.set_admin_role("owner")
+
+
+def test_a_currency_mismatch_hides_the_review_banner_and_editor_link(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        row.currency = "USD"
+        row.needs_review = True
+        session.commit()
+    page = owner.client.get("/fire")
+    assert 'data-fire-blocked="plan_currency_mismatch"' in page.text
+    assert "data-fire-needs-review" not in page.text
+    assert "data-fire-edit" not in page.text
+    assert "data-fire-reset" in page.text
+    assert "/fire/edit" not in page.text
+
+
+def test_the_view_query_count_does_not_grow_with_adjustments(owner) -> None:
+    plan_id = _create(owner)
+    seen = 0
+
+    def before(*_args: object) -> None:
+        nonlocal seen
+        seen += 1
+
+    def count() -> int:
+        nonlocal seen
+        seen = 0
+        engine = owner.app.state.database_engine
+        event.listen(engine, "before_cursor_execute", before)
+        try:
+            response = owner.client.get("/fire")
+            assert response.status_code == 200
+        finally:
+            event.remove(engine, "before_cursor_execute", before)
+        return seen
+
+    quiet = count()
+    with owner.db() as session, session.begin():
+        for index in range(50):
+            session.add(
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2027 + (index % 40),
+                    kind="cash",
+                    amount_minor=index + 1,
+                    label=f"Event {index}",
+                )
+            )
+    loud = count()
+    assert loud == quiet
+    assert quiet <= 20
 
 
 def test_a_viewer_sees_the_needs_review_banner_without_a_link(owner) -> None:

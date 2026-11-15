@@ -541,7 +541,7 @@ editing form beyond the wizard and no live-loan calculation changes.
   view header adds **Reset plan** (editors only) and moves Edit, the needs-review link and the
   sensitivity page/inputs links to the id-free `/fire` URL. The currency-mismatch panel links to
   Reset. `PlanEntry` now returns the already-loaded detail so the view page does not load the
-  plan and events twice. The needs-review banner still links editors to `/fire?edit=1#inputs`.
+  plan and events twice. The needs-review banner links editors to `/fire/edit#amounts`.
 - **Tests.** Wizard entry/steps/back/cancel/validation/no-write/create-once/double-submit,
   hidden-field carry, suggestions and no prefill, Use copying, category breakdown, loan portion,
   blocked suggestions without a zero, portfolio source links (asset class and net-worth item), no
@@ -592,8 +592,10 @@ breakdown. No client-side projection.
   recalculation; it loads no suggestions and never writes. `POST /fire/edit` re-validates under the
   workspace lock, persists, audits `fire_plan.updated`, clears `needs_review` and redirects to
   `/fire?notice=saved` (preserving `basis`). Errors render the full edit page with posted values,
-  inline messages and `data-fire-dirty="1"`; a partial save with no adjustment fields is rejected
-  before the service so it cannot delete all events.
+  inline messages and `data-fire-dirty="1"`; a truncated save without the adjustment-section
+  marker is rejected before the service so it cannot delete all events, while an intentional empty
+  adjustment list (marker present, every row removed) still saves. The amount copy states the
+  approved after-tax default from §10.
 - **Discard and dirty guard.** **Discard changes** is `GET /fire/edit?discarded=1`, stays in edit
   mode, reloads the saved values and shows a notice. **View plan** leaves; while the form is dirty,
   `fire.js` sets `data-fire-dirty=1`, shows a translated **Unsaved changes** status and uses the

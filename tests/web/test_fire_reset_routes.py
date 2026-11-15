@@ -25,6 +25,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "income_manual": "50000",
         "expenses_manual": "30000",
         "portfolio_manual": "1000000",
+        "adjustments_present": "1",
         "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",

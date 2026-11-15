@@ -195,6 +195,12 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             assert page.locator('input[name="income_manual"]').input_value() == "50000.00"
             edit_url = page.url
 
+            # A basis switch is a view preference, not an edit: it previews but stays clean.
+            page.locator('label:has(input[data-fire-basis="real"])').click()
+            expect(page.locator("[data-fire-preview-note]")).to_be_visible()
+            expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "0")
+            expect(page.locator("[data-fire-dirty-status]")).to_be_hidden()
+
             # Every change recalculates server-side in place and never navigates or writes.
             expenses = page.locator('input[name="expenses_manual"]')
             before_fire_age = page.locator("[data-fire-fire-age]").get_attribute(
@@ -270,6 +276,9 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             ).to_have_attribute("data-chart-ready", "true")
 
             page.set_viewport_size({"width": 390, "height": 844})
+            page.wait_for_timeout(200)
+            _no_page_overflow(page)
+            page.goto(f"{base}/fire/edit", wait_until="networkidle")
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             page.goto(f"{base}/fire", wait_until="networkidle")

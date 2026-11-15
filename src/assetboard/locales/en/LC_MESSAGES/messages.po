@@ -2868,6 +2868,12 @@ msgstr ""
 msgid "Saving override"
 msgstr ""
 
+msgid "Reset plan"
+msgstr ""
+
+msgid "Edit the plan"
+msgstr ""
+
 #, python-format
 msgid "%(value)s pp"
 msgstr ""
@@ -5895,7 +5901,6 @@ msgstr[1] ""
 msgid "Adjustments applied to the projection"
 msgstr ""
 
-#, fuzzy
 msgid "No adjustments yet."
 msgstr ""
 
@@ -6049,16 +6054,16 @@ msgstr ""
 #, python-format
 msgid ""
 "All amounts are in %(currency)s and in today's money in the plan's first "
-"year, which is the current year. Enter the yearly income and expenses, "
-"including loan payments."
+"year, which is the current year. Enter your after-tax income and "
+"expenses, including the taxes you actually pay and your loan payments."
 msgstr ""
 
 msgid "Annual income"
 msgstr ""
 
 msgid ""
-"Regular income in the current year: earnings, dividends and interest, "
-"before tax and other deductions."
+"Regular income you receive in the current year: earnings, dividends and "
+"interest. Use the after-tax amount."
 msgstr ""
 
 msgid "Suggested annual income"
@@ -6069,8 +6074,8 @@ msgstr ""
 
 msgid ""
 "Regular yearly spending in the current year, excluding savings and "
-"transfers. Include your loan payments; the planner will remove an "
-"included loan's payment after its payoff later."
+"transfers. Include the taxes you actually pay and your loan payments; the"
+" planner will remove an included loan's payment after its payoff later."
 msgstr ""
 
 msgid "Suggested annual expenses"
@@ -6194,15 +6199,13 @@ msgstr ""
 msgid "The plan cannot be projected."
 msgstr ""
 
-msgid "Reset plan"
-msgstr ""
-
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr ""
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
-"assumes constant rates and no taxes; real life will differ."
+"assumes constant rates and does not model taxes separately; real life "
+"will differ."
 msgstr ""
 
 msgid "Based on the saved plan; unsaved changes are not included."
@@ -6551,8 +6554,9 @@ msgid "Plan values"
 msgstr ""
 
 msgid ""
-"The assumptions saved in the plan. Editors and owners can change them in "
-"edit mode."
+"The assumptions saved in the plan. Income and expenses are after-tax cash"
+" flows; the projection does not model taxes separately. Editors and "
+"owners can change them in edit mode."
 msgstr ""
 
 #, python-format
@@ -13603,5 +13607,58 @@ msgstr ""
 #~ "The horizon age is not after your"
 #~ " current age. Raise it in Plan "
 #~ "inputs to project the plan."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "All amounts are in %(currency)s and "
+#~ "in today's money in the plan's "
+#~ "first year, which is the current "
+#~ "year. Enter the yearly income and "
+#~ "expenses, including loan payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular income in the current year: "
+#~ "earnings, dividends and interest, before "
+#~ "tax and other deductions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular yearly spending in the current"
+#~ " year, excluding savings and transfers. "
+#~ "Include your loan payments; the planner"
+#~ " will remove an included loan's "
+#~ "payment after its payoff later."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The projection assumes "
+#~ "constant rates and no taxes; real "
+#~ "life will differ."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Editors and owners can change them "
+#~ "in edit mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Amounts are the money you actually "
+#~ "receive and spend, after tax; taxes "
+#~ "are not modelled separately. Editors and"
+#~ " owners can change them in edit "
+#~ "mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Amounts are the money you actually "
+#~ "receive and spend, after tax. The "
+#~ "projection does not model taxes "
+#~ "separately. Editors and owners can "
+#~ "change them in edit mode."
 #~ msgstr ""
 

@@ -14,7 +14,7 @@
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}{% if error_code == 'birth_year_required' %} <a href="{{ profile_url }}" class="font-semibold underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a>{% endif %}</p>{% endif %}
 
-{% if s.needs_review %}
+{% if s.needs_review and not s.currency_mismatch %}
 <p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{% if can_edit %}{{ _("This plan was converted from the old format. Review its values and save to confirm them.") }} <a href="{{ scoped_url(request, 'fire_edit') }}#amounts" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% else %}{{ _("This plan was converted from the old format. An editor or owner must review its values and save to confirm them.") }}{% endif %}</p>
 {% endif %}
 
@@ -42,7 +42,7 @@
 
 <section class="panel mt-6 p-6 sm:p-7" aria-labelledby="plan-values-heading" data-fire-plan-values>
   <h2 id="plan-values-heading" class="text-base font-semibold">{{ _("Plan values") }}</h2>
-  <p class="mt-1 text-sm text-muted">{{ _("The assumptions saved in the plan. Editors and owners can change them in edit mode.") }}</p>
+  <p class="mt-1 text-sm text-muted">{{ _("The assumptions saved in the plan. Income and expenses are after-tax cash flows; the projection does not model taxes separately. Editors and owners can change them in edit mode.") }}</p>
   <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
     <div><dt class="text-muted">{{ _("Birth year") }}</dt><dd class="font-medium">{{ s.birth_year }}</dd></div>
     <div><dt class="text-muted">{{ _("Income stops") }}</dt><dd class="font-medium">{{ _("Age %(age)d, in %(year)d", age=s.stop_working_age, year=s.birth_year + s.stop_working_age) }}</dd></div>

@@ -12,6 +12,7 @@
 {% endmacro %}
 
   <section id="adjustments" class="panel p-6 sm:p-7" aria-labelledby="events-heading" data-fire-events>
+    <input type="hidden" name="adjustments_present" value="1">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="events-heading" class="text-base font-semibold">{{ _("Adjustments") }} {{ hint(_("A one-off cash flow is added to net worth in that year. An expense or income change alters the annual series from that year onward. A saving override replaces that year's net saving and is unique per year. Negative amounts reduce, positive amounts increase.")) }}</h2>
       <p class="text-xs text-muted">{% if window_end %}{{ _("Years %(start)d to %(end)d; a saving override starts in %(override)d", start=current_year, end=window_end, override=current_year + 1) }}{% endif %}</p>

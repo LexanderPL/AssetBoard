@@ -26,6 +26,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "income_manual": "50000",
         "expenses_manual": "30000",
         "portfolio_manual": "1000000",
+        "adjustments_present": "1",
         "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",
@@ -218,6 +219,22 @@ def test_viewers_can_load_the_grid(owner) -> None:
         assert "data-fire-sensitivity-error" not in fragment.text
     finally:
         owner.set_admin_role("owner")
+
+
+def test_the_blocked_sensitivity_link_to_the_editor_is_translated(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.scalars(
+            select(FireScenario).where(FireScenario.id == plan_id)
+        ).one().horizon_age = 41
+    owner.client.headers["Accept-Language"] = "pl"
+    try:
+        fragment = owner.client.get("/fire/sensitivity")
+        assert fragment.status_code == 200
+        assert "data-fire-sensitivity-blocked" in fragment.text
+        assert "Edytuj plan" in fragment.text
+    finally:
+        owner.client.headers.pop("Accept-Language", None)
 
 
 def test_the_edit_page_has_no_sensitivity_panel(owner) -> None:

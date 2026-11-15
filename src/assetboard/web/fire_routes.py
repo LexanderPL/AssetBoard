@@ -858,10 +858,10 @@ def _sensitivity_context(
     plan = results.detail.plan
     if plan.currency_mismatch:
         inputs_url = request.url_for("fire_reset").path
-        inputs_label = _t(request, "Reset plan")
+        inputs_label = _t(request, _("Reset plan"))
     else:
         inputs_url = request.url_for("fire_edit").path + "#amounts"
-        inputs_label = _t(request, "Edit the plan")
+        inputs_label = _t(request, _("Edit the plan"))
     context: dict[str, object] = {
         "sensitivity": None,
         "sensitivity_error": None,
@@ -1211,9 +1211,9 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
     )
     if detail is None or detail.plan.currency_mismatch:
         return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
-    # A malformed partial save must not be read as "delete every adjustment". A real submit always
-    # carries the adjustment fields (including the blank row).
-    if not any(_EVENT_KEY.match(key) for key in values):
+    # A malformed/truncated save must not be read as "delete every adjustment". The editor always
+    # posts a marker with the adjustment section, including when the user removed every row.
+    if values.get("adjustments_present") != "1":
         return await _render_edit(
             request,
             ctx,

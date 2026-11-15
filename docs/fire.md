@@ -6,7 +6,8 @@ calendar year you open it, not in a saved start year. Every amount is nominal mo
 currency.
 
 Projections are illustrative and not financial advice. The starting rates are examples, not
-recommendations, and the projection assumes constant rates and no separate tax model.
+recommendations. The projection assumes constant rates and does not model taxes separately:
+enter the money you actually receive and spend, after tax.
 
 ## One plan
 
@@ -94,7 +95,8 @@ Each amount has a suggestion card:
 - **Portfolio** shows the current investable assets, the as-of date and the sources that make up
   the value.
 
-**Use suggested value** copies the suggestion into the field. A suggestion never fills a field by
+The suggestions come from recorded ledger cash flows, so they are already after tax. **Use
+suggested value** copies the suggestion into the field. A suggestion never fills a field by
 itself, and the saved amount changes only when you press **Save changes**. The card shows the
 saved amount and says whether it matches or differs from the current suggestion. A blocked
 suggestion explains why and leaves the field for manual entry. Suggestions are read-only and
@@ -140,7 +142,9 @@ check the values and save to clear the review banner.
   warning.
 - **Annual income**, **annual expenses** and **starting portfolio** are manual amounts in the
   plan currency and at the current year's money. They cannot be negative; zero is allowed and
-  shown as zero.
+  shown as zero. Income is the money you actually receive after tax; expenses include the taxes
+  you actually pay. The projection does not model income-tax disappearance or capital-gains tax
+  separately.
 - Expenses are expected to include your loan payments. The planner removes an included loan's
   payment after its projected payoff when live loans are shown in a later update.
 

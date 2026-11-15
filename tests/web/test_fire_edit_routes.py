@@ -23,6 +23,7 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.fire import trailing_window
+from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from tests.fire_helpers import create_plan
 
@@ -65,6 +66,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "income_manual": "50000",
         "expenses_manual": "30000",
         "portfolio_manual": "1000000",
+        "adjustments_present": "1",
         "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",
@@ -311,6 +313,7 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-sensitivity" not in page.text
     assert "data-fire-csv" not in page.text
     assert "data-fire-reset" not in page.text
+    assert 'name="adjustments_present" value="1"' in page.text
     assert _input_value(page.text, "income_manual") == "50000.00"
     assert _input_value(page.text, "expenses_manual") == "30000.00"
     assert _input_value(page.text, "portfolio_manual") == "1000000.00"
@@ -380,6 +383,41 @@ def test_a_currency_mismatch_redirects_to_the_view(owner) -> None:
     assert preview.status_code == 200
     assert "data-fire-preview-error" in preview.text
     assert 'data-fire-blocked="plan_currency_mismatch"' in preview.text
+
+
+def test_a_noop_save_is_accepted(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.post("/fire/edit", _form(), token_from="/fire/edit")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire?notice=saved"
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert (row.income_minor, row.expenses_minor, row.portfolio_minor) == (
+            5_000_000,
+            3_000_000,
+            100_000_000,
+        )
+
+
+def test_a_plan_that_vanishes_between_load_and_submit_is_handled(owner) -> None:
+    plan_id = create_plan(owner)
+    token = owner.token("/fire/edit")
+    fire_service.delete_fire_plan(owner.app.state.session_factory, _context(owner), confirmed=True)
+    response = owner.client.post(
+        "/fire/edit",
+        data={"csrf_token": token} | _form(),
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire"
+    preview = owner.client.post(
+        "/fire/edit/preview",
+        data={"csrf_token": token} | _form(),
+        follow_redirects=False,
+    )
+    assert preview.status_code == 404
+    with owner.db() as session:
+        assert session.get(FireScenario, plan_id) is None
 
 
 def test_save_persists_returns_to_the_view_and_clears_needs_review(owner) -> None:
@@ -472,7 +510,7 @@ def test_discard_reloads_the_saved_values_with_a_notice(owner) -> None:
     assert _snapshot(owner, plan_id) == before
 
 
-def test_a_partial_save_without_adjustment_fields_is_rejected(owner) -> None:
+def test_a_truncated_save_without_adjustment_fields_is_rejected(owner) -> None:
     plan_id = create_plan(owner)
     response = owner.post(
         "/fire/edit",
@@ -487,7 +525,11 @@ def test_a_partial_save_without_adjustment_fields_is_rejected(owner) -> None:
     assert response.status_code == 303
     with owner.db() as session:
         assert session.scalar(select(func.count()).select_from(FireEvent)) == 1
-    partial = {key: value for key, value in _form().items() if not key.startswith("event_")}
+    partial = {
+        key: value
+        for key, value in _form().items()
+        if not key.startswith("event_") and key != "adjustments_present"
+    }
     response = owner.post("/fire/edit", partial, token_from="/fire/edit")
     assert response.status_code == 400
     assert "The adjustment rows are missing." in response.text
@@ -495,6 +537,28 @@ def test_a_partial_save_without_adjustment_fields_is_rejected(owner) -> None:
     with owner.db() as session:
         assert session.scalar(select(func.count()).select_from(FireEvent)) == 1
     assert plan_id
+
+
+def test_save_can_remove_every_adjustment_row(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        session.add(
+            FireEvent(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                year=2028,
+                kind="cash",
+                amount_minor=100_000,
+                label="Removed",
+            )
+        )
+    # The real form still carries the marker when the user removes every row, including the
+    # blank one; that is a deliberate empty list, not a truncated request.
+    form = {key: value for key, value in _form().items() if not key.startswith("event_")}
+    response = owner.post("/fire/edit", form, token_from="/fire/edit")
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.scalar(select(func.count()).select_from(FireEvent)) == 0
 
 
 def test_a_forged_scenario_id_and_use_are_ignored(owner) -> None:
@@ -537,6 +601,8 @@ def test_preview_returns_changed_results_and_writes_nothing(owner) -> None:
     assert "data-fire-chart" in response.text
     assert "<html" not in response.text
     assert 'id="fire-results"' not in response.text
+    assert "data-fire-suggestion" not in response.text
+    assert "data-suggested-minor" not in response.text
     assert _snapshot(owner, plan_id) == before
 
 
@@ -583,6 +649,8 @@ def test_suggestions_show_all_three_cards_and_never_prefill(owner) -> None:
     assert 'data-suggested-input="60000.00"' in text
     assert 'data-use-suggestion="expenses_manual"' in text
     assert 'data-use-suggestion="portfolio_manual"' in text
+    assert 'data-fire-suggestion-source-link="networth_item"' in text
+    assert "/net-worth?side=asset#item-" in text
     assert 'data-fire-suggestion-differs="1"' in text
     assert 'data-fire-suggestion-saved-minor="5000000"' in text
     # The saved amounts stay in the inputs; the suggestion never fills them by itself.
@@ -709,6 +777,18 @@ def test_the_preview_query_count_does_not_grow_with_events(owner) -> None:
     loud = _queries(owner, preview)
     assert loud == quiet
     assert quiet <= 20
+
+
+def test_the_edit_and_view_copy_state_after_tax_cash_flows(owner) -> None:
+    create_plan(owner)
+    edit = owner.client.get("/fire/edit").text
+    view = owner.client.get("/fire").text
+    assert "Use the after-tax amount." in edit
+    assert "Enter your after-tax income" in edit
+    assert "before tax" not in edit
+    assert "does not model taxes separately" in view
+    assert "after-tax" in view
+    assert "no taxes" not in view
 
 
 def test_the_edit_page_renders_in_polish(owner) -> None:
