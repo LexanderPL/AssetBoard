@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from uuid import UUID
 
@@ -23,7 +24,14 @@ from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.prices import save_manual_price
-from tests.fire_helpers import create_plan, post_wizard, review_signature, wizard_values
+from tests.fire_helpers import (
+    create_plan,
+    field_html,
+    post_wizard,
+    review_signature,
+    suggestion_html,
+    wizard_values,
+)
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -131,20 +139,20 @@ def _seed_portfolio(owner, value_minor: int = 5_000_000) -> UUID:
         return item.id
 
 
-def _seed_asset_class(owner) -> UUID:
+def _seed_asset_class(owner, name: str = "Stocks test", *, investable: bool = True) -> UUID:
     ctx = _context(owner)
     factory = owner.app.state.session_factory
     asset_class = create_asset_class(
         factory,
         ctx,
-        name="Stocks test",
+        name=name,
         color="#2563eb",
-        investable=True,
+        investable=investable,
     )
     instrument = create_instrument(
         factory,
         ctx,
-        name="Fund test",
+        name=f"Fund test {name}",
         symbol="",
         type="etf",
         quote_currency="EUR",
@@ -175,6 +183,15 @@ def _seed_asset_class(owner) -> UUID:
         locale="en",
     )
     return asset_class.id
+
+
+def _linked_item_id(owner, class_id: UUID) -> UUID:
+    with owner.db() as session:
+        return next(
+            row.id
+            for row in NetWorthItemRepository(session, _context(owner)).ordered()
+            if row.link_type == "portfolio_asset_class" and row.link_id == class_id
+        )
 
 
 def _link_loan_payment(owner, transaction_id: UUID, total_minor: int) -> UUID:
@@ -582,6 +599,41 @@ def test_expense_suggestion_shows_categories_and_the_loan_portion(owner) -> None
     assert 'data-fire-loan-portion="200000"' in text
 
 
+def test_the_wizard_uses_ledger_based_tax_copy(owner) -> None:
+    text = _step(post_wizard(owner, 1, "next", wizard_values()), 2)
+    assert "recorded in your ledger" in text
+    assert "income may be gross" in text
+    assert "taxes you actually pay" in text
+    assert "does not model taxes separately" in text
+    assert "after-tax" not in text
+    assert "after tax" not in text
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    assert "Income may be gross" in text
+    assert "does not model taxes separately" in text
+    assert "after-tax" not in text
+    assert "after tax" not in text
+
+
+def test_a_malformed_swr_is_ignored_when_the_rule_is_not_the_withdrawal_rate(owner) -> None:
+    values = wizard_values(rule="returns_cover_expenses", swr="not-a-rate")
+    for step in (1, 2):
+        post_wizard(owner, step, "next", values)
+    response = post_wizard(owner, 3, "next", values)
+    assert response.status_code == 200
+    assert 'data-fire-wizard="4"' in response.text
+    assert 'data-field-error="swr"' not in response.text
+    assert _state(owner) == (0, 0, 0)
+
+    invalid = wizard_values(rule="swr", swr="not-a-rate")
+    for step in (1, 2):
+        post_wizard(owner, step, "next", invalid)
+    response = post_wizard(owner, 3, "next", invalid)
+    assert response.status_code == 400
+    assert 'data-fire-wizard="4"' in response.text
+    assert 'data-field-error="swr"' in response.text
+    assert _state(owner) == (0, 0, 0)
+
+
 def test_blocked_suggestions_keep_manual_entry(owner) -> None:
     values = wizard_values(income_manual="", expenses_manual="")
     text = _step(post_wizard(owner, 1, "next", values), 2)
@@ -705,6 +757,173 @@ def test_profile_prefill(owner) -> None:
     assert 'name="birth_year" value="1980"' in text
     assert 'name="horizon_age" value="88"' in text
     assert 'name="stop_working_age" value=""' in text
+    assert 'data-fire-birth-year-source="profile"' in text
+    assert "From your profile." in text
+    assert "Add it to your profile" not in text
+    assert "data-fire-profile-link" not in text
+
+
+def test_the_wizard_explains_a_missing_profile_birth_year(owner) -> None:
+    text = _step(owner.client.get("/fire"), 1)
+    assert 'name="birth_year" value=""' in text
+    assert 'data-fire-birth-year-source="missing"' in text
+    assert "Enter your birth year. Add it to your profile to prefill it next time." in text
+    assert "data-fire-profile-link" in text
+    assert "From your profile." not in text
+
+
+def test_the_wizard_explains_a_cleared_birth_year_against_the_profile(owner) -> None:
+    with owner.db() as session, session.begin():
+        session.execute(update(User).where(User.id == owner.admin_id).values(birth_year=1980))
+    response = post_wizard(owner, 1, "next", wizard_values(birth_year=""))
+    assert response.status_code == 400
+    assert 'data-fire-wizard="1"' in response.text
+    assert 'data-fire-birth-year-source="empty"' in response.text
+    assert "Enter your birth year. Your profile has 1980." in response.text
+    assert "data-fire-profile-link" in response.text
+    assert "From your profile." not in response.text
+
+
+def test_the_wizard_explains_a_birth_year_changed_for_this_plan(owner) -> None:
+    with owner.db() as session, session.begin():
+        session.execute(update(User).where(User.id == owner.admin_id).values(birth_year=1980))
+    response = post_wizard(owner, 1, "back", wizard_values(birth_year="1985"))
+    assert response.status_code == 200
+    assert 'name="birth_year" value="1985"' in response.text
+    assert 'data-fire-birth-year-source="changed"' in response.text
+    assert "Changed for this plan. Your profile still has 1980" in response.text
+    assert "From your profile." not in response.text
+    assert "data-fire-profile-link" not in response.text
+
+
+def test_the_wizard_keeps_a_birth_year_entered_without_a_profile(owner) -> None:
+    response = post_wizard(owner, 1, "back", wizard_values(birth_year="1985"))
+    assert response.status_code == 200
+    assert 'name="birth_year" value="1985"' in response.text
+    assert 'data-fire-birth-year-source="entered"' in response.text
+    assert (
+        "This plan stores its own birth year. Add it to your profile to prefill it next time."
+        in response.text
+    )
+    assert 'href="/account"' in response.text
+    assert "data-fire-profile-link" in response.text
+    assert "Enter your birth year." not in response.text
+
+
+def test_the_wizard_has_no_required_boilerplate_or_suggestion_paragraph(owner) -> None:
+    values = wizard_values()
+    text = _step(owner.client.get("/fire"), 1)
+    assert "Required. Add it to your profile" not in text
+    assert "Required. Enter 0" not in text
+    for step in (1, 2):
+        text = _step(post_wizard(owner, step, "next", values), step + 1)
+        assert "Required. Enter 0" not in text
+        assert "A suggestion never fills" not in text
+    text = _step(post_wizard(owner, 3, "next", values), 4)
+    assert "Required. Enter 0" not in text
+    assert "A suggestion never fills" not in text
+
+
+def test_only_the_non_obvious_fields_keep_a_hint_beside_the_label(owner) -> None:
+    text = _step(owner.client.get("/fire"), 1)
+    for name in ("birth_year", "horizon_age", "stop_working_age"):
+        assert "data-fire-hint" not in field_html(text, name), name
+    text = _step(post_wizard(owner, 1, "next", wizard_values()), 2)
+    for name in ("income_manual", "expenses_manual"):
+        field = field_html(text, name)
+        if name == "expenses_manual":
+            assert "data-fire-hint" in field
+        else:
+            assert "data-fire-hint" not in field
+    assert "data-fire-hint" not in field_html(text, "income_manual")
+    text = _step(post_wizard(owner, 2, "next", wizard_values()), 3)
+    assert "data-fire-hint" not in field_html(text, "portfolio_manual")
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    for name in ("inflation", "income_growth"):
+        assert "data-fire-hint" not in field_html(text, name), name
+    for name in ("real_return", "rule", "swr"):
+        field = field_html(text, name)
+        assert "data-fire-hint" in field, name
+        control = "<select" if name == "rule" else "<input"
+        assert field.index("data-fire-hint") < field.index(control)
+        assert 'role="note"' in field
+        assert 'tabindex="0"' in field
+        assert "aria-label=" in field and "title=" in field
+        assert "focus-visible:ring-2" in field
+        assert "focus-visible:ring-primary" in field
+        assert f'aria-describedby="{name}-hint"' in field
+    expenses = field_html(
+        _step(post_wizard(owner, 1, "next", wizard_values()), 2), "expenses_manual"
+    )
+    assert 'aria-describedby="expenses_manual-hint"' in expenses
+    assert "focus-visible:ring-2" in expenses
+
+    # An inline error keeps both the hint and the error as descriptions.
+    error = post_wizard(owner, 3, "next", wizard_values(real_return="not-a-rate"))
+    assert error.status_code == 400
+    field = field_html(error.text, "real_return")
+    assert 'aria-invalid="true"' in field
+    assert 'aria-describedby="real_return-error real_return-hint"' in field
+    assert 'id="real_return-hint"' in field
+    assert 'id="real_return-error"' in field
+
+
+def test_the_income_suggestion_shows_the_category_breakdown_with_its_caption(owner) -> None:
+    _seed_ledger(owner)
+    values = wizard_values(income_manual="", expenses_manual="")
+    text = _step(post_wizard(owner, 1, "next", values), 2)
+    income = suggestion_html(text, "income")
+    expenses = suggestion_html(text, "expenses")
+    assert 'data-fire-suggestion-categories="income"' in income
+    assert 'data-fire-suggestion-categories="expenses"' in expenses
+    assert "Income by category in the window" in income
+    assert "Expenses by category in the window" in expenses
+    assert "Salary test" in income and "Food test" in expenses
+    assert "data-fire-loan-portion" not in income
+    assert "data-fire-loan-portion" in expenses
+
+
+def test_the_portfolio_suggestion_lists_skipped_sources_without_an_amount(owner) -> None:
+    _seed_portfolio(owner)
+    non_investable = _seed_asset_class(owner, "Home test", investable=False)
+    investable = _seed_asset_class(owner, "Stocks test", investable=True)
+    linked_item = _linked_item_id(owner, investable)
+    values = wizard_values(portfolio_manual="")
+    text = _step(post_wizard(owner, 2, "next", values), 3)
+    assert "data-fire-suggestion-skipped" in text
+    assert ">Skipped<" in text
+    assert "These sources are not counted in the amount above." in text
+    assert f'href="/investments/classes#asset-class-{non_investable}"' in text
+    assert f'href="/net-worth?side=asset#item-{linked_item}"' in text
+    assert 'data-fire-suggestion-skipped-source="portfolio_class"' in text
+    assert 'data-fire-suggestion-skipped-source="networth_item"' in text
+    assert 'data-fire-suggestion-skipped-reason="non_investable_class"' in text
+    assert 'data-fire-suggestion-skipped-reason="linked_item_double_count"' in text
+    assert "Non-investable asset class; its value is not counted." in text
+    assert "Linked net-worth item; its value is already counted through its source." in text
+    assert text.count("data-suggested-minor=") == 1
+
+
+def test_a_portfolio_with_only_skipped_sources_explains_the_missing_value(owner) -> None:
+    _seed_asset_class(owner, "Home test", investable=False)
+    text = _step(post_wizard(owner, 2, "next", wizard_values(portfolio_manual="")), 3)
+    assert 'data-fire-suggestion-block="no_linked_portfolio_data"' in text
+    assert "No investable portfolio classes" in text
+    assert "data-suggested-minor" not in text
+    assert 'data-use-suggestion="portfolio_manual"' not in text
+    assert 'name="portfolio_manual" value=""' in text
+
+
+def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(owner) -> None:
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    field = field_html(text, "swr")
+    assert 'name="swr"' in field
+    assert " disabled" not in field
+    assert " hidden" not in field
+    assert "data-fire-swr-field" in field
+    assert "js/fire.js" in text
+    assert not re.search(r"<script(?![^>]*\bsrc=)", text)
+    assert "onclick=" not in text
 
 
 def test_the_wizard_page_has_no_adjustment_editor(owner) -> None:
@@ -716,6 +935,9 @@ def test_the_wizard_page_has_no_adjustment_editor(owner) -> None:
 
 
 def test_the_wizard_and_reset_render_in_polish(owner) -> None:
+    _seed_ledger(owner)
+    _seed_portfolio(owner)
+    _seed_asset_class(owner, "Home test", investable=False)
     owner.client.headers["Accept-Language"] = "pl"
     try:
         page = owner.client.get("/fire")
@@ -723,6 +945,24 @@ def test_the_wizard_and_reset_render_in_polish(owner) -> None:
         assert "Skonfiguruj plan FIRE" in page.text
         assert "O Tobie" in page.text
         assert "Dochody i wydatki" in page.text
+        step_two = post_wizard(
+            owner,
+            1,
+            "next",
+            wizard_values(income_manual="", expenses_manual=""),
+        )
+        assert step_two.status_code == 200
+        assert "Przychody według kategorii w oknie" in step_two.text
+        assert "Wydatki według kategorii w oknie" in step_two.text
+        step_three = post_wizard(
+            owner,
+            2,
+            "next",
+            wizard_values(portfolio_manual=""),
+        )
+        assert step_three.status_code == 200
+        assert "Pominięte" in step_three.text
+        assert "Klasa aktywów nieinwestycyjna; jej wartość nie jest liczona." in step_three.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
     create_plan(owner)

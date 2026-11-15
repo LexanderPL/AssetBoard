@@ -67,10 +67,22 @@ BLOCK_FALLBACK = _("This suggestion is unavailable. Enter an amount manually.")
 
 WARNING_FALLBACK = _("Review this suggestion before using it.")
 
+SKIPPED_REASON_MESSAGES: dict[str, str] = {
+    "non_investable_class": _("Non-investable asset class; its value is not counted."),
+    "linked_item_double_count": _(
+        "Linked net-worth item; its value is already counted through its source."
+    ),
+}
+
 
 def block_messages(locale: str) -> dict[str, str]:
     """Every translated suggestion block message, keyed by the service code."""
     return {code: gettext(message, locale) for code, message in SUGGESTION_BLOCK_MESSAGES.items()}
+
+
+def skipped_reason_labels(locale: str) -> dict[str, str]:
+    """Every translated skipped-source reason, keyed by the service code."""
+    return {code: gettext(message, locale) for code, message in SKIPPED_REASON_MESSAGES.items()}
 
 
 def warning_text(warning: LinkedWarning, locale: str) -> str:
@@ -125,8 +137,10 @@ def warning_text(warning: LinkedWarning, locale: str) -> str:
 
 __all__ = [
     "BLOCK_FALLBACK",
+    "SKIPPED_REASON_MESSAGES",
     "SUGGESTION_BLOCK_MESSAGES",
     "WARNING_FALLBACK",
     "block_messages",
+    "skipped_reason_labels",
     "warning_text",
 ]

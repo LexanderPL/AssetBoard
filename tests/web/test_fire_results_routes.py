@@ -74,6 +74,17 @@ def test_the_view_uses_nominal_values_only(owner) -> None:
     assert "Plan progress" in ignored.text
 
 
+def test_the_view_plan_values_use_ledger_based_tax_copy(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    assert "Income and expenses are the amounts recorded in your ledger" in text
+    assert "Income may be gross" in text
+    assert "taxes you actually pay" in text
+    assert "does not model taxes separately" in text
+    assert "after-tax" not in text
+    assert "after tax" not in text
+
+
 def test_fire_templates_have_no_real_money_or_spreadsheet_wording() -> None:
     from pathlib import Path
 
@@ -98,6 +109,11 @@ def test_fire_templates_have_no_real_money_or_spreadsheet_wording() -> None:
         "fire_number_today",
         "data-fire-basis",
         'name="basis"',
+        "after-tax",
+        "after tax",
+        "A suggestion never fills",
+        "Required. Enter 0",
+        "Required. Add it to your profile",
     ):
         assert phrase not in text
     assert "real return" not in text.lower()

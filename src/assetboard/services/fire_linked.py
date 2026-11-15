@@ -49,6 +49,8 @@ from assetboard.services.portfolio import current_portfolio_data_in_session
 from assetboard.services.prices import latest_fx_rates_in_session
 
 SourceKind = Literal["portfolio_class", "portfolio_unallocated", "networth_item"]
+SkippedSourceKind = Literal["portfolio_class", "networth_item"]
+SkippedReason = Literal["non_investable_class", "linked_item_double_count"]
 
 
 class LinkedError(Exception):
@@ -129,12 +131,34 @@ class PortfolioSourceRow:
 
 
 @dataclass(frozen=True, slots=True)
+class SkippedPortfolioSourceRow:
+    """A portfolio source that is deliberately not counted in the suggestion.
+
+    There is no amount: the card lists the name, its source and the reason, but never a value
+    that could be mistaken for part of the total.
+    """
+
+    name: str
+    source_kind: SkippedSourceKind
+    source_id: UUID
+    reason: SkippedReason
+    color: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class LinkedPortfolio:
     as_of: date
     total: Money
     rows: tuple[PortfolioSourceRow, ...]
-    non_investable_classes: int
-    skipped_linked_items: int
+    skipped: tuple[SkippedPortfolioSourceRow, ...]
+
+    @property
+    def non_investable_classes(self) -> int:
+        return sum(1 for row in self.skipped if row.reason == "non_investable_class")
+
+    @property
+    def skipped_linked_items(self) -> int:
+        return sum(1 for row in self.skipped if row.reason == "linked_item_double_count")
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,7 +339,7 @@ def _portfolio(
         )
 
     rows: list[PortfolioSourceRow] = []
-    non_investable = 0
+    skipped: list[SkippedPortfolioSourceRow] = []
     for class_id, total in class_totals.items():
         if class_id is None:
             rows.append(
@@ -333,7 +357,15 @@ def _portfolio(
         if asset_class is None:
             continue
         if not asset_class.investable:
-            non_investable += 1
+            skipped.append(
+                SkippedPortfolioSourceRow(
+                    name=asset_class.name,
+                    source_kind="portfolio_class",
+                    source_id=asset_class.id,
+                    reason="non_investable_class",
+                    color=asset_class.color,
+                )
+            )
             continue
         rows.append(
             PortfolioSourceRow(
@@ -380,7 +412,18 @@ def _portfolio(
         and row.investable
         and row.include_in_net_worth
     ]
-    skipped_linked = sum(1 for row in item_rows if row.valuation_mode == "linked")
+    for item in item_rows:
+        if item.valuation_mode != "linked":
+            continue
+        skipped.append(
+            SkippedPortfolioSourceRow(
+                name=item.name,
+                source_kind="networth_item",
+                source_id=item.id,
+                reason="linked_item_double_count",
+                color=None,
+            )
+        )
     manual_items = [row for row in item_rows if row.valuation_mode == "manual"]
     valuations: dict[UUID, list[ValuationPoint]] = {}
     if manual_items:
@@ -441,6 +484,13 @@ def _portfolio(
         )
 
     total = sum((row.amount.amount_minor for row in rows), 0)
+    skipped.sort(
+        key=lambda row: (
+            0 if row.reason == "non_investable_class" else 1,
+            row.name.casefold(),
+            str(row.source_id),
+        )
+    )
     investable_class_ids = {class_id for class_id, row in classes.items() if row.investable}
     source_seen = bool(
         manual_items
@@ -453,30 +503,29 @@ def _portfolio(
             blocks.append(ResultsBlock("no_linked_portfolio_data", "portfolio_manual"))
     elif total == 0:
         warnings.append(LinkedWarning(code="linked_portfolio_zero", series="portfolio"))
-    if non_investable:
-        warnings.append(
-            LinkedWarning(
-                code="non_investable_classes",
-                series="portfolio",
-                count=non_investable,
-            )
-        )
-    if skipped_linked:
-        warnings.append(
-            LinkedWarning(
-                code="linked_items_skipped",
-                series="portfolio",
-                count=skipped_linked,
-            )
-        )
-
     portfolio = LinkedPortfolio(
         as_of=today,
         total=Money(total, currency),
         rows=tuple(rows),
-        non_investable_classes=non_investable,
-        skipped_linked_items=skipped_linked,
+        skipped=tuple(skipped),
     )
+    if portfolio.non_investable_classes:
+        warnings.append(
+            LinkedWarning(
+                code="non_investable_classes",
+                series="portfolio",
+                count=portfolio.non_investable_classes,
+            )
+        )
+    if portfolio.skipped_linked_items:
+        warnings.append(
+            LinkedWarning(
+                code="linked_items_skipped",
+                series="portfolio",
+                count=portfolio.skipped_linked_items,
+            )
+        )
+
     return portfolio, blocks, warnings
 
 
@@ -744,6 +793,9 @@ __all__ = [
     "PortfolioSourceRow",
     "ResultsBlock",
     "SetupSuggestions",
+    "SkippedPortfolioSourceRow",
+    "SkippedReason",
+    "SkippedSourceKind",
     "TrailingSeries",
     "linked_inputs",
     "linked_inputs_in_session",
