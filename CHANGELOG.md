@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.7](https://github.com/LexanderPL/AssetBoard/compare/v0.7.6...v0.7.7) (2026-11-15)
+
+
+### Features
+
+* **fire:** polish FIRE setup and inputs (F8.14) ([#351](https://github.com/LexanderPL/AssetBoard/issues/351)) ([061ca00](https://github.com/LexanderPL/AssetBoard/commit/061ca004e540ee2e46410825a77e8900e69b413f))
+* **fire:** unify adjustments and add archived history (F8.11) ([#346](https://github.com/LexanderPL/AssetBoard/issues/346)) ([cd4c1d4](https://github.com/LexanderPL/AssetBoard/commit/cd4c1d4446eb4d5aa4e95ab2676afdeba87e095f))
+* **fire:** use live loan schedules in the FIRE projection (F8.12) ([#349](https://github.com/LexanderPL/AssetBoard/issues/349)) ([27ac5ac](https://github.com/LexanderPL/AssetBoard/commit/27ac5ac598707ee6e38f6e56489aed4bbac67b7b))
+
 ## [0.7.6](https://github.com/LexanderPL/AssetBoard/compare/v0.7.5...v0.7.6) (2026-11-15)
 
 
