@@ -43,6 +43,9 @@ docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 8. **Nominal money only.** The planner shows each year's actual money (nominal). The
    "today's money"/real view and the basis toggle are removed.
 9. **No spreadsheet wording** in the UI or user documentation.
+10. **Taxes are not modelled.** The planner uses the amounts recorded in the ledger as they are.
+    Income may be gross; expenses should include the taxes actually paid. No tax split, tax
+    field or tax calculation is added.
 
 ---
 
@@ -66,7 +69,7 @@ docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
 - Multiple FIRE plans, comparison, duplicate, default/archive lifecycle, or scenario names.
 - Client-side projection or a JavaScript duplicate of the finance math.
-- Automatic tax modelling (see §10; a follow-up decision).
+- Automatic tax modelling (settled: not modelled in v2; see §10).
 - Bank sync, Monte Carlo, Coast FIRE, or tax filing.
 - Rewriting the M7 loan module. The FIRE planner reads its schedules; it does not change
   loan terms.
@@ -371,28 +374,19 @@ never describes a model that no longer exists.
 
 ---
 
-## 10. Taxes (open decision)
+## 10. Taxes (settled 2026-11-15: option B)
 
-The planner currently uses cash-flow amounts and does not model taxes separately. The owner
-has raised two different effects:
+The planner does **not** split income into gross and net, and it does **not** calculate or model
+taxes. It uses the amounts the user enters and reads from the ledger as they are:
 
-1. income taxes disappear when income stops;
-2. investment-gain taxes appear when assets are sold.
+- income may be gross or net, depending on what the ledger records;
+- expenses should include the taxes actually paid;
+- suggestions use the ledger's recorded cash flows and carry the same treatment;
+- no result, field or help text promises an after-tax amount.
 
-**Recommended v2 default:** treat the plan as **after-tax cash flows**. The manual
-income is after tax; expenses include taxes actually paid; suggestions come from the ledger,
-which is already after tax. The help text states this. Income-tax disappearance and
-capital-gains tax are not modelled automatically in v2.
-
-**Follow-up options (not in this rework unless the owner chooses one):**
-
-- an optional annual income-tax amount that stops with income;
-- an optional effective income-tax rate applied to gross income;
-- a capital-gains tax rate applied to withdrawals or gains, which needs a withdrawal model;
-- reusing the M3 tax rules to derive an effective rate.
-
-This is the one product decision still open. It does not block the model/UI features, but it
-must be settled before the results/copy feature claims to be tax-aware.
+Not modelled in v2: income-tax disappearance when income stops, an effective income-tax rate,
+capital-gains tax on withdrawals or gains, and derived rates from the M3 tax rules. These are
+follow-ups; the owner chose option B, so F8.14 adds no tax field and no tax calculation.
 
 ---
 
@@ -601,8 +595,8 @@ breakdown. No client-side projection.
   `/fire?notice=saved` (preserving `basis`). Errors render the full edit page with posted values,
   inline messages and `data-fire-dirty="1"`; a truncated save without the adjustment-section
   marker is rejected before the service so it cannot delete all events, while an intentional empty
-  adjustment list (marker present, every row removed) still saves. The amount copy states the
-  approved after-tax default from §10.
+  adjustment list (marker present, every row removed) still saves. The amount copy stated the
+  after-tax default that §10 then recommended; F8.14 replaced it with the ledger-based tax copy.
 - **Discard and dirty guard.** **Discard changes** is `GET /fire/edit?discarded=1`, stays in edit
   mode, reloads the saved values and shows a notice. **View plan** leaves; while the form is dirty,
   `fire.js` sets `data-fire-dirty=1`, shows a translated **Unsaved changes** status and uses the
@@ -829,6 +823,80 @@ the UI and user docs.
   the editor and the wizard copy. `docs/fire.md`, this as-built section and ADR-0025's
   superseded note were updated. All tests ran single-core.
 
+### F8.14 — FIRE setup and input polish
+
+**Acceptance**
+
+- Birth year is prefilled from the profile for new plans; the wizard shows a conditional
+  profile-source state and an existing plan keeps its saved birth year.
+- FIRE form help is limited to non-obvious assumptions, sits next to the label, and the
+  “Required. Enter 0…” boilerplate is gone.
+- The income suggestion shows the trailing-window category breakdown with an income caption;
+  the expense caption stays correct.
+- The suggestion boilerplate paragraph is removed from the wizard and edit page; amount,
+  window, as-of, warnings and saved-versus-suggested remain.
+- Tax copy says income and expenses are ledger amounts, income may be gross, expenses should
+  include taxes actually paid, and taxes are not modelled separately. No tax field or
+  calculation is added.
+- The portfolio suggestion lists skipped non-investable classes and double-counted linked
+  net-worth items by name, link and reason; no skipped amount is counted.
+- The withdrawal-rate field is enabled only for the withdrawal-rate rule, hidden/disabled
+  otherwise by CSP-safe JavaScript, with a working no-JavaScript fallback; the server ignores
+  the rate for other rules.
+- No model, migration, archive, loan-math or dependency change.
+- Tests cover copy and absence, hint placement/accessibility, profile states, income
+  categories, skipped sources, SWR toggle/no-JS, i18n, CSP, browser widths and query budgets.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.14 from docs/specs/M8-fire-planner-v2.md: FIRE setup and input polish for birth-year
+source copy, label-adjacent hints, income category suggestions, ledger-based tax copy and the
+withdrawal-rate field toggle. Keep the models, migrations, archive, loan math and projection math
+unchanged.
+```
+
+### As built (M8.F8.14)
+
+- **Birth year.** New plans prefill from the profile. The wizard shows one supporting line with
+  `data-fire-birth-year-source` (`profile`, `empty`, `changed`, `missing`): the profile link
+  appears only when the field is empty or missing, and an edited wizard year says the profile
+  still has the saved value. The edit form explains that the plan keeps its saved birth year;
+  changing the profile never rewrites an existing plan. The field is required with explicit
+  `id`/`for` and ARIA wiring. No profile model, service or M6 risk change.
+- **Hints.** The four non-obvious assumptions keep a focusable question-mark note beside the
+  label — return above inflation, independence rule, withdrawal rate and annual expenses
+  (taxes/loan treatment). Every other FIRE field hint and every “Required. Enter 0…” /
+  “Required. Add it to your profile…” span is gone. Hinted inputs use
+  `aria-describedby="<name>-hint"` (plus the error id on failure). The hint macro gained an
+  optional id, `data-fire-hint` and a visible focus ring.
+- **Suggestions.** The income card shows the trailing-window category breakdown with the
+  **Income by category in the window** caption; expenses keep the explicit expense caption. Both
+  tables carry `data-fire-suggestion-categories="income|expenses"`. The boilerplate “A suggestion
+  never fills a field by itself…” paragraph is gone from the wizard and editor; amount, window,
+  months with data, as-of date, warnings, blocked reason, Use button and saved-versus-suggested
+  note remain.
+- **Skipped sources.** `LinkedPortfolio` carries a `skipped` tuple of
+  `SkippedPortfolioSourceRow` rows (name, source kind/id, reason, optional colour, no amount);
+  the count properties derive from it. The portfolio card lists a collapsed **Skipped**
+  subsection with the reason and a link to the asset class or net-worth item. The total and the
+  warnings still count only the included sources; the rows are built from data already loaded,
+  with no per-row queries.
+- **Tax copy.** FIRE templates and `docs/fire.md` say income and expenses are ledger amounts,
+  income may be gross, expenses should include the taxes actually paid, and the planner does
+  not model taxes separately. No tax field, rate, calculation, model or migration was added.
+- **Withdrawal rate.** Both forms render the field visible and enabled for the no-JavaScript
+  fallback; `fire.js` hides and disables it unless the rule is **Withdrawal rate**, and the
+  wizard now loads `fire.js`. The route only parses a posted `swr` when the rule is
+  `withdrawal rate`, so a malformed value cannot fail a non-SWR save.
+- **Tests and docs.** Unit tests cover skipped rows, the query budget and income categories;
+  web tests cover profile states, hint placement/absence, both category tables, skipped sources,
+  tax copy, no boilerplate, SWR markup/no-JS and the malformed-SWR regression; Chromium covers
+  the wizard and editor toggles, scoped category locators, a JavaScript-disabled edit context,
+  390/1440 widths and CSP. `docs/fire.md`, §1, §3 and §10 were updated. No model, migration,
+  archive, dependency, loan-math or projection-math change. All tests ran single-core.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -862,6 +930,7 @@ the UI and user docs.
 4. F8.11 — unified adjustments.
 5. F8.12 — live loans.
 6. F8.13 — nominal-only results and wording.
+7. F8.14 — FIRE setup and input polish.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

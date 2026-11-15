@@ -33,6 +33,10 @@ def test_fire_guide_is_nominal_and_uses_plan_progress() -> None:
     assert "Plan progress" in text
     assert "FIRE number" in text
     assert "nominal" in text.lower()
+    assert "income may be gross" in text.lower()
+    assert "taxes you actually pay" in text.lower()
+    assert "Skipped" in text
+    assert "never fills a field by itself" not in text
     for phrase in (
         "Sheet progress",
         "Today's-money progress",
@@ -43,6 +47,8 @@ def test_fire_guide_is_nominal_and_uses_plan_progress() -> None:
         "Money basis",
         "Each year's money",
         "real return",
+        "after tax",
+        "after-tax",
     ):
         assert phrase.lower() not in text.lower()
 
