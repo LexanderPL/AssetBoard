@@ -434,7 +434,7 @@ def test_the_review_button_refreshes_without_creating(owner) -> None:
         review_signature=review_signature(text),
     )
     assert response.status_code == 200
-    assert "real return 6%" in response.text
+    assert "return above inflation 6%" in response.text
     assert "data-fire-review" in response.text
     assert _state(owner) == (0, 0, 0)
 

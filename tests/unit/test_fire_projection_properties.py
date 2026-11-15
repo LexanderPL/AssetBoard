@@ -31,10 +31,6 @@ def _half_up(value: Fraction) -> int:
     return ceil(value - Fraction(1, 2))
 
 
-def _deflate(value: int, inflation_bp: int, years: int) -> int:
-    return _half_up(Fraction(value) * Fraction(10_000, 10_000 + inflation_bp) ** years)
-
-
 @st.composite
 def _projection_inputs(
     draw: st.DrawFn,
@@ -160,23 +156,33 @@ def test_without_events_or_overrides_the_parity_recurrence_holds(
 
 @settings(max_examples=50, deadline=None)
 @given(inputs=_projection_inputs())
-def test_real_values_are_the_nominal_line_deflated_by_inflation(
-    inputs: ProjectionInputs,
-) -> None:
+def test_nominal_fire_metrics_follow_the_fire_row(inputs: ProjectionInputs) -> None:
     result = project(inputs)
-    for offset, row in enumerate(result.rows):
-        for nominal, real in (
-            (row.income, row.real_income),
-            (row.expenses, row.real_expenses),
-            (row.loan_payment, row.real_loan_payment),
-            (row.net, row.real_net),
-            (row.gain, row.real_gain),
-            (row.cash, row.real_cash),
-            (row.net_worth, row.real_net_worth),
-        ):
-            assert real.amount_minor == _deflate(
-                nominal.amount_minor, inputs.inflation_bp, offset
-            ), (row.year, nominal, real)
+    if result.fire_index is None:
+        assert result.fire_number is None
+        assert result.plan_progress_bp is None
+        return
+    fire_row = result.rows[result.fire_index]
+    rate_bp = (
+        inputs.swr_bp if inputs.rule is Rule.SWR else inputs.inflation_bp + inputs.real_return_bp
+    )
+    if rate_bp is not None and rate_bp > 0:
+        assert result.fire_number == Money(
+            _half_up(Fraction(fire_row.expenses.amount_minor * 10_000, rate_bp)), "EUR"
+        )
+    else:
+        assert result.fire_number is None
+    if fire_row.net_worth.amount_minor > 0:
+        expected_progress = _half_up(
+            Fraction(
+                inputs.start_portfolio.amount_minor * 10_000,
+                fire_row.net_worth.amount_minor,
+            )
+        )
+        assert result.plan_progress_bp == expected_progress
+        assert expected_progress >= 0
+    else:
+        assert result.plan_progress_bp is None
 
 
 @settings(max_examples=50, deadline=None)

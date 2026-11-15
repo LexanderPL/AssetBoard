@@ -86,19 +86,19 @@ def _cell_view(
 ) -> SensitivityCellView:
     if cell.fire_age is None:
         title = gettext(
-            "Never before age %(horizon)d; real return %(rate)s; expenses %(factor)s",
+            "Never before age %(horizon)d; return above inflation %(rate)s; expenses %(factor)s",
             locale,
         ) % {"horizon": horizon_age, "rate": rate_label, "factor": factor_label}
         sr_text = gettext(
-            "No FIRE before age %(horizon)d with a real return of %(rate)s and expenses at "
-            "%(factor)s of the saved plan.",
+            "No FIRE before age %(horizon)d with a return above inflation of %(rate)s and "
+            "expenses at %(factor)s of the saved plan.",
             locale,
         ) % {"horizon": horizon_age, "rate": rate_label, "factor": factor_label}
         age_label = "—"
     else:
         assert cell.fire_year is not None
         title = gettext(
-            "Age %(age)d in %(year)d; real return %(rate)s; expenses %(factor)s",
+            "Age %(age)d in %(year)d; return above inflation %(rate)s; expenses %(factor)s",
             locale,
         ) % {
             "age": cell.fire_age,
@@ -108,8 +108,8 @@ def _cell_view(
         }
         if cell.is_base:
             sr_text = gettext(
-                "Base case: FIRE at age %(age)d in %(year)d with a real return of %(rate)s "
-                "and expenses at %(factor)s of the saved plan.",
+                "Base case: FIRE at age %(age)d in %(year)d with a return above inflation of "
+                "%(rate)s and expenses at %(factor)s of the saved plan.",
                 locale,
             ) % {
                 "age": cell.fire_age,
@@ -119,8 +119,8 @@ def _cell_view(
             }
         else:
             sr_text = gettext(
-                "FIRE at age %(age)d in %(year)d with a real return of %(rate)s and expenses "
-                "at %(factor)s of the saved plan.",
+                "FIRE at age %(age)d in %(year)d with a return above inflation of %(rate)s and "
+                "expenses at %(factor)s of the saved plan.",
                 locale,
             ) % {
                 "age": cell.fire_age,

@@ -23,6 +23,7 @@ from assetboard.domain.fire import (
     Projection,
     ProjectionEvent,
     ProjectionInputs,
+    ProjectionLoan,
     ProjectionRow,
     Rule,
     project,
@@ -40,10 +41,6 @@ def _half_up(value: Fraction) -> int:
     if value >= 0:
         return floor(value + Fraction(1, 2))
     return ceil(value - Fraction(1, 2))
-
-
-def _deflate_oracle(value: int, inflation: Fraction, years: int) -> int:
-    return _half_up(Fraction(value) / inflation**years)
 
 
 def _oracle(inputs: ProjectionInputs) -> Projection:
@@ -132,13 +129,6 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
                 gain=_eur(gain),
                 cash=_eur(cash_amount),
                 net_worth=_eur(net_worth),
-                real_income=_eur(_deflate_oracle(income, inflation, offset)),
-                real_expenses=_eur(_deflate_oracle(expenses, inflation, offset)),
-                real_loan_payment=_eur(_deflate_oracle(loan_payment, inflation, offset)),
-                real_net=_eur(_deflate_oracle(net, inflation, offset)),
-                real_gain=_eur(_deflate_oracle(gain, inflation, offset)),
-                real_cash=_eur(_deflate_oracle(cash_amount, inflation, offset)),
-                real_net_worth=_eur(_deflate_oracle(net_worth, inflation, offset)),
                 is_fire=is_fire,
                 income_stopped=offset > 0 and age >= inputs.stop_working_age,
             )
@@ -146,27 +136,15 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
         previous_net_worth = net_worth
 
     fire_row = rows[fire_index] if fire_index is not None else None
-    first_expenses = rows[0].expenses.amount_minor
-    fire_number: Money | None
-    if first_expenses == 0:
-        fire_number = _eur(0)
-    elif inputs.rule is Rule.SWR:
-        assert inputs.swr_bp is not None
-        fire_number = _eur(_half_up(Fraction(first_expenses * 10_000, inputs.swr_bp)))
-    elif gain_bp > 0:
-        fire_number = _eur(_half_up(Fraction(first_expenses * 10_000, gain_bp)))
-    else:
-        fire_number = None
+    rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else gain_bp
+    fire_number: Money | None = None
+    if fire_row is not None and rate_bp is not None and rate_bp > 0:
+        fire_number = _eur(_half_up(Fraction(fire_row.expenses.amount_minor * 10_000, rate_bp)))
 
-    progress_sheet: int | None = None
+    plan_progress: int | None = None
     if fire_row is not None and fire_row.net_worth.amount_minor > 0:
-        progress_sheet = _half_up(
-            Fraction(rows[0].net_worth.amount_minor * 10_000, fire_row.net_worth.amount_minor)
-        )
-    progress_today: int | None = None
-    if fire_number is not None and fire_number.amount_minor > 0:
-        progress_today = _half_up(
-            Fraction(inputs.start_portfolio.amount_minor * 10_000, fire_number.amount_minor)
+        plan_progress = _half_up(
+            Fraction(inputs.start_portfolio.amount_minor * 10_000, fire_row.net_worth.amount_minor)
         )
 
     retirement_start = max(1, inputs.stop_working_age - current_age)
@@ -182,10 +160,8 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
         fire_age=current_age + fire_index if fire_index is not None else None,
         years_to_fire=fire_index,
         networth_at_fire=fire_row.net_worth if fire_row is not None else None,
-        real_networth_at_fire=fire_row.real_net_worth if fire_row is not None else None,
-        fire_number_today=fire_number,
-        progress_sheet_bp=progress_sheet,
-        progress_today_bp=progress_today,
+        fire_number=fire_number,
+        plan_progress_bp=plan_progress,
         depletion_age=depletion_age,
         min_networth_after_stop=(_eur(min_after_stop) if min_after_stop is not None else None),
     )
@@ -201,13 +177,6 @@ _ROW_FIELDS = (
     "gain",
     "cash",
     "net_worth",
-    "real_income",
-    "real_expenses",
-    "real_loan_payment",
-    "real_net",
-    "real_gain",
-    "real_cash",
-    "real_net_worth",
     "is_fire",
     "income_stopped",
 )
@@ -217,10 +186,8 @@ _METRIC_FIELDS = (
     "fire_age",
     "years_to_fire",
     "networth_at_fire",
-    "real_networth_at_fire",
-    "fire_number_today",
-    "progress_sheet_bp",
-    "progress_today_bp",
+    "fire_number",
+    "plan_progress_bp",
     "depletion_age",
     "min_networth_after_stop",
 )
@@ -322,14 +289,12 @@ def test_parity_t0_and_key_metrics_are_hand_checkable() -> None:
     # 10,000,000 * (2.5% + 5%) = 750,000.
     assert first.gain.amount_minor == 750_000
     assert first.net_worth.amount_minor == 10_750_000
-    assert first.real_income == first.income
-    assert first.real_net_worth == first.net_worth
     assert (result.fire_index, result.fire_year, result.fire_age) == (14, 2040, 55)
     assert result.years_to_fire == 14
-    # 4,000,000 / 7.5% = 53,333,333.33..., rounded once.
-    assert result.fire_number_today == _eur(53_333_333)
-    assert result.progress_sheet_bp == 1328
-    assert result.progress_today_bp == 1875
+    # 5,651,895 / 7.5% = 75,358,600 exactly, using the FIRE row's nominal expenses.
+    assert result.fire_number == _eur(75_358_600)
+    # 10,000,000 / 80,949,998 = 12.353...%, using the starting portfolio, not row 0.
+    assert result.plan_progress_bp == 1235
     assert result.depletion_age == 81
     assert result.rows[-1].year == 2075
 
@@ -370,7 +335,6 @@ def test_t0_reuses_the_net_column_and_cash_starts_earning_next_year() -> None:
     assert first.gain == _eur(100_000)
     assert first.cash == _eur(100_000)
     assert first.net_worth == _eur(1_200_000)
-    assert first.real_net_worth == first.net_worth
     # The cash added after the gain earns only from the following year.
     assert second.gain == _eur(120_000)
     assert second.net_worth == _eur(1_320_000)
@@ -429,11 +393,11 @@ def test_event_changes_are_inflated_from_the_start_year_and_start_at_their_year(
     # 2027 (t=1): no event yet; both series have grown once.
     assert rows[1].income == _eur(120_000)
     assert rows[1].expenses == _eur(110_000)
-    # The 2028 expense change is today's money, so at t=2 it is 10,000 * 1.1^2.
+    # The 2028 expense change is start-year money, so at t=2 it is 10,000 * 1.1^2.
     assert rows[2].expenses == _eur(121_000 + 12_100)
     assert rows[3].expenses == _eur(133_100 + 13_310)
     assert rows[3].income == _eur(172_800)
-    # The 2030 income change is today's money too: 5,000 * 1.2^4.
+    # The 2030 income change is start-year money too: 5,000 * 1.2^4.
     assert rows[4].income == _eur(207_360 + 10_368)
     assert rows[4].expenses == _eur(146_410 + 14_641)
 
@@ -603,43 +567,147 @@ def test_cash_does_not_enter_the_fire_predicate_in_its_event_year() -> None:
     assert result.rows[1].is_fire
 
 
-def test_never_fire_leaves_the_fire_metrics_none_but_keeps_todays_progress() -> None:
+def test_never_fire_leaves_every_fire_metric_undefined() -> None:
     result = project(_G2)
     assert result.fire_index is None
     assert result.fire_year is None
     assert result.fire_age is None
     assert result.years_to_fire is None
     assert result.networth_at_fire is None
-    assert result.real_networth_at_fire is None
-    assert result.progress_sheet_bp is None
-    assert result.fire_number_today == _eur(228_571_429)
-    assert result.progress_today_bp == 44
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
     assert result.depletion_age == 50
     assert result.min_networth_after_stop is not None
 
 
-def test_fire_number_none_without_a_positive_gain_rate_and_zero_expenses() -> None:
+def test_fire_number_needs_a_fire_row_and_a_positive_rate() -> None:
     no_gain = _edge(horizon_age=43, start_expenses=_eur(100_000))
     result = project(no_gain)
-    assert result.fire_number_today is None
-    assert result.progress_today_bp is None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
 
-    zero_expenses = _edge(
+    # A negative expense change can reach the returns-cover rule with a zero gain rate.
+    negative_expenses = _edge(
         horizon_age=43,
-        real_return_bp=-100,
-        start_expenses=_eur(0),
+        real_return_bp=0,
+        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),),
     )
-    result = project(zero_expenses)
-    assert result.fire_number_today == _eur(0)
-    assert result.progress_today_bp is None
+    reached = project(negative_expenses)
+    assert reached.fire_index == 0
+    assert reached.fire_number is None
+    assert reached.plan_progress_bp is None
 
+
+def test_zero_expenses_with_a_positive_rate_give_a_zero_fire_number() -> None:
     swr_zero = _edge(
         horizon_age=43,
         rule=Rule.SWR,
         swr_bp=400,
         start_expenses=_eur(0),
     )
-    assert project(swr_zero).fire_number_today == _eur(0)
+    result = project(swr_zero)
+    assert result.fire_index == 0
+    assert result.fire_number == _eur(0)
+    # The FIRE row's net worth is zero, so progress has no positive denominator.
+    assert result.plan_progress_bp is None
+
+    returns_zero = _edge(
+        horizon_age=43,
+        real_return_bp=1_000,
+        start_expenses=_eur(0),
+        start_portfolio=_eur(1_000_000),
+    )
+    result = project(returns_zero)
+    assert result.fire_index == 0
+    assert result.fire_number == _eur(0)
+
+
+def test_negative_fire_row_expenses_keep_a_negative_target_unclamped() -> None:
+    result = project(
+        _edge(
+            horizon_age=43,
+            rule=Rule.SWR,
+            swr_bp=400,
+            start_expenses=_eur(100_000),
+            start_portfolio=_eur(1_000_000),
+            events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-500_000)),),
+        )
+    )
+    assert result.fire_index == 0
+    # -400,000 / 4% = -10,000,000: the literal metric is not clamped to zero.
+    assert result.fire_number == _eur(-10_000_000)
+    # The row's net worth is the starting portfolio (no gain or cash), so progress is 100%.
+    assert result.plan_progress_bp == 10_000
+
+
+def test_plan_progress_uses_the_starting_portfolio_not_the_first_row() -> None:
+    result = project(_BASE)
+    assert result.networth_at_fire is not None
+    assert result.plan_progress_bp == _half_up(
+        Fraction(
+            _BASE.start_portfolio.amount_minor * 10_000,
+            result.networth_at_fire.amount_minor,
+        )
+    )
+    assert result.plan_progress_bp != _half_up(
+        Fraction(
+            result.rows[0].net_worth.amount_minor * 10_000,
+            result.networth_at_fire.amount_minor,
+        )
+    )
+
+
+def test_live_loan_payoff_changes_the_nominal_metrics() -> None:
+    included = project(_variant(loans=(ProjectionLoan(_eur(1_000_000), 2030, True),)))
+    ignored = project(_variant(loans=(ProjectionLoan(_eur(1_000_000), 2030, False),)))
+    assert (included.fire_index, included.fire_year) == (10, 2036)
+    assert included.fire_number == _eur(54_937_840)
+    assert included.plan_progress_bp == 1529
+    included_index = included.fire_index
+    assert included_index is not None
+    assert included.rows[included_index].loan_payment == _eur(0)
+
+    assert (ignored.fire_index, ignored.fire_year) == (14, 2040)
+    assert ignored.fire_number == _eur(75_358_600)
+    assert ignored.plan_progress_bp == 1235
+    ignored_index = ignored.fire_index
+    assert ignored_index is not None
+    assert ignored.rows[ignored_index].loan_payment == _eur(1_000_000)
+
+
+def test_projection_outputs_have_no_real_money_fields() -> None:
+    from dataclasses import fields
+
+    row_fields = {field.name for field in fields(ProjectionRow)}
+    metric_fields = {field.name for field in fields(Projection)}
+    assert row_fields == {
+        "year",
+        "age",
+        "income",
+        "expenses",
+        "loan_payment",
+        "net",
+        "gain",
+        "cash",
+        "net_worth",
+        "is_fire",
+        "income_stopped",
+    }
+    assert metric_fields == {
+        "inputs",
+        "rows",
+        "fire_index",
+        "fire_year",
+        "fire_age",
+        "years_to_fire",
+        "networth_at_fire",
+        "fire_number",
+        "plan_progress_bp",
+        "depletion_age",
+        "min_networth_after_stop",
+    }
+    assert not any(name.startswith("real_") for name in row_fields | metric_fields)
+    assert not any("today" in name or "sheet" in name for name in metric_fields)
 
 
 def test_depletion_window_starts_at_the_stop_row_inclusive() -> None:

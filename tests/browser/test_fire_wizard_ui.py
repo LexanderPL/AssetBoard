@@ -184,7 +184,10 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
                 page.get_by_role("button", name="Next").click()
 
             expect(page.locator("[data-fire-wizard]")).to_have_attribute("data-fire-wizard", "4")
+            expect(page.get_by_text("Return above inflation (%)")).to_be_visible()
+            expect(page.get_by_text("Real return")).to_have_count(0)
             expect(page.locator("[data-fire-review]")).to_be_visible()
+            expect(page.locator("[data-fire-review]")).to_contain_text("return above inflation")
             expect(page.locator("[data-fire-wizard-loans]")).to_be_visible()
             page.locator('input[name="inflation"]').fill("3.5")
             with page.expect_navigation(wait_until="networkidle"):

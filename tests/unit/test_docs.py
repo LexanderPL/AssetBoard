@@ -8,6 +8,7 @@ from assetboard.branding import ENV_PREFIX
 from assetboard.config import Settings
 
 DEPLOYMENT = Path(__file__).resolve().parents[2] / "docs" / "deployment.md"
+FIRE_GUIDE = Path(__file__).resolve().parents[2] / "docs" / "fire.md"
 TABLE_VARIABLE = re.compile(r"^\| `(?P<name>ASSETBOARD_[A-Z_]+)` \|", re.MULTILINE)
 README_TABLE_ROW = re.compile(
     r"^\| `(?P<name>ASSETBOARD_[A-Z_]+)` \| `?(?P<default>[^|`]+?)`? \|",
@@ -25,6 +26,25 @@ def deployment_table_variables() -> set[str]:
     section = document.split("## Environment variables\n", maxsplit=1)[1]
     section = section.split("\n## ", maxsplit=1)[0]
     return set(TABLE_VARIABLE.findall(section))
+
+
+def test_fire_guide_is_nominal_and_uses_plan_progress() -> None:
+    text = FIRE_GUIDE.read_text(encoding="utf-8")
+    assert "Plan progress" in text
+    assert "FIRE number" in text
+    assert "nominal" in text.lower()
+    for phrase in (
+        "Sheet progress",
+        "Today's-money progress",
+        "today's money",
+        "Today's money",
+        "spreadsheet",
+        "nominal/real",
+        "Money basis",
+        "Each year's money",
+        "real return",
+    ):
+        assert phrase.lower() not in text.lower()
 
 
 def test_every_settings_field_is_documented() -> None:

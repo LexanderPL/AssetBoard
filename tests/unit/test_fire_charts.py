@@ -1,4 +1,4 @@
-"""Server-prepared F8.3 chart data: basis, markers and accessible plotted values."""
+"""Server-prepared F8.13 chart data: nominal series, markers and accessible plotted values."""
 
 from __future__ import annotations
 
@@ -39,10 +39,10 @@ def _inputs(**overrides: object) -> ProjectionInputs:
     return ProjectionInputs(**values)  # type: ignore[arg-type]
 
 
-def test_the_net_worth_chart_follows_the_nominal_basis() -> None:
-    projection = project(_inputs())
-    charts = build_fire_charts(projection, "nominal", "en")
-    assert charts.basis == "nominal"
+def test_both_charts_use_nominal_values_only() -> None:
+    projection = project(_inputs(inflation_bp=250))
+    charts = build_fire_charts(projection, "en")
+    assert not hasattr(charts, "basis")
     assert charts.net_worth is not None
     data = charts.net_worth
     assert data["labels"] == [str(row.year) for row in projection.rows]
@@ -51,16 +51,6 @@ def test_the_net_worth_chart_follows_the_nominal_basis() -> None:
     assert series[0]["values"] == [row.net_worth.amount_minor for row in projection.rows]
     assert charts.net_worth_points[0].net_worth == format_money(projection.rows[0].net_worth, "en")
     assert charts.net_worth_points[0].year == str(projection.rows[0].year)
-
-
-def test_the_real_basis_uses_real_values_for_the_net_worth_chart_only() -> None:
-    projection = project(_inputs(inflation_bp=250))
-    charts = build_fire_charts(projection, "real", "en")
-    assert charts.basis == "real"
-    assert charts.net_worth is not None
-    series = _list(charts.net_worth, "series")
-    assert series[0]["name"] == "Net worth in today's money"
-    assert series[0]["values"] == [row.real_net_worth.amount_minor for row in projection.rows]
     assert charts.expenses_gain is not None
     expense_series = _list(charts.expenses_gain, "series")
     assert expense_series[0]["values"] == [row.expenses.amount_minor for row in projection.rows]
@@ -70,7 +60,7 @@ def test_the_real_basis_uses_real_values_for_the_net_worth_chart_only() -> None:
 def test_fire_income_stop_and_depletion_get_markers() -> None:
     projection = project(_inputs())
     assert projection.fire_index is not None
-    charts = build_fire_charts(projection, "nominal", "en")
+    charts = build_fire_charts(projection, "en")
     assert charts.net_worth is not None
     labels = [marker["label"] for marker in _list(charts.net_worth, "markers")]
     assert "FIRE" in labels
@@ -102,7 +92,7 @@ def test_a_never_fire_plan_marks_no_fire_point_and_reports_depletion() -> None:
     )
     assert projection.fire_index is None
     assert projection.depletion_age is not None
-    charts = build_fire_charts(projection, "nominal", "en")
+    charts = build_fire_charts(projection, "en")
     assert charts.fire_index is None
     assert charts.fire_year is None
     assert charts.fire_age is None
@@ -116,7 +106,7 @@ def test_a_never_fire_plan_marks_no_fire_point_and_reports_depletion() -> None:
 
 def test_chart_labels_and_tooltips_use_the_ui_locale() -> None:
     projection = project(_inputs(rule=Rule.SWR, swr_bp=400))
-    charts = build_fire_charts(projection, "nominal", "pl")
+    charts = build_fire_charts(projection, "pl")
     assert charts.net_worth is not None
     series = _list(charts.net_worth, "series")
     assert series[0]["name"] == gettext("Net worth", "pl")
@@ -128,7 +118,7 @@ def test_chart_labels_and_tooltips_use_the_ui_locale() -> None:
 
 
 def test_no_projection_means_no_chart_data() -> None:
-    charts = build_fire_charts(None, "nominal", "en")
+    charts = build_fire_charts(None, "en")
     assert charts.net_worth is None
     assert charts.expenses_gain is None
     assert charts.net_worth_points == ()

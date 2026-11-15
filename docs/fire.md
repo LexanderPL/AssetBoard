@@ -49,7 +49,8 @@ first; **Create plan** never saves values that differ from the review you last s
 3. **Portfolio:** the starting portfolio, with the current investable-assets suggestion, its
    as-of date and a list of the sources (portfolio classes and manual net-worth items) that link
    to the page where each source lives.
-4. **Assumptions and review:** inflation, real return, income growth and the independence rule.
+4. **Assumptions and review:** inflation, return above inflation, income growth and the
+   independence rule.
    The review shows the entered values, the projected window, the warnings and a read-only list
    of active loans with their annual payment, payoff year and included state. **Create plan**
    writes the plan once. Adjustments and loan include/ignore choices are changed after creation
@@ -75,8 +76,7 @@ The plan page shows the saved plan without any inputs or preview controls:
 - the **Download CSV** action when the projection is available.
 
 A converted plan shows a review banner until an editor or owner saves it in edit mode. The page
-never writes. The nominal/today's-money switch is a view preference in the link, not a saved
-plan value.
+never writes. All amounts are nominal: each year's actual money, not adjusted for inflation.
 
 ## Editing the plan
 
@@ -196,15 +196,15 @@ check the values and save to clear the review banner.
 ## Rates
 
 Rates are entered as percentages and stored as basis points. They may be negative where that
-makes sense. The hard bounds are −20% to 50% for inflation, real return and income growth, and
-0.5% to 20% for the withdrawal rate.
+makes sense. The hard bounds are −20% to 50% for inflation, return above inflation and income
+growth, and 0.5% to 20% for the withdrawal rate.
 
-The ordinary ranges are 0–10% inflation, −2–8% real return, 0–10% income growth and 2–6%
-withdrawal rate. A rate outside its ordinary range needs the **unusual rates** confirmation.
-When editing, only a rate you actually changed asks for it again.
+The ordinary ranges are 0–10% inflation, −2–8% return above inflation, 0–10% income growth and
+2–6% withdrawal rate. A rate outside its ordinary range needs the **unusual rates**
+confirmation. When editing, only a rate you actually changed asks for it again.
 
-The starting values (2.5% inflation, 5% real return, 3% income growth and 4% withdrawal rate)
-are illustrative examples, not recommendations.
+The starting values (2.5% inflation, 5% return above inflation, 3% income growth and 4%
+withdrawal rate) are illustrative examples, not recommendations.
 
 ## Adjustments
 
@@ -237,21 +237,31 @@ the preview includes it before you save.
 
 ## Results
 
-The plan page shows:
+The plan page shows nominal values only:
 
-- **FIRE age** and year, **years to FIRE**, the **FIRE number** and **progress** definitions;
-- the sustainability check: the depletion age and the lowest net worth after income stops;
-- a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth;
+- **FIRE age** and year, **years to FIRE** and the **FIRE number**. The FIRE number is the
+  nominal expenses in the FIRE year divided by the rate the independence rule uses: the
+  withdrawal rate, or the nominal gain rate when returns must cover expenses. It is shown with
+  the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
+- **Plan progress**: the starting portfolio divided by the projected nominal net worth at FIRE.
+  100% means the plan has reached its FIRE net-worth target. It is a dash when FIRE is never
+  reached or net worth at FIRE is not positive;
+- the sustainability check: the nominal depletion age and the lowest nominal net worth after
+  income stops;
+- a year-by-year schedule with income, expenses, loan payments, net saving, investment gain,
+  cash and net worth. Every amount is the actual money of that year, not adjusted for inflation;
 - the **Adjustments** list, with archived history collapsed and read-only;
-- a net-worth chart and an expenses-versus-gain chart;
-- **Download CSV** and, for editors and owners, **Edit plan** and **Reset plan**.
+- a nominal net-worth chart and a nominal expenses-versus-gain chart, each with accessible
+  plotted data;
+- **Download CSV** and, for editors and owners, **Edit plan** and **Reset plan**. The CSV has
+  one nominal row per plan year.
 
-The plan page is read-only. Editors and owners change the values on the separate edit page; the
-nominal/today's-money basis switch is a view preference and is not saved.
+The plan page is read-only. Editors and owners change the values on the separate edit page.
 
-The **Sensitivity** panel projects the saved plan across a range of real returns and expense
-levels. It always uses the saved plan, never unsaved preview values. A blocked plan shows the
-reason instead of a grid, and never a fake zero.
+The **Sensitivity** panel projects the saved plan across a range of returns above inflation and
+expense levels. It shows only the resulting FIRE age, never amounts. It always uses the saved
+plan, never unsaved preview values. A blocked plan shows the reason instead of a grid, and never
+a fake zero.
 
 ## Archive and restore
 

@@ -103,10 +103,10 @@ def test_the_id_url_redirects_to_the_view(owner) -> None:
     assert response.headers["location"] == "/fire"
     response = owner.client.get(f"/fire/{plan_id}?basis=real&sensitivity=1", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire?basis=real&sensitivity=1#sensitivity"
+    assert response.headers["location"] == "/fire?sensitivity=1#sensitivity"
     response = owner.client.get(f"/fire/{plan_id}?edit=1&basis=real", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire/edit?basis=real"
+    assert response.headers["location"] == "/fire/edit"
     response = owner.client.get(f"/fire/{plan_id}/edit", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/fire/edit"
@@ -124,7 +124,7 @@ def test_the_edit_query_redirects_to_the_editor(owner) -> None:
     create_plan(owner)
     response = owner.client.get("/fire?edit=1&basis=real", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire/edit?basis=real"
+    assert response.headers["location"] == "/fire/edit"
 
 
 def test_the_edit_query_is_ignored_without_a_plan(owner) -> None:

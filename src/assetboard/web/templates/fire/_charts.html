@@ -5,7 +5,7 @@
 
   <section class="mt-5" aria-labelledby="fire-net-worth-chart-heading" data-fire-chart="net-worth">
     <h3 id="fire-net-worth-chart-heading" class="text-sm font-semibold">{{ _("Net worth over time") }}</h3>
-    <p class="mt-1 text-xs text-muted">{% if charts.basis == "real" %}{{ _("In today's money.") }}{% else %}{{ _("In each year's money.") }}{% endif %}</p>
+    <p class="mt-1 text-xs text-muted">{{ _("Amounts are nominal: each year's own money, not adjusted for inflation.") }}</p>
     <div class="mt-3" data-chart="line" data-chart-json='{{ charts.net_worth|tojson }}'>
       <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
     </div>
@@ -28,7 +28,7 @@
   {% if charts.expenses_gain %}
   <section class="mt-8" aria-labelledby="fire-expenses-chart-heading" data-fire-chart="expenses-gain">
     <h3 id="fire-expenses-chart-heading" class="text-sm font-semibold">{{ _("Expenses versus investment gain") }}</h3>
-    <p class="mt-1 text-xs text-muted">{{ _("Both lines are in each year's money, because the independence rule compares nominal values.") }}</p>
+    <p class="mt-1 text-xs text-muted">{{ _("Both lines are nominal, because the independence rule compares each year's actual values.") }}</p>
     <div class="mt-3" data-chart="line" data-chart-json='{{ charts.expenses_gain|tojson }}'>
       <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
     </div>

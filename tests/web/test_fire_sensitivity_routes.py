@@ -139,7 +139,11 @@ def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owne
     assert 'hx-get="/fire/sensitivity"' in fragment.text
     assert 'href="/fire?sensitivity=1#sensitivity"' in fragment.text
     assert _base_age(fragment.text) == _fire_age(results)
-    assert "Sheet progress" not in fragment.text
+    assert "real return" not in fragment.text.lower()
+    assert "today's money" not in fragment.text.lower()
+    assert "data-fire-basis" not in fragment.text
+    assert "€" not in fragment.text
+    assert "return above inflation" in fragment.text
 
 
 def test_sensitivity_uses_the_saved_plan_and_not_an_unsaved_preview(owner) -> None:

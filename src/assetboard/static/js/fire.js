@@ -66,14 +66,11 @@
   }
 
   if (form instanceof HTMLElement) {
-    form.addEventListener("input", (event) => {
-      const target = event.target;
-      if (target instanceof HTMLInputElement && target.name === "basis") return;
+    form.addEventListener("input", () => {
       setDirty(true);
     });
     form.addEventListener("change", (event) => {
       const target = event.target;
-      if (target instanceof HTMLInputElement && target.name === "basis") return;
       if (
         target instanceof HTMLInputElement &&
         (target.matches("[data-adjustment-remove]") ||
