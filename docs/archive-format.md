@@ -930,6 +930,13 @@ fallback becomes `0` with a warning. Contribution overrides become `saving_overr
 one-click loan-payoff events are dropped. A 1.8 archive with several scenarios reports the
 skipped ones. Readers do not write these files anymore.
 
+Exporting a workspace before its one-time choice writes the default active legacy scenario
+(else the first active, else the first archived) as `fire_plan.csv`, marks it
+`needs_review=true` and counts the others in the `workspace.exported` audit event
+(`fire_legacy_scenarios_skipped`). A linked legacy input is resolved at export time; if it is
+blocked or has no value it is written as `0` and its field is recorded in the same audit event
+(`fire_plan_zeroed_fields`) instead of disappearing silently.
+
 ## Reader limits
 
 

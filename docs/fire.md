@@ -30,8 +30,8 @@ Version 0.7 allowed several named scenarios. On the first use after the upgrade:
 
 The converted plan is marked for review. Its linked values were resolved once during the
 conversion and stored as manual amounts. A linked value that could not be resolved is stored as
-zero and the migration reports which inputs were affected. Open the plan inputs, check the
-values and save to clear the review banner.
+zero and the migration records which inputs were affected in the audit log. Open the plan
+inputs, check the values and save to clear the review banner.
 
 ## Plan fields
 

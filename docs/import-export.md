@@ -97,7 +97,9 @@ Restore writes, all at once:
     `needs_review`. A 1.8 archive is upgraded: one scenario is kept (default active, else first
     active, else first archived), linked values use the archived fallbacks, contribution
     overrides become saving overrides, one-click loan-payoff events are dropped, and the other
-    scenarios are reported as skipped. A blank linked fallback becomes 0 with a warning.
+    scenarios are reported as skipped. A blank linked fallback becomes 0 with a warning. Export
+    before the one-time scenario choice resolves linked values once; a blocked value is exported
+    as 0 and listed in the `workspace.exported` audit event under `fire_plan_zeroed_fields`.
 
 A plan's projection is not stored: after a restore it is recomputed from the same inputs and
 gives the same result.

@@ -450,9 +450,10 @@ No wizard, view/edit split or live-loan UI yet.
 - Archive format 2.0 adds `fire_plan.csv` and the new `fire_events.csv`, and removes the four
   1.8 FIRE files. Export while several legacy rows await the choice writes the default/first
   scenario, resolves linked inputs at export time, sets `needs_review=true` and records
-  `fire_legacy_scenarios_skipped`. The reader upgrades 1.8 archives in memory (default/first,
-  fallbacks, contribution conversion, loan-payoff removal, skipped-scenario warnings). A 2.0
-  restore preserves `needs_review`.
+  `fire_legacy_scenarios_skipped`; a linked input that cannot be resolved is written as zero and
+  its field is named in `fire_plan_zeroed_fields`, never silently. The reader upgrades 1.8
+  archives in memory (default/first, fallbacks, contribution conversion, loan-payoff removal,
+  skipped-scenario warnings). A 2.0 restore preserves `needs_review`.
 - `fire_linked` resolution internals remain for the migration/export and F8.9 suggestions;
   expense-exclusion validation and loan-payoff code are gone.
 - A currency mismatch blocks projection and saving with a notice; reset/recreate is left to

@@ -340,6 +340,7 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "fire_plan",
             "fire_events",
             "fire_legacy_scenarios_skipped",
+            "fire_plan_zeroed_fields",
         }
         assert "amount" not in event.data
 

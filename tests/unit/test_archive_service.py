@@ -150,6 +150,7 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "fire_plan": 0,
             "fire_events": 0,
             "fire_legacy_scenarios_skipped": 0,
+            "fire_plan_zeroed_fields": "",
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -715,6 +716,47 @@ def test_export_legacy_default_first_resolves_and_reports_skipped(
             select(AuditEvent).where(AuditEvent.action == "workspace.exported")
         ).one()
         assert audit.data["fire_legacy_scenarios_skipped"] == 1
+
+
+def test_export_names_a_blocked_legacy_linked_input_instead_of_zeroing_silently(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("editor", "editor")
+    with team.factory.begin() as session:
+        repository = FireScenarioRepository(session, ctx)
+        plan = repository.create(
+            currency="EUR",
+            birth_year=1985,
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            stop_working_age=55,
+            horizon_age=90,
+            rule="returns_cover_expenses",
+            swr_bp=None,
+            income_minor=None,
+            expenses_minor=200_000,
+            portfolio_minor=10_000_000,
+            needs_review=True,
+            is_live=False,
+            legacy=_legacy_payload(
+                "Blocked linked", is_default=True, income_mode="trailing_12m", income_minor=None
+            ),
+        )
+
+    parsed, errors = parse_archive(export_workspace(team.factory, ctx).content)
+    assert errors == () and parsed is not None
+    plan_row = parsed.rows.fire_plan
+    assert plan_row is not None
+    assert plan_row.id == str(plan.id)
+    assert plan_row.income == "0.00"
+    assert plan_row.needs_review == "true"
+    assert len(parsed.rows.fire_events) == 0
+    with team.factory() as session:
+        audit = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "workspace.exported")
+        ).one()
+        assert audit.data["fire_plan_zeroed_fields"] == "income_manual"
 
 
 def test_export_writes_header_only_fire_files(team: WorkspaceDb) -> None:

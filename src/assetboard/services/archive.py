@@ -1161,6 +1161,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             legacy_skipped = len(legacy_plans) - 1
         fire_plan_row: FirePlanRow | None = None
         fire_event_rows: tuple[FireEventRow, ...] = ()
+        fire_zeroed_fields: set[str] = set()
         if export_plan is not None:
             if export_plan.is_live:
                 income_minor = export_plan.income_minor or 0
@@ -1195,17 +1196,22 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
 
                 def legacy_amount(mode: str, manual: Any, field: str, direction: str) -> int:
                     if mode == "manual":
-                        return manual if isinstance(manual, int) else 0
-                    if linked is not None and any(block.field == field for block in linked.blocks):
+                        if type(manual) is int:
+                            return manual
+                        fire_zeroed_fields.add(field)
                         return 0
-                    if linked is None:
+                    if linked is None or any(block.field == field for block in linked.blocks):
+                        fire_zeroed_fields.add(field)
                         return 0
                     if direction == "portfolio":
                         total = linked.portfolio.total if linked.portfolio is not None else None
                     else:
                         series = linked.income if direction == "income" else linked.expenses
                         total = series.annual_total if series is not None else None
-                    return total.amount_minor if total is not None else 0
+                    if total is None:
+                        fire_zeroed_fields.add(field)
+                        return 0
+                    return total.amount_minor
 
                 income_minor = legacy_amount(
                     modes[0], payload.get("income_manual_minor"), "income_manual", "income"
@@ -1538,6 +1544,9 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "fire_plan": 1 if fire_plan_row is not None else 0,
             "fire_events": len(fire_event_rows),
             "fire_legacy_scenarios_skipped": legacy_skipped,
+            # A linked legacy input whose value cannot be resolved is exported as 0 and its
+            # field is named here, so it is never a silent zero (see docs/archive-format.md).
+            "fire_plan_zeroed_fields": ", ".join(sorted(fire_zeroed_fields)),
         }
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
