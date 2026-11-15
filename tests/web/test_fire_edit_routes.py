@@ -1266,6 +1266,7 @@ def test_the_editor_shows_loan_toggles_and_preview_never_writes(owner) -> None:
     assert f'name="loan_include_{loan_id}"' in page.text
     assert re.search(rf'name="loan_include_{loan_id}"[^>]*value="1"[^>]*checked', page.text)
     assert "data-fire-loan-annual" in page.text
+    assert "data-fire-loans-saved-note" in page.text
     preview = owner.post(
         "/fire/edit/preview",
         _form(**{f"loan_include_{loan_id}": "0"}),
@@ -1273,7 +1274,34 @@ def test_the_editor_shows_loan_toggles_and_preview_never_writes(owner) -> None:
     )
     assert preview.status_code == 200
     assert "data-fire-loans-preview" in preview.text
+    assert "Loan choices in this preview:" in preview.text
     assert "data-fire-loans-ignored-total" in page.text
+    assert _loan_settings(owner, plan_id) == []
+
+
+def test_preview_loan_warning_uses_the_posted_expenses_and_writes_nothing(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = create_plan(owner)
+    create_loan(owner)
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    assert "data-fire-loans-expense-warning" not in page.text
+    assert _loan_settings(owner, plan_id) == []
+    low = owner.post(
+        "/fire/edit/preview",
+        _form(expenses_manual="1000"),
+        token_from="/fire/edit",
+    )
+    assert low.status_code == 200
+    assert "data-fire-loans-expense-warning" in low.text
+    high = owner.post(
+        "/fire/edit/preview",
+        _form(expenses_manual="100000"),
+        token_from="/fire/edit",
+    )
+    assert high.status_code == 200
+    assert "data-fire-loans-expense-warning" not in high.text
     assert _loan_settings(owner, plan_id) == []
 
 

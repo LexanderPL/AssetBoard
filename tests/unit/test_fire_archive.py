@@ -33,6 +33,7 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.fire import EventKind, ProjectionEvent, ProjectionInputs, Rule, project
 from assetboard.domain.money import Money
+from assetboard.services import fire_scenarios
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.fire_projection import scenario_results
 from assetboard.services.import_csv import default_import_adapters
@@ -49,6 +50,7 @@ EXPORTED_AT = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
 GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
+GOLDEN_V2_0 = FIXTURES / "workspace-archive-v2.0.zip"
 PLAN = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 EVENT = UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
 OVERRIDE = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
@@ -662,3 +664,45 @@ def test_a_missing_loan_setting_is_a_warning_and_is_skipped(
     assert any("missing loan" in warning.message for warning in parsed.warnings)
     _workspace_id, ctx, _batch_id, _report, counts = _restore(db, data_dir, rows)
     assert counts["counts"].get("fire_loan_settings_created", 0) == 0
+
+
+def test_released_2_0_archive_reads_with_every_loan_included() -> None:
+    parsed, errors = parse_archive(GOLDEN_V2_0.read_bytes())
+    assert errors == () and parsed is not None
+    assert parsed.manifest["format_version"] == "2.0"
+    assert parsed.rows.fire_loan_settings == ()
+
+
+def test_duplicate_and_invalid_fire_loan_settings_are_errors() -> None:
+    loan_rows, rate_rows = _loan_rows()
+    duplicated = FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Mortgage", "false")
+    invalid = FireLoanSettingRow(str(UUID(int=8)), str(LOAN), "Mortgage", "maybe")
+    parsed, errors = parse_archive(
+        _archive(
+            replace(
+                _rows(),
+                loans=loan_rows,
+                loan_rate_changes=rate_rows,
+                fire_loan_settings=(duplicated, duplicated, invalid),
+            )
+        )
+    )
+    assert parsed is None
+    messages = {error.message for error in errors}
+    assert "duplicate FIRE loan setting id" in messages
+    assert "duplicate FIRE loan setting" in messages
+    assert "invalid FIRE loan setting" in messages
+
+
+def test_an_included_true_setting_is_accepted_as_a_no_op(db: WorkspaceDb, data_dir: Path) -> None:
+    loan_rows, rate_rows = _loan_rows()
+    rows = replace(
+        _rows(),
+        loans=loan_rows,
+        loan_rate_changes=rate_rows,
+        fire_loan_settings=(FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Mortgage", "true"),),
+    )
+    _workspace_id, ctx, _batch_id, _report, counts = _restore(db, data_dir, rows)
+    assert counts["counts"]["fire_loan_settings_created"] == 0
+    detail = fire_scenarios.get_fire_plan(db.factory, ctx)
+    assert detail.ignored_loan_ids == frozenset()

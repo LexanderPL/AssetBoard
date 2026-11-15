@@ -9,6 +9,7 @@ import pytest
 from assetboard.domain.loans import ScheduleError
 from assetboard.domain.money import Money
 from assetboard.services import fire_loans, loan_schedule, loans
+from assetboard.web import fire_loans as fire_loan_web
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -249,3 +250,101 @@ def test_a_broken_schedule_never_becomes_a_zero(team: WorkspaceDb) -> None:
         # The M7 path still rejects an anchorless loan; the FIRE resolver catches it above.
         view = loans.get_loan(team.factory, team.ctx("owner", "owner"), loan_id)
         loan_schedule.schedule_inputs_from_view(view, date(2026, 3, 1))
+
+
+def test_first_payoff_year_counts_included_loans_only(team: WorkspaceDb) -> None:
+    early = _create(team, name="Early", term_months=12)
+    _create(team, name="Later", term_months=24)
+    data = _load(team, ignored_loan_ids=frozenset({early}))
+    early_row = _row(data, early)
+    assert early_row.state is fire_loans.LoanPlanState.IGNORED
+    assert early_row.payoff_year == 2027
+    assert data.first_payoff_year == 2028
+    assert data.payoff_names_by_year == {2028: ("Later",)}
+    assert (
+        fire_loan_web.build_loan_section(
+            data, currency="EUR", last_year=2050, expenses=None, locale="en"
+        ).first_payoff_year
+        == 2028
+    )
+
+
+def test_a_future_drawdown_only_loan_is_not_drawn_not_paid_off(team: WorkspaceDb) -> None:
+    loan_id = _create(team, name="Future tranche", drawdown_mode="tranches")
+    loans.add_transfer(
+        team.factory,
+        team.ctx("owner", "owner"),
+        loan_id,
+        date_value=date(2026, 9, 1),
+        amount=_money(1_000_000),
+        note="Second tranche",
+    )
+    data = _load(team)
+    row = _row(data, loan_id)
+    assert row.state is fire_loans.LoanPlanState.NOT_DRAWN
+    assert not row.eligible
+    assert row.annual_payment is None
+    assert data.included_annual_total == _money(0)
+
+
+def test_a_drawn_tranche_with_a_future_drawdown_is_included_and_flagged(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, name="Tranched", drawdown_mode="tranches")
+    ctx = team.ctx("owner", "owner")
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(10_000_000),
+        note="First tranche",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 9, 1),
+        amount=_money(2_000_000),
+        note="Second tranche",
+    )
+    data = _load(team)
+    row = _row(data, loan_id)
+    assert row.state is fire_loans.LoanPlanState.INCLUDED
+    assert row.eligible
+    assert row.future_drawdown
+    assert row.annual_payment is not None and row.annual_payment.amount_minor > 0
+    assert row.interest_only is False
+
+
+def test_a_target_total_overpayment_is_part_of_the_annual_payment(team: WorkspaceDb) -> None:
+    loan_id = _create(
+        team,
+        overpayment_mode="target_total",
+        overpayment_amount=_money(700_000),
+    )
+    data = _load(team)
+    row = _row(data, loan_id)
+    view = loans.get_loan(team.factory, team.ctx("owner", "owner"), loan_id)
+    actual = loan_schedule.schedule_inputs_from_view(view, date(2026, 3, 1))
+    schedule = loan_schedule.build_inputs_schedule(actual)
+    next_row = next(item for item in schedule.rows if item.date > date(2026, 3, 1))
+    expected = (
+        next_row.interest.amount_minor
+        + next_row.principal.amount_minor
+        + next_row.costs.amount_minor
+        + next_row.overpayment.amount_minor
+    ) * 12
+    assert row.annual_payment is not None
+    assert row.annual_payment.amount_minor == expected
+    assert next_row.overpayment.amount_minor > 0
+
+
+def test_an_interest_only_next_payment_is_flagged(team: WorkspaceDb) -> None:
+    loan_id = _create(team, interest_only_months=6)
+    data = _load(team)
+    row = _row(data, loan_id)
+    assert row.state is fire_loans.LoanPlanState.INCLUDED
+    assert row.interest_only
+    assert row.monthly_payment is not None and row.annual_payment is not None
+    assert row.annual_payment.amount_minor == row.monthly_payment.amount_minor * 12

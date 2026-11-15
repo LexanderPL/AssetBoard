@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import event, func, select
 
-from assetboard.db.models.fire import FireEvent, FireScenario
+from assetboard.db.models.fire import FireEvent, FireLoanSetting, FireScenario
 from assetboard.db.repositories import NotFound
 from assetboard.domain.fire import Rule
 from assetboard.domain.money import Money
@@ -525,3 +525,63 @@ def test_the_results_query_count_does_not_grow_with_loans(team: WorkspaceDb) -> 
     many = _statements(team, lambda: fire_projection.scenario_results(team.factory, ctx, plan_id))
     assert one == many
     assert many <= 16
+
+
+def _ignored_ids(team: WorkspaceDb) -> frozenset[UUID]:
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    return detail.ignored_loan_ids
+
+
+def _setting_count(team: WorkspaceDb) -> int:
+    with team.factory() as session:
+        return session.scalar(select(func.count()).select_from(FireLoanSetting)) or 0
+
+
+def test_an_archived_loan_toggle_is_rejected_and_its_saved_ignore_survives(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),))
+    loans.archive_loan(team.factory, team.ctx("owner", "owner"), loan_id)
+    before = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    with pytest.raises(FireError) as error:
+        _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=True),))
+    assert (error.value.field, error.value.code) == ("loans", "invalid_loan")
+    assert _ignored_ids(team) == frozenset({loan_id})
+    after = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert after.plan.expenses == before.plan.expenses
+    assert _setting_count(team) == 1
+    # The loan section is absent from a later save: the archived loan keeps its saved choice.
+    _update(team, plan_id)
+    assert _ignored_ids(team) == frozenset({loan_id})
+
+
+def test_a_paid_off_loan_toggle_is_rejected_without_a_setting(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(
+        team,
+        name="Paid",
+        principal_original=_money(100_000),
+        term_months=1,
+    )
+    results = fire_projection.scenario_results(team.factory, team.ctx("viewer", "viewer"), plan_id)
+    assert results.loans is not None
+    paid_row = next(row for row in results.loans.rows if row.loan_id == loan_id)
+    assert paid_row.state.value == "paid_off"
+    with pytest.raises(FireError) as error:
+        _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),))
+    assert (error.value.field, error.value.code) == ("loans", "invalid_loan")
+    assert _ignored_ids(team) == frozenset()
+    assert _setting_count(team) == 0
+
+
+def test_deleting_the_plan_cascades_its_loan_settings(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    loan_id = _create_loan(team)
+    _update(team, plan_id, loan_settings=(LoanSettingInput(loan_id=loan_id, included=False),))
+    assert _setting_count(team) == 1
+    fire_scenarios.delete_fire_plan(team.factory, team.ctx("owner", "owner"), confirmed=True)
+    assert _setting_count(team) == 0
+    with pytest.raises(NotFound):
+        fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))

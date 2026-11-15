@@ -348,6 +348,28 @@ def test_archived_and_paid_off_loans_show_reasons_in_the_view(owner) -> None:
     assert "Paid off; there is no payment to include." in page.text
 
 
+def test_the_first_included_payoff_skips_ignored_loans(owner) -> None:
+    from assetboard.db.models.fire import FireLoanSetting
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = _create(owner)
+    early = create_loan(owner, name="Early loan", term_months=12)
+    create_loan(owner, name="Later loan", term_months=24)
+    with owner.db() as session, session.begin():
+        session.add(
+            FireLoanSetting(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                loan_id=early,
+                included=False,
+            )
+        )
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "The first included loan payoff is in 2028." in page.text
+    assert "The first included loan payoff is in 2027." not in page.text
+
+
 def test_a_loan_payment_warning_is_shown_when_expenses_are_too_low(owner) -> None:
     from tests.fire_loan_helpers import create_loan
 
@@ -399,10 +421,13 @@ def test_the_loan_panel_has_an_empty_state_and_no_fake_zero(owner) -> None:
 
 def test_the_loan_panel_is_translated(owner) -> None:
     from assetboard.db.models.identity import User, Workspace
-    from tests.fire_loan_helpers import create_loan
+    from assetboard.services import loans as loan_service
+    from tests.fire_loan_helpers import create_loan, owner_context
 
     _create(owner)
     create_loan(owner, name="Kredyt hipoteczny")
+    archived = create_loan(owner, name="Stary kredyt")
+    loan_service.archive_loan(owner.app.state.session_factory, owner_context(owner), archived)
     with owner.db() as session, session.begin():
         session.get_one(Workspace, owner.home_id).locale = "pl"
         session.get_one(User, owner.admin_id).locale = "pl"
@@ -412,6 +437,7 @@ def test_the_loan_panel_is_translated(owner) -> None:
     assert "Uwzględnione w planie" in page.text
     assert "Rata roczna" in page.text or "Roczna rata" in page.text
     assert "Raty kredytów" in page.text
+    assert "Zarchiwizowany w Kredytach; nie jest częścią planu." in page.text
 
 
 def test_a_plan_currency_mismatch_explains_the_loan_block(owner) -> None:
