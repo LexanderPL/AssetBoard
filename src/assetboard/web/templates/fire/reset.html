@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Reset FIRE plan") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Reset FIRE plan") }}{% endblock %}
+{% block content %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+<section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="fire-reset-heading" data-fire-reset-page>
+  <h2 id="fire-reset-heading" class="text-base font-semibold">{{ _("Reset the FIRE plan?") }}</h2>
+  <p class="mt-3 text-sm">{{ _("This deletes the plan and all %(count)d adjustments (%(archived)d archived) for good. It cannot be undone, and the app keeps no copy.", count=plan.event_count, archived=plan.archived_event_count) }}</p>
+  {% if plan.currency_mismatch %}
+  <p role="status" class="mt-3 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-currency-warning>{{ _("The plan is in %(plan_currency)s but the workspace uses %(workspace_currency)s. Resetting lets you set up a new plan in the workspace currency.", plan_currency=plan.currency, workspace_currency=workspace_currency) }}</p>
+  {% endif %}
+  <p class="mt-3 border border-line bg-subtle px-4 py-3 text-sm text-muted">{{ _("Want a copy first?") }} <a href="{{ archive_url }}" class="font-semibold text-primary-ink underline underline-offset-2" data-fire-archive-link>{{ _("Download a workspace archive from Export and import") }}</a>. {{ _("It includes the plan and its adjustments.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'fire_reset_confirm') }}" class="mt-6 space-y-4" novalidate>
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-sm font-medium" for="fire-reset-confirm">{{ _("To confirm, type %(word)s:", word=reset_word) }}<input id="fire-reset-confirm" name="confirm" autocomplete="off" spellcheck="false" maxlength="32" required class="form-control px-3 py-2 font-normal" data-fire-reset-confirm></label>
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" class="rounded-xl border border-danger-line bg-danger-soft px-4 py-2 text-sm font-semibold text-danger-strong hover:bg-danger-line" data-fire-reset-submit>{{ _("Reset plan") }}</button>
+      <a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-reset-cancel>{{ _("Cancel") }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

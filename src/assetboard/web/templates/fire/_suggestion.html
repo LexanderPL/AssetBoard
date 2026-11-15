@@ -1,0 +1,98 @@
+{% from "categories/_macros.html" import swatch with context %}
+{% from "fire/_macros.html" import badge with context %}
+
+{% macro suggestion_warnings(suggestions, series, warning_text) %}
+{% set matching = suggestions.warnings | selectattr("series", "equalto", series) | list %}
+{% if matching %}
+<ul class="mt-3 space-y-2 text-sm" data-fire-suggestion-warnings>
+  {% for warning in matching %}
+  <li class="border border-warning-line bg-warning-soft px-3 py-2 text-warning-strong" data-fire-suggestion-warning="{{ warning.code }}">{{ warning_text(warning, locale) }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro suggestion_blocks(suggestions, field, messages, fallback) %}
+{% for block in suggestions.blocks if block.field == field %}
+<p role="note" class="mt-3 border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger-strong" data-fire-suggestion-block="{{ block.code }}">{{ messages.get(block.code, fallback) }}{% if block.detail %} <span class="font-normal">({{ block.detail }})</span>{% endif %}</p>
+{% endfor %}
+{% endmacro %}
+
+{% macro amount_suggestion(suggestions, field, kind, title, locale, show_categories=false, messages={}, fallback="", warning_text=none) %}
+{% set series = suggestions.income if kind == "income" else suggestions.expenses %}
+{% set warning_series = "income" if kind == "income" else "expense" %}
+{% set blocked = suggestions.blocks | selectattr("field", "equalto", field) | list %}
+<section class="border border-line bg-subtle p-4" aria-labelledby="suggestion-{{ kind }}-heading" data-fire-suggestion="{{ kind }}">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h3 id="suggestion-{{ kind }}-heading" class="text-sm font-semibold">{{ title }}</h3>
+    {% if series %}
+    <p class="text-lg font-semibold tabular-nums" data-suggested-minor="{{ series.annual_total.amount_minor }}">{{ format_money(series.annual_total, locale) }}<span class="text-xs font-normal text-muted"> {{ _("per year") }}</span></p>
+    {% endif %}
+  </div>
+  {% if series %}
+  <p class="mt-1 text-xs text-muted" data-fire-suggestion-window>{{ _("Window %(start)s – %(end)s · %(months)d months with data · window total %(total)s.", start=format_day(series.window.first_day, locale), end=format_day(series.window.last_day, locale), months=series.months_available, total=format_money(series.raw_total, locale)) }}</p>
+  {% endif %}
+  {{ suggestion_blocks(suggestions, field, messages, fallback) }}
+  {{ suggestion_warnings(suggestions, warning_series, warning_text) }}
+  {% if series and not blocked %}
+  <button type="submit" name="use" value="{{ field }}" formnovalidate class="btn-sm mt-3" data-use-suggestion="{{ field }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for %(label)s", label=title) }}</span></button>
+  {% endif %}
+  {% if show_categories and series %}
+  <div class="mt-4 overflow-x-auto">
+    <table class="sheet w-full text-sm" data-fire-suggestion-categories>
+      <caption class="sr-only">{{ _("Expenses by category in the window") }}</caption>
+      <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Category") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Window total") }}</th></tr></thead>
+      <tbody>
+        {% for row in series.categories %}
+        <tr class="border-t border-line" data-fire-suggestion-category="{{ row.category_id }}">
+          <th scope="row" class="py-2 pr-3 text-left font-normal"><span class="inline-flex min-w-0 items-center gap-2">{{ swatch(row.color) }}<span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span></th>
+          <td class="py-2 text-right tabular-nums">{{ format_money(row.amount, locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if suggestions.loan_portion is not none %}
+    {% if suggestions.loan_portion.has_data %}
+    <p class="mt-3 text-sm" data-fire-loan-portion="{{ suggestions.loan_portion.window_total.amount_minor }}">{{ _("Loan payments linked to ledger expenses in this window: %(amount)s in %(months)d months.", amount=format_money(suggestions.loan_portion.window_total, locale), months=suggestions.loan_portion.months_available) }}</p>
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-fire-loan-portion="none">{{ _("No ledger expenses in this window are linked to recorded loan payments. If you pay loans, make sure the amount you enter includes those payments.") }}</p>
+    {% endif %}
+  {% endif %}
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro portfolio_suggestion(suggestions, field, locale, messages={}, fallback="", warning_text=none) %}
+{% set portfolio = suggestions.portfolio %}
+{% set blocked = suggestions.blocks | selectattr("field", "equalto", field) | list %}
+<section class="border border-line bg-subtle p-4" aria-labelledby="suggestion-portfolio-heading" data-fire-suggestion="portfolio">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h3 id="suggestion-portfolio-heading" class="text-sm font-semibold">{{ _("Suggested starting portfolio") }}</h3>
+    {% if portfolio %}
+    <p class="text-lg font-semibold tabular-nums" data-suggested-minor="{{ portfolio.total.amount_minor }}">{{ format_money(portfolio.total, locale) }}</p>
+    {% endif %}
+  </div>
+  {% if portfolio %}
+  <p class="mt-1 text-xs text-muted" data-fire-suggestion-as-of>{{ _("Investable assets as of %(day)s.", day=format_day(portfolio.as_of, locale)) }}</p>
+  {% endif %}
+  {{ suggestion_blocks(suggestions, field, messages, fallback) }}
+  {{ suggestion_warnings(suggestions, "portfolio", warning_text) }}
+  {% if portfolio and not blocked %}
+  <button type="submit" name="use" value="{{ field }}" formnovalidate class="btn-sm mt-3" data-use-suggestion="{{ field }}">{{ _("Use suggested value") }}<span class="sr-only"> {{ _("for the starting portfolio") }}</span></button>
+  {% endif %}
+  {% if portfolio and portfolio.rows %}
+  <details class="mt-4 border-t border-line pt-3">
+    <summary class="cursor-pointer text-sm font-medium">{{ _("Where this value comes from") }}</summary>
+    <ul class="mt-2 space-y-1 text-sm" data-fire-suggestion-sources>
+      {% for row in portfolio.rows %}
+      <li class="flex flex-wrap items-baseline justify-between gap-2" data-fire-suggestion-source="{{ row.source_kind }}">
+        <span class="inline-flex min-w-0 items-center gap-2">{{ swatch(row.color or "#94a3b8") }}<span class="min-w-0 break-words">{{ row.name or _("Unallocated") }}</span></span>
+        <span class="tabular-nums">{{ format_money(row.amount, locale) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</section>
+{% endmacro %}

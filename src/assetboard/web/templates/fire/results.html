@@ -5,8 +5,9 @@
 {% block heading %}{{ _("FIRE plan") }}{% endblock %}
 {% block header_actions %}
 <a href="{{ scoped_url(request, 'fire_scenario_csv', scenario_id=plan.id) }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>
+{% if can_edit %}<a href="{{ scoped_url(request, 'fire_reset') }}" class="btn" data-fire-reset>{{ _("Reset plan") }}</a>{% endif %}
 {% if can_preview %}
-<a href="{{ scoped_url(request, 'fire_scenario', scenario_id=plan.id) }}?edit=1#inputs" class="btn-primary" data-fire-edit>{{ _("Edit plan") }}</a>
+<a href="{{ scoped_url(request, 'fire_scenarios') }}?edit=1#inputs" class="btn-primary" data-fire-edit>{{ _("Edit plan") }}</a>
 {% endif %}
 {% endblock %}
 
@@ -16,7 +17,7 @@
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}{% if error_code == 'birth_year_required' %} <a href="{{ profile_url }}" class="font-semibold underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a>{% endif %}</p>{% endif %}
 
 {% if s.needs_review %}
-<p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{{ _("This plan was converted from the old format. Review its values and save to confirm them.") }} {% if can_preview %}<a href="{{ scoped_url(request, 'fire_scenario', scenario_id=s.id) }}?edit=1#inputs" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% endif %}</p>
+<p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{{ _("This plan was converted from the old format. Review its values and save to confirm them.") }} {% if can_preview %}<a href="{{ scoped_url(request, 'fire_scenarios') }}?edit=1#inputs" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% endif %}</p>
 {% endif %}
 
 <section class="panel mb-6 p-6 sm:p-7" aria-labelledby="plan-overview-heading" data-fire-overview="{{ s.id }}">
