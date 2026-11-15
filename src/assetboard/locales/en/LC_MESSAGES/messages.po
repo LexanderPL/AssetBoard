@@ -2699,7 +2699,7 @@ msgstr ""
 msgid "Schedule unavailable"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "No payment"
 msgstr ""
 

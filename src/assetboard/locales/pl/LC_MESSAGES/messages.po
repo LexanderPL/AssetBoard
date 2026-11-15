@@ -2849,7 +2849,9 @@ msgstr "Nie ma jeszcze wypłaty; nie ma płatności do uwzględnienia."
 
 #, python-format
 msgid "The loan is in %(loan_currency)s, not the plan currency %(plan_currency)s."
-msgstr "Kredyt jest w walucie %(loan_currency)s, a nie w walucie planu %(plan_currency)s."
+msgstr ""
+"Kredyt jest w walucie %(loan_currency)s, a nie w walucie planu "
+"%(plan_currency)s."
 
 #, python-format
 msgid ""
@@ -2873,8 +2875,8 @@ msgid ""
 "Installment plans do not have a live loan schedule yet; they are excluded"
 " from the plan."
 msgstr ""
-"Plany ratalne nie mają jeszcze harmonogramu kredytu na żywo; są "
-"wyłączone z planu."
+"Plany ratalne nie mają jeszcze harmonogramu kredytu na żywo; są wyłączone"
+" z planu."
 
 msgid "The next payment is interest-only; the payment will change later."
 msgstr ""
