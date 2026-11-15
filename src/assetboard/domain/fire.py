@@ -271,8 +271,8 @@ class ProjectionEvent:
     """A one-off cash flow or a permanent change to one annual series.
 
     ``CASH`` amounts are nominal minor units in their event year. ``INCOME_CHANGE`` and
-    ``EXPENSE_CHANGE`` amounts are annual amounts in the scenario start year's (today's) money
-    and stay active from the event year onward.
+    ``EXPENSE_CHANGE`` amounts are annual amounts in the plan's first year's money and stay
+    active from the event year onward.
     """
 
     year: int
@@ -317,16 +317,16 @@ class ProjectionInputs:
 
 @dataclass(frozen=True, slots=True)
 class ProjectionRow:
-    """One plan year, nominal and in the start year's money.
+    """One plan year in nominal money.
 
     ``expenses`` is the net expense line after included loans stop being paid: the gross
     inflated expenses minus the recurring payment of every included loan whose payoff year has
     arrived. ``loan_payment`` is the part of that net line still attributable to loans in this
     year: included loans before their payoff and ignored loans for the whole horizon.
-    ``net`` at ``t = 0`` is the starting portfolio (the spreadsheet reuses that column), so the
-    first row's net worth is ``net + gain + cash``; later rows add ``net`` and ``cash`` to the
-    opening net worth. ``income_stopped`` marks the first year whose base salary is zero, not
-    event income.
+    ``net`` at ``t = 0`` is the starting portfolio (the v1 projection reuses that column), so
+    the first row's net worth is ``net + gain + cash``; later rows add ``net`` and ``cash`` to
+    the opening net worth. ``income_stopped`` marks the first year whose base salary is zero,
+    not event income.
     """
 
     year: int
@@ -338,23 +338,20 @@ class ProjectionRow:
     gain: Money
     cash: Money
     net_worth: Money
-    real_income: Money
-    real_expenses: Money
-    real_loan_payment: Money
-    real_net: Money
-    real_gain: Money
-    real_cash: Money
-    real_net_worth: Money
     is_fire: bool
     income_stopped: bool
 
 
 @dataclass(frozen=True, slots=True)
 class Projection:
-    """A complete projection plus the metrics the scenario page and comparison show.
+    """A complete projection plus the nominal metrics the plan page shows.
 
     ``inputs`` is the validated input with its currency canonicalized to uppercase, so it
-    matches the currency of every row's ``Money`` values.
+    matches the currency of every row's ``Money`` values. ``fire_number`` is the portfolio
+    needed at the FIRE row: that row's nominal expenses divided by the rule's rate. It is
+    ``None`` when FIRE is never reached or the rate is not positive. ``plan_progress_bp`` is
+    the starting portfolio divided by the nominal net worth at FIRE; it is ``None`` when FIRE
+    is never reached or the net worth at FIRE is not positive.
     """
 
     inputs: ProjectionInputs
@@ -364,10 +361,8 @@ class Projection:
     fire_age: int | None
     years_to_fire: int | None
     networth_at_fire: Money | None
-    real_networth_at_fire: Money | None
-    fire_number_today: Money | None
-    progress_sheet_bp: int | None
-    progress_today_bp: int | None
+    fire_number: Money | None
+    plan_progress_bp: int | None
     depletion_age: int | None
     min_networth_after_stop: Money | None
 
@@ -599,11 +594,6 @@ def _inflate(value: int, rate_bp: int, years: int) -> int:
     return round_ratio(value * (10_000 + rate_bp) ** years, 10_000**years)
 
 
-def _deflate(value: int, inflation_bp: int, years: int) -> int:
-    """``value / (1 + inflation) ** years`` with one half-up rounding at the end."""
-    return round_ratio(value * 10_000**years, (10_000 + inflation_bp) ** years)
-
-
 def _active_changes(changes: dict[int, int], rate_bp: int, years: int, year: int) -> int:
     """Inflate every active event group from the start year; one rounding per group."""
     total = 0
@@ -616,14 +606,13 @@ def _active_changes(changes: dict[int, int], rate_bp: int, years: int, year: int
 def project(inputs: ProjectionInputs) -> Projection:
     """Project one FIRE plan year by year from ``start_year`` through ``horizon_age``.
 
-    Parity follows the source spreadsheet. ``t = 0`` reuses the net column as the starting
-    portfolio and earns one gain before the row's cash flow; later rows add ``net`` and ``cash``
-    to the opening net worth. The nominal gain rate is the additive ``inflation + real return``,
-    exactly as the sheet formulas state. Base income grows with income growth while the row's
-    age is below the stop age; base expenses grow with inflation; event changes are separate
-    components inflated from the start year and active from their event year. Contribution
-    overrides replace the net line for their year but leave the shown income, expenses and cash
-    untouched. All series continue to the horizon after FIRE and after income stops.
+    ``t = 0`` reuses the net column as the starting portfolio and earns one gain before the
+    row's cash flow; later rows add ``net`` and ``cash`` to the opening net worth. The nominal
+    gain rate is the additive ``inflation + real return``. Base income grows with income growth
+    while the row's age is below the stop age; base expenses grow with inflation; event changes
+    are separate components inflated from the start year and active from their event year.
+    Saving overrides replace the net line for their year but leave the shown income, expenses
+    and cash untouched. All series continue to the horizon after FIRE and after income stops.
 
     A live loan is part of the expenses baseline. From an included loan's payoff year onward the
     projection subtracts its recurring annual payment, so the expense line is net of payments
@@ -634,10 +623,15 @@ def project(inputs: ProjectionInputs) -> Projection:
 
     Under ``returns_cover_expenses`` the first row with ``expenses < gain`` and a non-negative
     opening net worth is the FIRE row. The strict comparison and the previous-year gain mean the
-    crossing is marked one year after the moment the return first covers the year's expenses;
-    this is the spreadsheet's definition. Under ``swr`` the first row with
-    ``opening net worth * swr >= expenses`` wins, and cash does not enter either predicate in
-    its own event year. Real values deflate each nominal line by ``(1 + inflation) ** t``.
+    crossing is marked one year after the moment the return first covers the year's expenses.
+    Under ``swr`` the first row with ``opening net worth * swr >= expenses`` wins, and cash does
+    not enter either predicate in its own event year.
+
+    ``fire_number`` is the FIRE row's nominal expenses divided by the rule's rate (the
+    withdrawal rate, or the nominal gain rate when returns must cover expenses), rounded once.
+    It is ``None`` when FIRE is never reached or that rate is not positive. ``plan_progress_bp``
+    is the starting portfolio divided by the nominal net worth at FIRE, rounded once; it is
+    ``None`` when FIRE is never reached or that net worth is not positive.
 
     ``depletion_age`` and ``min_networth_after_stop`` look at rows from
     ``max(1, stop_working_age - age_at_start)`` onward, inclusive. Invalid inputs raise
@@ -716,15 +710,6 @@ def project(inputs: ProjectionInputs) -> Projection:
                 gain=Money(gain, currency),
                 cash=Money(cash, currency),
                 net_worth=Money(net_worth, currency),
-                real_income=Money(_deflate(income, plan.inflation_bp, offset), currency),
-                real_expenses=Money(_deflate(expenses, plan.inflation_bp, offset), currency),
-                real_loan_payment=Money(
-                    _deflate(loan_payment, plan.inflation_bp, offset), currency
-                ),
-                real_net=Money(_deflate(net, plan.inflation_bp, offset), currency),
-                real_gain=Money(_deflate(gain, plan.inflation_bp, offset), currency),
-                real_cash=Money(_deflate(cash, plan.inflation_bp, offset), currency),
-                real_net_worth=Money(_deflate(net_worth, plan.inflation_bp, offset), currency),
                 is_fire=is_fire,
                 income_stopped=offset > 0 and row_age >= plan.stop_working_age,
             )
@@ -735,29 +720,18 @@ def project(inputs: ProjectionInputs) -> Projection:
     fire_year = plan.start_year + fire_index if fire_index is not None else None
     fire_age = age + fire_index if fire_index is not None else None
 
-    first_expenses = rows[0].expenses.amount_minor
-    fire_number_today: Money | None
-    if first_expenses == 0:
-        # No annual expenses need no portfolio, even when the sheet's gain rate is not
-        # positive and the division would otherwise be undefined.
-        fire_number_today = Money(0, currency)
-    elif plan.rule is Rule.SWR:
-        assert plan.swr_bp is not None
-        fire_number_today = Money(round_ratio(first_expenses * 10_000, plan.swr_bp), currency)
-    elif gain_bp > 0:
-        fire_number_today = Money(round_ratio(first_expenses * 10_000, gain_bp), currency)
-    else:
-        fire_number_today = None
+    fire_number: Money | None = None
+    if fire_row is not None:
+        rate_bp = plan.swr_bp if plan.rule is Rule.SWR else gain_bp
+        if rate_bp is not None and rate_bp > 0:
+            fire_number = Money(
+                round_ratio(fire_row.expenses.amount_minor * 10_000, rate_bp), currency
+            )
 
-    progress_sheet_bp: int | None = None
+    plan_progress_bp: int | None = None
     if fire_row is not None and fire_row.net_worth.amount_minor > 0:
-        progress_sheet_bp = round_ratio(
-            rows[0].net_worth.amount_minor * 10_000, fire_row.net_worth.amount_minor
-        )
-    progress_today_bp: int | None = None
-    if fire_number_today is not None and fire_number_today.amount_minor > 0:
-        progress_today_bp = round_ratio(
-            plan.start_portfolio_minor * 10_000, fire_number_today.amount_minor
+        plan_progress_bp = round_ratio(
+            plan.start_portfolio_minor * 10_000, fire_row.net_worth.amount_minor
         )
 
     retirement_start = max(1, plan.stop_working_age - age)
@@ -775,10 +749,8 @@ def project(inputs: ProjectionInputs) -> Projection:
         fire_age=fire_age,
         years_to_fire=fire_index,
         networth_at_fire=fire_row.net_worth if fire_row is not None else None,
-        real_networth_at_fire=(fire_row.real_net_worth if fire_row is not None else None),
-        fire_number_today=fire_number_today,
-        progress_sheet_bp=progress_sheet_bp,
-        progress_today_bp=progress_today_bp,
+        fire_number=fire_number,
+        plan_progress_bp=plan_progress_bp,
         depletion_age=depletion_age,
         min_networth_after_stop=(
             Money(min_after_stop, currency) if min_after_stop is not None else None
