@@ -351,7 +351,7 @@ inflated. The ignored-loan choice is persisted per plan and archived in format 2
 
 ---
 
-## 9. Archive format (planned 2.0)
+## 9. Archive format (planned 2.1)
 
 The archive extension is updated in the same feature that reshapes the model, so the archive
 never describes a model that no longer exists.
