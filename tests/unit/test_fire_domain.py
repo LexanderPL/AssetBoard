@@ -13,11 +13,11 @@ from assetboard.domain.fire import (
     age_at_start,
     clean_event_label,
     clean_scenario_name,
-    contribution_years,
     default_horizon_age,
     event_years,
     extreme_rate_change,
     in_range,
+    saving_override_years,
     signed_amount_minor,
     year_in_window,
 )
@@ -26,14 +26,14 @@ from assetboard.domain.transactions import EntryError
 
 def test_age_and_windows_follow_the_start_year_and_horizon() -> None:
     assert age_at_start(2026, 1985) == 41
-    contributions = contribution_years(2026, 1985, 90)
+    overrides = saving_override_years(2026, 1985, 90)
     events = event_years(2026, 1985, 90)
-    assert (contributions.start, contributions.stop) == (2027, 2076)
+    assert (overrides.start, overrides.stop) == (2027, 2076)
     assert (events.start, events.stop) == (2026, 2076)
-    assert year_in_window(2027, contributions)
-    assert not year_in_window(2026, contributions)
+    assert year_in_window(2027, overrides)
+    assert not year_in_window(2026, overrides)
     assert year_in_window(2026, events)
-    assert not year_in_window(2076, contributions)
+    assert not year_in_window(2076, overrides)
     assert not year_in_window(2076, events)
 
 

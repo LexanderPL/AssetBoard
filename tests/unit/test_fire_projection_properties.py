@@ -14,7 +14,6 @@ from assetboard.domain.fire import (
     RATE_HARD_MIN_BP,
     SWR_HARD_MAX_BP,
     SWR_HARD_MIN_BP,
-    ContributionOverride,
     EventKind,
     ProjectionEvent,
     ProjectionInputs,
@@ -39,7 +38,7 @@ def _projection_inputs(
     draw: st.DrawFn,
     *,
     zero_rates: bool = False,
-    with_contributions: bool = True,
+    with_overrides: bool = True,
     with_events: bool = True,
 ) -> ProjectionInputs:
     start_year = draw(st.integers(min_value=2000, max_value=2090))
@@ -62,8 +61,8 @@ def _projection_inputs(
         rule = draw(st.sampled_from([Rule.RETURNS_COVER_EXPENSES, Rule.SWR]))
         swr_bp = draw(st.integers(SWR_HARD_MIN_BP, SWR_HARD_MAX_BP)) if rule is Rule.SWR else None
 
-    contributions: tuple[ContributionOverride, ...] = ()
-    if with_contributions:
+    events: list[ProjectionEvent] = []
+    if with_overrides:
         years = draw(
             st.lists(
                 st.integers(min_value=start_year + 1, max_value=last_year),
@@ -71,25 +70,32 @@ def _projection_inputs(
                 unique=True,
             )
         )
-        contributions = tuple(
-            ContributionOverride(
-                year, Money(draw(st.integers(-1_000_000_000, 1_000_000_000)), "EUR")
+        events.extend(
+            ProjectionEvent(
+                year,
+                EventKind.SAVING_OVERRIDE,
+                Money(draw(st.integers(-1_000_000_000, 1_000_000_000)), "EUR"),
             )
             for year in years
         )
-    events: tuple[ProjectionEvent, ...] = ()
     if with_events:
         rows = draw(
             st.lists(
                 st.tuples(
                     st.integers(min_value=start_year, max_value=last_year),
-                    st.sampled_from(list(EventKind)),
+                    st.sampled_from(
+                        [
+                            EventKind.CASH,
+                            EventKind.INCOME_CHANGE,
+                            EventKind.EXPENSE_CHANGE,
+                        ]
+                    ),
                     st.integers(-1_000_000_000, 1_000_000_000),
                 ),
                 max_size=4,
             )
         )
-        events = tuple(
+        events.extend(
             ProjectionEvent(year, kind, Money(amount, "EUR")) for year, kind, amount in rows
         )
 
@@ -107,8 +113,7 @@ def _projection_inputs(
         start_income=Money(draw(st.integers(0, 1_000_000_000)), "EUR"),
         start_expenses=Money(draw(st.integers(0, 1_000_000_000)), "EUR"),
         start_portfolio=Money(draw(st.integers(0, 1_000_000_000)), "EUR"),
-        contributions=contributions,
-        events=events,
+        events=tuple(events),
     )
 
 
@@ -129,7 +134,7 @@ def test_zero_return_and_inflation_equals_start_plus_cumulative_savings(
 
 
 @settings(max_examples=50, deadline=None)
-@given(inputs=_projection_inputs(with_contributions=False, with_events=False))
+@given(inputs=_projection_inputs(with_overrides=False, with_events=False))
 def test_without_events_or_overrides_the_parity_recurrence_holds(
     inputs: ProjectionInputs,
 ) -> None:

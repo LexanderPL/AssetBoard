@@ -92,8 +92,12 @@ def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inputs = _inputs(
-        contributions=(fire.ContributionOverride(year=2027, amount=Money(1_200_000, "EUR")),),
         events=(
+            fire.ProjectionEvent(
+                year=2027,
+                kind=fire.EventKind.SAVING_OVERRIDE,
+                amount=Money(1_200_000, "EUR"),
+            ),
             fire.ProjectionEvent(
                 year=2028,
                 kind=fire.EventKind.EXPENSE_CHANGE,
@@ -122,7 +126,6 @@ def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
         assert item.start_portfolio == inputs.start_portfolio
         assert item.inflation_bp == inputs.inflation_bp
         assert item.income_growth_bp == inputs.income_growth_bp
-        assert item.contributions == inputs.contributions
         assert item.events == inputs.events
 
 

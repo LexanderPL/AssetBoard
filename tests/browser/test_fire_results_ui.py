@@ -73,8 +73,7 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             page.get_by_role("button", name="Sign in").click()
             page.wait_for_url(f"{base}/")
 
-            page.goto(f"{base}/fire/new", wait_until="networkidle")
-            page.get_by_label("Scenario name").fill("Results plan")
+            page.goto(f"{base}/fire", wait_until="networkidle")
             page.get_by_label("Birth year").fill(str(start_year - 41))
             page.get_by_label("Horizon age").fill("90")
             page.get_by_label("Income stops at age").fill("55")
@@ -174,8 +173,7 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             scenario_id = UUID(page.url.split("/fire/", 1)[1].split("?")[0].split("#")[0])
             with app.state.session_factory() as session, session.begin():
                 row = session.get_one(FireScenario, scenario_id)
-                row.income_mode = "trailing_12m"
-                row.income_manual_minor = None
+                row.currency = "USD"
             page.reload(wait_until="networkidle")
             expect(page.locator("[data-fire-blocked]")).to_be_visible()
             assert page.locator("[data-chart]").count() == 0

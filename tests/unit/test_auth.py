@@ -1316,9 +1316,7 @@ WORKSPACE_TABLES = {
     "loan_payments",
     "installment_plans",
     "fire_scenarios",
-    "fire_contributions",
     "fire_events",
-    "fire_expense_exclusions",
 }
 
 

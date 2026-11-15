@@ -1,5 +1,6 @@
 """Full exports through real scoped repositories, with synthetic tenant data."""
 
+import json
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
@@ -13,11 +14,8 @@ from assetboard.db.models.identity import AuditEvent, Membership
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.repositories import (
     CategoryRepository,
-    FireContributionRepository,
     FireEventRepository,
-    FireExpenseExclusionRepository,
     FireScenarioRepository,
-    ItemValuationRepository,
     LoanRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
@@ -149,10 +147,9 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "loan_balance_checkpoints": 0,
             "loan_scenarios": 0,
             "installment_plans": 0,
-            "fire_scenarios": 0,
-            "fire_contributions": 0,
+            "fire_plan": 0,
             "fire_events": 0,
-            "fire_expense_exclusions": 0,
+            "fire_legacy_scenarios_skipped": 0,
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -318,7 +315,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "1.8"
+    assert parsed.manifest["format_version"] == "2.0"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 
@@ -342,10 +339,7 @@ def test_export_includes_loans_and_maps_their_references(team: WorkspaceDb) -> N
         LoanOverpaymentRepository,
         LoanPaymentRepository,
         LoanRateChangeRepository,
-        LoanRepository,
         LoanScenarioRepository,
-        NetWorthCategoryRepository,
-        NetWorthItemRepository,
         ReferenceRateRepository,
         ReferenceRateValueRepository,
         TransactionRepository,
@@ -532,19 +526,15 @@ def test_export_includes_risk_policy_and_never_provider_secrets(team: WorkspaceD
     assert parsed.rows.price_source_configs[0].fx_backfilled == '{"USD":"2026-02-01"}'
 
 
-def test_export_includes_fire_lineage_fallbacks_children_and_no_n_plus_one(
-    team: WorkspaceDb,
-) -> None:
+def test_export_writes_the_live_plan_and_events_with_lineage(team: WorkspaceDb) -> None:
     from sqlalchemy import event
     from sqlalchemy.orm import ORMExecuteState, Session
     from sqlalchemy.sql import ClauseElement
 
     ctx = team.ctx("editor", "editor")
-    scenario_origin = uuid4()
-    contribution_origin = uuid4()
+    plan_origin = uuid4()
     event_origin = uuid4()
-    exclusion_origin = uuid4()
-    category_origin = uuid4()
+    override_origin = uuid4()
     statements: list[str] = []
 
     def record(state: ORMExecuteState) -> None:
@@ -552,163 +542,40 @@ def test_export_includes_fire_lineage_fallbacks_children_and_no_n_plus_one(
         statements.append(str(state.statement))
 
     with team.factory.begin() as session:
-        categories = CategoryRepository(session, ctx)
-        food = categories.create(
-            name="Food",
-            name_key="food",
-            kind="expense",
-            treatment="regular",
-            color="#4f9d69",
-            sort_order=0,
-            import_key=f"id:{category_origin}",
-        )
-        salary = categories.create(
-            name="Salary",
-            name_key="salary",
-            kind="income",
-            treatment="regular",
-            color="#2f7f5f",
-            sort_order=0,
-        )
-        housing = categories.create(
-            name="Housing",
-            name_key="housing",
-            kind="expense",
-            treatment="regular",
-            color="#3b6ea8",
-            sort_order=1,
-        )
-        transactions = TransactionRepository(session, ctx)
-        transactions.create(
-            direction="income",
-            day=date(2026, 1, 10),
-            amount_minor=300_000,
-            currency="EUR",
-            category_id=salary.id,
-            description="January",
-            description_key="january",
-            source="manual",
-            created_by_user_id=team.users["editor"],
-        )
-        transactions.create(
-            direction="expense",
-            day=date(2026, 1, 15),
-            amount_minor=70_000,
-            currency="EUR",
-            category_id=food.id,
-            description="Rent",
-            description_key="rent",
-            source="manual",
-            created_by_user_id=team.users["editor"],
-        )
-        transactions.create(
-            direction="expense",
-            day=date(2026, 1, 20),
-            amount_minor=70_000,
-            currency="EUR",
-            category_id=housing.id,
-            description="Housing",
-            description_key="housing",
-            source="manual",
-            created_by_user_id=team.users["editor"],
-        )
-        networth_categories = NetWorthCategoryRepository(session, ctx)
-        assets = networth_categories.create(
-            name="Assets", name_key="assets", side="asset", color="#3b6ea8", sort_order=0
-        )
-        brokerage = NetWorthItemRepository(session, ctx).create(
-            side="asset",
-            category_id=assets.id,
-            name="Brokerage",
-            currency="EUR",
-            investable=True,
-            include_in_net_worth=True,
-            estimate_between=True,
-        )
-        ItemValuationRepository(session, ctx).create(
-            item_id=brokerage.id,
-            as_of=date(2026, 2, 1),
-            value_minor=5_000_000,
-            currency="EUR",
-        )
-        loan = LoanRepository(session, ctx).create(
-            name="Mortgage",
-            kind="annuity",
-            currency="EUR",
-            principal_original_minor=10_000_000,
-            origination_date=date(2025, 1, 1),
-            first_payment_date=date(2025, 2, 1),
-            term_months=120,
-            payment_day=1,
-            rate_mode="fixed",
-            day_count="monthly",
-            overpayment_mode="none",
-            overpayment_strategy="reduce_term",
-        )
-        scenarios = FireScenarioRepository(session, ctx)
-        scenarios.create(
-            name="Alpha archived",
-            name_key="alpha archived",
+        plan = FireScenarioRepository(session, ctx).create(
             currency="EUR",
             birth_year=1985,
-            start_year=2026,
             inflation_bp=250,
             real_return_bp=500,
             income_growth_bp=300,
             stop_working_age=55,
             horizon_age=90,
-            rule="returns_cover_expenses",
-            swr_bp=None,
-            income_mode="trailing_12m",
-            income_manual_minor=None,
-            expenses_mode="trailing_12m",
-            expenses_manual_minor=None,
-            portfolio_mode="linked_investable",
-            portfolio_manual_minor=None,
-            is_default=False,
-            archived_at=team.clock.now(),
+            rule="swr",
+            swr_bp=400,
+            income_minor=300_000,
+            expenses_minor=200_000,
+            portfolio_minor=10_000_000,
+            needs_review=True,
+            is_live=True,
+            legacy=None,
+            import_key=f"id:{plan_origin}",
         )
-        active = scenarios.create(
-            name="Zeta linked",
-            name_key="zeta linked",
-            currency="EUR",
-            birth_year=1985,
-            start_year=2026,
-            inflation_bp=250,
-            real_return_bp=500,
-            income_growth_bp=300,
-            stop_working_age=55,
-            horizon_age=90,
-            rule="returns_cover_expenses",
-            swr_bp=None,
-            income_mode="trailing_12m",
-            income_manual_minor=None,
-            expenses_mode="trailing_12m",
-            expenses_manual_minor=None,
-            portfolio_mode="linked_investable",
-            portfolio_manual_minor=None,
-            is_default=True,
-            import_key=f"id:{scenario_origin}",
-        )
-        FireContributionRepository(session, ctx).create(
-            scenario_id=active.id,
+        events = FireEventRepository(session, ctx)
+        events.create(
+            scenario_id=plan.id,
             year=2027,
-            net_amount_minor=-120_000,
-            import_key=f"id:{contribution_origin}",
-        )
-        FireEventRepository(session, ctx).create(
-            scenario_id=active.id,
-            year=2030,
-            kind="expense_change",
+            kind="saving_override",
             amount_minor=-120_000,
-            label="Loan repaid: Mortgage",
-            source_loan_id=loan.id,
-            import_key=f"id:{event_origin}",
+            label="Sabbatical",
+            import_key=f"id:{override_origin}",
         )
-        FireExpenseExclusionRepository(session, ctx).create(
-            scenario_id=active.id,
-            category_id=food.id,
-            import_key=f"id:{exclusion_origin}",
+        events.create(
+            scenario_id=plan.id,
+            year=2030,
+            kind="cash",
+            amount_minor=-500_000,
+            label="Renovation",
+            import_key=f"id:{event_origin}",
         )
 
     event.listen(Session, "do_orm_execute", record)
@@ -718,68 +585,136 @@ def test_export_includes_fire_lineage_fallbacks_children_and_no_n_plus_one(
         event.remove(Session, "do_orm_execute", record)
     parsed, errors = parse_archive(result.content)
     assert errors == () and parsed is not None
-    rows = parsed.rows
-    assert [row.name for row in rows.fire_scenarios] == ["Zeta linked", "Alpha archived"]
-    exported = rows.fire_scenarios[0]
-    assert exported.id == str(scenario_origin)
-    assert exported.income_fallback == "36000.00"
-    assert exported.expenses_fallback == "8400.00"
-    assert exported.portfolio_fallback == "50000.00"
-    assert rows.fire_contributions[0].id == str(contribution_origin)
-    assert rows.fire_contributions[0].net_amount == "-1200.00"
-    assert rows.fire_events[0].id == str(event_origin)
-    assert rows.fire_events[0].source_loan_id == str(loan.id)
-    assert rows.fire_expense_exclusions[0].id == str(exclusion_origin)
-    assert rows.fire_expense_exclusions[0].category_id == str(category_origin)
-    assert rows.fire_expense_exclusions[0].category == "Food"
-    for table in (
-        "fire_scenarios",
-        "fire_contributions",
-        "fire_events",
-        "fire_expense_exclusions",
-    ):
-        assert sum(f"FROM {table}" in statement for statement in statements) == 1, table
+    plan_row = parsed.rows.fire_plan
+    assert plan_row is not None
+    assert plan_row.id == str(plan_origin)
+    assert (plan_row.income, plan_row.expenses, plan_row.portfolio) == (
+        "3000.00",
+        "2000.00",
+        "100000.00",
+    )
+    assert plan_row.needs_review == "true"
+    assert [(row.id, row.kind) for row in parsed.rows.fire_events] == [
+        (str(override_origin), "saving_override"),
+        (str(event_origin), "cash"),
+    ]
+    assert sum("FROM fire_scenarios" in statement for statement in statements) == 2
+    assert sum("FROM fire_events" in statement for statement in statements) == 1
     with team.factory() as session:
         audit = session.scalars(
             select(AuditEvent).where(AuditEvent.action == "workspace.exported")
         ).one()
-        assert audit.data["fire_scenarios"] == 2
-        assert audit.data["fire_contributions"] == 1
-        assert audit.data["fire_events"] == 1
-        assert audit.data["fire_expense_exclusions"] == 1
+        assert audit.data["fire_plan"] == 1
+        assert audit.data["fire_events"] == 2
+        assert audit.data["fire_legacy_scenarios_skipped"] == 0
 
 
-def test_export_blanks_blocked_fire_fallbacks(team: WorkspaceDb) -> None:
+def _legacy_payload(
+    name: str, *, is_default: bool, income_mode: str = "manual", income_minor: int | None = 300_000
+) -> str:
+    return json.dumps(
+        {
+            "v": 1,
+            "name": name,
+            "name_key": name.casefold(),
+            "start_year": 2026,
+            "is_default": is_default,
+            "archived_at": None,
+            "income_mode": income_mode,
+            "expenses_mode": "manual",
+            "portfolio_mode": "manual",
+            "income_manual_minor": income_minor,
+            "expenses_manual_minor": 200_000,
+            "portfolio_manual_minor": 10_000_000,
+            "expense_exclusion_ids": [],
+        },
+        sort_keys=True,
+    )
+
+
+def test_export_legacy_default_first_resolves_and_reports_skipped(
+    team: WorkspaceDb,
+) -> None:
     ctx = team.ctx("editor", "editor")
     with team.factory.begin() as session:
-        FireScenarioRepository(session, ctx).create(
-            name="Blocked plan",
-            name_key="blocked plan",
+        categories = CategoryRepository(session, ctx)
+        salary = categories.create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        TransactionRepository(session, ctx).create(
+            direction="income",
+            day=date(2026, 1, 10),
+            amount_minor=1_000_000,
             currency="EUR",
-            birth_year=1990,
-            start_year=2026,
+            category_id=salary.id,
+            description="January",
+            description_key="january",
+            source="manual",
+            created_by_user_id=team.users["editor"],
+        )
+        repository = FireScenarioRepository(session, ctx)
+        chosen = repository.create(
+            currency="EUR",
+            birth_year=1985,
             inflation_bp=250,
             real_return_bp=500,
             income_growth_bp=300,
             stop_working_age=55,
-            horizon_age=95,
-            rule="swr",
-            swr_bp=400,
-            income_mode="trailing_12m",
-            income_manual_minor=None,
-            expenses_mode="trailing_12m",
-            expenses_manual_minor=None,
-            portfolio_mode="linked_investable",
-            portfolio_manual_minor=None,
-            is_default=True,
+            horizon_age=90,
+            rule="returns_cover_expenses",
+            swr_bp=None,
+            income_minor=None,
+            expenses_minor=200_000,
+            portfolio_minor=10_000_000,
+            needs_review=True,
+            is_live=False,
+            legacy=_legacy_payload(
+                "Chosen linked", is_default=True, income_mode="trailing_12m", income_minor=None
+            ),
+        )
+        repository.create(
+            currency="EUR",
+            birth_year=1985,
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            stop_working_age=55,
+            horizon_age=90,
+            rule="returns_cover_expenses",
+            swr_bp=None,
+            income_minor=300_000,
+            expenses_minor=200_000,
+            portfolio_minor=10_000_000,
+            needs_review=True,
+            is_live=False,
+            legacy=_legacy_payload("Skipped", is_default=False),
+        )
+        FireEventRepository(session, ctx).create(
+            scenario_id=chosen.id,
+            year=2030,
+            kind="cash",
+            amount_minor=-500_000,
+            label="Renovation",
         )
 
     parsed, errors = parse_archive(export_workspace(team.factory, ctx).content)
     assert errors == () and parsed is not None
-    scenario = parsed.rows.fire_scenarios[0]
-    assert scenario.income_fallback == ""
-    assert scenario.expenses_fallback == ""
-    assert scenario.portfolio_fallback == ""
+    plan = parsed.rows.fire_plan
+    assert plan is not None
+    assert plan.id == str(chosen.id)
+    assert plan.income == "120000.00"
+    assert plan.needs_review == "true"
+    assert len(parsed.rows.fire_events) == 1
+    with team.factory() as session:
+        audit = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "workspace.exported")
+        ).one()
+        assert audit.data["fire_legacy_scenarios_skipped"] == 1
 
 
 def test_export_writes_header_only_fire_files(team: WorkspaceDb) -> None:
@@ -791,15 +726,8 @@ def test_export_writes_header_only_fire_files(team: WorkspaceDb) -> None:
     result = export_workspace(team.factory, team.ctx("editor", "editor"))
     parsed, errors = parse_archive(result.content)
     assert errors == () and parsed is not None
-    assert parsed.rows.fire_scenarios == ()
-    assert parsed.rows.fire_contributions == ()
+    assert parsed.rows.fire_plan is None
     assert parsed.rows.fire_events == ()
-    assert parsed.rows.fire_expense_exclusions == ()
     with zipfile.ZipFile(io.BytesIO(result.content)) as archive:
-        for name in (
-            "fire_scenarios.csv",
-            "fire_contributions.csv",
-            "fire_events.csv",
-            "fire_expense_exclusions.csv",
-        ):
+        for name in ("fire_plan.csv", "fire_events.csv"):
             assert archive.read(name) == (",".join(CSV_COLUMNS[name]) + "\r\n").encode()
