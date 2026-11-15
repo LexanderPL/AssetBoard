@@ -408,15 +408,23 @@ def test_linked_portfolio_sums_investable_lookthrough_and_manual_investable_item
     assert linked.portfolio.non_investable_classes == 1
     assert linked.portfolio.skipped_linked_items == 1
     assert [
-        (row.name, row.source_kind, row.source_id, row.reason) for row in linked.portfolio.skipped
+        (row.name, row.source_kind, row.source_id, row.reason, row.color)
+        for row in linked.portfolio.skipped
     ] == [
-        ("Home", "portfolio_class", home, "non_investable_class"),
-        ("Skipped linked item", "networth_item", skipped_item_id, "linked_item_double_count"),
+        ("Home", "portfolio_class", home, "non_investable_class", "#64748b"),
+        (
+            "Skipped linked item",
+            "networth_item",
+            skipped_item_id,
+            "linked_item_double_count",
+            None,
+        ),
     ]
-    assert {warning.code for warning in linked.warnings} >= {
-        "non_investable_classes",
-        "linked_items_skipped",
+    counts = {
+        warning.code: warning.count for warning in linked.warnings if warning.count is not None
     }
+    assert counts["non_investable_classes"] == 1
+    assert counts["linked_items_skipped"] == 1
 
 
 def test_skipped_portfolio_rows_do_not_add_queries(team: WorkspaceDb) -> None:
@@ -441,19 +449,22 @@ def test_skipped_portfolio_rows_do_not_add_queries(team: WorkspaceDb) -> None:
         return seen
 
     quiet = count(lambda: _portfolio_inputs(team))
+    # Seed both groups in reverse name order. The linked names sort before the class names, so
+    # this also proves the reason is the primary key, not the display name.
     for index in range(20):
-        skipped_class = _asset_class(team, f"Skipped class {index:02d}", investable=False)
+        suffix = 19 - index
+        skipped_class = _asset_class(team, f"Skipped class {suffix:02d}", investable=False)
         _holding(
             team,
-            name=f"Skipped holding {index:02d}",
+            name=f"Skipped holding {suffix:02d}",
             class_id=skipped_class,
             quantity="1",
             price="1000",
         )
-        linked_source = _asset_class(team, f"Linked source {index:02d}", investable=True)
+        linked_source = _asset_class(team, f"Linked source {suffix:02d}", investable=True)
         _networth_item(
             team,
-            name=f"Skipped linked item {index:02d}",
+            name=f"a linked item {suffix:02d}",
             value_minor=None,
             valuation_mode="linked",
             link_type="portfolio_asset_class",
@@ -467,9 +478,17 @@ def test_skipped_portfolio_rows_do_not_add_queries(team: WorkspaceDb) -> None:
     assert linked.portfolio.total == _money(150_000)
     reasons = [row.reason for row in linked.portfolio.skipped]
     assert reasons == ["non_investable_class"] * 20 + ["linked_item_double_count"] * 20
-    for rows in (linked.portfolio.skipped[:20], linked.portfolio.skipped[20:]):
-        names = [row.name for row in rows]
-        assert names == sorted(names, key=str.casefold)
+    assert [row.name for row in linked.portfolio.skipped] == [
+        *(f"Skipped class {index:02d}" for index in range(20)),
+        *(f"a linked item {index:02d}" for index in range(20)),
+    ]
+    assert all(row.color == "#64748b" for row in linked.portfolio.skipped[:20])
+    assert all(row.color is None for row in linked.portfolio.skipped[20:])
+    counts = {
+        warning.code: warning.count for warning in linked.warnings if warning.count is not None
+    }
+    assert counts["non_investable_classes"] == 20
+    assert counts["linked_items_skipped"] == 20
 
 
 def test_linked_portfolio_converts_a_manual_item_with_fx_once(team: WorkspaceDb) -> None:

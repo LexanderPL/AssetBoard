@@ -801,7 +801,11 @@ def test_the_wizard_keeps_a_birth_year_entered_without_a_profile(owner) -> None:
     assert response.status_code == 200
     assert 'name="birth_year" value="1985"' in response.text
     assert 'data-fire-birth-year-source="entered"' in response.text
-    assert "This plan stores its own birth year." in response.text
+    assert (
+        "This plan stores its own birth year. Add it to your profile to prefill it next time."
+        in response.text
+    )
+    assert 'href="/account"' in response.text
     assert "data-fire-profile-link" in response.text
     assert "Enter your birth year." not in response.text
 
@@ -845,11 +849,23 @@ def test_only_the_non_obvious_fields_keep_a_hint_beside_the_label(owner) -> None
         assert 'role="note"' in field
         assert 'tabindex="0"' in field
         assert "aria-label=" in field and "title=" in field
+        assert "focus-visible:ring-2" in field
+        assert "focus-visible:ring-primary" in field
         assert f'aria-describedby="{name}-hint"' in field
     expenses = field_html(
         _step(post_wizard(owner, 1, "next", wizard_values()), 2), "expenses_manual"
     )
     assert 'aria-describedby="expenses_manual-hint"' in expenses
+    assert "focus-visible:ring-2" in expenses
+
+    # An inline error keeps both the hint and the error as descriptions.
+    error = post_wizard(owner, 3, "next", wizard_values(real_return="not-a-rate"))
+    assert error.status_code == 400
+    field = field_html(error.text, "real_return")
+    assert 'aria-invalid="true"' in field
+    assert 'aria-describedby="real_return-error real_return-hint"' in field
+    assert 'id="real_return-hint"' in field
+    assert 'id="real_return-error"' in field
 
 
 def test_the_income_suggestion_shows_the_category_breakdown_with_its_caption(owner) -> None:
@@ -888,6 +904,16 @@ def test_the_portfolio_suggestion_lists_skipped_sources_without_an_amount(owner)
     assert text.count("data-suggested-minor=") == 1
 
 
+def test_a_portfolio_with_only_skipped_sources_explains_the_missing_value(owner) -> None:
+    _seed_asset_class(owner, "Home test", investable=False)
+    text = _step(post_wizard(owner, 2, "next", wizard_values(portfolio_manual="")), 3)
+    assert 'data-fire-suggestion-block="no_linked_portfolio_data"' in text
+    assert "No investable portfolio classes" in text
+    assert "data-suggested-minor" not in text
+    assert 'data-use-suggestion="portfolio_manual"' not in text
+    assert 'name="portfolio_manual" value=""' in text
+
+
 def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(owner) -> None:
     text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
     field = field_html(text, "swr")
@@ -910,6 +936,8 @@ def test_the_wizard_page_has_no_adjustment_editor(owner) -> None:
 
 def test_the_wizard_and_reset_render_in_polish(owner) -> None:
     _seed_ledger(owner)
+    _seed_portfolio(owner)
+    _seed_asset_class(owner, "Home test", investable=False)
     owner.client.headers["Accept-Language"] = "pl"
     try:
         page = owner.client.get("/fire")
@@ -926,6 +954,15 @@ def test_the_wizard_and_reset_render_in_polish(owner) -> None:
         assert step_two.status_code == 200
         assert "Przychody według kategorii w oknie" in step_two.text
         assert "Wydatki według kategorii w oknie" in step_two.text
+        step_three = post_wizard(
+            owner,
+            2,
+            "next",
+            wizard_values(portfolio_manual=""),
+        )
+        assert step_three.status_code == 200
+        assert "Pominięte" in step_three.text
+        assert "Klasa aktywów nieinwestycyjna; jej wartość nie jest liczona." in step_three.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
     create_plan(owner)

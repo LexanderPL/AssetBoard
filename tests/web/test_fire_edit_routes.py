@@ -1098,6 +1098,8 @@ def test_the_edit_form_explains_the_saved_birth_year_source(owner) -> None:
         in field
     )
     assert _input_value(page.text, "birth_year") == "1985"
+    response = owner.post("/fire/edit", _form(), token_from="/fire/edit")
+    assert response.status_code == 303
     with owner.db() as session:
         assert session.get_one(FireScenario, plan_id).birth_year == 1985
 
@@ -1131,6 +1133,8 @@ def test_only_the_non_obvious_edit_fields_keep_a_hint_beside_the_label(owner) ->
         assert 'role="note"' in field
         assert 'tabindex="0"' in field
         assert "aria-label=" in field and "title=" in field
+        assert "focus-visible:ring-2" in field
+        assert "focus-visible:ring-primary" in field
         assert f'aria-describedby="{name}-hint"' in field
 
 
