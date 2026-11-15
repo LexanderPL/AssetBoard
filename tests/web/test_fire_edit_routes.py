@@ -23,6 +23,8 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.fire import trailing_window
+from assetboard.domain.money import Money
+from assetboard.i18n.numbers import format_amount_input
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from tests.fire_helpers import create_plan
@@ -314,6 +316,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-csv" not in page.text
     assert "data-fire-reset" not in page.text
     assert 'name="adjustments_present" value="1"' in page.text
+    assert "data-fire-adjustments" in page.text
+    assert "data-add-adjustment" in page.text
+    assert "data-add-event" not in page.text
+    assert "data-event-table" not in page.text
     assert _input_value(page.text, "income_manual") == "50000.00"
     assert _input_value(page.text, "expenses_manual") == "30000.00"
     assert _input_value(page.text, "portfolio_manual") == "1000000.00"
@@ -542,23 +548,259 @@ def test_a_truncated_save_without_adjustment_fields_is_rejected(owner) -> None:
 def test_save_can_remove_every_adjustment_row(owner) -> None:
     plan_id = create_plan(owner)
     with owner.db() as session, session.begin():
-        session.add(
-            FireEvent(
-                workspace_id=owner.home_id,
-                scenario_id=plan_id,
-                year=2028,
-                kind="cash",
-                amount_minor=100_000,
-                label="Removed",
-            )
+        event = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2028,
+            kind="cash",
+            amount_minor=100_000,
+            label="Removed",
         )
+        session.add(event)
+        session.flush()
+        event_id = event.id
     # The real form still carries the marker when the user removes every row, including the
     # blank one; that is a deliberate empty list, not a truncated request.
     form = {key: value for key, value in _form().items() if not key.startswith("event_")}
+    form.update(
+        {
+            "event_id_1": str(event_id),
+            "event_remove_1": "1",
+        }
+    )
     response = owner.post("/fire/edit", form, token_from="/fire/edit")
     assert response.status_code == 303
     with owner.db() as session:
         assert session.scalar(select(func.count()).select_from(FireEvent)) == 0
+
+
+def test_omitting_an_active_adjustment_is_an_error_not_a_deletion(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        first = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2027,
+            kind="cash",
+            amount_minor=100_000,
+            label="First",
+        )
+        second = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2028,
+            kind="cash",
+            amount_minor=200_000,
+            label="Second",
+        )
+        session.add_all((first, second))
+        session.flush()
+        first_id = first.id
+    form = {key: value for key, value in _form().items() if not key.startswith("event_")}
+    form.update(
+        {
+            "event_id_1": str(first_id),
+            "event_year_1": "2027",
+            "event_kind_1": "cash",
+            "event_amount_1": "1000",
+            "event_label_1": "First",
+        }
+    )
+    response = owner.post("/fire/edit", form, token_from="/fire/edit")
+    assert response.status_code == 400
+    assert "no longer part of the plan" in response.text
+    with owner.db() as session:
+        assert session.scalar(select(func.count()).select_from(FireEvent)) == 2
+
+
+def test_save_adds_edits_and_removes_adjustments_in_one_transaction(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        first = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2027,
+            kind="cash",
+            amount_minor=100_000,
+            label="First",
+        )
+        second = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2028,
+            kind="cash",
+            amount_minor=200_000,
+            label="Second",
+        )
+        session.add_all((first, second))
+        session.flush()
+        first_id, second_id = first.id, second.id
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            income_manual="55000",
+            event_id_1=str(first_id),
+            event_year_1="2027",
+            event_kind_1="cash",
+            event_amount_1="1500",
+            event_label_1="First updated",
+            event_id_2=str(second_id),
+            event_year_2="2028",
+            event_kind_2="cash",
+            event_amount_2="2000",
+            event_label_2="Second",
+            event_remove_2="1",
+            event_id_3="",
+            event_year_3="2029",
+            event_kind_3="saving_override",
+            event_amount_3="-500",
+            event_label_3="New override",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).income_minor == 5_500_000
+        rows = session.scalars(
+            select(FireEvent).where(FireEvent.scenario_id == plan_id).order_by(FireEvent.year)
+        ).all()
+        assert [(row.id, row.year, row.kind, row.amount_minor, row.label) for row in rows] == [
+            (first_id, 2027, "cash", 150_000, "First updated"),
+            (rows[1].id, 2029, "saving_override", -50_000, "New override"),
+        ]
+        assert second_id not in {row.id for row in rows}
+
+
+def test_a_row_validation_error_keeps_values_and_marks_the_control(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            income_manual="55000",
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="not-money",
+            event_label_1="Bad amount",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert 'data-adjustment-error="invalid_amount"' in response.text
+    assert (
+        'name="event_amount_1"' in response.text
+        and 'aria-describedby="adjustment-error-1"' in response.text
+    )
+    assert "Bad amount" in response.text
+    assert _input_value(response.text, "income_manual") == "55000"
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).income_minor == 5_000_000
+        assert session.scalar(select(func.count()).select_from(FireEvent)) == 0
+
+
+def test_duplicate_saving_override_marks_the_second_year_field(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            event_id_1="",
+            event_year_1="2028",
+            event_kind_1="saving_override",
+            event_amount_1="1000",
+            event_label_1="First",
+            event_id_2="",
+            event_year_2="2028",
+            event_kind_2="saving_override",
+            event_amount_2="2000",
+            event_label_2="Second",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert "A year can have only one saving override." in response.text
+    assert 'data-adjustment-error="duplicate_saving_override"' in response.text
+    assert 'id="event-year-2"' in response.text
+    assert 'aria-describedby="adjustment-error-2"' in response.text
+
+
+def test_archived_adjustments_are_read_only_and_deleted_only_by_the_checkbox(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        old = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2020,
+            kind="cash",
+            amount_minor=100_000,
+            label="Old bonus",
+        )
+        session.add(old)
+        session.flush()
+        old_id = old.id
+    page = owner.client.get("/fire/edit").text
+    assert "data-fire-archived-adjustments" in page
+    assert "Old bonus" in page
+    assert "Before the current year" in page
+    assert f'name="archived_remove_1" value="{old_id}"' in page
+    archived_section = page.split("data-fire-archived-adjustments", 1)[1]
+    assert "event_year_" not in archived_section
+    response = owner.post(
+        "/fire/edit",
+        _form(archived_remove_1=str(old_id)),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.scalar(select(func.count()).select_from(FireEvent)) == 0
+
+
+def test_the_adjustments_editor_has_no_bulk_paste_or_contribution_controls(owner) -> None:
+    create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    section = page.split("data-fire-adjustments", 1)[1].split("data-fire-actions", 1)[0]
+    assert "<textarea" not in section
+    assert "Paste" not in section
+    assert "Contribution" not in section
+    assert 'name="contribution' not in page
+    assert "data-add-adjustment" in section
+    assert "event_remove_new" not in section
+
+
+def test_all_four_kinds_render_and_save_from_the_single_editor(owner) -> None:
+    create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    for label in (
+        "One-off cash flow",
+        "Annual income change",
+        "Annual expense change",
+        "Saving override",
+    ):
+        assert label in page
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            event_year_1="2027",
+            event_kind_1="cash",
+            event_amount_1="1000",
+            event_label_1="Bonus",
+            event_year_2="2028",
+            event_kind_2="income_change",
+            event_amount_2="500",
+            event_label_2="Rent",
+            event_year_3="2029",
+            event_kind_3="expense_change",
+            event_amount_3="-200",
+            event_label_3="Loan repaid",
+            event_year_4="2030",
+            event_kind_4="saving_override",
+            event_amount_4="-3000",
+            event_label_4="Sabbatical",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    view = owner.client.get("/fire").text
+    for label in ("Bonus", "Rent", "Loan repaid", "Sabbatical"):
+        assert label in view
 
 
 def test_a_forged_scenario_id_and_use_are_ignored(owner) -> None:
@@ -604,6 +846,69 @@ def test_preview_returns_changed_results_and_writes_nothing(owner) -> None:
     assert "data-fire-suggestion" not in response.text
     assert "data-suggested-minor" not in response.text
     assert _snapshot(owner, plan_id) == before
+
+
+def test_preview_includes_unsaved_adjustment_rows_and_writes_nothing(owner) -> None:
+    plan_id = create_plan(owner)
+    before = _snapshot(owner, plan_id)
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="10000",
+            event_label_1="Bonus",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert "Preview of unsaved changes" in response.text
+    assert "data-fire-preview-error" not in response.text
+    assert _snapshot(owner, plan_id) == before
+
+
+def test_preview_marks_the_specific_invalid_row_control(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="not-money",
+            event_label_1="Bad",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert 'data-fire-preview-error-field="event_amount_1"' in response.text
+    assert "data-fire-preview-error" in response.text
+
+
+def test_preview_marks_an_archived_row_for_deletion_without_writing(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        old = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2020,
+            kind="cash",
+            amount_minor=100_000,
+            label="Old bonus",
+        )
+        session.add(old)
+        session.flush()
+        old_id = old.id
+    before = _snapshot(owner, plan_id)
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(archived_remove_1=str(old_id)),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert "data-fire-preview-error" not in response.text
+    assert _snapshot(owner, plan_id) == before
+    with owner.db() as session:
+        assert session.get_one(FireEvent, old_id).label == "Old bonus"
 
 
 def test_an_invalid_preview_keeps_the_saved_projection_and_names_the_field(owner) -> None:
@@ -756,10 +1061,31 @@ def test_the_editor_query_count_does_not_grow_with_events_or_ledger_rows(owner) 
 def test_the_preview_query_count_does_not_grow_with_events(owner) -> None:
     plan_id = create_plan(owner)
     token = owner.token("/fire/edit")
-    payload = {"csrf_token": token} | _form()
+
+    def payload() -> dict[str, str]:
+        form = {key: value for key, value in _form().items() if not key.startswith("event_")}
+        with owner.db() as session:
+            events = session.scalars(
+                select(FireEvent)
+                .where(FireEvent.scenario_id == plan_id)
+                .order_by(FireEvent.year, FireEvent.id)
+            ).all()
+        for index, event in enumerate(events, start=1):
+            form.update(
+                {
+                    f"event_id_{index}": str(event.id),
+                    f"event_year_{index}": str(event.year),
+                    f"event_kind_{index}": event.kind,
+                    f"event_amount_{index}": format_amount_input(
+                        Money(event.amount_minor, "EUR"), "en"
+                    ),
+                    f"event_label_{index}": event.label,
+                }
+            )
+        return {"csrf_token": token} | form
 
     def preview() -> Any:
-        return owner.client.post("/fire/edit/preview", data=payload, follow_redirects=False)
+        return owner.client.post("/fire/edit/preview", data=payload(), follow_redirects=False)
 
     quiet = _queries(owner, preview)
     for index in range(50):
@@ -802,6 +1128,9 @@ def test_the_edit_page_renders_in_polish(owner) -> None:
         assert "Odrzuć zmiany" in page.text
         assert "Niezapisane zmiany" in page.text
         assert "Użyj proponowanej wartości" in page.text
+        assert "Korekty" in page.text
+        assert "Dodaj korektę" in page.text
+        assert "Korekta oszczędności" in page.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
 

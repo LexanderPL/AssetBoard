@@ -291,6 +291,12 @@ def test_active_rows_from_detail_append_the_blank_new_row() -> None:
     ]
     assert rows[-1].index == "new"
     assert rows[0].amount_input == "-200.00"
+    view_rows = fire_adjustments.active_rows_from_detail(
+        _detail(active=(first, second)), "en", include_blank=False
+    )
+    assert [row.year for row in view_rows] == [2027, 2028]
+    assert fire_adjustments.next_adjustment_index(rows) == "3"
+    assert fire_adjustments.saved_active_count(rows) == 2
 
 
 def test_active_rows_from_values_preserve_errors_and_removal_marks() -> None:
