@@ -26,8 +26,12 @@ is told that an editor or owner can set it up.
 The wizard writes nothing until the last step. **Next** validates the current step and its
 earlier steps; **Back** returns without saving; **Cancel** leaves the wizard and no plan exists.
 The step values travel with the form, so leaving the wizard discards them. If the workspace base
-currency changes while you are in the wizard, the amounts are not converted; check them before
-**Create plan**.
+currency changes while you are in the wizard, the amounts are not converted; the refreshed
+review shows the new currency and you confirm it before **Create plan**.
+
+The review on the last step summarises the values that will be saved. If you change an
+assumption on that step, **Review changes** (or pressing **Create plan**) refreshes the summary
+first; **Create plan** never saves values that differ from the review you last saw.
 
 1. **About you:** birth year (prefilled from your profile, editable for this plan), horizon age
    (prefilled from your profile's life expectancy) and the age at which income stops. The page
@@ -38,7 +42,8 @@ currency changes while you are in the wizard, the amounts are not converted; che
    months with data and any warnings shown. The expense card also shows the category breakdown
    (window totals) and the loan payments that are linked to ledger expenses.
 3. **Portfolio:** the starting portfolio, with the current investable-assets suggestion, its
-   as-of date and a list of the sources (portfolio classes and manual net-worth items).
+   as-of date and a list of the sources (portfolio classes and manual net-worth items) that link
+   to the page where each source lives.
 4. **Assumptions and review:** inflation, real return, income growth and the independence rule.
    The review shows the entered values, the projected window and the warnings; **Create plan**
    writes the plan once. Adjustments are added after creation, and active loans are listed in the

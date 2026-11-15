@@ -498,16 +498,19 @@ editing form beyond the wizard and no live-loan calculation changes.
   `/fire/compare` remain 303 redirects. The old `POST /fire` create route and `fire/form.html`
   are gone.
 - **Wizard.** `GET /fire/setup` and `POST /fire/setup`; one POST per step, no server draft and no
-  write before Create. Hidden fields carry the other steps, `step` is 1–4, `go=next|back|create`,
+  write before Create. Hidden fields carry the other steps, `step` is 1–4, `go=next|back|review|create`,
   and `use=<field>` is the server-side **Use suggested value** action (no JavaScript). Every POST
   re-validates steps 1..current, and a hidden-field error returns to the owning step. Cancel is a
-  plain GET to `/fire?cancelled=1`; Cancel/Back/Next/Use never write. Create calls
+  plain GET to `/fire?cancelled=1`; Cancel/Back/Next/Review/Use never write. The review renders a
+  hidden digest of every value it summarises; Create re-validates and refreshes the review instead
+  of writing when a step-4 field, the workspace currency or the current year changed since that
+  render, so the summary the user confirms is always the plan that is saved. Create calls
   `create_fire_plan` once under the workspace lock; it re-validates, refuses an existing plan or
   legacy rows, snapshots the currency, sets `needs_review=false` and audits
   `fire_plan.created`. A double submit redirects with `plan_exists`. The wizard never migrates a
   legacy row (`plan_entry(auto_migrate=False)`) and never reads event or loan fields; forged
-  fields are ignored. A base-currency change between steps is not converted; the page states this
-  in the help text rather than adding a hidden-currency guard.
+  fields are ignored. A base-currency change between steps is not converted; the refreshed review
+  makes the user confirm the new currency.
 - **Steps.** About you (birth year from the profile, horizon from the profile's life expectancy,
   stop-working age empty/required; current age and first/last year shown); income and expenses
   (empty by default; empty is `amount_required`, explicit 0 valid); portfolio (empty by default);
@@ -522,8 +525,11 @@ editing form beyond the wizard and no live-loan calculation changes.
   query, `TransactionRepository.regular_window_loan_totals`); it is a window total, and when no
   rows are linked the card explains that instead of showing a zero. F8.12 adds the live scheduled
   annual payment separately. Suggestion cards never prefill; Use copies the locale-formatted
-  amount into the field. Blocked suggestions show the translated reason, hide Use and keep the
-  manual field. No new dependency, model or migration.
+  amount into the field. A blocked card drops its series/portfolio value, shows the translated
+  reason, hides Use and keeps the manual field, so it never displays a placeholder zero. The
+  portfolio card's source rows link to the asset class (`/investments/classes#asset-class-<id>`)
+  or the net-worth item (`/net-worth?side=asset#item-<id>`); the unallocated bucket has no source
+  page. No new dependency, model or migration.
 - **Reset.** `GET/POST /fire/reset`, editor-only and CSRF-protected. The page shows the adjustment
   counts, a currency-mismatch warning, a link to the workspace archive (`/workspace/data`) and a
   typed confirmation of the fixed ASCII word `reset` (trimmed, case-insensitive). A wrong/empty
@@ -537,13 +543,15 @@ editing form beyond the wizard and no live-loan calculation changes.
   Reset. `PlanEntry` now returns the already-loaded detail so the view page does not load the
   plan and events twice. The needs-review banner still links editors to `/fire?edit=1#inputs`.
 - **Tests.** Wizard entry/steps/back/cancel/validation/no-write/create-once/double-submit,
-  suggestions and no prefill, Use copying, category breakdown, loan portion, blocked suggestions,
-  portfolio sources, no events/loans, review, unusual rates, profile prefill, viewer/legacy
-  guards, CSRF, Polish rendering, reset confirmation/audit/roles/CSRF/currency mismatch, the
-  no-plan 404 and the id redirect; existing F8.8 results, preview, CSV, sensitivity and chooser
-  tests were updated to the id-free view URL while the preview/save/CSV routes stay id-based for
-  F8.10. Chrome covers the full wizard, Use buttons, reset, 390/1440 widths and CSP. The new
-  transaction repository method is in the tenant coverage/test. All tests ran single-core.
+  hidden-field carry, suggestions and no prefill, Use copying, category breakdown, loan portion,
+  blocked suggestions without a zero, portfolio source links (asset class and net-worth item), no
+  events/loans (including malformed forged fields), review, the stale-review refresh (field and
+  currency), unusual rates, profile prefill, viewer/legacy guards, CSRF, Polish rendering, reset
+  confirmation/audit/roles/CSRF/currency mismatch, the no-plan 404 and the id redirect; existing
+  F8.8 results, preview, CSV, sensitivity and chooser tests were updated to the id-free view URL
+  while the preview/save/CSV routes stay id-based for F8.10. Chrome covers the full wizard, Use
+  buttons, reset, 390/1440 widths and CSP. The new transaction repository method is in the tenant
+  coverage/test. All tests ran single-core.
 
 
 ### F8.10 — View/edit modes and suggested inputs
