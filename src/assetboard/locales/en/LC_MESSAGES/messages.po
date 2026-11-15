@@ -3101,6 +3101,12 @@ msgstr ""
 msgid "Review this suggestion before using it."
 msgstr ""
 
+msgid "Non-investable asset class; its value is not counted."
+msgstr ""
+
+msgid "Linked net-worth item; its value is already counted through its source."
+msgstr ""
+
 #, python-format
 msgid ""
 "Only %(months)d of the last 12 full months have data. The yearly amount "
@@ -6157,28 +6163,14 @@ msgid "Birth year"
 msgstr ""
 
 msgid ""
-"Used to turn plan years into ages. It is stored with the plan and "
-"prefilled from your profile."
-msgstr ""
-
-msgid "Required. You can change it for this plan without changing your profile."
+"New plans prefill this from your profile. This plan keeps the birth year "
+"saved with it."
 msgstr ""
 
 msgid "Horizon age"
 msgstr ""
 
-msgid ""
-"The last age shown in the projection. It defaults from your profile's "
-"life expectancy."
-msgstr ""
-
 msgid "Income stops at age"
-msgstr ""
-
-msgid ""
-"The age at which income stops; from then on the plan spends from the "
-"portfolio. If this age is in the past, income is zero and the page "
-"explains it."
 msgstr ""
 
 msgid "Assumptions"
@@ -6188,33 +6180,25 @@ msgstr ""
 msgid "Inflation (%%)"
 msgstr ""
 
-msgid "The yearly rise in prices. It reduces what the portfolio can buy."
-msgstr ""
-
 #, python-format
 msgid "Return above inflation (%%)"
 msgstr ""
 
 msgid ""
-"The yearly investment return above inflation. The projection adds it to "
-"inflation to get the nominal gain rate. It is not a promise of future "
-"returns."
+"Investment return after inflation. It is added to inflation; it is not a "
+"promise of future returns."
 msgstr ""
 
 #, python-format
 msgid "Income growth (%%)"
 msgstr ""
 
-msgid "How much your income grows each year until it stops."
-msgstr ""
-
 msgid "Independence rule"
 msgstr ""
 
 msgid ""
-"Returns cover expenses: independent when the portfolio's return pays the "
-"inflated expenses. Withdrawal rate: independent when the portfolio is "
-"large enough for a chosen safe withdrawal rate."
+"Returns cover expenses compares the portfolio's return with expenses. "
+"Withdrawal rate uses the rate below."
 msgstr ""
 
 #, python-format
@@ -6223,9 +6207,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Only used with the withdrawal-rate rule. The share of the portfolio "
-"withdrawn in the first year of retirement. 4%% is a common example, not a"
-" rule."
+"Share of the portfolio withdrawn in the first year of retirement. 4%% is "
+"an example, not a rule."
 msgstr ""
 
 msgid "I confirm these unusual rates are intentional"
@@ -6243,44 +6226,34 @@ msgstr ""
 #, python-format
 msgid ""
 "All amounts are in %(currency)s and in the current year's money. Later "
-"years are projected in their own nominal money. Enter your after-tax "
-"income and expenses, including the taxes you actually pay and your loan "
-"payments."
+"years are projected in their own nominal money. Income and expenses are "
+"the amounts recorded in your ledger. Income may be gross; expenses should"
+" include the taxes you actually pay and your loan payments. The planner "
+"does not model taxes separately."
 msgstr ""
 
 msgid "Annual income"
 msgstr ""
 
-msgid ""
-"Regular income you receive in the current year: earnings, dividends and "
-"interest. Use the after-tax amount."
+msgid "Suggested annual income"
 msgstr ""
 
-msgid "Suggested annual income"
+msgid "Income by category in the window"
 msgstr ""
 
 msgid "Annual expenses"
 msgstr ""
 
-msgid ""
-"Regular yearly spending in the current year, excluding savings and "
-"transfers. Include the taxes you actually pay and your loan payments; the"
-" planner will remove an included loan's payment after its payoff later."
+msgid "Include the taxes you actually pay and your loan payments."
 msgstr ""
 
 msgid "Suggested annual expenses"
 msgstr ""
 
+msgid "Expenses by category in the window"
+msgstr ""
+
 msgid "Starting portfolio"
-msgstr ""
-
-msgid "Investable assets today: investments and cash savings, not your home."
-msgstr ""
-
-msgid ""
-"A suggestion never fills a field by itself. Press Use suggested value to "
-"copy one, then change it if you want. The saved amount changes only when "
-"you press Save changes."
 msgstr ""
 
 #, python-format
@@ -6571,7 +6544,7 @@ msgstr ""
 msgid "Data as of %(day)s."
 msgstr ""
 
-msgid "Expenses by category in the window"
+msgid "Window totals by category"
 msgstr ""
 
 msgid "Window total"
@@ -6605,6 +6578,12 @@ msgid "the starting portfolio"
 msgstr ""
 
 msgid "Where this value comes from"
+msgstr ""
+
+msgid "Skipped"
+msgstr ""
+
+msgid "These sources are not counted in the amount above."
 msgstr ""
 
 msgid "Year by year"
@@ -6837,9 +6816,10 @@ msgid "Plan values"
 msgstr ""
 
 msgid ""
-"The assumptions saved in the plan. Income and expenses are after-tax cash"
-" flows; the projection does not model taxes separately. Editors and "
-"owners can change them in edit mode."
+"The assumptions saved in the plan. Income and expenses are the amounts "
+"recorded in your ledger. Income may be gross; expenses should include the"
+" taxes you actually pay and your loan payments. The projection does not "
+"model taxes separately. Editors and owners can change them in edit mode."
 msgstr ""
 
 #, python-format
@@ -6869,20 +6849,22 @@ msgstr ""
 msgid "Step %(step)s of %(total)s: %(label)s"
 msgstr ""
 
+msgid "Enter your birth year. Add it to your profile to prefill it next time."
+msgstr ""
+
+#, python-format
+msgid "Enter your birth year. Your profile has %(year)d."
+msgstr ""
+
+#, python-format
 msgid ""
-"Used to turn plan years into ages. Prefilled from your profile; you can "
-"change it for this plan."
-msgstr ""
-
-msgid "Required. Add it to your profile to prefill it next time."
+"Changed for this plan. Your profile still has %(year)d; changing it later"
+" does not change this plan."
 msgstr ""
 
 msgid ""
-"The age at which income stops; from then on the plan spends from the "
-"portfolio. Enter the age you stop working, not the year."
-msgstr ""
-
-msgid "Required. Enter 0 only if income already stopped."
+"From your profile. This plan stores its own birth year; changing your "
+"profile later does not change this plan."
 msgstr ""
 
 #, python-format
@@ -6910,26 +6892,10 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Enter yearly amounts in %(currency)s for %(year)d. Use the amounts you "
-"actually receive and spend, after tax."
-msgstr ""
-
-msgid ""
-"Regular income you receive in a year: earnings, dividends and interest. "
-"Use the after-tax amount."
-msgstr ""
-
-msgid "Required. Enter 0 if this does not apply."
-msgstr ""
-
-msgid ""
-"Regular yearly spending, including your loan payments. Savings and "
-"transfers are not expenses."
-msgstr ""
-
-msgid ""
-"A suggestion never fills a field by itself. Press Use suggested value to "
-"copy one, then change it if you want."
+"Enter yearly amounts in %(currency)s for %(year)d. Use the amounts "
+"recorded in your ledger: income may be gross, and expenses should include"
+" the taxes you actually pay and your loan payments. The planner does not "
+"model taxes separately."
 msgstr ""
 
 #, python-format
@@ -6979,9 +6945,10 @@ msgstr ""
 
 msgid ""
 "Projections are illustrative and not financial advice. The starting rates"
-" are examples, not recommendations. The projection assumes constant rates"
-" and does not model taxes separately. Nothing is saved until you press "
-"Create plan."
+" are examples, not recommendations. The projection assumes constant "
+"rates. Income may be gross; expenses should include the taxes you "
+"actually pay. The planner does not model taxes separately. Nothing is "
+"saved until you press Create plan."
 msgstr ""
 
 msgid "Back"
@@ -10170,9 +10137,6 @@ msgstr ""
 
 #, python-format
 msgid "Skip %(name)s on %(date)s"
-msgstr ""
-
-msgid "Skipped"
 msgstr ""
 
 #, python-format
@@ -13853,5 +13817,162 @@ msgstr ""
 #~ "Live loans are not part of the "
 #~ "plan yet. Enter yearly expenses that "
 #~ "include your loan payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Used to turn plan years into ages."
+#~ " It is stored with the plan and"
+#~ " prefilled from your profile."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Required. You can change it for "
+#~ "this plan without changing your profile."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The last age shown in the "
+#~ "projection. It defaults from your "
+#~ "profile's life expectancy."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The age at which income stops; "
+#~ "from then on the plan spends from"
+#~ " the portfolio. If this age is "
+#~ "in the past, income is zero and"
+#~ " the page explains it."
+#~ msgstr ""
+
+#~ msgid "The yearly rise in prices. It reduces what the portfolio can buy."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The yearly investment return above "
+#~ "inflation. The projection adds it to "
+#~ "inflation to get the nominal gain "
+#~ "rate. It is not a promise of "
+#~ "future returns."
+#~ msgstr ""
+
+#~ msgid "How much your income grows each year until it stops."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns cover expenses: independent when "
+#~ "the portfolio's return pays the inflated"
+#~ " expenses. Withdrawal rate: independent "
+#~ "when the portfolio is large enough "
+#~ "for a chosen safe withdrawal rate."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Only used with the withdrawal-rate "
+#~ "rule. The share of the portfolio "
+#~ "withdrawn in the first year of "
+#~ "retirement. 4%% is a common example, "
+#~ "not a rule."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "All amounts are in %(currency)s and "
+#~ "in the current year's money. Later "
+#~ "years are projected in their own "
+#~ "nominal money. Enter your after-tax "
+#~ "income and expenses, including the taxes"
+#~ " you actually pay and your loan "
+#~ "payments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular income you receive in the "
+#~ "current year: earnings, dividends and "
+#~ "interest. Use the after-tax amount."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular yearly spending in the current"
+#~ " year, excluding savings and transfers. "
+#~ "Include the taxes you actually pay "
+#~ "and your loan payments; the planner "
+#~ "will remove an included loan's payment"
+#~ " after its payoff later."
+#~ msgstr ""
+
+#~ msgid "Investable assets today: investments and cash savings, not your home."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A suggestion never fills a field "
+#~ "by itself. Press Use suggested value "
+#~ "to copy one, then change it if "
+#~ "you want. The saved amount changes "
+#~ "only when you press Save changes."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The assumptions saved in the plan. "
+#~ "Income and expenses are after-tax "
+#~ "cash flows; the projection does not "
+#~ "model taxes separately. Editors and "
+#~ "owners can change them in edit "
+#~ "mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Used to turn plan years into ages."
+#~ " Prefilled from your profile; you can"
+#~ " change it for this plan."
+#~ msgstr ""
+
+#~ msgid "Required. Add it to your profile to prefill it next time."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The age at which income stops; "
+#~ "from then on the plan spends from"
+#~ " the portfolio. Enter the age you "
+#~ "stop working, not the year."
+#~ msgstr ""
+
+#~ msgid "Required. Enter 0 only if income already stopped."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Enter yearly amounts in %(currency)s for"
+#~ " %(year)d. Use the amounts you "
+#~ "actually receive and spend, after tax."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular income you receive in a "
+#~ "year: earnings, dividends and interest. "
+#~ "Use the after-tax amount."
+#~ msgstr ""
+
+#~ msgid "Required. Enter 0 if this does not apply."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Regular yearly spending, including your "
+#~ "loan payments. Savings and transfers are"
+#~ " not expenses."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A suggestion never fills a field "
+#~ "by itself. Press Use suggested value "
+#~ "to copy one, then change it if "
+#~ "you want."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The starting rates are"
+#~ " examples, not recommendations. The "
+#~ "projection assumes constant rates and "
+#~ "does not model taxes separately. Nothing"
+#~ " is saved until you press Create "
+#~ "plan."
 #~ msgstr ""
 
