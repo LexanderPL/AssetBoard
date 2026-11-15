@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from datetime import date
 from pathlib import Path
-from uuid import UUID
 
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
@@ -77,14 +76,20 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             page.get_by_label("Birth year").fill(str(start_year - 41))
             page.get_by_label("Horizon age").fill("90")
             page.get_by_label("Income stops at age").fill("55")
-            page.get_by_label("Annual income").fill("50000")
-            page.get_by_label("Annual expenses").fill("30000")
-            page.get_by_label("Starting portfolio").fill("1000000")
             with page.expect_navigation(wait_until="networkidle"):
-                page.locator("[data-fire-save]").click()
+                page.get_by_role("button", name="Next").click()
+            page.locator('input[name="income_manual"]').fill("50000")
+            page.locator('input[name="expenses_manual"]').fill("30000")
+            with page.expect_navigation(wait_until="networkidle"):
+                page.get_by_role("button", name="Next").click()
+            page.locator('input[name="portfolio_manual"]').fill("1000000")
+            with page.expect_navigation(wait_until="networkidle"):
+                page.get_by_role("button", name="Next").click()
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-create]").click()
 
             results_url = page.url
-            assert "/fire/" in results_url
+            assert "/fire" in results_url and "/fire/" not in results_url
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
             ).to_have_attribute("data-chart-ready", "true")
@@ -161,7 +166,7 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             page.get_by_label("Income growth (%)").fill("0")
             page.get_by_label("Income stops at age").fill("41")
             page.get_by_label("Annual income").fill("0")
-            page.get_by_label("Annual expenses").fill("30000")
+            page.locator('input[name="expenses_manual"]').fill("30000")
             page.get_by_label("Starting portfolio").fill("100000")
             expect(page.locator("[data-fire-never]")).to_be_visible()
             expect(page.locator("[data-fire-depletion]")).to_be_visible()
@@ -170,7 +175,12 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             # A saved plan can be blocked (here the horizon is not after the current age).
             # The page still boots the chart scripts so a later preview can draw the charts
             # that were absent when the blocked page loaded.
-            scenario_id = UUID(page.url.split("/fire/", 1)[1].split("?")[0].split("#")[0])
+            from sqlalchemy import select
+
+            with app.state.session_factory() as session:
+                scenario_id = session.scalars(
+                    select(FireScenario.id).where(FireScenario.is_live.is_(True))
+                ).one()
             with app.state.session_factory() as session, session.begin():
                 row = session.get_one(FireScenario, scenario_id)
                 row.horizon_age = 41
