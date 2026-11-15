@@ -725,7 +725,9 @@ UI. Remove the saved loan-payoff event action.
   interest + principal + costs + regular overpayment ×12 is the annual payment. The actual
   schedule's summary gives the payoff date. The resolver returns included, ignored, archived,
   paid-off, not-drawn, currency-mismatch, schedule-error, no-payment, amount-invalid and
-  installment-plan rows with totals and payoff years; it never writes.
+  installment-plan rows with totals and payoff years; it never writes. A tranche loan with no
+  drawn balance and undrawn principal is **not drawn**, even when it has a future transfer. The
+  first-payoff line and payoff badges use included loans only.
 - **Projection.** `ProjectionInputs.loans` and `ProjectionRow.loan_payment` /
   `real_loan_payment` were added. `ProjectionRow.expenses` is the net line after included
   loans stop being paid; `loan_payment` is the part still attributable to included loans before
@@ -737,22 +739,35 @@ UI. Remove the saved loan-payoff event action.
   the plan, **Discard changes** restores them, and preview uses posted toggles without writing.
   The wizard review lists active loans read-only. The table has a **Loan payments** column and
   a payoff badge; charts mark included payoffs. The expense suggestion card adds the live
-  scheduled annual payment separately from the ledger-linked window portion.
+  scheduled annual payment separately from the ledger-linked window portion. In edit mode the
+  results summary is labelled as the live preview of the posted choices while the detailed
+  cards below keep showing the saved choice until save; the understated-expenses warning lives
+  in the results summary and uses the validated posted expenses during a preview.
+- **Forged toggles.** Only a loan the live resolver currently marks included or ignored can be
+  posted. A request naming an archived, paid-off, not-drawn, broken, currency-mismatched,
+  amount-invalid or installment-plan loan is rejected without touching its saved setting, so an
+  ignored loan keeps that choice through archiving and restore; a save whose form has no loan
+  section changes no setting.
 - **Warnings and approximations.** An included payment greater than the entered expenses shows
   a warning, but the drop is not capped and the plan is not blocked. The drop is fixed nominal
-  and is not inflated; sensitivity scales the whole expense line including the loan component;
-  a payoff inside a year removes the full annual payment from that year; a final balloon row is
-  annualised as specified. These are documented in `docs/fire.md`.
+  and is not inflated; sensitivity scales the whole expense line including each loan's scaled
+  annual payment, with payoff years fixed; a payoff inside a year removes the full annual
+  payment from that year; a final balloon row is annualised as specified. These are documented
+  in `docs/fire.md`. The shared loan view tolerates a missing loan start only for the FIRE
+  resolver; the loan pages keep their existing strict error.
 - **Archive 2.1.** `FORMAT_VERSION` is 2.1. `required_files`/`required_columns` keep 2.0 archives
   readable and require the new file only for 2.1. Export writes ignored rows; restore maps loan
-  lineage ids, skips a missing loan with a warning, and counts/audits the restored settings.
-  `EMPTINESS_CHECKS`, demo exclusions, tenant factories/coverage/isolation, the migration table
-  set, model exports and the golden 2.1 fixture cover the new table. Merge still reports
-  `fire_restore_only`.
-- **Tests.** Annual-payment/regular-overpayment and future-one-off tests, payoff changes, ignore
-  toggles, multiple loans, currency/paid-off/archived/broken/installment states, projection
-  integration, preview/save/no-write, query budgets, tenant/roles/CSRF, archive round-trip and
-  2.0 compatibility, Polish i18n and Chromium coverage. All tests were run single-core.
+  lineage ids, skips a missing loan with a warning, accepts `included=true` as a no-op and
+  counts/audits only created settings. `EMPTINESS_CHECKS`, demo exclusions, tenant
+  factories/coverage/isolation, the migration table set, model exports and the golden 2.1
+  fixture cover the new table. Merge still reports `fire_restore_only`.
+- **Tests.** Annual-payment/regular-overpayment, target-total, interest-only and future-one-off
+  tests, payoff changes, ignore toggles, first-included-payoff, multiple loans,
+  currency/paid-off/archived/not-drawn/broken/installment states, projection integration,
+  sensitivity loan scaling, preview/save/no-write, forged ineligible toggles with a preserved
+  saved ignore, query budgets, tenant/roles/CSRF, archive round-trip, 2.0 compatibility,
+  duplicate/invalid/no-op settings, Polish i18n and Chromium coverage. All tests were run
+  single-core.
 
 ### F8.13 — Nominal-only results and wording
 

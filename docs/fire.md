@@ -129,13 +129,17 @@ term or overpayment plan changes the next FIRE calculation.
   you entered, or when you deliberately do not want its payoff to affect the forecast.
 - The loan choice is saved per plan with **Save changes**; **Discard changes** restores the saved
   choice and a preview never writes. Existing plans treat every loan as included until you
-  change it.
+  change it. In edit mode the results summary at the top of the page is the live preview of the
+  posted choices, including the expense warning; the detailed loan cards below keep showing the
+  saved choice and its effect until you save.
 - Multiple loans are summed, each with its own payoff year. The year-by-year table has a **Loan
   payments** column showing the part of that year's expenses still attributable to loans, and a
   badge on the payoff year. The charts mark included loan payoffs.
 - Loans in another currency, archived loans, paid-off and not-drawn loans, broken schedules and
   installment plans are listed with a reason and are not included. They are never silently
-  treated as zero.
+  treated as zero. A saved ignore survives archiving the loan, so restoring it restores the
+  choice; a request that tries to change an excluded loan's choice is rejected rather than
+  silently rewriting that saved choice.
 - If the scheduled loan payments are larger than the entered annual expenses, the page warns
   that the expenses may not include them. The planner does not cap the drop or block the
   projection.
