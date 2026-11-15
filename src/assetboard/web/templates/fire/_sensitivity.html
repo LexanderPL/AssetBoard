@@ -14,7 +14,7 @@
   <p class="font-medium">{{ _("The sensitivity grid is unavailable while the projection is blocked.") }}</p>
   <ul class="mt-2 space-y-1">
     {% for block in sensitivity_blocks %}
-    <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The linked input could not be resolved.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
+    <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
     {% endfor %}
   </ul>
   <a href="{{ sensitivity_inputs_url }}" class="btn-sm mt-3">{{ _("Open plan inputs") }}</a>
@@ -71,5 +71,5 @@
 
 <div class="mt-4 flex flex-wrap items-center gap-3">
   <a href="{{ sensitivity_page_url }}" class="btn-sm" hx-get="{{ sensitivity_fragment_url }}" hx-target="#fire-sensitivity" hx-swap="innerHTML" data-fire-sensitivity-refresh>{{ _("Refresh grid") }}</a>
-  <p class="text-xs text-muted">{{ _("The grid always uses the saved inputs, including linked values and exclusions.") }}</p>
+  <p class="text-xs text-muted">{{ _("The grid always uses the saved plan, not unsaved changes.") }}</p>
 </div>

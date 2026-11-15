@@ -3,7 +3,7 @@
 {% block title %}{{ title }} · {{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("FIRE planner") }}{% endblock %}
 {% block header_actions %}
-<a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("All scenarios") }}</a>
+<a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("FIRE plan") }}</a>
 {% endblock %}
 
 {% block content %}
@@ -13,12 +13,12 @@
 
 <p class="mb-4 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The starting rates are examples, not recommendations.") }}</p>
 
-<form id="fire-form" method="post" action="{{ action }}" class="space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
+<form id="fire-form" method="post" action="{{ action }}" class="space-y-6" data-fire-form data-current-year="{{ current_year }}" novalidate>
   {{ csrf_input() }}
   {% include "fire/_form_body.html" %}
 
   <div class="flex flex-wrap items-center gap-3">
-    <button type="submit" class="btn-primary" data-fire-save>{{ _("Save scenario") }}</button>
+    <button type="submit" class="btn-primary" data-fire-save>{{ _("Create plan") }}</button>
     <a href="{{ cancel_url }}" class="btn">{{ _("Cancel") }}</a>
   </div>
 </form>

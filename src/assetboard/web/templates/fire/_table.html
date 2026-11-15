@@ -7,7 +7,7 @@
         {% if basis == "real" %}{{ _("Every amount is in today's money.") }}{% else %}{{ _("Every amount is in that year's money.") }}{% endif %}
       </p>
     </div>
-    <a href="{{ scoped_url(request, 'fire_scenario_csv', scenario_id=detail.scenario.id) }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>
+    <a href="{{ scoped_url(request, 'fire_scenario_csv', scenario_id=detail.plan.id) }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>
   </div>
   <div class="mt-4 overflow-x-auto" role="region" aria-label="{{ _('Year-by-year projection') }}" tabindex="0" data-fire-table-scroll>
     <table class="sheet w-full min-w-[48rem] text-sm" data-fire-table data-fire-basis="{{ basis }}">

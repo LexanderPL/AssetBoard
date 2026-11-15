@@ -803,26 +803,17 @@ msgstr "Zapisano warunki obligacji"
 msgid "Risk targets saved"
 msgstr "Zapisano cele ryzyka"
 
-msgid "FIRE scenario added"
-msgstr "Dodano scenariusz FIRE"
+msgid "FIRE plan created"
+msgstr "Utworzono plan FIRE"
 
-msgid "FIRE scenario changed"
-msgstr "Zmieniono scenariusz FIRE"
+msgid "FIRE plan changed"
+msgstr "Zmieniono plan FIRE"
 
-msgid "FIRE scenario duplicated"
-msgstr "Zduplikowano scenariusz FIRE"
+msgid "FIRE plan deleted"
+msgstr "Usunięto plan FIRE"
 
-msgid "FIRE scenario archived"
-msgstr "Zarchiwizowano scenariusz FIRE"
-
-msgid "FIRE scenario restored"
-msgstr "Przywrócono scenariusz FIRE"
-
-msgid "FIRE default scenario changed"
-msgstr "Zmieniono domyślny scenariusz FIRE"
-
-msgid "FIRE loan payoff added"
-msgstr "Dodano spłatę kredytu do planu FIRE"
+msgid "Old FIRE scenario converted to the one-plan format"
+msgstr "Stary scenariusz FIRE został przekształcony w format jednego planu"
 
 msgid "Investment transaction added"
 msgstr "Dodano transakcję inwestycyjną"
@@ -874,6 +865,21 @@ msgstr "Inne zdarzenie"
 
 msgid "Linking an identity provider failed"
 msgstr "Nieudane powiązanie z dostawcą tożsamości"
+
+msgid "Adjustments deleted"
+msgstr "Usunięte korekty"
+
+msgid "Old scenario"
+msgstr "Stary scenariusz"
+
+msgid "Old scenarios deleted"
+msgstr "Usunięte stare scenariusze"
+
+msgid "Inputs set to zero"
+msgstr "Wartości wejściowe ustawione na zero"
+
+msgid "Archived adjustments"
+msgstr "Zarchiwizowane korekty"
 
 msgid "Method"
 msgstr "Metoda"
@@ -1481,10 +1487,6 @@ msgstr "Tryb demonstracyjny"
 msgid "Demo"
 msgstr "Demo"
 
-#, python-format
-msgid "Loan repaid: %(name)s"
-msgstr "Spłacono kredyt: %(name)s"
-
 msgid "Invalid UTF-8 encoding."
 msgstr "Nieprawidłowe kodowanie UTF-8."
 
@@ -1787,6 +1789,42 @@ msgid ""
 msgstr ""
 "Archiwum nie miało aktywnego domyślnego scenariusza FIRE; scenariusz "
 "%(scenario)s został ustawiony jako domyślny."
+
+msgid ""
+"This is a FIRE archive from an older version; one scenario was converted "
+"to the single-plan format."
+msgstr ""
+"To archiwum FIRE ze starszej wersji; jeden scenariusz został "
+"przekształcony w format jednego planu."
+
+msgid ""
+"The archive had more than one FIRE scenario; only the default or first "
+"one was kept."
+msgstr ""
+"Archiwum zawierało więcej niż jeden scenariusz FIRE; zachowano tylko "
+"domyślny lub pierwszy."
+
+msgid "A linked FIRE input used the value resolved when the archive was exported."
+msgstr ""
+"Powiązana wartość FIRE użyła wartości wyliczonej podczas eksportu "
+"archiwum."
+
+msgid ""
+"A linked FIRE input had no resolved value in the archive; it was restored"
+" as 0."
+msgstr ""
+"Powiązana wartość FIRE nie miała w archiwum wyliczonej wartości; "
+"przywrócono 0."
+
+msgid ""
+"Saved loan-payoff events from the old archive were removed; the plan now "
+"reads live loans instead."
+msgstr ""
+"Zapisane zdarzenia spłaty kredytu ze starego archiwum zostały usunięte; "
+"plan korzysta teraz z bieżących kredytów."
+
+msgid "Old contribution overrides were converted to saving-override adjustments."
+msgstr "Stare nadpisania wpłat zostały przekształcone w korekty oszczędności."
 
 msgid "A FIRE scenario id appears more than once."
 msgstr "Identyfikator scenariusza FIRE występuje więcej niż raz."
@@ -2739,34 +2777,20 @@ msgstr "Wydatki"
 msgid "Investment gain"
 msgstr "Zysk z inwestycji"
 
-#, python-format
-msgid "%(name)s (archived)"
-msgstr "%(name)s (zarchiwizowana)"
-
-#, python-format
-msgid "%(name)s: FIRE at age %(age)d"
-msgstr "%(name)s: FIRE w wieku %(age)d"
-
-msgid "Enter a name of 1 to 200 characters."
-msgstr "Podaj nazwę o długości od 1 do 200 znaków."
-
 msgid "Enter your birth year, or add it to your profile first."
 msgstr "Podaj rok urodzenia albo najpierw dodaj go do profilu."
 
-msgid "Enter a birth year between 1900 and the plan's start year."
-msgstr "Podaj rok urodzenia od 1900 do roku rozpoczęcia planu."
+msgid "Enter a birth year between 1900 and the current year."
+msgstr "Wpisz rok urodzenia od 1900 do bieżącego roku."
 
 msgid "Enter a horizon between 1 and 120 years of age."
 msgstr "Podaj horyzont między 1 a 120 rokiem życia."
 
-msgid "The horizon age must be older than your age at the start of the plan."
-msgstr "Wiek horyzontu musi być wyższy niż Twój wiek na początku planu."
+msgid "The horizon age must be older than your current age."
+msgstr "Wiek końcowy musi być starszy niż Twój obecny wiek."
 
 msgid "Enter the age at which income stops, between 0 and 120."
 msgstr "Podaj wiek zakończenia dochodów, od 0 do 120."
-
-msgid "Income cannot stop before your age at the start of the plan."
-msgstr "Dochody nie mogą się skończyć przed Twoim wiekiem na początku planu."
 
 msgid "Enter a percentage between -20% and 50% with at most two decimals."
 msgstr "Podaj procent od -20% do 50% z co najwyżej dwoma miejscami po przecinku."
@@ -2779,46 +2803,17 @@ msgstr ""
 msgid "Choose how the plan decides that you are financially independent."
 msgstr "Wybierz, jak plan ma określać niezależność finansową."
 
-msgid "Choose how starting income is entered."
-msgstr "Wybierz sposób wprowadzenia dochodu początkowego."
-
-msgid "Choose how starting expenses are entered."
-msgstr "Wybierz sposób wprowadzenia wydatków początkowych."
-
-msgid "Choose how the starting portfolio is entered."
-msgstr "Wybierz sposób wprowadzenia portfela początkowego."
-
-msgid ""
-"This input can only be resolved while saving; preview the plan from its "
-"page."
-msgstr ""
-"Tę wartość można ustalić dopiero podczas zapisywania; uruchom podgląd na "
-"stronie planu."
-
-msgid ""
-"An excluded category is no longer a regular expense category of this "
-"workspace. Reload the page and try again."
-msgstr ""
-"Wykluczona kategoria nie jest już zwykłą kategorią wydatków w tym "
-"obszarze roboczym. Odśwież stronę i spróbuj ponownie."
-
 msgid "Enter a valid non-negative amount in the plan currency."
 msgstr "Podaj prawidłową nieujemną kwotę w walucie planu."
 
-msgid "Another active scenario already has this name."
-msgstr "Inny aktywny scenariusz ma już tę nazwę."
+msgid "Enter a whole year for every row."
+msgstr "Podaj pełny rok w każdym wierszu."
 
-msgid "Every contribution and event year must fall inside the plan's window."
-msgstr "Każdy rok składki i zdarzenia musi mieścić się w oknie planu."
+msgid "Every event year must fall inside the plan's window."
+msgstr "Każdy rok korekty musi mieścić się w okresie planu."
 
-msgid "Each contribution year can appear only once."
-msgstr "Każdy rok składki może wystąpić tylko raz."
-
-msgid "A scenario can have at most 120 contribution rows."
-msgstr "Scenariusz może mieć najwyżej 120 wierszy składek."
-
-msgid "A scenario can have at most 200 events."
-msgstr "Scenariusz może mieć najwyżej 200 zdarzeń."
+msgid "A plan can have at most 200 events."
+msgstr "Plan może mieć najwyżej 200 korekt."
 
 msgid "Choose a valid event type."
 msgstr "Wybierz prawidłowy typ zdarzenia."
@@ -2826,23 +2821,24 @@ msgstr "Wybierz prawidłowy typ zdarzenia."
 msgid "Give every event a short description."
 msgstr "Podaj krótki opis każdego zdarzenia."
 
-msgid ""
-"This event is no longer part of the scenario. Reload the page and try "
-"again."
-msgstr ""
-"To zdarzenie nie należy już do scenariusza. Odśwież stronę i spróbuj "
-"ponownie."
+msgid "This event is no longer part of the plan. Reload the page and try again."
+msgstr "Ta korekta nie jest już częścią planu. Odśwież stronę i spróbuj ponownie."
 
 msgid "The same event appears twice. Reload the page and try again."
 msgstr "To samo zdarzenie występuje dwa razy. Odśwież stronę i spróbuj ponownie."
 
-msgid "Enter a whole year for every row."
-msgstr "Podaj pełny rok w każdym wierszu."
+msgid "A year can have only one saving override."
+msgstr "W jednym roku może być tylko jedna korekta oszczędności."
 
-msgid "Archived scenarios are read-only. Restore the scenario first."
+msgid ""
+"A saving override starts in the next year; the current year uses the "
+"starting portfolio."
 msgstr ""
-"Zarchiwizowane scenariusze są tylko do odczytu. Najpierw przywróć "
-"scenariusz."
+"Korekta oszczędności zaczyna się w następnym roku; bieżący rok korzysta z"
+" portfela początkowego."
+
+msgid "Create the plan first, then add adjustments."
+msgstr "Najpierw utwórz plan, a potem dodaj korekty."
 
 msgid "A rate is outside the usual range. Tick the confirmation box to save it."
 msgstr ""
@@ -2854,112 +2850,77 @@ msgstr ""
 "Zaznacz pole potwierdzenia tylko wtedy, gdy naprawdę chcesz użyć "
 "nietypowych stóp."
 
-msgid "The plan is missing a starting value."
-msgstr "W planie brakuje wartości początkowej."
-
 msgid "The saved plan cannot be projected."
 msgstr "Nie można wykonać prognozy zapisanego planu."
 
-msgid "This loan payoff can no longer be added."
-msgstr "Tej spłaty kredytu nie można już dodać."
+msgid "This workspace already has a FIRE plan."
+msgstr "Ten obszar roboczy ma już plan FIRE."
 
-msgid "This loan payoff is already in the plan."
-msgstr "Ta spłata kredytu jest już w planie."
+msgid "Choose one of the old FIRE scenarios before creating a new plan."
+msgstr "Wybierz jeden ze starych scenariuszy FIRE przed utworzeniem nowego planu."
 
-msgid "The plan is missing a resolved starting value."
-msgstr "W planie brakuje ustalonej wartości początkowej."
-
-msgid ""
-"No regular income transactions fall in the last 12 full months, so linked"
-" income is unavailable. Add income to the ledger or switch this input to "
-"Manual."
-msgstr ""
-"W ostatnich 12 pełnych miesiącach nie ma zwykłych transakcji przychodów, "
-"więc połączony przychód jest niedostępny. Dodaj przychody do księgi lub "
-"przełącz to pole na ręczne."
+msgid "Choose one of the old FIRE scenarios to keep."
+msgstr "Wybierz jeden ze starych scenariuszy FIRE do zachowania."
 
 msgid ""
-"No regular expense transactions fall in the last 12 full months, so "
-"linked expenses are unavailable. Add expenses to the ledger or switch "
-"this input to Manual."
+"An old FIRE scenario cannot be read. Contact the workspace owner before "
+"retrying."
 msgstr ""
-"W ostatnich 12 pełnych miesiącach nie ma zwykłych transakcji wydatków, "
-"więc połączone wydatki są niedostępne. Dodaj wydatki do księgi lub "
-"przełącz to pole na ręczne."
+"Nie można odczytać starego scenariusza FIRE. Skontaktuj się z "
+"właścicielem obszaru roboczego."
 
 msgid ""
-"Every regular expense category in the window is excluded, so linked "
-"expenses are unavailable. Clear an exclusion or switch this input to "
-"Manual."
+"The workspace base currency no longer matches the plan's currency. The "
+"plan cannot be projected or changed; reset it and create a plan in the "
+"current currency."
 msgstr ""
-"Wszystkie zwykłe kategorie wydatków w oknie są wykluczone, więc połączone"
-" wydatki są niedostępne. Usuń wykluczenie lub przełącz to pole na ręczne."
+"Waluta bazowa obszaru roboczego nie odpowiada już walucie planu. Nie "
+"można prognozować ani zmieniać planu; zresetuj go i utwórz plan w "
+"bieżącej walucie."
+
+msgid "Confirm that the plan will be deleted."
+msgstr "Potwierdź, że plan zostanie usunięty."
+
+msgid "Confirm that the other old FIRE scenarios will be deleted."
+msgstr "Potwierdź, że pozostałe stare scenariusze FIRE zostaną usunięte."
 
 msgid ""
-"Some ledger rows in the window use another currency. Linked values need "
-"only the scenario currency; switch this input to Manual or review those "
-"rows."
+"The workspace base currency no longer matches the plan's currency. Reset "
+"the plan and create a new one in the current currency."
 msgstr ""
-"Niektóre wiersze księgi w oknie są w innej walucie. Połączone wartości "
-"wymagają wyłącznie waluty scenariusza; przełącz to pole na ręczne lub "
-"sprawdź te wiersze."
+"Waluta bazowa obszaru roboczego nie odpowiada już walucie planu. Zresetuj"
+" plan i utwórz nowy w bieżącej walucie."
 
 msgid ""
-"The workspace base currency no longer matches the scenario's currency, so"
-" linked values are unavailable. Create a new scenario or switch these "
-"inputs to Manual."
+"The plan's horizon is not after your current age. Raise the horizon age "
+"to project it."
 msgstr ""
-"Waluta bazowa obszaru roboczego nie pasuje już do waluty scenariusza, "
-"więc połączone wartości są niedostępne. Utwórz nowy scenariusz lub "
-"przełącz te pola na ręczne."
+"Końcowy wiek planu nie jest starszy niż Twój obecny wiek. Zwiększ wiek "
+"końcowy, aby prognozować plan."
 
-msgid ""
-"No investable portfolio classes or investable manual net-worth items were"
-" found. Add data or switch the starting portfolio to Manual."
-msgstr ""
-"Nie znaleziono inwestycyjnych klas portfela ani inwestycyjnych ręcznych "
-"pozycji majątku. Dodaj dane lub przełącz portfel początkowy na ręczny."
+msgid "The plan has an invalid amount."
+msgstr "Plan ma nieprawidłową kwotę."
 
-msgid ""
-"An investable holding has no current price. Add a price or switch the "
-"starting portfolio to Manual."
-msgstr ""
-"Inwestycyjne posiadanie nie ma bieżącej ceny. Dodaj cenę lub przełącz "
-"portfel początkowy na ręczny."
+msgid "The plan has an invalid horizon."
+msgstr "Plan ma nieprawidłowy wiek końcowy."
 
-msgid ""
-"An investable holding has no FX rate to the scenario currency. Add a rate"
-" or switch the starting portfolio to Manual."
-msgstr ""
-"Inwestycyjne posiadanie nie ma kursu walutowego do waluty scenariusza. "
-"Dodaj kurs lub przełącz portfel początkowy na ręczny."
+msgid "The plan has an invalid stop-working age."
+msgstr "Plan ma nieprawidłowy wiek zakończenia dochodu."
 
-msgid ""
-"An investable net-worth item has no value effective today. Add a "
-"valuation or switch the starting portfolio to Manual."
-msgstr ""
-"Inwestycyjna pozycja majątku nie ma wartości obowiązującej dziś. Dodaj "
-"wycenę lub przełącz portfel początkowy na ręczny."
+msgid "The plan has an invalid rate."
+msgstr "Plan ma nieprawidłową stopę."
 
-msgid ""
-"An investable net-worth item has no FX rate to the scenario currency. Add"
-" a rate or switch the starting portfolio to Manual."
-msgstr ""
-"Inwestycyjna pozycja majątku nie ma kursu walutowego do waluty "
-"scenariusza. Dodaj kurs lub przełącz portfel początkowy na ręczny."
+msgid "The plan has an invalid withdrawal rate."
+msgstr "Plan ma nieprawidłową stopę wypłat."
 
-msgid "The scenario could not be saved. Reload the page and try again."
-msgstr "Nie udało się zapisać scenariusza. Odśwież stronę i spróbuj ponownie."
+msgid "A saving override is stored in the current year and is not applied."
+msgstr "Korekta oszczędności jest zapisana w bieżącym roku i nie jest stosowana."
 
-msgid "Compare at most three scenarios at a time."
-msgstr "Porównuj najwyżej trzy scenariusze jednocześnie."
+msgid "A year has more than one saving override."
+msgstr "W jednym roku jest więcej niż jedna korekta oszczędności."
 
-msgid ""
-"The selected scenarios use different currencies. Choose scenarios that "
-"share one currency; there is no currency conversion in the comparison."
-msgstr ""
-"Wybrane scenariusze używają różnych walut. Wybierz scenariusze o tej "
-"samej walucie; porównanie nie przelicza walut."
+msgid "The plan could not be saved. Reload the page and try again."
+msgstr "Nie udało się zapisać planu. Odśwież stronę i spróbuj ponownie."
 
 msgid "The sensitivity axes are empty."
 msgstr "Osie analizy wrażliwości są puste."
@@ -2981,10 +2942,10 @@ msgstr "Osie analizy wrażliwości muszą obejmować zapisany plan."
 
 msgid ""
 "The real-return range would leave the supported -20 to 50 percent bounds."
-" Adjust the scenario's return and try again."
+" Adjust the plan's return and try again."
 msgstr ""
-"Zakres realnej stopy zwrotu wykroczyłby poza obsługiwane granice od -20 "
-"do 50 procent. Zmień stopę zwrotu scenariusza i spróbuj ponownie."
+"Zakres realnego zwrotu wykracza poza obsługiwane granice -20 do 50 "
+"procent. Dostosuj stopę zwrotu planu i spróbuj ponownie."
 
 msgid ""
 "The expense range is outside the supported 0 to 1000 percent of the saved"
@@ -3003,26 +2964,18 @@ msgstr ""
 msgid "The sensitivity grid could not be calculated."
 msgstr "Nie udało się obliczyć siatki analizy wrażliwości."
 
-msgid "Scenario created."
-msgstr "Utworzono scenariusz."
+msgid "FIRE plan created."
+msgstr "Utworzono plan FIRE."
 
-msgid "Scenario saved."
-msgstr "Zapisano scenariusz."
+msgid "FIRE plan saved."
+msgstr "Zapisano plan FIRE."
 
-msgid "Scenario duplicated."
-msgstr "Zduplikowano scenariusz."
-
-msgid "Scenario archived."
-msgstr "Zarchiwizowano scenariusz."
-
-msgid "Scenario restored."
-msgstr "Przywrócono scenariusz."
-
-msgid "Default scenario changed."
-msgstr "Zmieniono domyślny scenariusz."
-
-msgid "Loan payoff added to the plan."
-msgstr "Dodano spłatę kredytu do planu."
+msgid ""
+"The old FIRE scenario was converted to the one-plan format. Review its "
+"values."
+msgstr ""
+"Stary scenariusz FIRE został przekształcony w format jednego planu. "
+"Sprawdź jego wartości."
 
 msgid "Returns cover expenses"
 msgstr "Zwrot pokrywa wydatki"
@@ -3038,6 +2991,9 @@ msgstr "Zmiana rocznych wydatków"
 
 msgid "Annual income change"
 msgstr "Zmiana rocznych dochodów"
+
+msgid "Saving override"
+msgstr "Korekta oszczędności"
 
 msgid "annual income"
 msgstr "roczne dochody"
@@ -3694,6 +3650,10 @@ msgstr "Najpierw dodaj kategorię wydatków."
 
 msgid "Add an income category first."
 msgstr "Najpierw dodaj kategorię przychodów."
+
+#, python-format
+msgid "%(name)s (archived)"
+msgstr "%(name)s (zarchiwizowana)"
 
 #, python-format
 msgid "Rate change: %(rate)s"
@@ -6210,52 +6170,39 @@ msgstr ""
 msgid "Plotted expenses and gain data"
 msgstr "Dane wykresu wydatków i zysku"
 
-msgid "Net saving"
-msgstr "Oszczędności netto"
-
-msgid "this contribution row"
-msgstr "ten wiersz składki"
+msgid "Archived"
+msgstr "Zarchiwizowana"
 
 msgid "Description"
 msgstr "Opis"
 
-msgid "this event"
-msgstr "to zdarzenie"
+msgid "this adjustment"
+msgstr "tę korektę"
 
 msgid "Plan"
 msgstr "Plan"
 
-msgid "Scenario name"
-msgstr "Nazwa scenariusza"
+msgid "First projected year"
+msgstr "Pierwszy prognozowany rok"
 
-msgid "Start year"
-msgstr "Rok rozpoczęcia"
+msgid "The projection always starts in the current calendar year."
+msgstr "Prognoza zawsze zaczyna się w bieżącym roku kalendarzowym."
 
-msgid "Fixed when the scenario is created, so a saved plan stays reproducible."
-msgstr ""
-"Ustalany przy tworzeniu scenariusza, aby zapisany plan pozostał "
-"odtwarzalny."
-
-msgid "The current year when the scenario was created."
-msgstr "Bieżący rok w momencie utworzenia scenariusza."
-
-msgid "Snapshotted from the workspace base currency."
-msgstr "Zapisana z waluty bazowej obszaru roboczego."
+msgid "Snapshotted from the workspace base currency when the plan is created."
+msgstr "Kopia waluty bazowej obszaru roboczego z chwili utworzenia planu."
 
 msgid "Birth year"
 msgstr "Rok urodzenia"
 
 msgid ""
-"Used to turn plan years into ages. It is stored with the scenario and "
+"Used to turn plan years into ages. It is stored with the plan and "
 "prefilled from your profile."
 msgstr ""
-"Służy do przeliczania lat planu na wiek. Jest zapisywany w scenariuszu i "
-"wstępnie wypełniany z profilu."
+"Służy do zamiany lat planu na wiek. Jest zapisywany w planie i wstępnie "
+"wypełniany z profilu."
 
-msgid ""
-"Required. You can change it for this scenario without changing your "
-"profile."
-msgstr "Wymagany. Możesz go zmienić dla tego scenariusza bez zmiany profilu."
+msgid "Required. You can change it for this plan without changing your profile."
+msgstr "Wymagany. Możesz zmienić go dla tego planu bez zmiany profilu."
 
 msgid "Horizon age"
 msgstr "Wiek horyzontu"
@@ -6272,10 +6219,12 @@ msgstr "Dochody kończą się w wieku"
 
 msgid ""
 "The age at which income stops; from then on the plan spends from the "
-"portfolio."
+"portfolio. If this age is in the past, income is zero and the page "
+"explains it."
 msgstr ""
-"Wiek, w którym kończą się dochody; od tego momentu plan wydaje środki z "
-"portfela."
+"Wiek, w którym dochód się kończy; od tego momentu plan korzysta z "
+"portfela. Jeśli ten wiek już minął, dochód wynosi zero, a strona to "
+"wyjaśnia."
 
 msgid "Assumptions"
 msgstr "Założenia"
@@ -6346,168 +6295,80 @@ msgstr "Kwoty początkowe"
 
 #, python-format
 msgid ""
-"All amounts are in %(currency)s and in today's money. Enter the yearly "
-"income and expenses at the start of the plan."
+"All amounts are in %(currency)s and in today's money at the start of the "
+"plan. Enter the yearly income and expenses, including loan payments."
 msgstr ""
-"Wszystkie kwoty są w %(currency)s i w dzisiejszej wartości pieniądza. "
-"Wprowadź roczne dochody i wydatki na początku planu."
+"Wszystkie kwoty są w %(currency)s i w dzisiejszych pieniądzach na "
+"początku planu. Wpisz roczny dochód i wydatki, w tym spłaty kredytów."
 
 msgid "Annual income"
 msgstr "Roczne dochody"
 
 msgid ""
-"Regular income in the start year: earnings, dividends and interest, "
-"before tax and other deductions. Linked income sums every regular income "
-"transaction."
+"Regular income in the current year: earnings, dividends and interest, "
+"before tax and other deductions."
 msgstr ""
-"Regularne dochody w roku rozpoczęcia: zarobki, dywidendy i odsetki, przed"
-" podatkiem i innymi potrąceniami. Połączone dochody sumują wszystkie "
-"regularne transakcje przychodowe."
-
-msgid "Last 12 full months"
-msgstr "Ostatnie 12 pełnych miesięcy"
+"Regularny dochód w bieżącym roku: zarobki, dywidendy i odsetki, przed "
+"podatkami i innymi potrąceniami."
 
 msgid "Annual expenses"
 msgstr "Roczne wydatki"
 
 msgid ""
-"Regular yearly spending in the start year, excluding savings and "
-"transfers."
+"Regular yearly spending in the current year, excluding savings and "
+"transfers. Include your loan payments; the planner will remove an "
+"included loan's payment after its payoff later."
 msgstr ""
-"Regularne roczne wydatki w roku rozpoczęcia, bez oszczędności i "
-"transferów."
+"Regularne roczne wydatki w bieżącym roku, bez oszczędności i przelewów. "
+"Uwzględnij spłaty kredytów; plan usunie spłatę uwzględnionego kredytu po "
+"jego spłacie."
 
 msgid "Starting portfolio"
 msgstr "Portfel początkowy"
 
-msgid ""
-"Investable assets at the start: investments and cash savings, not your "
-"home."
-msgstr ""
-"Aktywa inwestycyjne na początku: inwestycje i oszczędności gotówkowe, bez"
-" domu."
+msgid "Investable assets today: investments and cash savings, not your home."
+msgstr "Inwestowalne aktywa dziś: inwestycje i oszczędności gotówkowe, bez domu."
 
-msgid "Investable assets"
-msgstr "Aktywa inwestycyjne"
-
-msgid ""
-"Linked sources use today's data in the scenario currency: the last 12 "
-"full months for income and expenses, and the current investable "
-"portfolio."
-msgstr ""
-"Połączone źródła używają dzisiejszych danych w walucie scenariusza: "
-"ostatnich 12 pełnych miesięcy dla przychodów i wydatków oraz bieżącego "
-"portfela inwestycyjnego."
-
-msgid "Expense exclusions"
-msgstr "Wykluczenia wydatków"
-
-msgid ""
-"Choose regular expense categories to leave out of the linked trailing "
-"expenses, for example unusual one-off spending. Income is not affected."
-msgstr ""
-"Wybierz zwykłe kategorie wydatków, które mają być pominięte w połączonych"
-" wydatkach z ostatnich 12 miesięcy, na przykład nietypowe jednorazowe "
-"wydatki. Przychody nie są objęte wykluczeniem."
-
-msgid ""
-"Only used when expenses are read from the app's data. The excluded "
-"categories' window totals are shown separately in the linked inputs "
-"panel."
-msgstr ""
-"Używane tylko wtedy, gdy wydatki są odczytywane z danych aplikacji. Sumy "
-"wykluczonych kategorii w oknie są pokazane osobno w panelu połączonych "
-"danych."
-
-msgid "Archived"
-msgstr "Zarchiwizowana"
-
-msgid "No regular expense categories are available yet."
-msgstr "Nie ma jeszcze zwykłych kategorii wydatków."
-
-msgid "Contribution overrides"
-msgstr "Nadpisania składek"
-
-msgid ""
-"A positive amount is net saving in that year; a negative amount is net "
-"dissaving. A year without a row uses income minus expenses."
-msgstr ""
-"Kwota dodatnia oznacza oszczędności netto w danym roku; ujemna — "
-"wydawanie oszczędności netto. Rok bez wiersza używa dochodów minus "
-"wydatki."
-
-#, python-format
-msgid "Years %(start)d to %(end)d"
-msgstr "Lata %(start)d–%(end)d"
-
-msgid ""
-"Optional explicit net savings for individual years. Paste a column from a"
-" spreadsheet or add rows one by one."
-msgstr ""
-"Opcjonalne jawne oszczędności netto dla poszczególnych lat. Wklej kolumnę"
-" z arkusza albo dodawaj wiersze po kolei."
-
-msgid "Paste a column (amounts, or year and amount)"
-msgstr "Wklej kolumnę (kwoty albo rok i kwota)"
-
-msgid "2029, 15000"
-msgstr "2029, 15000"
-
-msgid "Paste a column first."
-msgstr "Najpierw wklej kolumnę."
-
-msgid "Rows filled from the pasted column."
-msgstr "Wiersze wypełnione z wklejonej kolumny."
-
-msgid "Fill rows from the pasted column"
-msgstr "Wypełnij wiersze z wklejonej kolumny"
-
-#, python-format
-msgid ""
-"Bare amounts fill consecutive years from %(start)d; a blank line skips a "
-"year. Lines like 2029, 15000 or a year and an amount separated by a tab "
-"fill those years. Pasting replaces the rows below."
-msgstr ""
-"Same kwoty wypełniają kolejne lata od %(start)d; pusta linia pomija rok. "
-"Wiersze typu 2029, 15000 albo rok i kwota rozdzielone tabulatorem "
-"wypełniają te lata. Wklejenie zastępuje wiersze poniżej."
-
-#, python-format
-msgid "Net saving (%(currency)s)"
-msgstr "Oszczędności netto (%(currency)s)"
-
-msgid "Add a contribution row"
-msgstr "Dodaj wiersz składki"
+msgid "Adjustments"
+msgstr "Korekty"
 
 msgid ""
 "A one-off cash flow is added to net worth in that year. An expense or "
-"income change alters the annual series from that year onward. Negative "
-"amounts reduce, positive amounts increase."
+"income change alters the annual series from that year onward. A saving "
+"override replaces that year's net saving and is unique per year. Negative"
+" amounts reduce, positive amounts increase."
 msgstr ""
-"Jednorazowy przepływ gotówki jest dodawany do majątku netto w danym roku."
-" Zmiana wydatków lub dochodów zmienia roczną serię od tego roku. Kwoty "
-"ujemne zmniejszają, dodatnie zwiększają."
+"Jednorazowy przepływ gotówki jest dodawany do majątku w danym roku. "
+"Zmiana wydatków lub dochodów zmienia roczną serię od tego roku. Korekta "
+"oszczędności zastępuje oszczędności netto w danym roku i jest unikalna "
+"dla roku. Kwoty ujemne zmniejszają, dodatnie zwiększają."
+
+#, python-format
+msgid "Years %(start)d to %(end)d; a saving override starts in %(override)d"
+msgstr "Lata %(start)d–%(end)d; korekta oszczędności zaczyna się w %(override)d"
 
 msgid ""
-"Optional one-off inflows or outflows, and permanent changes to the yearly"
-" expense or income series."
+"Adjustments before the current year are kept as archived history and are "
+"not applied to the projection."
 msgstr ""
-"Opcjonalne jednorazowe wpływy lub wypływy oraz trwałe zmiany rocznej "
-"serii wydatków lub dochodów."
+"Korekty sprzed bieżącego roku są zachowywane jako historia i nie są "
+"stosowane do prognozy."
 
 #, python-format
 msgid "Amount (%(currency)s)"
 msgstr "Kwota (%(currency)s)"
 
-msgid "Add an event"
-msgstr "Dodaj zdarzenie"
+msgid "Add an adjustment"
+msgstr "Dodaj korektę"
 
 msgid ""
 "Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
-"repaid; 500 per year of extra rental income."
+"repaid; 500 per year of extra rental income; a whole-year net saving "
+"override."
 msgstr ""
-"Przykłady: jednorazowy wpływ 20 000 gotówki; −1 200 rocznie po spłacie "
-"kredytu; 500 rocznie dodatkowego dochodu z najmu."
+"Przykłady: jednorazowy wpływ 20 000; −1 200 rocznie po spłacie kredytu; "
+"500 rocznie dodatkowego dochodu z najmu; korekta oszczędności na cały "
+"rok."
 
 msgid "Plan inputs"
 msgstr "Dane planu"
@@ -6533,204 +6394,8 @@ msgstr "Zapisz zmiany"
 msgid "Discard changes"
 msgstr "Odrzuć zmiany"
 
-msgid "This scenario is archived and read-only. Restore it to change its inputs."
-msgstr ""
-"Ten scenariusz jest zarchiwizowany i tylko do odczytu. Przywróć go, aby "
-"zmienić dane."
-
 msgid "Your role can read this plan but not change it."
 msgstr "Twoja rola pozwala czytać ten plan, ale nie zmieniać go."
-
-msgid "Linked inputs"
-msgstr "Połączone dane"
-
-#, python-format
-msgid "As of %(day)s"
-msgstr "Na dzień %(day)s"
-
-msgid ""
-"Values read from the app's own data. The projection still uses the "
-"scenario currency and start year; nothing is written by a preview."
-msgstr ""
-"Wartości odczytane z danych aplikacji. Prognoza nadal używa waluty "
-"scenariusza i roku początkowego; podgląd niczego nie zapisuje."
-
-#, python-format
-msgid ""
-"Only %(months)d of the last 12 full months have data. The annual amount "
-"is scaled from those months."
-msgstr ""
-"Tylko %(months)d z ostatnich 12 pełnych miesięcy ma dane. Kwota roczna "
-"jest przeliczona z tych miesięcy."
-
-#, python-format
-msgid ""
-"The latest included data is from %(month)s, before the window ends on "
-"%(end)s."
-msgstr ""
-"Najnowsze uwzględnione dane pochodzą z %(month)s, przed końcem okna "
-"%(end)s."
-
-#, python-format
-msgid ""
-"The plan starts in %(start)d but the linked data is as of %(current)d. "
-"Later data cannot be included until the plan is recreated."
-msgstr ""
-"Plan zaczyna się w %(start)d, a połączone dane są na dzień %(current)d. "
-"Późniejsze dane nie mogą być uwzględnione, dopóki plan nie zostanie "
-"utworzony ponownie."
-
-#, python-format
-msgid "The latest price for %(name)s is stale."
-msgstr "Najnowsza cena dla %(name)s jest nieaktualna."
-
-#, python-format
-msgid "The latest FX rate for %(name)s is stale."
-msgstr "Najnowszy kurs walutowy dla %(name)s jest nieaktualny."
-
-msgid ""
-"The linked portfolio has sources but sums to zero today. The plan "
-"continues with a zero starting portfolio."
-msgstr ""
-"Połączony portfel ma źródła, ale dziś sumuje się do zera. Plan kontynuuje"
-" z zerowym portfelem początkowym."
-
-#, python-format
-msgid ""
-"%(count)s non-investable asset class is excluded from the linked "
-"portfolio."
-msgid_plural ""
-"%(count)s non-investable asset classes are excluded from the linked "
-"portfolio."
-msgstr[0] ""
-"%(count)s nieinwestycyjna klasa aktywów jest wyłączona z połączonego "
-"portfela."
-msgstr[1] ""
-"%(count)s nieinwestycyjne klasy aktywów są wyłączone z połączonego "
-"portfela."
-msgstr[2] ""
-"%(count)s nieinwestycyjnych klas aktywów jest wyłączonych z połączonego "
-"portfela."
-
-#, python-format
-msgid "%(count)s linked net-worth item is skipped to avoid double counting."
-msgid_plural "%(count)s linked net-worth items are skipped to avoid double counting."
-msgstr[0] ""
-"%(count)s połączona pozycja majątku jest pomijana, aby uniknąć podwójnego"
-" liczenia."
-msgstr[1] ""
-"%(count)s połączone pozycje majątku są pomijane, aby uniknąć podwójnego "
-"liczenia."
-msgstr[2] ""
-"%(count)s połączonych pozycji majątku jest pomijanych, aby uniknąć "
-"podwójnego liczenia."
-
-#, python-format
-msgid ""
-"As of %(day)s. Investable portfolio classes and manual net-worth items "
-"marked investable."
-msgstr ""
-"Na dzień %(day)s. Inwestycyjne klasy portfela i ręczne pozycje majątku "
-"oznaczone jako inwestycyjne."
-
-msgid "Linked starting portfolio breakdown"
-msgstr "Podział połączonego portfela początkowego"
-
-msgid "Trailing income"
-msgstr "Przychody z ostatnich 12 miesięcy"
-
-msgid "Trailing expenses"
-msgstr "Wydatki z ostatnich 12 miesięcy"
-
-msgid "per year"
-msgstr "rocznie"
-
-#, python-format
-msgid ""
-"Window %(start)s – %(end)s: %(months)d months with data; window total "
-"%(total)s."
-msgstr ""
-"Okno %(start)s – %(end)s: %(months)d miesięcy z danymi; suma w oknie "
-"%(total)s."
-
-msgid "Linked trailing income by category"
-msgstr "Połączone przychody z ostatnich 12 miesięcy według kategorii"
-
-msgid "Linked trailing expenses by category"
-msgstr "Połączone wydatki z ostatnich 12 miesięcy według kategorii"
-
-msgid "Window total"
-msgstr "Suma w oknie"
-
-msgid "Excluded categories"
-msgstr "Wykluczone kategorie"
-
-#, python-format
-msgid ""
-"Left out of the linked expenses; shown for transparency. Window total "
-"%(total)s."
-msgstr ""
-"Pominięte w połączonych wydatkach; pokazane dla przejrzystości. Suma w "
-"oknie %(total)s."
-
-msgid "Loan payoff suggestions"
-msgstr "Sugestie spłaty kredytów"
-
-msgid ""
-"Paying a loan off frees its contractual instalments from the payoff year "
-"onward. The amount is the next up to 12 contractual payments (interest, "
-"principal and costs, without overpayments), in today's money."
-msgstr ""
-"Spłata kredytu uwalnia jego umowne raty od roku spłaty. Kwota to następne"
-" maksymalnie 12 umownych płatności (odsetki, kapitał i koszty, bez "
-"nadpłat), w dzisiejszych pieniądzach."
-
-msgid ""
-"Suggestions use the saved plan and the loan schedules as of this page "
-"load; unsaved Plan-input changes do not update them."
-msgstr ""
-"Sugestie korzystają z zapisanego planu i harmonogramów kredytów z chwili "
-"wczytania strony; niezapisane zmiany w danych planu ich nie aktualizują."
-
-#, python-format
-msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
-msgstr "Spłata w %(year)d uwalnia %(amount)s/rok (w dzisiejszych pieniądzach)."
-
-#, python-format
-msgid "Based on the next %(months)d contractual instalments."
-msgstr "Na podstawie następnych %(months)d umownych rat."
-
-msgid "Add this loan payoff event? Unsaved changes in Plan inputs will be lost."
-msgstr ""
-"Dodać to zdarzenie spłaty kredytu? Niezapisane zmiany w danych planu "
-"zostaną utracone."
-
-msgid "Add payoff event"
-msgstr "Dodaj zdarzenie spłaty"
-
-msgid "Only editors can add a payoff event."
-msgstr "Tylko redaktorzy mogą dodać zdarzenie spłaty."
-
-msgid "This scenario is archived and read-only."
-msgstr "Ten scenariusz jest zarchiwizowany i tylko do odczytu."
-
-msgid "This loan is already paid off, so there is nothing to add."
-msgstr "Ten kredyt jest już spłacony, więc nie ma czego dodawać."
-
-msgid "A payoff event for this loan is already in the plan."
-msgstr "Zdarzenie spłaty tego kredytu jest już w planie."
-
-msgid "The loan schedule cannot be calculated. Check the loan settings."
-msgstr "Nie można obliczyć harmonogramu kredytu. Sprawdź ustawienia kredytu."
-
-msgid "The payoff year falls outside the plan window."
-msgstr "Rok spłaty wykracza poza okno planu."
-
-msgid "The loan is in another currency than the plan."
-msgstr "Kredyt jest w innej walucie niż plan."
-
-msgid "No positive annual amount can be calculated for this loan."
-msgstr "Nie można obliczyć dodatniej kwoty rocznej dla tego kredytu."
 
 #, python-format
 msgid "Bar capped at 100%%, exact value %(value)s"
@@ -6838,21 +6503,23 @@ msgstr "Pieniądze każdego roku"
 msgid "Today's money"
 msgstr "Dzisiejsze pieniądze"
 
-msgid "A view preference; it is not saved with the scenario."
-msgstr "Preferencja widoku; nie jest zapisywana ze scenariuszem."
+msgid "A view preference; it is not saved with the plan."
+msgstr "Preferencja widoku; nie jest zapisywana w planie."
 
 msgid "The projection is unavailable"
 msgstr "Prognoza jest niedostępna"
 
-msgid "The linked input could not be resolved."
-msgstr "Nie udało się ustalić połączonej wartości."
+msgid "The plan cannot be projected."
+msgstr "Nie można prognozować planu."
 
 msgid ""
-"Switch the affected input to Manual in Plan inputs, or fix the linked "
-"data."
+"These adjustments are before the plan's current year (or a saving "
+"override in the current year) and are not applied to the projection. They"
+" stay in the plan as history."
 msgstr ""
-"Przełącz odpowiednie pole na ręczne w danych planu lub popraw połączone "
-"dane."
+"Te korekty są sprzed bieżącego roku planu (lub korekta oszczędności w "
+"bieżącym roku) i nie są stosowane do prognozy. Pozostają w planie jako "
+"historia."
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
@@ -6913,12 +6580,8 @@ msgstr "Nie osiąga FIRE przed horyzontem"
 msgid "Refresh grid"
 msgstr "Odśwież siatkę"
 
-msgid ""
-"The grid always uses the saved inputs, including linked values and "
-"exclusions."
-msgstr ""
-"Siatka zawsze używa zapisanych danych, w tym wartości powiązanych i "
-"wykluczeń."
+msgid "The grid always uses the saved plan, not unsaved changes."
+msgstr "Siatka zawsze używa zapisanego planu, a nie niezapisanych zmian."
 
 msgid "Sensitivity"
 msgstr "Wrażliwość"
@@ -6958,6 +6621,9 @@ msgstr "w dzisiejszych pieniądzach"
 msgid "each year's money"
 msgstr "w pieniądzach każdego roku"
 
+msgid "Net saving"
+msgstr "Oszczędności netto"
+
 msgid "Cash"
 msgstr "Gotówka"
 
@@ -6978,121 +6644,63 @@ msgstr ""
 "Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
 " wyczerpany wiersz jest oznaczony na czerwono."
 
-msgid "Compare scenarios"
-msgstr "Porównaj scenariusze"
+msgid "Choose your FIRE plan"
+msgstr "Wybierz plan FIRE"
 
-msgid "All scenarios"
-msgstr "Wszystkie scenariusze"
+msgid "This workspace has old FIRE scenarios"
+msgstr "Ten obszar roboczy ma stare scenariusze FIRE"
 
 msgid ""
-"Choose up to three saved scenarios. Their FIRE metrics and net worth are "
-"shown side by side; archived scenarios can be compared too."
+"The FIRE planner now keeps one plan per workspace. Choose the scenario to"
+" keep; the other scenarios and their adjustments will be deleted. Before "
+"you confirm, download a backup from the workspace data page if you want a"
+" copy of the old scenarios."
 msgstr ""
-"Wybierz do trzech zapisanych scenariuszy. Ich metryki FIRE i wartość "
-"netto są pokazane obok siebie; można porównywać także zarchiwizowane "
-"scenariusze."
+"Planer FIRE przechowuje teraz jeden plan na obszar roboczy. Wybierz "
+"scenariusz do zachowania; pozostałe scenariusze i ich korekty zostaną "
+"usunięte. Przed potwierdzeniem pobierz kopię zapasową ze strony danych "
+"obszaru roboczego, jeśli chcesz zachować stare scenariusze."
 
-msgid "Active scenarios"
-msgstr "Aktywne scenariusze"
+msgid ""
+"The chosen plan will be converted to the one-plan format and marked for "
+"review. Linked values are resolved once during this conversion."
+msgstr ""
+"Wybrany plan zostanie przekształcony w format jednego planu i oznaczony "
+"do sprawdzenia. Powiązane wartości są wyliczane jednorazowo podczas tej "
+"konwersji."
 
 msgid "Default"
 msgstr "Domyślny"
 
-msgid "Linked"
-msgstr "Powiązane"
+msgid "Needs attention"
+msgstr "Wymaga uwagi"
 
 #, python-format
-msgid "Age %(age)d in %(year)d"
-msgstr "Wiek %(age)d w %(year)d"
-
-msgid "Archived scenarios"
-msgstr "Zarchiwizowane scenariusze"
-
-msgid "Compare selected"
-msgstr "Porównaj wybrane"
-
-msgid "With nothing selected, the default scenario is shown."
-msgstr "Gdy nic nie wybrano, pokazywany jest domyślny scenariusz."
-
-msgid "No scenarios to compare yet."
-msgstr "Nie ma jeszcze scenariuszy do porównania."
-
-msgid "Open the FIRE planner"
-msgstr "Otwórz planer FIRE"
+msgid "Start year %(year)d · age %(age)d · %(currency)s · %(count)d adjustment(s)"
+msgstr "Rok początkowy %(year)d · wiek %(age)d · %(currency)s · korekty: %(count)d"
 
 msgid ""
-"These scenarios start in different years. Today's-money values are "
-"anchored to each scenario's start year, so compare them with care."
+"I understand that the other old FIRE scenarios and their adjustments will"
+" be deleted."
 msgstr ""
-"Te scenariusze zaczynają się w różnych latach. Wartości w dzisiejszych "
-"pieniądzach są zakotwiczone w roku rozpoczęcia każdego scenariusza, więc "
-"porównuj je ostrożnie."
+"Rozumiem, że pozostałe stare scenariusze FIRE i ich korekty zostaną "
+"usunięte."
 
-msgid "Scenario comparison"
-msgstr "Porównanie scenariuszy"
+msgid "Keep this plan and delete the others"
+msgstr "Zachowaj ten plan i usuń pozostałe"
 
-#, python-format
-msgid "%(num)d scenario selected"
-msgid_plural "%(num)d scenarios selected"
-msgstr[0] "%(num)d wybrany scenariusz"
-msgstr[1] "%(num)d wybrane scenariusze"
-msgstr[2] "%(num)d wybranych scenariuszy"
-
-msgid "FIRE results by scenario"
-msgstr "Wyniki FIRE według scenariuszy"
-
-msgid "Scenario"
-msgstr "Scenariusz"
-
-msgid "Start"
-msgstr "Początek"
-
-msgid "Net worth at FIRE (today's money)"
-msgstr "Wartość netto na FIRE (w dzisiejszych pieniądzach)"
-
-msgid "Depletion age"
-msgstr "Wiek wyczerpania"
-
-msgid "Unavailable"
-msgstr "Niedostępny"
-
-#, python-format
-msgid "Never before age %(age)d"
-msgstr "Nigdy przed wiekiem %(age)d"
-
-msgid "FIRE reached"
-msgstr "Osiągnięto FIRE"
-
-#, python-format
-msgid "Age %(age)d"
-msgstr "Wiek %(age)d"
+msgid "Download a backup"
+msgstr "Pobierz kopię zapasową"
 
 msgid ""
-"No years after income stops fall inside the horizon, so depletion was not"
-" checked."
+"An editor or owner must choose one of these scenarios before the FIRE "
+"planner can be used."
 msgstr ""
-"Żadne lata po zakończeniu dochodów nie mieszczą się w horyzoncie, więc "
-"nie sprawdzono wyczerpania."
+"Edytor lub właściciel musi wybrać jeden z tych scenariuszy, zanim będzie "
+"można używać planera FIRE."
 
-msgid ""
-"Net worth at FIRE is always in today's money. The chart follows the "
-"selected basis."
-msgstr ""
-"Wartość netto na FIRE jest zawsze w dzisiejszych pieniądzach. Wykres "
-"podąża za wybranym sposobem prezentacji."
-
-msgid "Net worth over time by scenario"
-msgstr "Wartość netto w czasie według scenariuszy"
-
-msgid "Plotted scenario net worth data"
-msgstr "Dane wykresu wartości netto scenariuszy"
-
-msgid ""
-"No selected scenario can be plotted. Fix the blocked plans or select "
-"another scenario."
-msgstr ""
-"Żadnego z wybranych scenariuszy nie można narysować. Napraw zablokowane "
-"plany lub wybierz inny scenariusz."
+msgid "FIRE plan"
+msgstr "Plan FIRE"
 
 msgid "Open your profile"
 msgstr "Otwórz swój profil"
@@ -7104,108 +6712,61 @@ msgstr ""
 "Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
 "Początkowe stopy są przykładami, a nie rekomendacjami."
 
-msgid "Save scenario"
-msgstr "Zapisz scenariusz"
+msgid "Create plan"
+msgstr "Utwórz plan"
 
-msgid "New scenario"
-msgstr "Nowy scenariusz"
-
-msgid "Plan your financial independence"
-msgstr "Zaplanuj niezależność finansową"
+msgid "Edit plan"
+msgstr "Edytuj plan"
 
 msgid ""
-"A scenario keeps the assumptions of one plan: your age, the rates, the "
-"starting amounts and any yearly overrides or one-off events. Results and "
-"projections arrive in a later update; for now the scenario stores and "
-"validates the plan."
+"This plan was converted from the old format. Review its values and save "
+"to confirm them."
 msgstr ""
-"Scenariusz przechowuje założenia jednego planu: Twój wiek, stopy, kwoty "
-"początkowe oraz roczne nadpisania lub jednorazowe zdarzenia. Wyniki i "
-"prognozy pojawią się w późniejszej aktualizacji; teraz scenariusz "
-"zapisuje i sprawdza plan."
+"Ten plan został przekształcony ze starego formatu. Sprawdź jego wartości "
+"i zapisz, aby je potwierdzić."
+
+msgid "Review the plan inputs"
+msgstr "Sprawdź dane planu"
 
 #, python-format
-msgid "%(num)d active scenario"
-msgid_plural "%(num)d active scenarios"
-msgstr[0] "%(num)d aktywny scenariusz"
-msgstr[1] "%(num)d aktywne scenariusze"
-msgstr[2] "%(num)d aktywnych scenariuszy"
-
-msgid "Horizon"
-msgstr "Horyzont"
-
-msgid "Real return"
-msgstr "Realna stopa zwrotu"
-
-msgid "Inflation"
-msgstr "Inflacja"
+msgid "First year %(year)d · age %(age)d · currency %(currency)s"
+msgstr "Pierwszy rok %(year)d · wiek %(age)d · waluta %(currency)s"
 
 #, python-format
-msgid "%(num)d contribution override"
-msgid_plural "%(num)d contribution overrides"
-msgstr[0] "%(num)d nadpisanie składki"
-msgstr[1] "%(num)d nadpisania składek"
-msgstr[2] "%(num)d nadpisań składek"
+msgid "%(num)d adjustment"
+msgid_plural "%(num)d adjustments"
+msgstr[0] "%(num)d korekta"
+msgstr[1] "%(num)d korekty"
+msgstr[2] "%(num)d korekt"
 
 #, python-format
-msgid "%(num)d event"
-msgid_plural "%(num)d events"
-msgstr[0] "%(num)d zdarzenie"
-msgstr[1] "%(num)d zdarzenia"
-msgstr[2] "%(num)d zdarzeń"
-
-msgid "Open"
-msgstr "Otwarty"
-
-msgid "Make default"
-msgstr "Ustaw jako domyślny"
-
-msgid "Duplicate"
-msgstr "Duplikuj"
-
-#, python-format
-msgid "Archive the scenario %(name)s?"
-msgstr "Zarchiwizować scenariusz %(name)s?"
-
-msgid "No active scenarios yet."
-msgstr "Nie ma jeszcze aktywnych scenariuszy."
+msgid "%(num)d archived"
+msgid_plural "%(num)d archived"
+msgstr[0] "%(num)d zarchiwizowana"
+msgstr[1] "%(num)d zarchiwizowane"
+msgstr[2] "%(num)d zarchiwizowanych"
 
 msgid ""
-"Create a scenario to store your assumptions. The first one becomes the "
-"default."
-msgstr "Utwórz scenariusz, aby zapisać założenia. Pierwszy stanie się domyślny."
-
-msgid "An editor or owner of this workspace can add scenarios."
-msgstr "Scenariusze może dodawać edytor lub właściciel tego obszaru roboczego."
-
-msgid ""
-"Archived scenarios are read-only and keep their inputs. Restore one to "
-"edit it again."
+"The horizon age is not after your current age. Raise it in Plan inputs to"
+" project the plan."
 msgstr ""
-"Zarchiwizowane scenariusze są tylko do odczytu i zachowują swoje dane. "
-"Przywróć scenariusz, aby go ponownie edytować."
+"Wiek końcowy nie jest starszy niż Twój obecny wiek. Zwiększ go w danych "
+"planu, aby prognozować plan."
 
-#, python-format
-msgid "archived %(date)s"
-msgstr "zarchiwizowano %(date)s"
-
-msgid "Compare"
-msgstr "Porównaj"
-
-#, python-format
-msgid "Start year %(year)d · age %(age)d at the start · currency %(currency)s"
-msgstr "Rok rozpoczęcia %(year)d · wiek %(age)d na początku · waluta %(currency)s"
-
-msgid "Edit scenario"
-msgstr "Edytuj scenariusz"
+msgid ""
+"Income already stops at or before your current age, so base income is "
+"zero. The plan still spends from the portfolio."
+msgstr ""
+"Dochód kończy się już w Twoim wieku lub wcześniej, więc dochód bazowy "
+"wynosi zero. Plan nadal korzysta z portfela."
 
 #, python-format
 msgid ""
 "Income stops after the plan's horizon. The plan is saved, but the "
-"projection will have no working years beyond age %(horizon)d."
+"projection has no working years beyond age %(horizon)d."
 msgstr ""
-"Dochody kończą się po horyzoncie planu. Plan zostanie zapisany, ale "
-"prognoza nie będzie miała lat pracy po osiągnięciu wieku %(horizon)d."
+"Dochód kończy się po horyzoncie planu. Plan jest zapisany, ale prognoza "
+"nie ma lat pracy po wieku %(horizon)d."
 
 msgid "Filters"
 msgstr "Filtry"
@@ -9090,6 +8651,9 @@ msgstr "Następna płatność"
 msgid "Closed"
 msgstr "Zamknięty"
 
+msgid "Open"
+msgstr "Otwarty"
+
 #, python-format
 msgid "Paid %(paid)s of %(total)s installments"
 msgstr "Spłacono %(paid)s z %(total)s rat"
@@ -10132,6 +9696,12 @@ msgstr ""
 "Porównanie i wykres są ukryte, dopóki warunki kredytu nie pozwolą "
 "zbudować harmonogramu."
 
+msgid "Scenario comparison"
+msgstr "Porównanie scenariuszy"
+
+msgid "Scenario"
+msgstr "Scenariusz"
+
 msgid "Months saved vs baseline"
 msgstr "Zaoszczędzone miesiące wzgl. bazy"
 
@@ -10565,9 +10135,6 @@ msgstr "Nie wygenerowano jeszcze żadnych wystąpień."
 
 msgid "Post next installment"
 msgstr "Zaksięguj następną ratę"
-
-msgid "Edit plan"
-msgstr "Edytuj plan"
 
 msgid "Restore plan"
 msgstr "Plan przywracania"
@@ -12205,32 +11772,8 @@ msgstr "Ustawienia dostawcy"
 msgid "Risk targets restored"
 msgstr "Przywrócone cele ryzyka"
 
-msgid "FIRE scenarios"
-msgstr "Scenariusze FIRE"
-
-msgid "FIRE contributions"
-msgstr "Składki FIRE"
-
 msgid "FIRE events"
 msgstr "Zdarzenia FIRE"
-
-msgid "FIRE expense exclusions"
-msgstr "Wykluczenia wydatków FIRE"
-
-msgid "FIRE inputs restored as manual"
-msgstr "Wartości FIRE przywrócone jako ręczne"
-
-msgid "FIRE inputs restored as zero"
-msgstr "Wartości FIRE przywrócone jako zero"
-
-msgid "FIRE exclusions skipped"
-msgstr "Pominięte wykluczenia FIRE"
-
-msgid "FIRE loan links cleared"
-msgstr "Wyczyszczone powiązania kredytów FIRE"
-
-msgid "FIRE default scenario promoted"
-msgstr "Awansowano domyślny scenariusz FIRE"
 
 msgid "Suggested categories to remove"
 msgstr "Proponowane kategorie do usunięcia"
@@ -13473,7 +13016,7 @@ msgstr "Usuń obszar roboczy…"
 #~ msgstr "Rodzaju stopy nie można zmienić po utworzeniu kredytu."
 
 #~ msgid "Unavailable"
-#~ msgstr "Niedostępne"
+#~ msgstr "Niedostępny"
 
 #~ msgid "Income growth"
 #~ msgstr "Wzrost dochodów"
@@ -13537,4 +13080,829 @@ msgstr "Usuń obszar roboczy…"
 #~ msgstr ""
 #~ "Dochody z pracy w roku rozpoczęcia, "
 #~ "przed podatkiem i innymi potrąceniami."
+
+#~ msgid "FIRE scenario added"
+#~ msgstr "Dodano scenariusz FIRE"
+
+#~ msgid "FIRE scenario changed"
+#~ msgstr "Zmieniono scenariusz FIRE"
+
+#~ msgid "FIRE scenario duplicated"
+#~ msgstr "Zduplikowano scenariusz FIRE"
+
+#~ msgid "FIRE scenario archived"
+#~ msgstr "Zarchiwizowano scenariusz FIRE"
+
+#~ msgid "FIRE scenario restored"
+#~ msgstr "Przywrócono scenariusz FIRE"
+
+#~ msgid "FIRE default scenario changed"
+#~ msgstr "Zmieniono domyślny scenariusz FIRE"
+
+#~ msgid "FIRE loan payoff added"
+#~ msgstr "Dodano spłatę kredytu do planu FIRE"
+
+#~ msgid "Loan repaid: %(name)s"
+#~ msgstr "Spłacono kredyt: %(name)s"
+
+#~ msgid "%(name)s: FIRE at age %(age)d"
+#~ msgstr "%(name)s: FIRE w wieku %(age)d"
+
+#~ msgid "Enter a name of 1 to 200 characters."
+#~ msgstr "Podaj nazwę o długości od 1 do 200 znaków."
+
+#~ msgid "Income cannot stop before your age at the start of the plan."
+#~ msgstr "Dochody nie mogą się skończyć przed Twoim wiekiem na początku planu."
+
+#~ msgid "Choose how starting income is entered."
+#~ msgstr "Wybierz sposób wprowadzenia dochodu początkowego."
+
+#~ msgid "Choose how starting expenses are entered."
+#~ msgstr "Wybierz sposób wprowadzenia wydatków początkowych."
+
+#~ msgid "Choose how the starting portfolio is entered."
+#~ msgstr "Wybierz sposób wprowadzenia portfela początkowego."
+
+#~ msgid ""
+#~ "This input can only be resolved "
+#~ "while saving; preview the plan from "
+#~ "its page."
+#~ msgstr ""
+#~ "Tę wartość można ustalić dopiero podczas"
+#~ " zapisywania; uruchom podgląd na stronie"
+#~ " planu."
+
+#~ msgid ""
+#~ "An excluded category is no longer "
+#~ "a regular expense category of this "
+#~ "workspace. Reload the page and try "
+#~ "again."
+#~ msgstr ""
+#~ "Wykluczona kategoria nie jest już zwykłą"
+#~ " kategorią wydatków w tym obszarze "
+#~ "roboczym. Odśwież stronę i spróbuj "
+#~ "ponownie."
+
+#~ msgid "Another active scenario already has this name."
+#~ msgstr "Inny aktywny scenariusz ma już tę nazwę."
+
+#~ msgid "Each contribution year can appear only once."
+#~ msgstr "Każdy rok składki może wystąpić tylko raz."
+
+#~ msgid "A scenario can have at most 120 contribution rows."
+#~ msgstr "Scenariusz może mieć najwyżej 120 wierszy składek."
+
+#~ msgid "Archived scenarios are read-only. Restore the scenario first."
+#~ msgstr ""
+#~ "Zarchiwizowane scenariusze są tylko do "
+#~ "odczytu. Najpierw przywróć scenariusz."
+
+#~ msgid "The plan is missing a starting value."
+#~ msgstr "W planie brakuje wartości początkowej."
+
+#~ msgid "This loan payoff can no longer be added."
+#~ msgstr "Tej spłaty kredytu nie można już dodać."
+
+#~ msgid "The plan is missing a resolved starting value."
+#~ msgstr "W planie brakuje ustalonej wartości początkowej."
+
+#~ msgid ""
+#~ "No regular income transactions fall in"
+#~ " the last 12 full months, so "
+#~ "linked income is unavailable. Add income"
+#~ " to the ledger or switch this "
+#~ "input to Manual."
+#~ msgstr ""
+#~ "W ostatnich 12 pełnych miesiącach nie"
+#~ " ma zwykłych transakcji przychodów, więc"
+#~ " połączony przychód jest niedostępny. Dodaj"
+#~ " przychody do księgi lub przełącz to"
+#~ " pole na ręczne."
+
+#~ msgid ""
+#~ "No regular expense transactions fall in"
+#~ " the last 12 full months, so "
+#~ "linked expenses are unavailable. Add "
+#~ "expenses to the ledger or switch "
+#~ "this input to Manual."
+#~ msgstr ""
+#~ "W ostatnich 12 pełnych miesiącach nie"
+#~ " ma zwykłych transakcji wydatków, więc "
+#~ "połączone wydatki są niedostępne. Dodaj "
+#~ "wydatki do księgi lub przełącz to "
+#~ "pole na ręczne."
+
+#~ msgid ""
+#~ "Every regular expense category in the"
+#~ " window is excluded, so linked "
+#~ "expenses are unavailable. Clear an "
+#~ "exclusion or switch this input to "
+#~ "Manual."
+#~ msgstr ""
+#~ "Wszystkie zwykłe kategorie wydatków w "
+#~ "oknie są wykluczone, więc połączone "
+#~ "wydatki są niedostępne. Usuń wykluczenie "
+#~ "lub przełącz to pole na ręczne."
+
+#~ msgid ""
+#~ "Some ledger rows in the window use"
+#~ " another currency. Linked values need "
+#~ "only the scenario currency; switch this"
+#~ " input to Manual or review those "
+#~ "rows."
+#~ msgstr ""
+#~ "Niektóre wiersze księgi w oknie są "
+#~ "w innej walucie. Połączone wartości "
+#~ "wymagają wyłącznie waluty scenariusza; "
+#~ "przełącz to pole na ręczne lub "
+#~ "sprawdź te wiersze."
+
+#~ msgid ""
+#~ "No investable portfolio classes or "
+#~ "investable manual net-worth items were"
+#~ " found. Add data or switch the "
+#~ "starting portfolio to Manual."
+#~ msgstr ""
+#~ "Nie znaleziono inwestycyjnych klas portfela"
+#~ " ani inwestycyjnych ręcznych pozycji "
+#~ "majątku. Dodaj dane lub przełącz portfel"
+#~ " początkowy na ręczny."
+
+#~ msgid ""
+#~ "An investable holding has no current "
+#~ "price. Add a price or switch the"
+#~ " starting portfolio to Manual."
+#~ msgstr ""
+#~ "Inwestycyjne posiadanie nie ma bieżącej "
+#~ "ceny. Dodaj cenę lub przełącz portfel"
+#~ " początkowy na ręczny."
+
+#~ msgid ""
+#~ "An investable holding has no FX "
+#~ "rate to the scenario currency. Add "
+#~ "a rate or switch the starting "
+#~ "portfolio to Manual."
+#~ msgstr ""
+#~ "Inwestycyjne posiadanie nie ma kursu "
+#~ "walutowego do waluty scenariusza. Dodaj "
+#~ "kurs lub przełącz portfel początkowy na"
+#~ " ręczny."
+
+#~ msgid ""
+#~ "An investable net-worth item has "
+#~ "no value effective today. Add a "
+#~ "valuation or switch the starting "
+#~ "portfolio to Manual."
+#~ msgstr ""
+#~ "Inwestycyjna pozycja majątku nie ma "
+#~ "wartości obowiązującej dziś. Dodaj wycenę "
+#~ "lub przełącz portfel początkowy na "
+#~ "ręczny."
+
+#~ msgid ""
+#~ "An investable net-worth item has "
+#~ "no FX rate to the scenario "
+#~ "currency. Add a rate or switch the"
+#~ " starting portfolio to Manual."
+#~ msgstr ""
+#~ "Inwestycyjna pozycja majątku nie ma "
+#~ "kursu walutowego do waluty scenariusza. "
+#~ "Dodaj kurs lub przełącz portfel "
+#~ "początkowy na ręczny."
+
+#~ msgid "Compare at most three scenarios at a time."
+#~ msgstr "Porównuj najwyżej trzy scenariusze jednocześnie."
+
+#~ msgid ""
+#~ "The selected scenarios use different "
+#~ "currencies. Choose scenarios that share "
+#~ "one currency; there is no currency "
+#~ "conversion in the comparison."
+#~ msgstr ""
+#~ "Wybrane scenariusze używają różnych walut. "
+#~ "Wybierz scenariusze o tej samej walucie;"
+#~ " porównanie nie przelicza walut."
+
+#~ msgid "Scenario created."
+#~ msgstr "Utworzono scenariusz."
+
+#~ msgid "Scenario saved."
+#~ msgstr "Zapisano scenariusz."
+
+#~ msgid "Scenario duplicated."
+#~ msgstr "Zduplikowano scenariusz."
+
+#~ msgid "Scenario archived."
+#~ msgstr "Zarchiwizowano scenariusz."
+
+#~ msgid "Scenario restored."
+#~ msgstr "Przywrócono scenariusz."
+
+#~ msgid "Default scenario changed."
+#~ msgstr "Zmieniono domyślny scenariusz."
+
+#~ msgid "Loan payoff added to the plan."
+#~ msgstr "Dodano spłatę kredytu do planu."
+
+#~ msgid "this contribution row"
+#~ msgstr "ten wiersz składki"
+
+#~ msgid "this event"
+#~ msgstr "to zdarzenie"
+
+#~ msgid "Scenario name"
+#~ msgstr "Nazwa scenariusza"
+
+#~ msgid "Start year"
+#~ msgstr "Rok rozpoczęcia"
+
+#~ msgid "Fixed when the scenario is created, so a saved plan stays reproducible."
+#~ msgstr ""
+#~ "Ustalany przy tworzeniu scenariusza, aby "
+#~ "zapisany plan pozostał odtwarzalny."
+
+#~ msgid "The current year when the scenario was created."
+#~ msgstr "Bieżący rok w momencie utworzenia scenariusza."
+
+#~ msgid "Last 12 full months"
+#~ msgstr "Ostatnie 12 pełnych miesięcy"
+
+#~ msgid ""
+#~ "Regular yearly spending in the start "
+#~ "year, excluding savings and transfers."
+#~ msgstr ""
+#~ "Regularne roczne wydatki w roku "
+#~ "rozpoczęcia, bez oszczędności i transferów."
+
+#~ msgid "Investable assets"
+#~ msgstr "Aktywa inwestycyjne"
+
+#~ msgid ""
+#~ "Linked sources use today's data in "
+#~ "the scenario currency: the last 12 "
+#~ "full months for income and expenses, "
+#~ "and the current investable portfolio."
+#~ msgstr ""
+#~ "Połączone źródła używają dzisiejszych danych"
+#~ " w walucie scenariusza: ostatnich 12 "
+#~ "pełnych miesięcy dla przychodów i "
+#~ "wydatków oraz bieżącego portfela "
+#~ "inwestycyjnego."
+
+#~ msgid "Expense exclusions"
+#~ msgstr "Wykluczenia wydatków"
+
+#~ msgid ""
+#~ "Choose regular expense categories to "
+#~ "leave out of the linked trailing "
+#~ "expenses, for example unusual one-off"
+#~ " spending. Income is not affected."
+#~ msgstr ""
+#~ "Wybierz zwykłe kategorie wydatków, które "
+#~ "mają być pominięte w połączonych "
+#~ "wydatkach z ostatnich 12 miesięcy, na"
+#~ " przykład nietypowe jednorazowe wydatki. "
+#~ "Przychody nie są objęte wykluczeniem."
+
+#~ msgid ""
+#~ "Only used when expenses are read "
+#~ "from the app's data. The excluded "
+#~ "categories' window totals are shown "
+#~ "separately in the linked inputs panel."
+#~ msgstr ""
+#~ "Używane tylko wtedy, gdy wydatki są "
+#~ "odczytywane z danych aplikacji. Sumy "
+#~ "wykluczonych kategorii w oknie są "
+#~ "pokazane osobno w panelu połączonych "
+#~ "danych."
+
+#~ msgid "No regular expense categories are available yet."
+#~ msgstr "Nie ma jeszcze zwykłych kategorii wydatków."
+
+#~ msgid "Contribution overrides"
+#~ msgstr "Nadpisania składek"
+
+#~ msgid ""
+#~ "A positive amount is net saving in"
+#~ " that year; a negative amount is "
+#~ "net dissaving. A year without a "
+#~ "row uses income minus expenses."
+#~ msgstr ""
+#~ "Kwota dodatnia oznacza oszczędności netto "
+#~ "w danym roku; ujemna — wydawanie "
+#~ "oszczędności netto. Rok bez wiersza "
+#~ "używa dochodów minus wydatki."
+
+#~ msgid "Years %(start)d to %(end)d"
+#~ msgstr "Lata %(start)d–%(end)d"
+
+#~ msgid ""
+#~ "Optional explicit net savings for "
+#~ "individual years. Paste a column from"
+#~ " a spreadsheet or add rows one "
+#~ "by one."
+#~ msgstr ""
+#~ "Opcjonalne jawne oszczędności netto dla "
+#~ "poszczególnych lat. Wklej kolumnę z "
+#~ "arkusza albo dodawaj wiersze po kolei."
+
+#~ msgid "Paste a column (amounts, or year and amount)"
+#~ msgstr "Wklej kolumnę (kwoty albo rok i kwota)"
+
+#~ msgid "2029, 15000"
+#~ msgstr "2029, 15000"
+
+#~ msgid "Paste a column first."
+#~ msgstr "Najpierw wklej kolumnę."
+
+#~ msgid "Rows filled from the pasted column."
+#~ msgstr "Wiersze wypełnione z wklejonej kolumny."
+
+#~ msgid "Fill rows from the pasted column"
+#~ msgstr "Wypełnij wiersze z wklejonej kolumny"
+
+#~ msgid ""
+#~ "Bare amounts fill consecutive years from"
+#~ " %(start)d; a blank line skips a "
+#~ "year. Lines like 2029, 15000 or a"
+#~ " year and an amount separated by "
+#~ "a tab fill those years. Pasting "
+#~ "replaces the rows below."
+#~ msgstr ""
+#~ "Same kwoty wypełniają kolejne lata od"
+#~ " %(start)d; pusta linia pomija rok. "
+#~ "Wiersze typu 2029, 15000 albo rok "
+#~ "i kwota rozdzielone tabulatorem wypełniają "
+#~ "te lata. Wklejenie zastępuje wiersze "
+#~ "poniżej."
+
+#~ msgid "Net saving (%(currency)s)"
+#~ msgstr "Oszczędności netto (%(currency)s)"
+
+#~ msgid "Add a contribution row"
+#~ msgstr "Dodaj wiersz składki"
+
+#~ msgid ""
+#~ "Optional one-off inflows or outflows,"
+#~ " and permanent changes to the yearly"
+#~ " expense or income series."
+#~ msgstr ""
+#~ "Opcjonalne jednorazowe wpływy lub wypływy "
+#~ "oraz trwałe zmiany rocznej serii "
+#~ "wydatków lub dochodów."
+
+#~ msgid "Add an event"
+#~ msgstr "Dodaj zdarzenie"
+
+#~ msgid ""
+#~ "This scenario is archived and read-"
+#~ "only. Restore it to change its "
+#~ "inputs."
+#~ msgstr ""
+#~ "Ten scenariusz jest zarchiwizowany i "
+#~ "tylko do odczytu. Przywróć go, aby "
+#~ "zmienić dane."
+
+#~ msgid "Linked inputs"
+#~ msgstr "Połączone dane"
+
+#~ msgid "As of %(day)s"
+#~ msgstr "Na dzień %(day)s"
+
+#~ msgid ""
+#~ "Values read from the app's own "
+#~ "data. The projection still uses the "
+#~ "scenario currency and start year; "
+#~ "nothing is written by a preview."
+#~ msgstr ""
+#~ "Wartości odczytane z danych aplikacji. "
+#~ "Prognoza nadal używa waluty scenariusza "
+#~ "i roku początkowego; podgląd niczego nie"
+#~ " zapisuje."
+
+#~ msgid ""
+#~ "Only %(months)d of the last 12 "
+#~ "full months have data. The annual "
+#~ "amount is scaled from those months."
+#~ msgstr ""
+#~ "Tylko %(months)d z ostatnich 12 pełnych"
+#~ " miesięcy ma dane. Kwota roczna jest"
+#~ " przeliczona z tych miesięcy."
+
+#~ msgid ""
+#~ "The latest included data is from "
+#~ "%(month)s, before the window ends on "
+#~ "%(end)s."
+#~ msgstr ""
+#~ "Najnowsze uwzględnione dane pochodzą z "
+#~ "%(month)s, przed końcem okna %(end)s."
+
+#~ msgid ""
+#~ "The plan starts in %(start)d but "
+#~ "the linked data is as of "
+#~ "%(current)d. Later data cannot be "
+#~ "included until the plan is recreated."
+#~ msgstr ""
+#~ "Plan zaczyna się w %(start)d, a "
+#~ "połączone dane są na dzień %(current)d."
+#~ " Późniejsze dane nie mogą być "
+#~ "uwzględnione, dopóki plan nie zostanie "
+#~ "utworzony ponownie."
+
+#~ msgid "The latest price for %(name)s is stale."
+#~ msgstr "Najnowsza cena dla %(name)s jest nieaktualna."
+
+#~ msgid "The latest FX rate for %(name)s is stale."
+#~ msgstr "Najnowszy kurs walutowy dla %(name)s jest nieaktualny."
+
+#~ msgid ""
+#~ "The linked portfolio has sources but "
+#~ "sums to zero today. The plan "
+#~ "continues with a zero starting "
+#~ "portfolio."
+#~ msgstr ""
+#~ "Połączony portfel ma źródła, ale dziś"
+#~ " sumuje się do zera. Plan kontynuuje"
+#~ " z zerowym portfelem początkowym."
+
+#~ msgid ""
+#~ "%(count)s non-investable asset class is"
+#~ " excluded from the linked portfolio."
+#~ msgid_plural ""
+#~ "%(count)s non-investable asset classes "
+#~ "are excluded from the linked portfolio."
+#~ msgstr[0] ""
+#~ "%(count)s nieinwestycyjna klasa aktywów jest"
+#~ " wyłączona z połączonego portfela."
+#~ msgstr[1] ""
+#~ "%(count)s nieinwestycyjne klasy aktywów są "
+#~ "wyłączone z połączonego portfela."
+#~ msgstr[2] ""
+#~ "%(count)s nieinwestycyjnych klas aktywów jest"
+#~ " wyłączonych z połączonego portfela."
+
+#~ msgid "%(count)s linked net-worth item is skipped to avoid double counting."
+#~ msgid_plural "%(count)s linked net-worth items are skipped to avoid double counting."
+#~ msgstr[0] ""
+#~ "%(count)s połączona pozycja majątku jest "
+#~ "pomijana, aby uniknąć podwójnego liczenia."
+#~ msgstr[1] ""
+#~ "%(count)s połączone pozycje majątku są "
+#~ "pomijane, aby uniknąć podwójnego liczenia."
+#~ msgstr[2] ""
+#~ "%(count)s połączonych pozycji majątku jest "
+#~ "pomijanych, aby uniknąć podwójnego liczenia."
+
+#~ msgid ""
+#~ "As of %(day)s. Investable portfolio "
+#~ "classes and manual net-worth items "
+#~ "marked investable."
+#~ msgstr ""
+#~ "Na dzień %(day)s. Inwestycyjne klasy "
+#~ "portfela i ręczne pozycje majątku "
+#~ "oznaczone jako inwestycyjne."
+
+#~ msgid "Linked starting portfolio breakdown"
+#~ msgstr "Podział połączonego portfela początkowego"
+
+#~ msgid "Trailing income"
+#~ msgstr "Przychody z ostatnich 12 miesięcy"
+
+#~ msgid "Trailing expenses"
+#~ msgstr "Wydatki z ostatnich 12 miesięcy"
+
+#~ msgid "per year"
+#~ msgstr "rocznie"
+
+#~ msgid ""
+#~ "Window %(start)s – %(end)s: %(months)d "
+#~ "months with data; window total "
+#~ "%(total)s."
+#~ msgstr ""
+#~ "Okno %(start)s – %(end)s: %(months)d "
+#~ "miesięcy z danymi; suma w oknie "
+#~ "%(total)s."
+
+#~ msgid "Linked trailing income by category"
+#~ msgstr "Połączone przychody z ostatnich 12 miesięcy według kategorii"
+
+#~ msgid "Linked trailing expenses by category"
+#~ msgstr "Połączone wydatki z ostatnich 12 miesięcy według kategorii"
+
+#~ msgid "Window total"
+#~ msgstr "Suma w oknie"
+
+#~ msgid "Excluded categories"
+#~ msgstr "Wykluczone kategorie"
+
+#~ msgid ""
+#~ "Left out of the linked expenses; "
+#~ "shown for transparency. Window total "
+#~ "%(total)s."
+#~ msgstr ""
+#~ "Pominięte w połączonych wydatkach; pokazane"
+#~ " dla przejrzystości. Suma w oknie "
+#~ "%(total)s."
+
+#~ msgid "Loan payoff suggestions"
+#~ msgstr "Sugestie spłaty kredytów"
+
+#~ msgid ""
+#~ "Paying a loan off frees its "
+#~ "contractual instalments from the payoff "
+#~ "year onward. The amount is the "
+#~ "next up to 12 contractual payments "
+#~ "(interest, principal and costs, without "
+#~ "overpayments), in today's money."
+#~ msgstr ""
+#~ "Spłata kredytu uwalnia jego umowne raty"
+#~ " od roku spłaty. Kwota to następne"
+#~ " maksymalnie 12 umownych płatności "
+#~ "(odsetki, kapitał i koszty, bez "
+#~ "nadpłat), w dzisiejszych pieniądzach."
+
+#~ msgid ""
+#~ "Suggestions use the saved plan and "
+#~ "the loan schedules as of this page"
+#~ " load; unsaved Plan-input changes do"
+#~ " not update them."
+#~ msgstr ""
+#~ "Sugestie korzystają z zapisanego planu i"
+#~ " harmonogramów kredytów z chwili wczytania"
+#~ " strony; niezapisane zmiany w danych "
+#~ "planu ich nie aktualizują."
+
+#~ msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
+#~ msgstr "Spłata w %(year)d uwalnia %(amount)s/rok (w dzisiejszych pieniądzach)."
+
+#~ msgid "Based on the next %(months)d contractual instalments."
+#~ msgstr "Na podstawie następnych %(months)d umownych rat."
+
+#~ msgid ""
+#~ "Add this loan payoff event? Unsaved "
+#~ "changes in Plan inputs will be "
+#~ "lost."
+#~ msgstr ""
+#~ "Dodać to zdarzenie spłaty kredytu? "
+#~ "Niezapisane zmiany w danych planu "
+#~ "zostaną utracone."
+
+#~ msgid "Add payoff event"
+#~ msgstr "Dodaj zdarzenie spłaty"
+
+#~ msgid "Only editors can add a payoff event."
+#~ msgstr "Tylko redaktorzy mogą dodać zdarzenie spłaty."
+
+#~ msgid "This scenario is archived and read-only."
+#~ msgstr "Ten scenariusz jest zarchiwizowany i tylko do odczytu."
+
+#~ msgid "This loan is already paid off, so there is nothing to add."
+#~ msgstr "Ten kredyt jest już spłacony, więc nie ma czego dodawać."
+
+#~ msgid "A payoff event for this loan is already in the plan."
+#~ msgstr "Zdarzenie spłaty tego kredytu jest już w planie."
+
+#~ msgid "The loan schedule cannot be calculated. Check the loan settings."
+#~ msgstr "Nie można obliczyć harmonogramu kredytu. Sprawdź ustawienia kredytu."
+
+#~ msgid "The payoff year falls outside the plan window."
+#~ msgstr "Rok spłaty wykracza poza okno planu."
+
+#~ msgid "The loan is in another currency than the plan."
+#~ msgstr "Kredyt jest w innej walucie niż plan."
+
+#~ msgid "No positive annual amount can be calculated for this loan."
+#~ msgstr "Nie można obliczyć dodatniej kwoty rocznej dla tego kredytu."
+
+#~ msgid "The linked input could not be resolved."
+#~ msgstr "Nie udało się ustalić połączonej wartości."
+
+#~ msgid ""
+#~ "Switch the affected input to Manual "
+#~ "in Plan inputs, or fix the linked"
+#~ " data."
+#~ msgstr ""
+#~ "Przełącz odpowiednie pole na ręczne w"
+#~ " danych planu lub popraw połączone "
+#~ "dane."
+
+#~ msgid "Compare scenarios"
+#~ msgstr "Porównaj scenariusze"
+
+#~ msgid "All scenarios"
+#~ msgstr "Wszystkie scenariusze"
+
+#~ msgid ""
+#~ "Choose up to three saved scenarios. "
+#~ "Their FIRE metrics and net worth "
+#~ "are shown side by side; archived "
+#~ "scenarios can be compared too."
+#~ msgstr ""
+#~ "Wybierz do trzech zapisanych scenariuszy. "
+#~ "Ich metryki FIRE i wartość netto "
+#~ "są pokazane obok siebie; można "
+#~ "porównywać także zarchiwizowane scenariusze."
+
+#~ msgid "Active scenarios"
+#~ msgstr "Aktywne scenariusze"
+
+#~ msgid "Linked"
+#~ msgstr "Powiązane"
+
+#~ msgid "Age %(age)d in %(year)d"
+#~ msgstr "Wiek %(age)d w %(year)d"
+
+#~ msgid "Archived scenarios"
+#~ msgstr "Zarchiwizowane scenariusze"
+
+#~ msgid "Compare selected"
+#~ msgstr "Porównaj wybrane"
+
+#~ msgid "With nothing selected, the default scenario is shown."
+#~ msgstr "Gdy nic nie wybrano, pokazywany jest domyślny scenariusz."
+
+#~ msgid "No scenarios to compare yet."
+#~ msgstr "Nie ma jeszcze scenariuszy do porównania."
+
+#~ msgid ""
+#~ "These scenarios start in different "
+#~ "years. Today's-money values are anchored "
+#~ "to each scenario's start year, so "
+#~ "compare them with care."
+#~ msgstr ""
+#~ "Te scenariusze zaczynają się w różnych"
+#~ " latach. Wartości w dzisiejszych "
+#~ "pieniądzach są zakotwiczone w roku "
+#~ "rozpoczęcia każdego scenariusza, więc porównuj"
+#~ " je ostrożnie."
+
+#~ msgid "%(num)d scenario selected"
+#~ msgid_plural "%(num)d scenarios selected"
+#~ msgstr[0] "%(num)d wybrany scenariusz"
+#~ msgstr[1] "%(num)d wybrane scenariusze"
+#~ msgstr[2] "%(num)d wybranych scenariuszy"
+
+#~ msgid "FIRE results by scenario"
+#~ msgstr "Wyniki FIRE według scenariuszy"
+
+#~ msgid "Start"
+#~ msgstr "Początek"
+
+#~ msgid "Net worth at FIRE (today's money)"
+#~ msgstr "Wartość netto na FIRE (w dzisiejszych pieniądzach)"
+
+#~ msgid "Depletion age"
+#~ msgstr "Wiek wyczerpania"
+
+#~ msgid "Never before age %(age)d"
+#~ msgstr "Nigdy przed wiekiem %(age)d"
+
+#~ msgid "FIRE reached"
+#~ msgstr "Osiągnięto FIRE"
+
+#~ msgid "Age %(age)d"
+#~ msgstr "Wiek %(age)d"
+
+#~ msgid ""
+#~ "No years after income stops fall "
+#~ "inside the horizon, so depletion was "
+#~ "not checked."
+#~ msgstr ""
+#~ "Żadne lata po zakończeniu dochodów nie"
+#~ " mieszczą się w horyzoncie, więc nie"
+#~ " sprawdzono wyczerpania."
+
+#~ msgid ""
+#~ "Net worth at FIRE is always in "
+#~ "today's money. The chart follows the "
+#~ "selected basis."
+#~ msgstr ""
+#~ "Wartość netto na FIRE jest zawsze "
+#~ "w dzisiejszych pieniądzach. Wykres podąża "
+#~ "za wybranym sposobem prezentacji."
+
+#~ msgid "Net worth over time by scenario"
+#~ msgstr "Wartość netto w czasie według scenariuszy"
+
+#~ msgid "Plotted scenario net worth data"
+#~ msgstr "Dane wykresu wartości netto scenariuszy"
+
+#~ msgid ""
+#~ "No selected scenario can be plotted. "
+#~ "Fix the blocked plans or select "
+#~ "another scenario."
+#~ msgstr ""
+#~ "Żadnego z wybranych scenariuszy nie "
+#~ "można narysować. Napraw zablokowane plany "
+#~ "lub wybierz inny scenariusz."
+
+#~ msgid "Save scenario"
+#~ msgstr "Zapisz scenariusz"
+
+#~ msgid "New scenario"
+#~ msgstr "Nowy scenariusz"
+
+#~ msgid "Plan your financial independence"
+#~ msgstr "Zaplanuj niezależność finansową"
+
+#~ msgid ""
+#~ "A scenario keeps the assumptions of "
+#~ "one plan: your age, the rates, the"
+#~ " starting amounts and any yearly "
+#~ "overrides or one-off events. Results "
+#~ "and projections arrive in a later "
+#~ "update; for now the scenario stores "
+#~ "and validates the plan."
+#~ msgstr ""
+#~ "Scenariusz przechowuje założenia jednego "
+#~ "planu: Twój wiek, stopy, kwoty "
+#~ "początkowe oraz roczne nadpisania lub "
+#~ "jednorazowe zdarzenia. Wyniki i prognozy "
+#~ "pojawią się w późniejszej aktualizacji; "
+#~ "teraz scenariusz zapisuje i sprawdza "
+#~ "plan."
+
+#~ msgid "%(num)d active scenario"
+#~ msgid_plural "%(num)d active scenarios"
+#~ msgstr[0] "%(num)d aktywny scenariusz"
+#~ msgstr[1] "%(num)d aktywne scenariusze"
+#~ msgstr[2] "%(num)d aktywnych scenariuszy"
+
+#~ msgid "Horizon"
+#~ msgstr "Horyzont"
+
+#~ msgid "Real return"
+#~ msgstr "Realna stopa zwrotu"
+
+#~ msgid "Inflation"
+#~ msgstr "Inflacja"
+
+#~ msgid "%(num)d contribution override"
+#~ msgid_plural "%(num)d contribution overrides"
+#~ msgstr[0] "%(num)d nadpisanie składki"
+#~ msgstr[1] "%(num)d nadpisania składek"
+#~ msgstr[2] "%(num)d nadpisań składek"
+
+#~ msgid "%(num)d event"
+#~ msgid_plural "%(num)d events"
+#~ msgstr[0] "%(num)d zdarzenie"
+#~ msgstr[1] "%(num)d zdarzenia"
+#~ msgstr[2] "%(num)d zdarzeń"
+
+#~ msgid "Make default"
+#~ msgstr "Ustaw jako domyślny"
+
+#~ msgid "Duplicate"
+#~ msgstr "Duplikuj"
+
+#~ msgid "Archive the scenario %(name)s?"
+#~ msgstr "Zarchiwizować scenariusz %(name)s?"
+
+#~ msgid "No active scenarios yet."
+#~ msgstr "Nie ma jeszcze aktywnych scenariuszy."
+
+#~ msgid ""
+#~ "Create a scenario to store your "
+#~ "assumptions. The first one becomes the"
+#~ " default."
+#~ msgstr "Utwórz scenariusz, aby zapisać założenia. Pierwszy stanie się domyślny."
+
+#~ msgid ""
+#~ "Archived scenarios are read-only and "
+#~ "keep their inputs. Restore one to "
+#~ "edit it again."
+#~ msgstr ""
+#~ "Zarchiwizowane scenariusze są tylko do "
+#~ "odczytu i zachowują swoje dane. Przywróć"
+#~ " scenariusz, aby go ponownie edytować."
+
+#~ msgid "archived %(date)s"
+#~ msgstr "zarchiwizowano %(date)s"
+
+#~ msgid "Compare"
+#~ msgstr "Porównaj"
+
+#~ msgid "Edit scenario"
+#~ msgstr "Edytuj scenariusz"
+
+#~ msgid "FIRE scenarios"
+#~ msgstr "Scenariusze FIRE"
+
+#~ msgid "FIRE contributions"
+#~ msgstr "Składki FIRE"
+
+#~ msgid "FIRE expense exclusions"
+#~ msgstr "Wykluczenia wydatków FIRE"
+
+#~ msgid "FIRE inputs restored as manual"
+#~ msgstr "Wartości FIRE przywrócone jako ręczne"
+
+#~ msgid "FIRE exclusions skipped"
+#~ msgstr "Pominięte wykluczenia FIRE"
+
+#~ msgid "FIRE loan links cleared"
+#~ msgstr "Wyczyszczone powiązania kredytów FIRE"
+
+#~ msgid "FIRE default scenario promoted"
+#~ msgstr "Awansowano domyślny scenariusz FIRE"
 
