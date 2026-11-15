@@ -53,7 +53,7 @@
   </dl>
 
   <dl class="mt-4 grid gap-4 sm:grid-cols-2">
-    {{ progress_card("plan", _("Plan progress"), _("Starting portfolio divided by the projected net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target."), projection.plan_progress_bp, _("Not defined: net worth at FIRE is not positive.") if projection.fire_age is not none and projection.plan_progress_bp is none else "") }}
+    {{ progress_card("plan", _("Plan progress"), _("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target."), projection.plan_progress_bp, _("Not defined: net worth at FIRE is not positive.") if projection.fire_age is not none and projection.plan_progress_bp is none else "") }}
   </dl>
 
   {% if projection.fire_age is none %}

@@ -243,9 +243,9 @@ The plan page shows nominal values only:
   nominal expenses in the FIRE year divided by the rate the independence rule uses: the
   withdrawal rate, or the nominal gain rate when returns must cover expenses. It is shown with
   the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
-- **Plan progress**: the starting portfolio divided by the projected net worth at FIRE. 100%
-  means the plan has reached its FIRE net-worth target. It is a dash when FIRE is never reached
-  or net worth at FIRE is not positive;
+- **Plan progress**: the starting portfolio divided by the projected nominal net worth at FIRE.
+  100% means the plan has reached its FIRE net-worth target. It is a dash when FIRE is never
+  reached or net worth at FIRE is not positive;
 - the sustainability check: the nominal depletion age and the lowest nominal net worth after
   income stops;
 - a year-by-year schedule with income, expenses, loan payments, net saving, investment gain,

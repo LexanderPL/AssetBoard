@@ -6986,11 +6986,11 @@ msgstr "Postęp planu"
 
 #, python-format
 msgid ""
-"Starting portfolio divided by the projected net worth at FIRE. 100%% "
-"means the plan has reached its FIRE net-worth target."
+"Starting portfolio divided by the projected nominal net worth at FIRE. "
+"100%% means the plan has reached its FIRE net-worth target."
 msgstr ""
-"Portfel początkowy podzielony przez prognozowaną wartość netto w roku "
-"FIRE. 100%% oznacza, że plan osiągnął docelową wartość netto FIRE."
+"Portfel początkowy podzielony przez prognozowaną nominalną wartość netto "
+"w roku FIRE. 100%% oznacza, że plan osiągnął docelową wartość netto FIRE."
 
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr "Nieokreślony: wartość netto w roku FIRE nie jest dodatnia."

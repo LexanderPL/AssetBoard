@@ -6429,8 +6429,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Starting portfolio divided by the projected net worth at FIRE. 100%% "
-"means the plan has reached its FIRE net-worth target."
+"Starting portfolio divided by the projected nominal net worth at FIRE. "
+"100%% means the plan has reached its FIRE net-worth target."
 msgstr ""
 
 msgid "Not defined: net worth at FIRE is not positive."
@@ -13853,31 +13853,5 @@ msgstr ""
 #~ "Live loans are not part of the "
 #~ "plan yet. Enter yearly expenses that "
 #~ "include your loan payments."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "The real-return range would leave "
-#~ "the supported -20 to 50 percent "
-#~ "bounds. Adjust the plan's return and "
-#~ "try again."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Both lines are in each year's "
-#~ "money, because the independence rule "
-#~ "compares nominal values."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "The yearly investment return above "
-#~ "inflation. It is not a promise of"
-#~ " future returns."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Projections are illustrative and not "
-#~ "financial advice. The projection assumes "
-#~ "constant rates and does not model "
-#~ "taxes separately; real life will differ."
 #~ msgstr ""
 
