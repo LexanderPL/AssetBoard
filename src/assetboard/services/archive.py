@@ -1141,8 +1141,14 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 payload = cast("dict[str, Any]", loaded) if isinstance(loaded, dict) else {}
             except ValueError:
                 payload = {}
+            if payload.get("archived_at"):
+                rank = 2
+            elif payload.get("is_default"):
+                rank = 0
+            else:
+                rank = 1
             return (
-                1 if payload.get("archived_at") else 0,
+                rank,
                 str(payload.get("name_key") or ""),
                 str(lineage_id(row.id, row.import_key)),
             )

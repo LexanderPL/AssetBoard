@@ -692,7 +692,7 @@ def test_export_legacy_default_first_resolves_and_reports_skipped(
             portfolio_minor=10_000_000,
             needs_review=True,
             is_live=False,
-            legacy=_legacy_payload("Skipped", is_default=False),
+            legacy=_legacy_payload("A skipped", is_default=False),
         )
         FireEventRepository(session, ctx).create(
             scenario_id=chosen.id,
