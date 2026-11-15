@@ -2766,6 +2766,13 @@ msgstr "FIRE"
 msgid "FIRE at age %(age)d (%(year)d)"
 msgstr "FIRE w wieku %(age)d (%(year)d)"
 
+msgid "Loan paid off"
+msgstr "Spłacony kredyt"
+
+#, python-format
+msgid "Loan payments end in %(year)d"
+msgstr "Płatności kredytu kończą się w %(year)d"
+
 msgid "Income stops"
 msgstr "Dochody kończą się"
 
@@ -2792,11 +2799,54 @@ msgstr "Portfel wyczerpany"
 msgid "Net worth in today's money"
 msgstr "Wartość netto w dzisiejszych pieniądzach"
 
+msgid "Loan payments end this year"
+msgstr "Płatności kredytu kończą się w tym roku"
+
 msgid "Expenses"
 msgstr "Wydatki"
 
 msgid "Investment gain"
 msgstr "Zysk z inwestycji"
+
+msgid "The next payment is interest-only; the payment will change later."
+msgstr ""
+"Następna płatność obejmuje tylko odsetki; wysokość raty zmieni się "
+"później."
+
+msgid ""
+"A future drawdown will change the payment; this is the next scheduled "
+"payment."
+msgstr ""
+"Przyszła transza zmieni wysokość raty; to jest następna zaplanowana "
+"płatność."
+
+msgid "Stays in expenses through the plan horizon."
+msgstr "Pozostaje w wydatkach przez cały horyzont planu."
+
+#, python-format
+msgid "No drop within the plan horizon; the payoff is in %(year)d."
+msgstr "Brak spadku w horyzoncie planu; spłata nastąpi w %(year)d."
+
+#, python-format
+msgid "Removed from %(year)d onward; %(amount)s a year returns to the plan."
+msgstr "Usuwane od %(year)d; %(amount)s rocznie wraca do planu."
+
+msgid ""
+"No active loans. Enter annual expenses that include any loan payments you"
+" make."
+msgstr "Brak aktywnych kredytów. Wpisz roczne wydatki obejmujące płacone raty."
+
+msgid "No loan is included in the plan. The reasons are listed below."
+msgstr "Żaden kredyt nie jest uwzględniony w planie. Powody znajdują się poniżej."
+
+msgid ""
+"Your annual expenses are lower than the scheduled loan payments. Check "
+"that the expenses include these payments, or ignore the loan if it is not"
+" part of this plan."
+msgstr ""
+"Twoje roczne wydatki są niższe niż zaplanowane raty kredytów. Sprawdź, "
+"czy wydatki obejmują te raty, albo zignoruj kredyt, jeśli nie należy do "
+"tego planu."
 
 msgid "Enter your birth year, or add it to your profile first."
 msgstr "Podaj rok urodzenia albo najpierw dodaj go do profilu."
@@ -2919,6 +2969,17 @@ msgstr "Potwierdź, że pozostałe stare scenariusze FIRE zostaną usunięte."
 
 msgid "The adjustment rows are missing. Reload the page and try again."
 msgstr "Brakuje wierszy korekt. Odśwież stronę i spróbuj ponownie."
+
+msgid ""
+"A loan in the request is no longer available. Reload the page and try "
+"again."
+msgstr "Kredyt z żądania nie jest już dostępny. Odśwież stronę i spróbuj ponownie."
+
+msgid "The same loan appears twice. Reload the page and try again."
+msgstr "Ten sam kredyt występuje dwa razy. Odśwież stronę i spróbuj ponownie."
+
+msgid "Choose Included or Ignored for each loan."
+msgstr "Wybierz opcję Uwzględniony lub Ignorowany dla każdego kredytu."
 
 msgid ""
 "The workspace base currency no longer matches the plan's currency. Reset "
@@ -6682,6 +6743,92 @@ msgstr ""
 "proponowanej wartości, aby ją skopiować, a potem zmień ją, jeśli chcesz. "
 "Zapisana kwota zmienia się dopiero po kliknięciu Zapisz zmiany."
 
+#, python-format
+msgid "Live loan data as of %(date)s"
+msgstr "Dane o kredytach na dzień %(date)s"
+
+msgid ""
+"Your annual expenses are expected to include these loan payments. An "
+"included loan is removed from the projection from its payoff year; an "
+"ignored loan stays in the forecast through the horizon. Loan payments are"
+" fixed nominal amounts and are not inflated."
+msgstr ""
+"Twoje roczne wydatki powinny obejmować te raty kredytów. Uwzględniony "
+"kredyt jest usuwany z prognozy od roku jego spłaty; zignorowany kredyt "
+"pozostaje w prognozie przez cały horyzont. Raty kredytów są stałymi "
+"kwotami nominalnymi i nie są indeksowane inflacją."
+
+msgid ""
+"Loans cannot be included while the plan currency does not match the "
+"workspace currency. Reset the plan to review them in the current "
+"currency."
+msgstr ""
+"Kredytów nie można uwzględnić, gdy waluta planu nie zgadza się z walutą "
+"obszaru roboczego. Zresetuj plan, aby przejrzeć je w bieżącej walucie."
+
+msgid "No loan information is available for this plan."
+msgstr "Brak informacji o kredytach dla tego planu."
+
+msgid "Included in the plan"
+msgstr "Uwzględnione w planie"
+
+msgid "Ignored in the plan"
+msgstr "Ignorowane w planie"
+
+msgid "Loan component of expenses"
+msgstr "Część wydatków na kredyty"
+
+#, python-format
+msgid "The first included loan payoff is in %(year)d."
+msgstr "Pierwsza spłata uwzględnionego kredytu nastąpi w %(year)d."
+
+msgid "Loans included or ignored in the plan"
+msgstr "Kredyty uwzględnione lub ignorowane w planie"
+
+msgid "Annual payment"
+msgstr "Roczna rata"
+
+msgid "monthly"
+msgstr "miesięcznie"
+
+msgid "payoff"
+msgstr "spłata"
+
+msgid "Current balance"
+msgstr "Bieżące saldo"
+
+msgid "Effect on the plan"
+msgstr "Wpływ na plan"
+
+msgid "Include in plan"
+msgstr "Uwzględnij w planie"
+
+msgid "Included"
+msgstr "Uwzględniony"
+
+msgid "Ignored"
+msgstr "Ignorowany"
+
+#, python-format
+msgid "%(num)d loan is not included"
+msgid_plural "%(num)d loans are not included"
+msgstr[0] "%(num)d kredyt nie jest uwzględniony"
+msgstr[1] "%(num)d kredyty nie są uwzględnione"
+msgstr[2] "%(num)d kredytów nie jest uwzględnionych"
+
+msgid "Monthly installment"
+msgstr "Rata miesięczna"
+
+msgid "ends"
+msgstr "kończy się"
+
+msgid ""
+"Active loans are included in the plan after creation. You can ignore one "
+"in edit mode."
+msgstr ""
+"Aktywne kredyty są uwzględniane w planie po jego utworzeniu. Możesz "
+"zignorować kredyt w trybie edycji."
+
 msgid ""
 "Live loans are not part of the plan yet. Enter yearly expenses that "
 "include your loan payments."
@@ -6806,6 +6953,14 @@ msgstr "Nie można prognozować planu."
 
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr "Zmień poniżej wartości planu; prognoza aktualizuje się podczas edycji."
+
+#, python-format
+msgid "Included loans: %(amount)s a year"
+msgstr "Uwzględnione kredyty: %(amount)s rocznie"
+
+#, python-format
+msgid "Ignored loans: %(amount)s a year"
+msgstr "Ignorowane kredyty: %(amount)s rocznie"
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
@@ -6940,6 +7095,17 @@ msgstr ""
 "spłatami kredytów. Jeśli spłacasz kredyty, upewnij się, że wpisana kwota "
 "je obejmuje."
 
+#, python-format
+msgid "Scheduled loan payments (live): %(amount)s a year from %(num)d loan."
+msgid_plural "Scheduled loan payments (live): %(amount)s a year from %(num)d loans."
+msgstr[0] "Zaplanowane raty kredytów (na żywo): %(amount)s rocznie z %(num)d kredytu."
+msgstr[1] ""
+"Zaplanowane raty kredytów (na żywo): %(amount)s rocznie z %(num)d "
+"kredytów."
+msgstr[2] ""
+"Zaplanowane raty kredytów (na żywo): %(amount)s rocznie z %(num)d "
+"kredytów."
+
 msgid "Suggested starting portfolio"
 msgstr "Proponowany portfel początkowy"
 
@@ -6975,6 +7141,9 @@ msgstr "w dzisiejszych pieniądzach"
 msgid "each year's money"
 msgstr "w pieniądzach każdego roku"
 
+msgid "Loan payments"
+msgstr "Raty kredytów"
+
 msgid "Net saving"
 msgstr "Oszczędności netto"
 
@@ -6983,6 +7152,10 @@ msgstr "Gotówka"
 
 msgid "No income"
 msgstr "Brak dochodów"
+
+#, python-format
+msgid "Loan paid off: %(names)s"
+msgstr "Spłacone kredyty: %(names)s"
 
 msgid ""
 "In the first year, net saving shows the starting portfolio. Its gain is "
@@ -6999,11 +7172,13 @@ msgstr ""
 " wyczerpany wiersz jest oznaczony na czerwono."
 
 msgid ""
-"Active loans are not listed during setup yet. They will be included in "
-"the plan after you create it."
+"Loan payments are the part of that year's expenses still attributable to "
+"loans. Included loans stop counting at their payoff year; ignored loans "
+"continue through the horizon."
 msgstr ""
-"Aktywne kredyty nie są jeszcze wyświetlane podczas konfiguracji. Zostaną "
-"uwzględnione w planie po jego utworzeniu."
+"Raty kredytów to część wydatków danego roku nadal związana z kredytami. "
+"Uwzględnione kredyty przestają być liczone w roku spłaty; ignorowane są "
+"liczone przez cały horyzont."
 
 msgid "Choose your FIRE plan"
 msgstr "Wybierz plan FIRE"
@@ -10024,9 +10199,6 @@ msgstr "Wprowadzenie"
 msgid "Original terms"
 msgstr "Pierwotne warunki"
 
-msgid "Current balance"
-msgstr "Bieżące saldo"
-
 msgid "Interest-only"
 msgstr "Tylko odsetki"
 
@@ -10782,9 +10954,6 @@ msgstr ""
 
 msgid "Archive plan"
 msgstr "Zarchiwizuj plan"
-
-msgid "Monthly installment"
-msgstr "Rata miesięczna"
 
 msgid "Total remaining"
 msgstr "Pozostało łącznie"
@@ -12495,9 +12664,6 @@ msgstr "Kategorie w pliku"
 
 msgid "Mapped"
 msgstr "Przypisane"
-
-msgid "Ignored"
-msgstr "Zignorowane"
 
 msgid "Unresolved"
 msgstr "Nierozwiązane"

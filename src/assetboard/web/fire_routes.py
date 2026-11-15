@@ -41,10 +41,12 @@ from assetboard.i18n.numbers import (
     parse_amount,
 )
 from assetboard.services import fire_linked as fire_linked_service
+from assetboard.services import fire_loans as fire_loans_service
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web import fire_adjustments
+from assetboard.web import fire_loans as fire_loan_web
 from assetboard.web.context import CurrentContext
 from assetboard.web.fire_charts import build_fire_charts
 from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
@@ -109,6 +111,11 @@ ERRORS = {
     "confirmation_required": _("Confirm that the plan will be deleted."),
     "choice_not_confirmed": _("Confirm that the other old FIRE scenarios will be deleted."),
     "missing_adjustments": _("The adjustment rows are missing. Reload the page and try again."),
+    "invalid_loan": _(
+        "A loan in the request is no longer available. Reload the page and try again."
+    ),
+    "duplicate_loan": _("The same loan appears twice. Reload the page and try again."),
+    "invalid_loan_setting": _("Choose Included or Ignored for each loan."),
 }
 
 RESULT_BLOCK_MESSAGES = {
@@ -338,6 +345,7 @@ def _plan_input(
         extreme_rates_confirmed=values.get("extreme_rates_confirmed") == "1",
         events=parsed.events,
         removed_event_ids=parsed.removed_event_ids,
+        loan_settings=fire_loan_web.parse_loan_toggles(values),
     )
 
 
@@ -643,6 +651,17 @@ def _results_context(
         "preview_error": preview_error,
         "preview_error_field": preview_error_field,
         "can_edit": has_role(ctx, Role.EDITOR),
+        "loan_section": (
+            fire_loan_web.build_loan_section(
+                results.loans,
+                currency=results.detail.plan.currency,
+                last_year=results.detail.plan.last_year,
+                expenses=results.detail.plan.expenses,
+                locale=request.state.locale,
+            )
+            if results.loans is not None
+            else None
+        ),
         "block_messages": {
             code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
         },
@@ -719,6 +738,7 @@ def _edit_context(
         )
     )
     context.update(_suggestion_context(request, suggestions, results.detail.plan))
+    context["loans_editable"] = True
     context["notice"] = notice
     context["dirty"] = dirty
     return context
@@ -766,6 +786,7 @@ def _view_context(
             ),
             "sensitivity_fragment_url": request.url_for("fire_sensitivity").path,
             "sensitivity_inputs_url": request.url_for("fire_edit").path + "#amounts",
+            "loans_editable": False,
         }
     )
     if sensitivity_loaded:
@@ -865,6 +886,7 @@ def _wizard_context(
     defaults: fire_service.FirePlanDefaults,
     *,
     suggestions: fire_linked_service.SetupSuggestions | None = None,
+    loan_section: fire_loan_web.LoanSectionView | None = None,
     review: dict[str, object] | None = None,
     error: str | None = None,
     error_field: str | None = None,
@@ -883,6 +905,9 @@ def _wizard_context(
         "profile_url": request.url_for("account").path,
         "cancel_url": request.url_for("fire_scenarios").path + "?cancelled=1",
         "suggestions": suggestions,
+        "loan_section": loan_section,
+        "loans_editable": False,
+        "loans_wizard": step == 4,
         "suggestion_block_messages": block_messages(locale),
         "suggestion_block_fallback": gettext(BLOCK_FALLBACK, locale),
         "suggestion_warning_text": warning_text,
@@ -928,6 +953,39 @@ def _load_wizard_suggestions(
     return None
 
 
+def _wizard_last_year(values: dict[str, str], current_year: int) -> int:
+    try:
+        birth_year = int(values.get("birth_year", ""))
+        horizon_age = int(values.get("horizon_age", ""))
+    except ValueError:
+        return current_year
+    return birth_year + horizon_age
+
+
+def _load_wizard_loans(
+    factory: object,
+    ctx: Context,
+    values: dict[str, str],
+    defaults: fire_service.FirePlanDefaults,
+    step: int,
+) -> fire_loan_web.LoanSectionView | None:
+    """The live loan card/review on steps 2 and 4; never writes settings."""
+    if step not in (2, 4):
+        return None
+    data = fire_loans_service.load_fire_loans(
+        factory,  # type: ignore[arg-type]
+        ctx,
+        currency=defaults.currency,
+    )
+    return fire_loan_web.build_loan_section(
+        data,
+        currency=defaults.currency,
+        last_year=_wizard_last_year(values, defaults.current_year),
+        expenses=None,
+        locale=ctx.user.locale or ctx.workspace.locale,
+    )
+
+
 def _wizard_suggestion_amount(
     suggestions: fire_linked_service.SetupSuggestions | None,
     field: str,
@@ -953,6 +1011,7 @@ async def _render_wizard(
     defaults: fire_service.FirePlanDefaults,
     *,
     suggestions: fire_linked_service.SetupSuggestions | None = None,
+    loan_section: fire_loan_web.LoanSectionView | None = None,
     review: dict[str, object] | None = None,
     error: str | None = None,
     error_field: str | None = None,
@@ -967,6 +1026,15 @@ async def _render_wizard(
             step,
             defaults.currency,
         )
+    if loan_section is None:
+        loan_section = await run_in_threadpool(
+            _load_wizard_loans,
+            request.app.state.session_factory,
+            ctx,
+            values,
+            defaults,
+            step,
+        )
     context = _wizard_context(
         request,
         ctx,
@@ -974,6 +1042,7 @@ async def _render_wizard(
         values,
         defaults,
         suggestions=suggestions,
+        loan_section=loan_section,
         review=review,
         error=error,
         error_field=error_field,
@@ -1008,7 +1077,12 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
     if entry.detail is not None:
         if request.query_params.get("edit") == "1":
             return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
-        results = fire_projection_service.results_from_detail(entry.detail)
+        results = await run_in_threadpool(
+            fire_projection_service.results_for_detail,
+            request.app.state.session_factory,
+            ctx,
+            entry.detail,
+        )
         context = await run_in_threadpool(
             _view_context,
             request,
@@ -1088,7 +1162,27 @@ async def _render_edit(
         ctx,
         currency=detail.plan.currency,
     )
-    results = fire_projection_service.results_from_detail(detail)
+    results = await run_in_threadpool(
+        fire_projection_service.results_for_detail,
+        request.app.state.session_factory,
+        ctx,
+        detail,
+    )
+    if values is not None:
+        try:
+            toggles = fire_loan_web.parse_loan_toggles(values)
+        except fire_service.FireError:
+            toggles = ()
+        if toggles:
+            loan_data = await run_in_threadpool(
+                fire_loans_service.load_fire_loans,
+                request.app.state.session_factory,
+                ctx,
+                currency=detail.plan.currency,
+                ignored_loan_ids=detail.ignored_loan_ids,
+                included_overrides={item.loan_id: item.included for item in toggles},
+            )
+            results = fire_projection_service.results_from_detail(detail, loans=loan_data)
     context = await run_in_threadpool(
         _edit_context,
         request,
@@ -1128,7 +1222,12 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
             factory=request.app.state.session_factory,
         )
     except fire_service.FireError as exc:
-        saved = fire_projection_service.results_from_detail(detail)
+        saved = await run_in_threadpool(
+            fire_projection_service.results_for_detail,
+            request.app.state.session_factory,
+            ctx,
+            detail,
+        )
         context = await run_in_threadpool(
             _results_context,
             request,

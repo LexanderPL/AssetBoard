@@ -45,6 +45,13 @@
 </section>
 {% endif %}
 
+{% if loan_section and loan_section.rows %}
+<div class="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-sm" data-fire-loans-preview>
+  <span>{{ _("Included loans: %(amount)s a year", amount=loan_section.included_total_label) }}</span>
+  <span>{{ _("Ignored loans: %(amount)s a year", amount=loan_section.ignored_total_label) }}</span>
+</div>
+{% endif %}
+
 {% if projection %}
   {% include "fire/_metrics.html" %}
   {% include "fire/_table.html" %}

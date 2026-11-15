@@ -734,3 +734,25 @@ def test_the_wizard_and_reset_render_in_polish(owner) -> None:
         assert "Aby potwierdzić, wpisz reset:" in page.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
+
+
+def test_the_wizard_review_lists_live_loans_without_settings_or_writes(owner) -> None:
+    from assetboard.db.models.fire import FireLoanSetting
+    from tests.fire_loan_helpers import create_loan
+
+    loan_id = create_loan(owner, name="Home mortgage")
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    assert "data-fire-wizard-loans" in text
+    assert "Home mortgage" in text
+    assert "data-fire-loan-annual" in text
+    assert "data-fire-loan-payoff" in text
+    assert 'name="loan_include_' not in text
+    with owner.db() as session:
+        assert session.scalar(select(func.count()).select_from(FireLoanSetting)) == 0
+    assert f'data-fire-loan="{loan_id}"' in text
+
+
+def test_the_wizard_review_shows_an_empty_loan_state(owner) -> None:
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    assert "data-fire-wizard-loans" in text
+    assert "No active loans." in text

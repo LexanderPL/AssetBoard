@@ -1242,3 +1242,81 @@ def test_another_workspace_has_its_own_editor_state(owner) -> None:
     )
     assert response.status_code == 303
     assert owner.client.get("/fire/edit").status_code == 200
+
+
+def _loan_settings(owner, plan_id: UUID) -> list[tuple[UUID, bool]]:
+    from assetboard.db.models.fire import FireLoanSetting
+
+    with owner.db() as session:
+        return [
+            (row.loan_id, row.included)
+            for row in session.scalars(
+                select(FireLoanSetting).where(FireLoanSetting.scenario_id == plan_id)
+            )
+        ]
+
+
+def test_the_editor_shows_loan_toggles_and_preview_never_writes(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = create_plan(owner)
+    loan_id = create_loan(owner)
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    assert f'name="loan_include_{loan_id}"' in page.text
+    assert re.search(rf'name="loan_include_{loan_id}"[^>]*value="1"[^>]*checked', page.text)
+    assert "data-fire-loan-annual" in page.text
+    preview = owner.post(
+        "/fire/edit/preview",
+        _form(**{f"loan_include_{loan_id}": "0"}),
+        token_from="/fire/edit",
+    )
+    assert preview.status_code == 200
+    assert "data-fire-loans-preview" in preview.text
+    assert "data-fire-loans-ignored-total" in page.text
+    assert _loan_settings(owner, plan_id) == []
+
+
+def test_loan_toggles_save_with_save_changes_and_discard_restores(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = create_plan(owner)
+    loan_id = create_loan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(**{f"loan_include_{loan_id}": "0"}),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    assert _loan_settings(owner, plan_id) == [(loan_id, False)]
+    view = owner.client.get("/fire")
+    assert 'data-fire-loan-state="ignored"' in view.text
+    discarded = owner.client.get("/fire/edit?discarded=1")
+    assert f'name="loan_include_{loan_id}"' in discarded.text
+    assert re.search(rf'name="loan_include_{loan_id}"[^>]*value="0"[^>]*checked', discarded.text)
+
+
+def test_a_save_error_keeps_posted_loan_toggles(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    create_plan(owner)
+    loan_id = create_loan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(birth_year="1901", **{f"loan_include_{loan_id}": "0"}),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert re.search(rf'name="loan_include_{loan_id}"[^>]*value="0"[^>]*checked', response.text)
+
+
+def test_an_unknown_loan_toggle_is_rejected_without_writing(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(**{"loan_include_00000000-0000-0000-0000-000000000000": "0"}),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert "data-action-error" in response.text
+    assert _loan_settings(owner, plan_id) == []

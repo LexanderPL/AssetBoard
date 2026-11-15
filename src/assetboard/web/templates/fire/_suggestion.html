@@ -32,7 +32,7 @@
 {% endif %}
 {% endmacro %}
 
-{% macro amount_suggestion(suggestions, field, kind, title, locale, show_categories=false, messages={}, fallback="", warning_text=none, saved=none, copy_input=none) %}
+{% macro amount_suggestion(suggestions, field, kind, title, locale, show_categories=false, messages={}, fallback="", warning_text=none, saved=none, copy_input=none, scheduled_loan_total=none, scheduled_loan_count=0) %}
 {% set series = suggestions.income if kind == "income" else suggestions.expenses %}
 {% set warning_series = "income" if kind == "income" else "expense" %}
 {% set blocked = suggestions.blocks | selectattr("field", "equalto", field) | list %}
@@ -72,6 +72,9 @@
     {% else %}
     <p class="mt-3 text-sm text-muted" data-fire-loan-portion="none">{{ _("No ledger expenses in this window are linked to recorded loan payments. If you pay loans, make sure the amount you enter includes those payments.") }}</p>
     {% endif %}
+  {% endif %}
+  {% if scheduled_loan_total %}
+  <p class="mt-3 text-sm" data-fire-scheduled-loan-payment="{{ scheduled_loan_total }}">{{ ngettext("Scheduled loan payments (live): %(amount)s a year from %(num)d loan.", "Scheduled loan payments (live): %(amount)s a year from %(num)d loans.", scheduled_loan_count, amount=scheduled_loan_total, num=scheduled_loan_count) }}</p>
   {% endif %}
   {% endif %}
 </section>
