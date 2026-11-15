@@ -1,5 +1,5 @@
 {% from "fire/_macros.html" import hint with context %}
-{% set editable = can_edit and not detail.scenario.archived %}
+{% set editable = can_edit %}
 <section class="mt-6" aria-labelledby="inputs-heading">
   <details id="inputs" class="panel p-6 sm:p-7"{% if inputs_open %} open{% endif %}>
     <summary class="cursor-pointer list-none">
@@ -19,7 +19,7 @@
     <fieldset disabled class="mt-5 space-y-6">
       {% include "fire/_form_body.html" %}
     </fieldset>
-    <p class="mt-4 text-sm text-muted" data-fire-readonly>{{ _("This scenario is archived and read-only. Restore it to change its inputs.") if detail.scenario.archived else _("Your role can read this plan but not change it.") }}</p>
+    <p class="mt-4 text-sm text-muted" data-fire-readonly>{{ _("Your role can read this plan but not change it.") }}</p>
     {% endif %}
   </details>
 </section>

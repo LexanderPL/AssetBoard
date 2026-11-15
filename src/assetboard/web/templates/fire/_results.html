@@ -1,5 +1,6 @@
+{% from "fire/_macros.html" import badge with context %}
 {% set projection = results.projection %}
-{% set s = detail.scenario %}
+{% set s = plan %}
 
 {% if preview_error %}
 <p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-fire-preview-error data-fire-preview-error-field="{{ preview_error_field or '' }}">{{ preview_error }}</p>
@@ -16,9 +17,6 @@
 {% set basis_label_class = "cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle has-[:checked]:bg-primary-soft has-[:checked]:text-primary-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3" data-fire-results-toolbar>
   {% if can_preview %}
-  {# Editors switch the basis without leaving the page: the radios belong to #fire-form (the form
-     wraps the results), so they post with the preview and with Save. hx-preserve keeps the chosen
-     radio through the fragment swap. #}
   <div id="fire-basis-toggle" class="inline-flex rounded-xl border border-line bg-surface p-1" role="radiogroup" aria-label="{{ _('Money basis') }}" data-fire-basis-toggle hx-preserve="true">
     <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="nominal" class="sr-only"{% if basis == 'nominal' %} checked{% endif %} data-fire-basis="nominal"><span>{{ _("Each year's money") }}</span></label>
     <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="real" class="sr-only"{% if basis == 'real' %} checked{% endif %} data-fire-basis="real"><span>{{ _("Today's money") }}</span></label>
@@ -29,25 +27,37 @@
     <a href="?basis=real{% if inputs_open %}&edit=1{% endif %}#fire-results" class="{{ active_basis_class if basis == 'real' else inactive_basis_class }}"{% if basis == 'real' %} aria-current="true"{% endif %} data-fire-basis="real">{{ _("Today's money") }}</a>
   </div>
   {% endif %}
-  <p class="text-xs text-muted">{{ _("A view preference; it is not saved with the scenario.") }}</p>
+  <p class="text-xs text-muted">{{ _("A view preference; it is not saved with the plan.") }}</p>
 </div>
 
 {% if results.blocks %}
-<section class="panel p-6 sm:p-7" role="alert" data-fire-blocked="{{ results.blocked.code }}" data-fire-blocked-field="{{ results.blocked.field }}">
+<section class="panel p-6 sm:p-7" role="alert" data-fire-blocked="{{ results.blocked.code }}" data-fire-blocked-field="{{ results.blocked.field or '' }}">
   <h2 class="text-base font-semibold">{{ _("The projection is unavailable") }}</h2>
   <ul class="mt-3 space-y-2 text-sm text-ink">
     {% for block in results.blocks %}
-    <li data-fire-block="{{ block.code }}" data-fire-block-field="{{ block.field }}">
-      <span class="font-medium">{{ block_messages.get(block.code, _("The linked input could not be resolved.")) }}</span>
+    <li data-fire-block="{{ block.code }}" data-fire-block-field="{{ block.field or '' }}">
+      <span class="font-medium">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}</span>
       {% if block.detail %}<span class="text-muted"> ({{ block.detail }})</span>{% endif %}
-      <span class="mt-1 block text-xs text-muted">{{ _("Switch the affected input to Manual in Plan inputs, or fix the linked data.") }}</span>
     </li>
     {% endfor %}
   </ul>
 </section>
 {% endif %}
 
-{% include "fire/_linked_inputs.html" %}
+{% if detail.archived_events %}
+<details class="panel mt-4 p-6 sm:p-7" data-fire-archived-adjustments>
+  <summary class="cursor-pointer text-base font-semibold">{{ _("Archived adjustments") }} <span class="text-sm font-normal text-muted">({{ detail.archived_events|length }})</span></summary>
+  <p class="mt-2 text-sm text-muted">{{ _("These adjustments are before the plan's current year (or a saving override in the current year) and are not applied to the projection. They stay in the plan as history.") }}</p>
+  <ul class="mt-3 divide-y divide-line text-sm">
+    {% for row in detail.archived_events %}
+    <li class="flex flex-wrap items-baseline justify-between gap-2 py-2">
+      <span><span class="font-medium tabular-nums">{{ row.year }}</span> · {{ event_kind_labels.get(row.kind, row.kind) }} · {{ row.label }}</span>
+      <span class="tabular-nums text-muted">{{ format_money(row.amount, locale) }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
 
 {% if projection %}
   {% include "fire/_metrics.html" %}

@@ -1,34 +1,22 @@
-"""FIRE planner scenarios (F8.1).
+"""The one FIRE plan of a workspace (F8.8).
 
-One scenario is a named set of planning assumptions and two editors: explicit yearly net-saving
-overrides (``fire_contributions``) and one-off cash or permanent expense/income changes
-(``fire_events``). The currency is snapshotted from the workspace base currency; child rows
-store only minor units.
+A workspace has at most one live plan. The table keeps its v1 name ``fire_scenarios`` for
+migration continuity: the chosen row is reshaped in place, the others are deleted after the user
+chooses in the app.
 
-Contribution and event amounts are **signed** minor units, an explicit exception to overview
-§3.2 (ledger rows are stored positive and get their direction from the entity). Here the sign
-is the meaning: positive saves/adds/increases, negative dissaves/withdraws/reduces.
+While old scenarios await that choice, each old row stays readable through two temporary columns:
+``is_live`` marks the chosen plan and ``legacy`` carries the old presentation data (name, start
+year, default/archive flags, linked modes and exclusion category ids) as compact JSON. A partial
+unique index on ``is_live`` enforces one live plan per workspace; a later cleanup revision drops
+both temporary columns and replaces that index with a plain unique ``workspace_id``.
 
-Scenarios are archived, never hard-deleted. A partial unique index keeps active names unique
-ignoring case; another keeps at most one active default per workspace.
-
-F8.4 adds ``fire_expense_exclusions``: regular expense categories left out of a scenario's
-linked trailing expenses. The category must stay a regular expense category while referenced.
-
-F8.4 also adds ``FireEvent.source_loan_id``: the loan a one-click payoff event came from. It is
-NULL for ordinary events and drives exact idempotency (never the translated label). The composite
-foreign key keeps the loan in the same workspace. ``ON DELETE RESTRICT`` is deliberate: loans are
-archived, never hard-deleted, and a composite ``SET NULL`` would also try to clear the non-null
-``workspace_id`` column.
-
-F8.6 adds the archive lineage column ``import_key`` to every FIRE model, following the ledger
-tables. A restore writes ``import_key = "id:<archive id>"`` so a later export keeps the original
-lineage id; the partial unique index is per workspace.
+Amounts are non-negative integer minor units of the plan currency. Event amounts stay **signed**,
+an explicit exception to overview §3.2: positive saves/adds/increases, negative
+dissaves/withdraws/reduces.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
@@ -39,6 +27,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     false,
@@ -47,7 +36,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
-from assetboard.db.types import UtcDateTime
 from assetboard.domain.fire import (
     MAX_LABEL_LENGTH,
     MAX_YEAR,
@@ -68,32 +56,15 @@ def _year_range(name: str) -> CheckConstraint:
 
 
 class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """A named FIRE plan; ``start_year`` is fixed at creation and shown read-only."""
+    """The single FIRE plan of a workspace; legacy rows wait for the one-time chooser."""
 
     __tablename__ = "fire_scenarios"
     __table_args__ = (
         UniqueConstraint("workspace_id", "id", name="uq_fire_scenarios_workspace_id_id"),
-        CheckConstraint("length(name) > 0", name="name_not_empty"),
         CheckConstraint("length(currency) = 3", name="currency_length"),
         _year_range("birth_year"),
-        _year_range("start_year"),
-        CheckConstraint("birth_year <= start_year", name="birth_not_after_start"),
-        CheckConstraint(
-            "horizon_age BETWEEN 1 AND 120",
-            name="horizon_age_valid",
-        ),
-        CheckConstraint(
-            "stop_working_age BETWEEN 0 AND 120",
-            name="stop_working_age_valid",
-        ),
-        CheckConstraint(
-            "horizon_age > start_year - birth_year",
-            name="horizon_after_current_age",
-        ),
-        CheckConstraint(
-            "stop_working_age >= start_year - birth_year",
-            name="stop_not_before_current_age",
-        ),
+        CheckConstraint("horizon_age BETWEEN 1 AND 120", name="horizon_age_valid"),
+        CheckConstraint("stop_working_age BETWEEN 0 AND 120", name="stop_working_age_valid"),
         CheckConstraint(
             f"inflation_bp BETWEEN {RATE_HARD_MIN_BP} AND {RATE_HARD_MAX_BP}",
             name="inflation_valid",
@@ -117,55 +88,32 @@ class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="swr_valid",
         ),
         CheckConstraint(
-            "income_mode IN ('manual', 'trailing_12m')",
-            name="income_mode_valid",
+            f"income_minor IS NULL OR income_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}",
+            name="income_amount_valid",
         ),
         CheckConstraint(
-            "expenses_mode IN ('manual', 'trailing_12m')",
-            name="expenses_mode_valid",
+            f"expenses_minor IS NULL OR expenses_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}",
+            name="expenses_amount_valid",
         ),
         CheckConstraint(
-            "portfolio_mode IN ('manual', 'linked_investable')",
-            name="portfolio_mode_valid",
+            f"portfolio_minor IS NULL OR portfolio_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}",
+            name="portfolio_amount_valid",
         ),
         CheckConstraint(
-            "(income_mode = 'manual' AND income_manual_minor IS NOT NULL AND "
-            f"income_manual_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}) OR "
-            "(income_mode != 'manual' AND income_manual_minor IS NULL)",
-            name="income_manual_valid",
+            "NOT is_live OR ("
+            "income_minor IS NOT NULL AND expenses_minor IS NOT NULL "
+            "AND portfolio_minor IS NOT NULL)",
+            name="live_complete",
         ),
-        CheckConstraint(
-            "(expenses_mode = 'manual' AND expenses_manual_minor IS NOT NULL AND "
-            f"expenses_manual_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}) OR "
-            "(expenses_mode != 'manual' AND expenses_manual_minor IS NULL)",
-            name="expenses_manual_valid",
-        ),
-        CheckConstraint(
-            "(portfolio_mode = 'manual' AND portfolio_manual_minor IS NOT NULL AND "
-            f"portfolio_manual_minor BETWEEN 0 AND {MAX_AMOUNT_MINOR}) OR "
-            "(portfolio_mode != 'manual' AND portfolio_manual_minor IS NULL)",
-            name="portfolio_manual_valid",
-        ),
-        CheckConstraint(
-            "NOT (is_default AND archived_at IS NOT NULL)",
-            name="default_not_archived",
-        ),
-        # Active scenario names are unique ignoring case; archived names may be reused.
+        CheckConstraint("is_live OR legacy IS NOT NULL", name="live_or_legacy"),
+        CheckConstraint("NOT (is_live AND legacy IS NOT NULL)", name="live_not_legacy"),
+        # One chosen plan per workspace while old scenarios await the chooser.
         Index(
-            "uq_fire_scenarios_active_name_key",
-            "workspace_id",
-            "name_key",
-            unique=True,
-            sqlite_where=text("archived_at IS NULL"),
-            postgresql_where=text("archived_at IS NULL"),
-        ),
-        # At most one active default per workspace (the service promotes one).
-        Index(
-            "uq_fire_scenarios_active_default",
+            "uq_fire_scenarios_live_workspace",
             "workspace_id",
             unique=True,
-            sqlite_where=text("is_default AND archived_at IS NULL"),
-            postgresql_where=text("is_default AND archived_at IS NULL"),
+            sqlite_where=text("is_live"),
+            postgresql_where=text("is_live"),
         ),
         Index(
             "uq_fire_scenarios_import_key",
@@ -175,122 +123,33 @@ class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             sqlite_where=text("import_key IS NOT NULL"),
             postgresql_where=text("import_key IS NOT NULL"),
         ),
-        Index("ix_fire_scenarios_workspace_name", "workspace_id", "name"),
     )
 
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    name_key: Mapped[str] = mapped_column(String(255), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     birth_year: Mapped[int] = mapped_column(Integer(), nullable=False)
-    start_year: Mapped[int] = mapped_column(Integer(), nullable=False)
+    stop_working_age: Mapped[int] = mapped_column(Integer(), nullable=False)
+    horizon_age: Mapped[int] = mapped_column(Integer(), nullable=False)
     inflation_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
     real_return_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
     income_growth_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
-    stop_working_age: Mapped[int] = mapped_column(Integer(), nullable=False)
-    horizon_age: Mapped[int] = mapped_column(Integer(), nullable=False)
     rule: Mapped[str] = mapped_column(String(32), nullable=False)
     swr_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    income_mode: Mapped[str] = mapped_column(String(16), nullable=False)
-    income_manual_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
-    expenses_mode: Mapped[str] = mapped_column(String(16), nullable=False)
-    expenses_manual_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
-    portfolio_mode: Mapped[str] = mapped_column(String(16), nullable=False)
-    portfolio_manual_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
-    is_default: Mapped[bool] = mapped_column(
+    income_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    expenses_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    portfolio_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    needs_review: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=False, server_default=false()
     )
-    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
-    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
-
-
-class FireContribution(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """One explicit net-saving override for a plan year (signed minor units)."""
-
-    __tablename__ = "fire_contributions"
-    __table_args__ = (
-        UniqueConstraint(
-            "workspace_id",
-            "scenario_id",
-            "year",
-            name="uq_fire_contributions_workspace_scenario_year",
-        ),
-        ForeignKeyConstraint(
-            ["workspace_id", "scenario_id"],
-            ["fire_scenarios.workspace_id", "fire_scenarios.id"],
-            name="fk_fire_contributions_workspace_scenario",
-            ondelete="CASCADE",
-        ),
-        _year_range("year"),
-        CheckConstraint(
-            f"net_amount_minor BETWEEN -{MAX_AMOUNT_MINOR} AND {MAX_AMOUNT_MINOR}",
-            name="net_amount_valid",
-        ),
-        Index(
-            "uq_fire_contributions_import_key",
-            "workspace_id",
-            "import_key",
-            unique=True,
-            sqlite_where=text("import_key IS NOT NULL"),
-            postgresql_where=text("import_key IS NOT NULL"),
-        ),
+    # Temporary migration columns; removed by the cleanup revision once every workspace chose.
+    is_live: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
     )
-
-    scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
-    year: Mapped[int] = mapped_column(Integer(), nullable=False)
-    net_amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
-    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
-
-
-class FireExpenseExclusion(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """One expense category excluded from a scenario's linked trailing expenses (F8.4).
-
-    The category must be a regular expense category when it is saved; the category usage seam
-    keeps it regular (and an expense) while the exclusion exists. Archived categories remain
-    valid so an old exclusion keeps meaning the same thing.
-    """
-
-    __tablename__ = "fire_expense_exclusions"
-    __table_args__ = (
-        UniqueConstraint(
-            "workspace_id",
-            "scenario_id",
-            "category_id",
-            name="uq_fire_expense_exclusions_workspace_scenario_category",
-        ),
-        ForeignKeyConstraint(
-            ["workspace_id", "scenario_id"],
-            ["fire_scenarios.workspace_id", "fire_scenarios.id"],
-            name="fk_fire_expense_exclusions_workspace_scenario",
-            ondelete="CASCADE",
-        ),
-        ForeignKeyConstraint(
-            ["workspace_id", "category_id"],
-            ["categories.workspace_id", "categories.id"],
-            name="fk_fire_expense_exclusions_workspace_category",
-            ondelete="CASCADE",
-        ),
-        Index(
-            "ix_fire_expense_exclusions_workspace_scenario",
-            "workspace_id",
-            "scenario_id",
-        ),
-        Index(
-            "uq_fire_expense_exclusions_import_key",
-            "workspace_id",
-            "import_key",
-            unique=True,
-            sqlite_where=text("import_key IS NOT NULL"),
-            postgresql_where=text("import_key IS NOT NULL"),
-        ),
-    )
-
-    scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
-    category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    legacy: Mapped[str | None] = mapped_column(Text(), nullable=True)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
 
 
 class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """A one-off cash flow or a permanent annual expense/income change (signed minor units)."""
+    """A cash flow, a permanent series change or a saving override in one plan year."""
 
     __tablename__ = "fire_events"
     __table_args__ = (
@@ -302,7 +161,7 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         ),
         _year_range("year"),
         CheckConstraint(
-            "kind IN ('cash', 'expense_change', 'income_change')",
+            "kind IN ('cash', 'expense_change', 'income_change', 'saving_override')",
             name="kind_valid",
         ),
         CheckConstraint(
@@ -313,14 +172,16 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             f"length(label) > 0 AND length(label) <= {MAX_LABEL_LENGTH}",
             name="label_valid",
         ),
-        ForeignKeyConstraint(
-            ["workspace_id", "source_loan_id"],
-            ["loans.workspace_id", "loans.id"],
-            name="fk_fire_events_workspace_source_loan",
-            ondelete="RESTRICT",
-        ),
         Index("ix_fire_events_workspace_scenario_year", "workspace_id", "scenario_id", "year"),
-        Index("ix_fire_events_workspace_source_loan", "workspace_id", "source_loan_id"),
+        Index(
+            "uq_fire_events_saving_override",
+            "workspace_id",
+            "scenario_id",
+            "year",
+            unique=True,
+            sqlite_where=text("kind = 'saving_override'"),
+            postgresql_where=text("kind = 'saving_override'"),
+        ),
         Index(
             "uq_fire_events_import_key",
             "workspace_id",
@@ -336,5 +197,4 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     label: Mapped[str] = mapped_column(String(MAX_LABEL_LENGTH), nullable=False)
-    source_loan_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)

@@ -1,16 +1,15 @@
-"""FIRE planner settings (F8.1): scenario list, overview and the create/edit form.
+"""FIRE plan pages (F8.8): one plan, its chooser and the current results/inputs page.
 
-Routes parse and format form values and map service errors to field messages; validation,
-roles, uniqueness, defaults and archiving live in ``services.fire_scenarios``. Every
-state-changing route is covered by the router-level ``require_csrf`` dependency.
+Routes parse and format form values and map service errors to field messages; validation, roles,
+the one-time legacy choice and the current-year projection live in ``services.fire_scenarios`` and
+``services.fire_projection``. Every state-changing route is covered by the router-level
+``require_csrf`` dependency.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
 from decimal import Decimal
-from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -22,9 +21,6 @@ from assetboard.domain.fire import (
     DEFAULT_EXPENSE_FACTORS_BP,
     DEFAULT_RETURN_DELTAS_BP,
     EventKind,
-    ExpensesMode,
-    IncomeMode,
-    PortfolioMode,
     Rule,
     SensitivityError,
     sensitivity,
@@ -33,7 +29,7 @@ from assetboard.domain.fire import (
 from assetboard.domain.money import Money
 from assetboard.domain.transactions import EntryError, amount_minor
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month
+from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
     format_amount_input,
     format_money,
@@ -41,13 +37,11 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
-from assetboard.services import fire_comparison as fire_comparison_service
-from assetboard.services import fire_linked as fire_linked_service
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
-from assetboard.web.fire_charts import build_fire_charts, build_fire_comparison_chart
+from assetboard.web.fire_charts import build_fire_charts
 from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
 from assetboard.web.fire_sensitivity import build_sensitivity_view
 from assetboard.web.forms import InvalidPercentOrFixed, signed_percent_to_bp
@@ -63,109 +57,67 @@ def _(message: str) -> str:
 
 
 ERRORS = {
-    "invalid_name": _("Enter a name of 1 to 200 characters."),
     "birth_year_required": _("Enter your birth year, or add it to your profile first."),
-    "invalid_birth_year": _("Enter a birth year between 1900 and the plan's start year."),
+    "invalid_birth_year": _("Enter a birth year between 1900 and the current year."),
     "invalid_horizon": _("Enter a horizon between 1 and 120 years of age."),
-    "horizon_not_after_age": _(
-        "The horizon age must be older than your age at the start of the plan."
-    ),
+    "horizon_not_after_age": _("The horizon age must be older than your current age."),
     "invalid_stop_age": _("Enter the age at which income stops, between 0 and 120."),
-    "stop_before_age": _("Income cannot stop before your age at the start of the plan."),
     "invalid_rate": _("Enter a percentage between -20% and 50% with at most two decimals."),
     "invalid_swr": _("Enter a withdrawal rate between 0.5% and 20% with at most two decimals."),
     "invalid_rule": _("Choose how the plan decides that you are financially independent."),
-    "invalid_income_mode": _("Choose how starting income is entered."),
-    "invalid_expenses_mode": _("Choose how starting expenses are entered."),
-    "invalid_portfolio_mode": _("Choose how the starting portfolio is entered."),
-    "linked_mode_unavailable": _(
-        "This input can only be resolved while saving; preview the plan from its page."
-    ),
-    "invalid_expense_exclusion": _(
-        "An excluded category is no longer a regular expense category of this workspace. "
-        "Reload the page and try again."
-    ),
     "invalid_amount": _("Enter a valid non-negative amount in the plan currency."),
-    "duplicate_name": _("Another active scenario already has this name."),
-    "rows_outside_window": _(
-        "Every contribution and event year must fall inside the plan's window."
-    ),
-    "duplicate_contribution_year": _("Each contribution year can appear only once."),
-    "too_many_contributions": _("A scenario can have at most 120 contribution rows."),
-    "too_many_events": _("A scenario can have at most 200 events."),
+    "invalid_year": _("Enter a whole year for every row."),
+    "rows_outside_window": _("Every event year must fall inside the plan's window."),
+    "too_many_events": _("A plan can have at most 200 events."),
     "invalid_event_kind": _("Choose a valid event type."),
     "invalid_label": _("Give every event a short description."),
-    "invalid_event": _(
-        "This event is no longer part of the scenario. Reload the page and try again."
-    ),
+    "invalid_event": _("This event is no longer part of the plan. Reload the page and try again."),
     "duplicate_event": _("The same event appears twice. Reload the page and try again."),
-    "invalid_year": _("Enter a whole year for every row."),
-    "archived": _("Archived scenarios are read-only. Restore the scenario first."),
+    "duplicate_saving_override": _("A year can have only one saving override."),
+    "saving_override_current_year": _(
+        "A saving override starts in the next year; the current year uses the starting portfolio."
+    ),
+    "events_not_allowed_on_create": _("Create the plan first, then add adjustments."),
     "extreme_rate_confirmation_required": _(
         "A rate is outside the usual range. Tick the confirmation box to save it."
     ),
     "invalid_extreme_rates": _("Tick the confirmation box only when you mean the unusual rates."),
-    "missing_starting_value": _("The plan is missing a starting value."),
     "invalid_projection": _("The saved plan cannot be projected."),
-    "loan_payoff_unavailable": _("This loan payoff can no longer be added."),
-    "loan_event_exists": _("This loan payoff is already in the plan."),
+    "plan_exists": _("This workspace already has a FIRE plan."),
+    "migration_required": _("Choose one of the old FIRE scenarios before creating a new plan."),
+    "choice_required": _("Choose one of the old FIRE scenarios to keep."),
+    "legacy_invalid": _(
+        "An old FIRE scenario cannot be read. Contact the workspace owner before retrying."
+    ),
+    "plan_currency_mismatch": _(
+        "The workspace base currency no longer matches the plan's currency. The plan cannot be "
+        "projected or changed; reset it and create a plan in the current currency."
+    ),
+    "confirmation_required": _("Confirm that the plan will be deleted."),
+    "choice_not_confirmed": _("Confirm that the other old FIRE scenarios will be deleted."),
 }
 
 RESULT_BLOCK_MESSAGES = {
-    "missing_starting_value": _("The plan is missing a resolved starting value."),
+    "plan_currency_mismatch": _(
+        "The workspace base currency no longer matches the plan's currency. Reset the plan and "
+        "create a new one in the current currency."
+    ),
+    "horizon_not_after_age": _(
+        "The plan's horizon is not after your current age. Raise the horizon age to project it."
+    ),
     "invalid_projection": _("The saved plan cannot be projected."),
-    "no_income_data": _(
-        "No regular income transactions fall in the last 12 full months, so linked income is "
-        "unavailable. Add income to the ledger or switch this input to Manual."
+    "invalid_amount": _("The plan has an invalid amount."),
+    "invalid_horizon": _("The plan has an invalid horizon."),
+    "invalid_stop_age": _("The plan has an invalid stop-working age."),
+    "invalid_rate": _("The plan has an invalid rate."),
+    "invalid_swr": _("The plan has an invalid withdrawal rate."),
+    "saving_override_current_year": _(
+        "A saving override is stored in the current year and is not applied."
     ),
-    "no_expense_data": _(
-        "No regular expense transactions fall in the last 12 full months, so linked expenses are "
-        "unavailable. Add expenses to the ledger or switch this input to Manual."
-    ),
-    "expenses_all_excluded": _(
-        "Every regular expense category in the window is excluded, so linked expenses are "
-        "unavailable. Clear an exclusion or switch this input to Manual."
-    ),
-    "ledger_currency_mismatch": _(
-        "Some ledger rows in the window use another currency. Linked values need only the "
-        "scenario currency; switch this input to Manual or review those rows."
-    ),
-    "scenario_currency_mismatch": _(
-        "The workspace base currency no longer matches the scenario's currency, so linked "
-        "values are unavailable. Create a new scenario or switch these inputs to Manual."
-    ),
-    "no_linked_portfolio_data": _(
-        "No investable portfolio classes or investable manual net-worth items were found. Add "
-        "data or switch the starting portfolio to Manual."
-    ),
-    "portfolio_price_missing": _(
-        "An investable holding has no current price. Add a price or switch the starting "
-        "portfolio to Manual."
-    ),
-    "portfolio_fx_missing": _(
-        "An investable holding has no FX rate to the scenario currency. Add a rate or switch "
-        "the starting portfolio to Manual."
-    ),
-    "item_value_missing": _(
-        "An investable net-worth item has no value effective today. Add a valuation or switch "
-        "the starting portfolio to Manual."
-    ),
-    "item_fx_missing": _(
-        "An investable net-worth item has no FX rate to the scenario currency. Add a rate or "
-        "switch the starting portfolio to Manual."
-    ),
+    "duplicate_saving_override": _("A year has more than one saving override."),
 }
 
-FALLBACK_ERROR = _("The scenario could not be saved. Reload the page and try again.")
-
-COMPARISON_ERRORS = {
-    "too_many_scenarios": _("Compare at most three scenarios at a time."),
-    "currency_mismatch": _(
-        "The selected scenarios use different currencies. Choose scenarios that share one "
-        "currency; there is no currency conversion in the comparison."
-    ),
-}
-
+FALLBACK_ERROR = _("The plan could not be saved. Reload the page and try again.")
 SENSITIVITY_ERRORS = {
     "empty_axis": _("The sensitivity axes are empty."),
     "invalid_value": _("The sensitivity axes contain an invalid value."),
@@ -175,7 +127,7 @@ SENSITIVITY_ERRORS = {
     "missing_base": _("The sensitivity axes must include the saved plan."),
     "return_out_of_range": _(
         "The real-return range would leave the supported -20 to 50 percent bounds. Adjust the "
-        "scenario's return and try again."
+        "plan's return and try again."
     ),
     "expense_factor_out_of_range": _(
         "The expense range is outside the supported 0 to 1000 percent of the saved plan."
@@ -188,13 +140,9 @@ SENSITIVITY_ERRORS = {
 SENSITIVITY_FALLBACK = _("The sensitivity grid could not be calculated.")
 
 NOTICES = {
-    "created": _("Scenario created."),
-    "saved": _("Scenario saved."),
-    "duplicated": _("Scenario duplicated."),
-    "archived": _("Scenario archived."),
-    "restored": _("Scenario restored."),
-    "default_changed": _("Default scenario changed."),
-    "loan_event_added": _("Loan payoff added to the plan."),
+    "created": _("FIRE plan created."),
+    "saved": _("FIRE plan saved."),
+    "migrated": _("The old FIRE scenario was converted to the one-plan format. Review its values."),
 }
 
 RULE_LABELS = {
@@ -205,6 +153,7 @@ EVENT_KIND_LABELS = {
     EventKind.CASH.value: _("One-off cash flow"),
     EventKind.EXPENSE_CHANGE.value: _("Annual expense change"),
     EventKind.INCOME_CHANGE.value: _("Annual income change"),
+    EventKind.SAVING_OVERRIDE.value: _("Saving override"),
 }
 STARTING_FIELD_LABELS = {
     "income_manual": _("annual income"),
@@ -212,9 +161,7 @@ STARTING_FIELD_LABELS = {
     "portfolio_manual": _("starting portfolio"),
 }
 
-_CONTRIBUTION_KEY = re.compile(r"^contribution_(year|amount)_([0-9]+)$")
 _EVENT_KEY = re.compile(r"^event_(id|year|kind|amount|label)_([0-9]+)$")
-_CONTRIBUTION_FIELDS = ("year", "amount")
 _EVENT_FIELDS = ("id", "year", "kind", "amount", "label")
 
 
@@ -235,100 +182,6 @@ def _notice(request: Request, code: str | None) -> str | None:
     return _t(request, message) if message is not None else None
 
 
-def _compare_url(request: Request, scenario_ids: Sequence[UUID], basis: str) -> str:
-    query = [("scenario", str(scenario_id)) for scenario_id in scenario_ids]
-    if basis == "real":
-        query.append(("basis", "real"))
-    path = request.url_for("fire_compare").path
-    return f"{path}?{urlencode(query)}" if query else path
-
-
-def _preselected_ids(scenarios: fire_service.FireScenarioList) -> tuple[UUID, ...]:
-    """The default active scenario, else the first active one, else the first archived one."""
-    if scenarios.active:
-        default = next((row for row in scenarios.active if row.is_default), scenarios.active[0])
-        return (default.id,)
-    if scenarios.archived:
-        return (scenarios.archived[0].id,)
-    return ()
-
-
-def _compare_context(
-    request: Request,
-    comparison: fire_comparison_service.FireComparison,
-    scenarios: fire_service.FireScenarioList,
-    *,
-    basis: str,
-) -> dict[str, object]:
-    error_code = comparison.error_code
-    chart = (
-        build_fire_comparison_chart(comparison, basis, request.state.locale)
-        if error_code is None
-        else None
-    )
-    return {
-        "comparison": comparison,
-        "scenarios": scenarios,
-        "selected_ids": set(comparison.selected_ids),
-        "selected_order": comparison.selected_ids,
-        "comparison_error": _t(request, COMPARISON_ERRORS[error_code]) if error_code else None,
-        "comparison_error_code": error_code,
-        "chart": chart,
-        "basis": basis,
-        "nominal_url": _compare_url(request, comparison.selected_ids, "nominal"),
-        "real_url": _compare_url(request, comparison.selected_ids, "real"),
-        "block_messages": {
-            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
-        },
-        "format_money": format_money,
-    }
-
-
-def _sensitivity_context(
-    request: Request, results: fire_projection_service.FireScenarioResults
-) -> dict[str, object]:
-    scenario = results.detail.scenario
-    fragment_url = request.url_for("fire_scenario_sensitivity", scenario_id=str(scenario.id)).path
-    page_url = (
-        request.url_for("fire_scenario", scenario_id=str(scenario.id)).path
-        + "?sensitivity=1#sensitivity"
-    )
-    context: dict[str, object] = {
-        "sensitivity": None,
-        "sensitivity_error": None,
-        "sensitivity_error_code": None,
-        "sensitivity_blocks": results.blocks,
-        "block_messages": {
-            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
-        },
-        "sensitivity_fragment_url": fragment_url,
-        "sensitivity_page_url": page_url,
-        "sensitivity_inputs_url": (
-            request.url_for("fire_scenario", scenario_id=str(scenario.id)).path + "?edit=1#inputs"
-        ),
-    }
-    if results.projection is None:
-        return context
-    try:
-        grid = sensitivity(
-            results.projection.inputs,
-            DEFAULT_RETURN_DELTAS_BP,
-            DEFAULT_EXPENSE_FACTORS_BP,
-        )
-    except SensitivityError as exc:
-        context["sensitivity_error"] = _t(
-            request, SENSITIVITY_ERRORS.get(exc.code, SENSITIVITY_FALLBACK)
-        )
-        context["sensitivity_error_code"] = exc.code
-    else:
-        context["sensitivity"] = build_sensitivity_view(
-            grid,
-            horizon_age=results.projection.inputs.horizon_age,
-            locale=request.state.locale,
-        )
-    return context
-
-
 def _uuid(value: str) -> UUID:
     try:
         return UUID(value)
@@ -337,7 +190,6 @@ def _uuid(value: str) -> UUID:
 
 
 def _basis(value: str | None) -> str:
-    """The page's money basis; anything but ``real`` is the default nominal view."""
     return "real" if value == "real" else "nominal"
 
 
@@ -359,10 +211,6 @@ def _editor_rows(
         }
         for index in indexes
     ]
-
-
-def _row_blank(row: dict[str, str], fields: tuple[str, ...]) -> bool:
-    return all(not row.get(field, "").strip() for field in fields)
 
 
 def _row_year(text: str, field: str) -> int:
@@ -390,11 +238,10 @@ def _money_from_text(
         minor = signed_amount_minor(amount, currency) if signed else amount_minor(amount, currency)
         return Money(minor, currency)
     except (ValueError, EntryError):
-        code = "invalid_amount"
-        raise fire_service.FireError(field, code) from None
+        raise fire_service.FireError(field, "invalid_amount") from None
 
 
-def _scenario_money(
+def _plan_money(
     values: dict[str, str], key: str, locale: str, currency: str, field: str
 ) -> Money | None:
     text = values.get(key, "").strip()
@@ -449,27 +296,11 @@ def _optional_uuid(values: dict[str, str], key: str, field: str) -> UUID | None:
         raise fire_service.FireError(field, "invalid_event") from None
 
 
-def _contribution_inputs(
-    values: dict[str, str], locale: str, currency: str
-) -> tuple[fire_service.ContributionInput, ...]:
-    rows: list[fire_service.ContributionInput] = []
-    for row in _editor_rows(values, _CONTRIBUTION_KEY, "contribution", _CONTRIBUTION_FIELDS):
-        if _row_blank(row, _CONTRIBUTION_FIELDS):
-            continue
-        year = _row_year(row["year"], "contributions")
-        amount = _money_from_text(
-            row["amount"].strip(), locale, currency, signed=True, field="contributions"
-        )
-        rows.append(fire_service.ContributionInput(year=year, amount_minor=amount.amount_minor))
-    return tuple(rows)
-
-
 def _event_inputs(
     values: dict[str, str], locale: str, currency: str
 ) -> tuple[fire_service.EventInput, ...]:
     rows: list[fire_service.EventInput] = []
     for row in _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS):
-        # The kind select always carries a value, so a row is blank when its text fields are.
         if not any(row[field].strip() for field in ("year", "amount", "label")):
             continue
         year = _row_year(row["year"], "events")
@@ -488,22 +319,12 @@ def _event_inputs(
     return tuple(rows)
 
 
-def _scenario_input(
+def _plan_input(
     values: dict[str, str],
     locale: str,
     currency: str,
-    exclusion_ids: Sequence[str] = (),
-) -> fire_service.FireScenarioInput:
-    exclusions: list[UUID] = []
-    for value in exclusion_ids:
-        try:
-            exclusions.append(UUID(value))
-        except ValueError:
-            raise fire_service.FireError(
-                "expense_exclusions", "invalid_expense_exclusion"
-            ) from None
-    return fire_service.FireScenarioInput(
-        name=values.get("name", ""),
+) -> fire_service.FirePlanInput:
+    return fire_service.FirePlanInput(
         birth_year=_optional_int(values, "birth_year", "invalid_birth_year"),
         inflation_bp=_percent(values, "inflation", locale),
         real_return_bp=_percent(values, "real_return", locale),
@@ -512,26 +333,17 @@ def _scenario_input(
         horizon_age=_required_int(values, "horizon_age", "invalid_horizon"),
         rule=values.get("rule", Rule.RETURNS_COVER_EXPENSES.value),
         swr_bp=_optional_percent(values, "swr", locale),
-        income_mode=values.get("income_mode", IncomeMode.MANUAL.value),
-        income_manual=_scenario_money(values, "income_manual", locale, currency, "income_manual"),
-        expenses_mode=values.get("expenses_mode", ExpensesMode.MANUAL.value),
-        expenses_manual=_scenario_money(
-            values, "expenses_manual", locale, currency, "expenses_manual"
-        ),
-        portfolio_mode=values.get("portfolio_mode", PortfolioMode.MANUAL.value),
-        portfolio_manual=_scenario_money(
-            values, "portfolio_manual", locale, currency, "portfolio_manual"
-        ),
-        expense_exclusion_ids=tuple(exclusions),
+        income=_plan_money(values, "income_manual", locale, currency, "income_manual"),
+        expenses=_plan_money(values, "expenses_manual", locale, currency, "expenses_manual"),
+        portfolio=_plan_money(values, "portfolio_manual", locale, currency, "portfolio_manual"),
         extreme_rates_confirmed=values.get("extreme_rates_confirmed") == "1",
-        contributions=_contribution_inputs(values, locale, currency),
         events=_event_inputs(values, locale, currency),
     )
 
 
 def _base_values(
     *,
-    start_year: int,
+    current_year: int,
     currency: str,
     birth_year: int | None,
     horizon_age: int,
@@ -541,17 +353,12 @@ def _base_values(
     swr_bp: int | None,
     stop_working_age: int | str = "",
     rule: str = Rule.RETURNS_COVER_EXPENSES.value,
-    income_mode: str = IncomeMode.MANUAL.value,
-    expenses_mode: str = ExpensesMode.MANUAL.value,
-    portfolio_mode: str = PortfolioMode.MANUAL.value,
-    name: str = "",
     income_manual: str = "",
     expenses_manual: str = "",
     portfolio_manual: str = "",
 ) -> dict[str, str]:
     return {
-        "name": name,
-        "start_year": str(start_year),
+        "current_year": str(current_year),
         "currency": currency,
         "birth_year": "" if birth_year is None else str(birth_year),
         "horizon_age": str(horizon_age),
@@ -561,18 +368,14 @@ def _base_values(
         "income_growth": _rate_input(income_growth_bp, "en"),
         "rule": rule,
         "swr": "" if swr_bp is None else _rate_input(swr_bp, "en"),
-        "income_mode": income_mode,
         "income_manual": income_manual,
-        "expenses_mode": expenses_mode,
         "expenses_manual": expenses_manual,
-        "portfolio_mode": portfolio_mode,
         "portfolio_manual": portfolio_manual,
         "extreme_rates_confirmed": "",
     }
 
 
 def _values_for_locale(values: dict[str, str], locale: str) -> dict[str, str]:
-    """Re-render the illustrative default rates with the interface's decimal sign."""
     result = dict(values)
     for key in ("inflation", "real_return", "income_growth", "swr"):
         text = result.get(key, "").strip()
@@ -581,50 +384,27 @@ def _values_for_locale(values: dict[str, str], locale: str) -> dict[str, str]:
     return result
 
 
-def _detail_values(detail: fire_service.FireScenarioDetail, locale: str) -> dict[str, str]:
-    scenario = detail.scenario
+def _detail_values(detail: fire_service.FirePlanDetail, locale: str) -> dict[str, str]:
+    plan = detail.plan
     return {
-        "name": scenario.name,
-        "start_year": str(scenario.start_year),
-        "currency": scenario.currency,
-        "birth_year": str(scenario.birth_year),
-        "horizon_age": str(scenario.horizon_age),
-        "stop_working_age": str(scenario.stop_working_age),
-        "inflation": _rate_input(scenario.inflation_bp, locale),
-        "real_return": _rate_input(scenario.real_return_bp, locale),
-        "income_growth": _rate_input(scenario.income_growth_bp, locale),
-        "rule": scenario.rule,
-        "swr": "" if scenario.swr_bp is None else _rate_input(scenario.swr_bp, locale),
-        "income_mode": scenario.income_mode,
-        "income_manual": ""
-        if scenario.income_manual is None
-        else format_amount_input(scenario.income_manual, locale),
-        "expenses_mode": scenario.expenses_mode,
-        "expenses_manual": ""
-        if scenario.expenses_manual is None
-        else format_amount_input(scenario.expenses_manual, locale),
-        "portfolio_mode": scenario.portfolio_mode,
-        "portfolio_manual": ""
-        if scenario.portfolio_manual is None
-        else format_amount_input(scenario.portfolio_manual, locale),
+        "current_year": str(plan.current_year),
+        "currency": plan.currency,
+        "birth_year": str(plan.birth_year),
+        "horizon_age": str(plan.horizon_age),
+        "stop_working_age": str(plan.stop_working_age),
+        "inflation": _rate_input(plan.inflation_bp, locale),
+        "real_return": _rate_input(plan.real_return_bp, locale),
+        "income_growth": _rate_input(plan.income_growth_bp, locale),
+        "rule": plan.rule,
+        "swr": "" if plan.swr_bp is None else _rate_input(plan.swr_bp, locale),
+        "income_manual": format_amount_input(plan.income, locale),
+        "expenses_manual": format_amount_input(plan.expenses, locale),
+        "portfolio_manual": format_amount_input(plan.portfolio, locale),
         "extreme_rates_confirmed": "",
     }
 
 
-def _contribution_rows(
-    detail: fire_service.FireScenarioDetail, locale: str
-) -> list[dict[str, str]]:
-    return [
-        {
-            "index": str(index),
-            "year": str(row.year),
-            "amount": format_amount_input(row.amount, locale),
-        }
-        for index, row in enumerate(detail.contributions, start=1)
-    ]
-
-
-def _event_rows(detail: fire_service.FireScenarioDetail, locale: str) -> list[dict[str, str]]:
+def _event_rows(detail: fire_service.FirePlanDetail, locale: str) -> list[dict[str, str]]:
     return [
         {
             "index": str(index),
@@ -633,6 +413,7 @@ def _event_rows(detail: fire_service.FireScenarioDetail, locale: str) -> list[di
             "kind": row.kind,
             "amount": format_amount_input(row.amount, locale),
             "label": row.label,
+            "archived": "1" if row.archived else "",
         }
         for index, row in enumerate(detail.events, start=1)
     ]
@@ -650,12 +431,10 @@ def _form_context(
     request: Request,
     ctx: Context,
     *,
-    detail: fire_service.FireScenarioDetail | None,
-    defaults: fire_service.FireScenarioDefaults | None,
+    detail: fire_service.FirePlanDetail | None,
+    defaults: fire_service.FirePlanDefaults | None,
     values: dict[str, str] | None,
-    contribution_rows: list[dict[str, str]] | None,
     event_rows: list[dict[str, str]] | None,
-    exclusion_ids: Sequence[str] | None = None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
@@ -668,7 +447,7 @@ def _form_context(
             assert defaults is not None
             values = _values_for_locale(
                 _base_values(
-                    start_year=defaults.start_year,
+                    current_year=defaults.current_year,
                     currency=defaults.currency,
                     birth_year=defaults.birth_year,
                     horizon_age=defaults.life_expectancy,
@@ -679,29 +458,9 @@ def _form_context(
                 ),
                 locale,
             )
-    if contribution_rows is None:
-        contribution_rows = _contribution_rows(detail, locale) if detail is not None else []
     if event_rows is None:
         event_rows = _event_rows(detail, locale) if detail is not None else []
-    if exclusion_ids is None:
-        exclusion_ids = (
-            tuple(str(category_id) for category_id in detail.expense_exclusion_ids)
-            if detail is not None
-            else ()
-        )
-    selected_exclusions: set[UUID] = set()
-    for value in exclusion_ids:
-        try:
-            selected_exclusions.add(UUID(value))
-        except ValueError:
-            continue
-    exclusion_options = fire_linked_service.expense_exclusion_options(
-        request.app.state.session_factory,
-        ctx,
-        selected_ids=selected_exclusions,
-    )
-    empty_contribution = _blank_row(_row_index(contribution_rows), _CONTRIBUTION_FIELDS)
-    empty_event = _blank_row(_row_index(event_rows), _EVENT_FIELDS)
+    current_year = int(values.get("current_year", "0") or 0)
     window_end: int | None = None
     try:
         birth_year = int(values.get("birth_year", ""))
@@ -710,16 +469,15 @@ def _form_context(
     except ValueError:
         window_end = None
     if detail is not None:
-        start_year = detail.scenario.start_year
-        currency = detail.scenario.currency
-        title = _t(request, "Edit scenario")
-        action = request.url_for("fire_scenario_update", scenario_id=str(detail.scenario.id)).path
-        cancel = request.url_for("fire_scenario", scenario_id=str(detail.scenario.id)).path
+        currency = detail.plan.currency
+        title = _t(request, "FIRE plan")
+        action = request.url_for("fire_scenario_update", scenario_id=str(detail.plan.id)).path
+        cancel = request.url_for("fire_scenario", scenario_id=str(detail.plan.id)).path
     else:
         assert defaults is not None
-        start_year = defaults.start_year
+        current_year = defaults.current_year
         currency = defaults.currency
-        title = _t(request, "New scenario")
+        title = _t(request, "Create your FIRE plan")
         action = request.url_for("fire_scenario_create").path
         cancel = request.url_for("fire_scenarios").path
     return {
@@ -728,15 +486,11 @@ def _form_context(
         "title": title,
         "action": action,
         "cancel_url": cancel,
-        "start_year": start_year,
+        "current_year": current_year,
         "currency": currency,
         "window_end": window_end,
-        "contribution_rows": contribution_rows,
-        "empty_contribution": empty_contribution,
         "event_rows": event_rows,
-        "empty_event": empty_event,
-        "expense_exclusion_options": exclusion_options,
-        "selected_exclusion_ids": selected_exclusions,
+        "empty_event": _blank_row(_row_index(event_rows), _EVENT_FIELDS),
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
@@ -752,30 +506,10 @@ def _form_context(
     }
 
 
-def _list_context(
-    request: Request,
-    ctx: Context,
-    *,
-    notice: str | None = None,
-    error: str | None = None,
-) -> dict[str, object]:
-    scenarios = fire_service.list_fire_scenarios(request.app.state.session_factory, ctx)
-    return {
-        "scenarios": scenarios,
-        "notice": notice,
-        "error": error,
-        "can_edit": has_role(ctx, Role.EDITOR),
-        "format_money": format_money,
-        "format_rate_short": format_rate_short,
-        "format_day": format_day,
-        "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
-    }
-
-
 def _results_context(
     request: Request,
     ctx: Context,
-    results: fire_projection_service.FireScenarioResults,
+    results: fire_projection_service.FirePlanResults,
     *,
     basis: str,
     inputs_open: bool,
@@ -786,6 +520,7 @@ def _results_context(
     return {
         "results": results,
         "detail": results.detail,
+        "plan": results.detail.plan,
         "projection": projection,
         "basis": basis,
         "inputs_open": inputs_open,
@@ -796,28 +531,26 @@ def _results_context(
         ),
         "preview_error": preview_error,
         "preview_error_field": preview_error_field,
-        "can_preview": has_role(ctx, Role.EDITOR) and not results.detail.scenario.archived,
+        "can_preview": has_role(ctx, Role.EDITOR),
         "field_labels": {
             field: _t(request, label) for field, label in STARTING_FIELD_LABELS.items()
         },
         "block_messages": {
             code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
         },
-        "linked": results.linked,
         "format_money": format_money,
         "format_rate_short": format_rate_short,
         "format_day": lambda day: format_day(day, request.state.locale),
-        "format_month": lambda month: format_month(month, request.state.locale),
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
         },
         "sensitivity_loaded": False,
         "sensitivity_fragment_url": request.url_for(
-            "fire_scenario_sensitivity", scenario_id=str(results.detail.scenario.id)
+            "fire_scenario_sensitivity", scenario_id=str(results.detail.plan.id)
         ).path,
         "sensitivity_page_url": (
-            request.url_for("fire_scenario", scenario_id=str(results.detail.scenario.id)).path
+            request.url_for("fire_scenario", scenario_id=str(results.detail.plan.id)).path
             + "?sensitivity=1#sensitivity"
         ),
     }
@@ -826,7 +559,7 @@ def _results_context(
 def _combined_context(
     request: Request,
     ctx: Context,
-    results: fire_projection_service.FireScenarioResults,
+    results: fire_projection_service.FirePlanResults,
     *,
     basis: str,
     inputs_open: bool,
@@ -835,9 +568,7 @@ def _combined_context(
     error_code: str | None = None,
     error_field: str | None = None,
     values: dict[str, str] | None = None,
-    contribution_rows: list[dict[str, str]] | None = None,
     event_rows: list[dict[str, str]] | None = None,
-    exclusion_ids: Sequence[str] | None = None,
 ) -> dict[str, object]:
     detail = results.detail
     context = _form_context(
@@ -846,9 +577,7 @@ def _combined_context(
         detail=detail,
         defaults=None,
         values=values,
-        contribution_rows=contribution_rows,
         event_rows=event_rows,
-        exclusion_ids=exclusion_ids,
         error=error,
         error_code=error_code,
         error_field=error_field,
@@ -863,23 +592,16 @@ def _combined_context(
         )
     )
     context["notice"] = notice
-    results_url = request.url_for("fire_scenario", scenario_id=str(detail.scenario.id)).path
+    results_url = request.url_for("fire_scenario", scenario_id=str(detail.plan.id)).path
     if basis == "real":
         results_url = f"{results_url}?basis=real"
     context["cancel_url"] = results_url
     return context
 
 
-async def _form_data(request: Request) -> tuple[dict[str, str], list[str]]:
-    """Text fields plus the repeated ``expense_exclusion`` checkbox values."""
+async def _form_data(request: Request) -> dict[str, str]:
     form = await request.form()
-    values = {key: value for key, value in form.items() if isinstance(value, str)}
-    exclusions = [
-        value
-        for value in form.getlist("expense_exclusion")
-        if isinstance(value, str) and value.strip()
-    ]
-    return values, exclusions
+    return {key: value for key, value in form.items() if isinstance(value, str)}
 
 
 def _redirect(
@@ -889,7 +611,6 @@ def _redirect(
     notice: str | None = None,
     error: str | None = None,
     basis: str | None = None,
-    anchor: str | None = None,
     **params: str,
 ) -> RedirectResponse:
     url = request.url_for(route, **params).path
@@ -902,28 +623,80 @@ def _redirect(
         query.append("basis=real")
     if query:
         url = f"{url}?{'&'.join(query)}"
-    if anchor is not None:
-        url = f"{url}#{anchor}"
     return RedirectResponse(url, status_code=303)
+
+
+def _sensitivity_context(
+    request: Request, results: fire_projection_service.FirePlanResults
+) -> dict[str, object]:
+    plan = results.detail.plan
+    fragment_url = request.url_for("fire_scenario_sensitivity", scenario_id=str(plan.id)).path
+    page_url = (
+        request.url_for("fire_scenario", scenario_id=str(plan.id)).path
+        + "?sensitivity=1#sensitivity"
+    )
+    context: dict[str, object] = {
+        "sensitivity": None,
+        "sensitivity_error": None,
+        "sensitivity_error_code": None,
+        "sensitivity_blocks": results.blocks,
+        "block_messages": {
+            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
+        },
+        "sensitivity_fragment_url": fragment_url,
+        "sensitivity_page_url": page_url,
+        "sensitivity_inputs_url": (
+            request.url_for("fire_scenario", scenario_id=str(plan.id)).path + "?edit=1#inputs"
+        ),
+    }
+    if results.projection is None:
+        return context
+    try:
+        grid = sensitivity(
+            results.projection.inputs,
+            DEFAULT_RETURN_DELTAS_BP,
+            DEFAULT_EXPENSE_FACTORS_BP,
+        )
+    except SensitivityError as exc:
+        context["sensitivity_error"] = _t(
+            request, SENSITIVITY_ERRORS.get(exc.code, SENSITIVITY_FALLBACK)
+        )
+        context["sensitivity_error_code"] = exc.code
+    else:
+        context["sensitivity"] = build_sensitivity_view(
+            grid,
+            horizon_age=results.projection.inputs.horizon_age,
+            locale=request.state.locale,
+        )
+    return context
 
 
 @router.get("/fire", name="fire_scenarios")
 async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response:
-    context = await run_in_threadpool(
-        _list_context,
-        request,
-        ctx,
-        notice=_notice(request, request.query_params.get("notice")),
-        error=_error(request, request.query_params.get("error")),
-    )
-    return render_template(request, "fire/list.html", context=context)
-
-
-@router.get("/fire/new", name="fire_scenario_new")
-async def fire_scenario_new(request: Request, ctx: CurrentContext) -> Response:
-    require_role(ctx, Role.EDITOR)
+    entry = await run_in_threadpool(fire_service.plan_entry, request.app.state.session_factory, ctx)
+    if entry.migration is not None:
+        return _redirect(
+            request,
+            "fire_scenario",
+            notice="migrated",
+            scenario_id=str(entry.migration.plan_id),
+        )
+    if entry.plan is not None:
+        return RedirectResponse(
+            request.url_for("fire_scenario", scenario_id=str(entry.plan.id)).path,
+            status_code=303,
+        )
+    if entry.legacy:
+        context = {
+            "legacy": entry.legacy,
+            "can_edit": has_role(ctx, Role.EDITOR),
+            "error": _error(request, request.query_params.get("error")),
+            "notice": _notice(request, request.query_params.get("notice")),
+            "format_money": format_money,
+        }
+        return render_template(request, "fire/choose.html", context=context)
     defaults = await run_in_threadpool(
-        fire_service.scenario_defaults, request.app.state.session_factory, ctx
+        fire_service.plan_defaults, request.app.state.session_factory, ctx
     )
     context = await run_in_threadpool(
         _form_context,
@@ -932,55 +705,41 @@ async def fire_scenario_new(request: Request, ctx: CurrentContext) -> Response:
         detail=None,
         defaults=defaults,
         values=None,
-        contribution_rows=None,
         event_rows=None,
     )
     return render_template(request, "fire/form.html", context=context)
 
 
+@router.get("/fire/new", name="fire_scenario_new")
+async def fire_scenario_new(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+
+
 @router.get("/fire/compare", name="fire_compare")
 async def fire_compare_page(request: Request, ctx: CurrentContext) -> Response:
-    """Compare up to three saved scenarios; a read-only GET page for every role."""
+    """The old comparison URL; comparison is gone in favour of the one-plan model."""
     require_role(ctx, Role.VIEWER)
-    selected = tuple(_uuid(value) for value in request.query_params.getlist("scenario"))
-    scenarios = await run_in_threadpool(
-        fire_service.list_fire_scenarios, request.app.state.session_factory, ctx
-    )
-    if not selected:
-        selected = _preselected_ids(scenarios)
-    comparison = await run_in_threadpool(
-        fire_comparison_service.compare_fire_scenarios,
-        request.app.state.session_factory,
-        ctx,
-        selected,
-    )
-    basis = _basis(request.query_params.get("basis"))
-    context = await run_in_threadpool(
-        _compare_context,
-        request,
-        comparison,
-        scenarios,
-        basis=basis,
-    )
-    return render_template(request, "fire/compare.html", context=context)
+    return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
 
 
 @router.post("/fire", name="fire_scenario_create")
 async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
-    values, exclusion_ids = await _form_data(request)
-    rows = _editor_rows(values, _CONTRIBUTION_KEY, "contribution", _CONTRIBUTION_FIELDS)
+    values = await _form_data(request)
     event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     defaults = await run_in_threadpool(
-        fire_service.scenario_defaults, request.app.state.session_factory, ctx
+        fire_service.plan_defaults, request.app.state.session_factory, ctx
     )
     try:
-        scenario = _scenario_input(values, request.state.locale, defaults.currency, exclusion_ids)
-        scenario_id = await run_in_threadpool(
-            fire_service.create_fire_scenario,
+        plan = _plan_input(values, request.state.locale, defaults.currency)
+        if plan.events:
+            raise fire_service.FireError("events", "events_not_allowed_on_create")
+        plan_id = await run_in_threadpool(
+            fire_service.create_fire_plan,
             request.app.state.session_factory,
             ctx,
-            scenario,
+            plan,
         )
     except fire_service.FireError as exc:
         context = await run_in_threadpool(
@@ -990,15 +749,34 @@ async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Respons
             detail=None,
             defaults=defaults,
             values=values,
-            contribution_rows=rows,
             event_rows=event_rows,
-            exclusion_ids=exclusion_ids,
             error=_error(request, exc.code),
             error_code=exc.code,
             error_field=exc.field,
         )
         return render_template(request, "fire/form.html", status_code=400, context=context)
-    return _redirect(request, "fire_scenario", notice="created", scenario_id=str(scenario_id))
+    return _redirect(request, "fire_scenario", notice="created", scenario_id=str(plan_id))
+
+
+@router.post("/fire/choose", name="fire_scenario_choose")
+async def fire_scenario_choose(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    form = await request.form()
+    scenario_value = form.get("scenario_id")
+    confirmed = form.get("confirm") == "1"
+    try:
+        if not confirmed:
+            raise fire_service.FireError("plan", "choice_not_confirmed")
+        scenario_id = _uuid(scenario_value if isinstance(scenario_value, str) else "")
+        result = await run_in_threadpool(
+            fire_service.migrate_legacy_plan,
+            request.app.state.session_factory,
+            ctx,
+            scenario_id,
+        )
+    except fire_service.FireError as exc:
+        return _redirect(request, "fire_scenarios", error=exc.code)
+    return _redirect(request, "fire_scenario", notice="migrated", scenario_id=str(result.plan_id))
 
 
 @router.get("/fire/{scenario_id}", name="fire_scenario")
@@ -1033,7 +811,6 @@ async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id:
 async def fire_scenario_sensitivity(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    """The saved plan's sensitivity grid as an HTMX fragment; read-only for every role."""
     require_role(ctx, Role.VIEWER)
     results = await run_in_threadpool(
         fire_projection_service.scenario_results,
@@ -1049,19 +826,13 @@ async def fire_scenario_sensitivity(
 async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
     require_role(ctx, Role.EDITOR)
     detail = await run_in_threadpool(
-        fire_service.get_fire_scenario,
+        fire_service.get_fire_plan,
         request.app.state.session_factory,
         ctx,
-        _uuid(scenario_id),
     )
-    if detail.scenario.archived:
-        return _redirect(
-            request,
-            "fire_scenario",
-            error="archived",
-            scenario_id=str(detail.scenario.id),
-        )
-    url = request.url_for("fire_scenario", scenario_id=str(detail.scenario.id)).path
+    if str(detail.plan.id) != scenario_id:
+        raise NotFound
+    url = request.url_for("fire_scenario", scenario_id=str(detail.plan.id)).path
     return RedirectResponse(f"{url}?edit=1#inputs", status_code=303)
 
 
@@ -1069,35 +840,29 @@ async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id:
 async def fire_scenario_preview(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    """Return only the results fragment for the posted inputs; never write anything."""
     require_role(ctx, Role.EDITOR)
-    values, exclusion_ids = await _form_data(request)
+    values = await _form_data(request)
     detail = await run_in_threadpool(
-        fire_service.get_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
+        fire_service.get_fire_plan, request.app.state.session_factory, ctx
     )
+    if str(detail.plan.id) != scenario_id:
+        raise NotFound
     basis = _basis(values.get("basis"))
     try:
-        scenario = _scenario_input(
-            values, request.state.locale, detail.scenario.currency, exclusion_ids
-        )
+        plan = _plan_input(values, request.state.locale, detail.plan.currency)
         results = await run_in_threadpool(
-            fire_projection_service.preview_scenario_results,
+            fire_projection_service.preview_plan_results,
             ctx,
             detail,
-            scenario,
+            plan,
             factory=request.app.state.session_factory,
         )
     except fire_service.FireError as exc:
-        # The preview never replaces the saved result with a broken one: show what is saved and
-        # explain the field the user needs to fix.
         saved = await run_in_threadpool(
             fire_projection_service.scenario_results,
             request.app.state.session_factory,
             ctx,
-            detail.scenario.id,
+            detail.plan.id,
         )
         context = await run_in_threadpool(
             _results_context,
@@ -1133,7 +898,7 @@ async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: 
         code = results.blocked.code if results.blocked is not None else "invalid_projection"
         raise HTTPException(status_code=409, detail=_error(request, code))
     content = await run_in_threadpool(render_fire_csv, results.projection)
-    filename = f"fire-scenario-{results.detail.scenario.id}.csv"
+    filename = f"fire-plan-{results.detail.plan.id}.csv"
     return Response(
         content,
         media_type="text/csv; charset=utf-8",
@@ -1148,32 +913,27 @@ async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: 
 @router.post("/fire/{scenario_id}", name="fire_scenario_update")
 async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
     require_role(ctx, Role.EDITOR)
-    values, exclusion_ids = await _form_data(request)
-    rows = _editor_rows(values, _CONTRIBUTION_KEY, "contribution", _CONTRIBUTION_FIELDS)
+    values = await _form_data(request)
     event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     detail = await run_in_threadpool(
-        fire_service.get_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
+        fire_service.get_fire_plan, request.app.state.session_factory, ctx
     )
+    if str(detail.plan.id) != scenario_id:
+        raise NotFound
     try:
-        scenario = _scenario_input(
-            values, request.state.locale, detail.scenario.currency, exclusion_ids
-        )
+        plan = _plan_input(values, request.state.locale, detail.plan.currency)
         saved_id = await run_in_threadpool(
-            fire_service.update_fire_scenario,
+            fire_service.update_fire_plan,
             request.app.state.session_factory,
             ctx,
-            detail.scenario.id,
-            scenario,
+            plan,
         )
     except fire_service.FireError as exc:
         saved = await run_in_threadpool(
             fire_projection_service.scenario_results,
             request.app.state.session_factory,
             ctx,
-            detail.scenario.id,
+            detail.plan.id,
         )
         context = await run_in_threadpool(
             _combined_context,
@@ -1186,9 +946,7 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
             error_code=exc.code,
             error_field=exc.field,
             values=values,
-            contribution_rows=rows,
             event_rows=event_rows,
-            exclusion_ids=exclusion_ids,
         )
         return render_template(request, "fire/results.html", status_code=400, context=context)
     return _redirect(
@@ -1198,109 +956,6 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
         basis=_basis(values.get("basis")),
         scenario_id=str(saved_id),
     )
-
-
-@router.post("/fire/{scenario_id}/duplicate", name="fire_scenario_duplicate")
-async def fire_scenario_duplicate(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    try:
-        new_id = await run_in_threadpool(
-            fire_service.duplicate_fire_scenario,
-            request.app.state.session_factory,
-            ctx,
-            _uuid(scenario_id),
-        )
-    except fire_service.FireError as exc:
-        return _redirect(
-            request, "fire_scenario", error=exc.code, scenario_id=str(_uuid(scenario_id))
-        )
-    return _redirect(request, "fire_scenario", notice="duplicated", scenario_id=str(new_id))
-
-
-@router.post("/fire/{scenario_id}/default", name="fire_scenario_default")
-async def fire_scenario_default(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    try:
-        await run_in_threadpool(
-            fire_service.set_default_fire_scenario,
-            request.app.state.session_factory,
-            ctx,
-            _uuid(scenario_id),
-        )
-    except fire_service.FireError as exc:
-        return _redirect(
-            request, "fire_scenario", error=exc.code, scenario_id=str(_uuid(scenario_id))
-        )
-    return _redirect(request, "fire_scenarios", notice="default_changed")
-
-
-@router.post("/fire/{scenario_id}/archive", name="fire_scenario_archive")
-async def fire_scenario_archive(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    try:
-        await run_in_threadpool(
-            fire_service.archive_fire_scenario,
-            request.app.state.session_factory,
-            ctx,
-            _uuid(scenario_id),
-        )
-    except fire_service.FireError as exc:
-        return _redirect(request, "fire_scenarios", error=exc.code)
-    return _redirect(request, "fire_scenarios", notice="archived")
-
-
-@router.post("/fire/{scenario_id}/loan-payoff", name="fire_scenario_loan_payoff")
-async def fire_scenario_loan_payoff(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    """One-click loan payoff event; a full POST outside the live-preview form."""
-    require_role(ctx, Role.EDITOR)
-    form = await request.form()
-    loan_value = form.get("loan_id")
-    try:
-        loan_id = _uuid(loan_value if isinstance(loan_value, str) else "")
-        outcome = await run_in_threadpool(
-            fire_linked_service.add_loan_payoff_event,
-            request.app.state.session_factory,
-            ctx,
-            _uuid(scenario_id),
-            loan_id,
-        )
-    except fire_linked_service.LinkedError as exc:
-        return _redirect(
-            request,
-            "fire_scenario",
-            error=exc.code,
-            anchor="fire-loan-suggestions",
-            scenario_id=str(_uuid(scenario_id)),
-        )
-    return _redirect(
-        request,
-        "fire_scenario",
-        notice="loan_event_added" if outcome == "added" else None,
-        error=None if outcome == "added" else "loan_event_exists",
-        anchor="fire-loan-suggestions",
-        scenario_id=str(_uuid(scenario_id)),
-    )
-
-
-@router.post("/fire/{scenario_id}/restore", name="fire_scenario_restore")
-async def fire_scenario_restore(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    try:
-        await run_in_threadpool(
-            fire_service.restore_fire_scenario,
-            request.app.state.session_factory,
-            ctx,
-            _uuid(scenario_id),
-        )
-    except fire_service.FireError as exc:
-        return _redirect(request, "fire_scenarios", error=exc.code)
-    return _redirect(request, "fire_scenarios", notice="restored")
 
 
 __all__ = ["router"]

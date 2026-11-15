@@ -45,9 +45,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "budget_lines",
         "categories",
         "email_tokens",
-        "fire_contributions",
         "fire_events",
-        "fire_expense_exclusions",
         "fire_scenarios",
         "import_batches",
         "import_category_mappings",
@@ -2001,7 +1999,7 @@ def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         data_dir=tmp_path,
         database_url=f"sqlite:///{tmp_path / 'fire_scenarios.db'}",
     )
-    upgrade_database(settings)
+    command.upgrade(alembic_config(settings), "0059_f81_fire_scenarios")
     engine = create_database_engine(settings.database_url or "")
     try:
         inspector = inspect(engine)
@@ -2081,7 +2079,7 @@ def test_0062_fire_archive_migration_is_reversible(tmp_path: Path) -> None:
         data_dir=tmp_path,
         database_url=f"sqlite:///{tmp_path / 'fire_archive.db'}",
     )
-    upgrade_database(settings)
+    command.upgrade(alembic_config(settings), "0062_f86_fire_archive")
     engine = create_database_engine(settings.database_url or "")
     tables_and_indexes = (
         ("fire_scenarios", "uq_fire_scenarios_import_key"),
@@ -2139,7 +2137,7 @@ def test_0060_fire_expense_exclusions_migration_is_reversible(tmp_path: Path) ->
         data_dir=tmp_path,
         database_url=f"sqlite:///{tmp_path / 'fire_exclusions.db'}",
     )
-    upgrade_database(settings)
+    command.upgrade(alembic_config(settings), "0060_f84_fire_expense_exclusions")
     engine = create_database_engine(settings.database_url or "")
     try:
         inspector = inspect(engine)
@@ -2240,5 +2238,253 @@ def test_0061_loan_tranches_migration_is_reversible(tmp_path: Path) -> None:
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0063_keeps_contribution_identity_and_drops_loan_payoff_events(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'one_plan_rows.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0062_f86_fire_archive")
+    engine = create_database_engine(settings.database_url or "")
+    workspace = "11111111111141118111111111111111"
+    first = "22222222222242228222222222222222"
+    second = "33333333333343338333333333333333"
+    contribution = "44444444444444448444444444444444"
+    cash_event = "55555555555545558555555555555555"
+    payoff_event = "66666666666646668666666666666666"
+    loan = "77777777777747778777777777777777"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces "
+                "(id, name, base_currency, locale, timezone, require_two_factor, "
+                "auto_copy_plan, taxes_enabled, upcoming_days, investment_cost_basis, "
+                "created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', 0, 0, 0, 30, "
+                "'average', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO loans "
+                "(name, kind, currency, first_payment_date, term_months, payment_day, rate_mode, "
+                "overpayment_mode, overpayment_strategy, id, created_at, updated_at, workspace_id) "
+                "VALUES ('Mortgage', 'annuity', 'EUR', '2026-05-01', 12, 5, 'fixed', 'none', "
+                "'reduce_term', ?, '2026-01-01 00:00:00', '2026-01-01 00:00:00', ?)",
+                (loan, workspace),
+            )
+            for scenario_id, name in ((first, "First plan"), (second, "Second plan")):
+                connection.exec_driver_sql(
+                    "INSERT INTO fire_scenarios "
+                    "(id, workspace_id, name, name_key, currency, birth_year, start_year, "
+                    "inflation_bp, real_return_bp, income_growth_bp, stop_working_age, "
+                    "horizon_age, rule, swr_bp, income_mode, income_manual_minor, expenses_mode, "
+                    "expenses_manual_minor, portfolio_mode, portfolio_manual_minor, is_default, "
+                    "archived_at, created_at, updated_at) VALUES "
+                    "(?, ?, ?, ?, 'EUR', 1985, 2026, 250, 500, 300, 55, 90, "
+                    "'returns_cover_expenses', NULL, 'manual', 500000, 'manual', 300000, "
+                    "'manual', 10000000, ?, NULL, '2026-01-01 00:00:00', "
+                    "'2026-01-01 00:00:00')",
+                    (scenario_id, workspace, name, name.casefold(), scenario_id == first),
+                )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_contributions "
+                "(id, workspace_id, scenario_id, year, net_amount_minor, import_key, created_at, "
+                "updated_at) VALUES (?, ?, ?, 2027, 120000, ?, '2025-06-01 01:02:03', "
+                "'2025-06-02 04:05:06')",
+                (contribution, workspace, first, f"id:{contribution}"),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_events "
+                "(id, workspace_id, scenario_id, year, kind, amount_minor, label, import_key, "
+                "created_at, updated_at) VALUES (?, ?, ?, 2030, 'cash', -500000, 'Renovation', "
+                "?, '2025-07-01 00:00:00', '2025-07-02 00:00:00')",
+                (cash_event, workspace, first, f"id:{cash_event}"),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_events "
+                "(id, workspace_id, scenario_id, year, kind, amount_minor, label, "
+                "source_loan_id, created_at, updated_at) VALUES (?, ?, ?, 2029, "
+                "'expense_change', -100000, 'Loan repaid', ?, "
+                "'2025-08-01 00:00:00', '2025-08-02 00:00:00')",
+                (payoff_event, workspace, first, loan),
+            )
+
+        upgrade_database(settings)
+
+        with engine.connect() as connection:
+            scenarios = connection.exec_driver_sql(
+                "SELECT id, is_live, legacy FROM fire_scenarios ORDER BY id"
+            ).all()
+            assert [row[0] for row in scenarios] == [first, second]
+            assert all(row[1] == 0 for row in scenarios)
+            assert "First plan" in scenarios[0][2] and "Second plan" in scenarios[1][2]
+            event = connection.exec_driver_sql(
+                "SELECT id, kind, label, import_key, created_at, updated_at FROM fire_events "
+                "WHERE kind = 'saving_override'"
+            ).one()
+            assert event[0] == contribution
+            assert event[1] == "saving_override"
+            assert event[2] == "Saving override"
+            assert event[3] == f"id:{contribution}"
+            assert str(event[4]).startswith("2025-06-01 01:02:03")
+            assert str(event[5]).startswith("2025-06-02 04:05:06")
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT COUNT(*) FROM fire_events WHERE id = ?", (payoff_event,)
+                ).scalar_one()
+                == 0
+            )
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT COUNT(*) FROM fire_events WHERE id = ?", (cash_event,)
+                ).scalar_one()
+                == 1
+            )
+
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "UPDATE fire_scenarios SET is_live = 1, legacy = NULL WHERE id = ?", (first,)
+            )
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(
+                "UPDATE fire_scenarios SET is_live = 1, legacy = NULL WHERE id = ?", (second,)
+            )
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO fire_events "
+                "(id, workspace_id, scenario_id, year, kind, amount_minor, label, created_at, "
+                "updated_at) VALUES "
+                "('88888888888848888888888888888888', ?, ?, 2027, 'saving_override', 1, "
+                "'Duplicate', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace, first),
+            )
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0063_f88_one_plan_migration_backfills_and_is_lossily_reversible(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'one_plan.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0062_f86_fire_archive")
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id = "11111111111141118111111111111111"
+    scenario_id = "22222222222242228222222222222222"
+    contribution_id = "33333333333343338333333333333333"
+    event_id = "44444444444444448444444444444444"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces "
+                "(id, name, base_currency, locale, timezone, require_two_factor, "
+                "auto_copy_plan, taxes_enabled, upcoming_days, investment_cost_basis, "
+                "created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', 0, 0, 0, 30, "
+                "'average', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_scenarios "
+                "(id, workspace_id, name, name_key, currency, birth_year, start_year, "
+                "inflation_bp, real_return_bp, income_growth_bp, stop_working_age, horizon_age, "
+                "rule, swr_bp, income_mode, income_manual_minor, expenses_mode, "
+                "expenses_manual_minor, portfolio_mode, portfolio_manual_minor, is_default, "
+                "archived_at, created_at, updated_at) VALUES "
+                "(?, ?, 'Old plan', 'old plan', 'EUR', 1985, 2026, 250, 500, 300, 55, 90, "
+                "'returns_cover_expenses', NULL, 'manual', 500000, 'manual', 300000, 'manual', "
+                "10000000, 1, NULL, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (scenario_id, workspace_id),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_contributions "
+                "(id, workspace_id, scenario_id, year, net_amount_minor, created_at, updated_at) "
+                "VALUES (?, ?, ?, 2027, 120000, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (contribution_id, workspace_id, scenario_id),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_events "
+                "(id, workspace_id, scenario_id, year, kind, amount_minor, label, created_at, "
+                "updated_at) VALUES (?, ?, ?, 2030, 'cash', -500000, 'Renovation', "
+                "'2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (event_id, workspace_id, scenario_id),
+            )
+        upgrade_database(settings)
+        inspector = inspect(engine)
+        scenario_columns = {column["name"] for column in inspector.get_columns("fire_scenarios")}
+        assert {
+            "income_minor",
+            "expenses_minor",
+            "portfolio_minor",
+            "needs_review",
+            "is_live",
+            "legacy",
+        } <= scenario_columns
+        assert (
+            not {
+                "name",
+                "name_key",
+                "start_year",
+                "is_default",
+                "archived_at",
+                "income_mode",
+                "expenses_mode",
+                "portfolio_mode",
+                "income_manual_minor",
+            }
+            & scenario_columns
+        )
+        event_columns = {column["name"] for column in inspector.get_columns("fire_events")}
+        assert "source_loan_id" not in event_columns
+        tables = set(inspector.get_table_names())
+        assert not {"fire_contributions", "fire_expense_exclusions"} & tables
+        indexes = {index["name"] for index in inspector.get_indexes("fire_scenarios")}
+        assert "uq_fire_scenarios_live_workspace" in indexes
+        event_indexes = {index["name"] for index in inspector.get_indexes("fire_events")}
+        assert "uq_fire_events_saving_override" in event_indexes
+        event_checks = {
+            check.get("sqltext") or "" for check in inspector.get_check_constraints("fire_events")
+        }
+        assert any("saving_override" in sql for sql in event_checks)
+
+        with engine.connect() as connection:
+            rows = connection.exec_driver_sql(
+                "SELECT is_live, needs_review, income_minor, legacy FROM fire_scenarios"
+            ).all()
+            assert len(rows) == 1
+            assert rows[0][0] == 0
+            assert rows[0][1] == 1
+            assert rows[0][2] == 500000
+            assert "Old plan" in rows[0][3]
+            events = connection.exec_driver_sql(
+                "SELECT kind, amount_minor, label FROM fire_events ORDER BY year"
+            ).all()
+            assert events == [
+                ("saving_override", 120000, "Saving override"),
+                ("cash", -500000, "Renovation"),
+            ]
+
+        check_database_migrations(settings)
+        command.downgrade(alembic_config(settings), "0062_f86_fire_archive")
+        inspector = inspect(engine)
+        assert "fire_contributions" in set(inspector.get_table_names())
+        assert "fire_expense_exclusions" in set(inspector.get_table_names())
+        scenario_columns = {column["name"] for column in inspector.get_columns("fire_scenarios")}
+        assert "name" in scenario_columns and "start_year" in scenario_columns
+        event_columns = {column["name"] for column in inspector.get_columns("fire_events")}
+        assert "source_loan_id" in event_columns
+        with engine.connect() as connection:
+            contribution = connection.exec_driver_sql(
+                "SELECT net_amount_minor FROM fire_contributions"
+            ).one()
+            assert contribution[0] == 120000
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
     finally:
         engine.dispose()

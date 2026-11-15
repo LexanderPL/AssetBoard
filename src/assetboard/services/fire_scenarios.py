@@ -1,33 +1,31 @@
-"""FIRE scenario settings (F8.1).
+"""The one FIRE plan of a workspace, its chooser and its one-time migration (F8.8).
 
-A scenario is created with the workspace base currency and the current plan year snapshotted;
-later changes keep both, so a saved plan stays reproducible. Validation lives here, not in the
-route: roles, the required birth year, rate bounds and the confirmation for unusual rates, the
-age horizon and the contribution/event year windows. Archived scenarios are read-only; there is
-no hard delete. Exactly one active scenario is the default whenever an active one exists.
+A plan is a current-year projection: no start year is stored, no name, no linked mode and no
+default/archive lifecycle. The plan keeps a currency snapshot and ``needs_review``. Old v1
+scenarios stay readable in a temporary ``legacy`` JSON payload until an editor chooses one; the
+chosen row is migrated in place and the others are hard-deleted with an audit event.
 
-F8.4 resolves the linked input modes from the app's own data at read/projection time, so a
-linked mode stores no manual amount. Expense-category exclusions are validated against the
-workspace and reconciled by category id.
+Validation lives here, not in the route: roles, birth year, rates, age horizon, saving-override
+uniqueness and the event year windows. Writes run under the workspace lock and re-check the role
+with ``require_role_now``.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from datetime import datetime
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
+from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
-    FireContributionRepository,
     FireEventRepository,
-    FireExpenseExclusionRepository,
     FireScenarioRepository,
     NotFound,
 )
@@ -37,10 +35,8 @@ from assetboard.domain.fire import (
     ILLUSTRATIVE_INFLATION_BP,
     ILLUSTRATIVE_REAL_RETURN_BP,
     ILLUSTRATIVE_SWR_BP,
-    MAX_CONTRIBUTION_ROWS,
     MAX_EVENT_ROWS,
     MAX_HORIZON_AGE,
-    MAX_NAME_LENGTH,
     MAX_STOP_WORKING_AGE,
     MAX_YEAR,
     MIN_HORIZON_AGE,
@@ -50,31 +46,22 @@ from assetboard.domain.fire import (
     SWR_HARD_MAX_BP,
     SWR_HARD_MIN_BP,
     EventKind,
-    ExpensesMode,
-    IncomeMode,
-    PortfolioMode,
     Rule,
     age_at_start,
     clean_event_label,
-    clean_scenario_name,
-    contribution_years,
     default_horizon_age,
-    event_years,
     extreme_rate_change,
-    year_in_window,
 )
 from assetboard.domain.money import Money
-from assetboard.domain.text import text_key
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 from assetboard.services.context import Context, Role, require_role, require_role_now
-from assetboard.services.fire_linked import (
-    ExpenseExclusionError,
-    validate_expense_exclusions_in_session,
-)
+from assetboard.services.fire_linked import LinkedInputs, linked_inputs_in_session
+
+LEGACY_NAME = "FIRE plan"
 
 
 class FireError(Exception):
-    """Invalid scenario input; ``field`` names the form control and ``code`` the message."""
+    """Invalid plan input; ``field`` names the form control and ``code`` the message."""
 
     def __init__(self, field: str, code: str) -> None:
         super().__init__(code)
@@ -83,50 +70,35 @@ class FireError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
-class ContributionInput:
-    year: int
-    amount_minor: int
-
-
-@dataclass(frozen=True, slots=True)
 class EventInput:
     year: int
     kind: str
     amount_minor: int
     label: str
-    # The saved row this editor row came from; ``None`` creates a new event. A saving keeps the
-    # identity (and timestamps) of unchanged events, which F8.6 archive lineage relies on.
+    # The saved row this editor row came from; ``None`` creates a new event.
     id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioInput:
-    name: str = ""
+class FirePlanInput:
     birth_year: int | None = None
     inflation_bp: int = ILLUSTRATIVE_INFLATION_BP
     real_return_bp: int = ILLUSTRATIVE_REAL_RETURN_BP
     income_growth_bp: int = ILLUSTRATIVE_INCOME_GROWTH_BP
     stop_working_age: int = 0
-    # None takes the profile's life expectancy on create (90 without one), or the saved horizon
-    # on update; the web form always posts an explicit value.
     horizon_age: int | None = None
     rule: str = Rule.RETURNS_COVER_EXPENSES.value
     swr_bp: int | None = None
-    income_mode: str = IncomeMode.MANUAL.value
-    income_manual: Money | None = None
-    expenses_mode: str = ExpensesMode.MANUAL.value
-    expenses_manual: Money | None = None
-    portfolio_mode: str = PortfolioMode.MANUAL.value
-    portfolio_manual: Money | None = None
-    expense_exclusion_ids: tuple[UUID, ...] = ()
+    income: Money | None = None
+    expenses: Money | None = None
+    portfolio: Money | None = None
     extreme_rates_confirmed: bool = False
-    contributions: tuple[ContributionInput, ...] = ()
     events: tuple[EventInput, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioDefaults:
-    start_year: int
+class FirePlanDefaults:
+    current_year: int
     currency: str
     birth_year: int | None
     life_expectancy: int
@@ -137,30 +109,21 @@ class FireScenarioDefaults:
 
 
 @dataclass(frozen=True, slots=True)
-class ContributionView:
-    id: UUID
-    year: int
-    amount: Money
-
-
-@dataclass(frozen=True, slots=True)
 class EventView:
     id: UUID
     year: int
     kind: str
     amount: Money
     label: str
-    # The loan a one-click payoff event came from; NULL for an ordinary event (F8.4).
-    source_loan_id: UUID | None = None
+    archived: bool = False
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioView:
+class FirePlanView:
     id: UUID
-    name: str
     currency: str
     birth_year: int
-    start_year: int
+    current_year: int
     age_at_start: int
     inflation_bp: int
     real_return_bp: int
@@ -169,56 +132,73 @@ class FireScenarioView:
     horizon_age: int
     rule: str
     swr_bp: int | None
-    income_mode: str
-    income_manual: Money | None
-    expenses_mode: str
-    expenses_manual: Money | None
-    portfolio_mode: str
-    portfolio_manual: Money | None
-    is_default: bool
-    archived_at: datetime | None
-    contribution_count: int
+    income: Money
+    expenses: Money
+    portfolio: Money
+    needs_review: bool
+    currency_mismatch: bool
     event_count: int
+    archived_event_count: int
+    import_key: str | None = None
 
     @property
-    def archived(self) -> bool:
-        return self.archived_at is not None
+    def last_year(self) -> int:
+        return self.birth_year + self.horizon_age
 
     @property
     def stop_after_horizon(self) -> bool:
-        """Work continues past the horizon: allowed, shown as a non-blocking warning."""
         return self.stop_working_age > self.horizon_age
 
     @property
-    def linked(self) -> bool:
-        """Whether any starting value comes from the app's own data (F8.4)."""
-        return (
-            self.income_mode != "manual"
-            or self.expenses_mode != "manual"
-            or self.portfolio_mode != "manual"
-        )
+    def income_stopped(self) -> bool:
+        """The current age is at or beyond the stop age: base income is zero."""
+        return self.stop_working_age <= self.age_at_start
+
+    @property
+    def horizon_reached(self) -> bool:
+        return self.horizon_age <= self.age_at_start
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioDetail:
-    scenario: FireScenarioView
-    contributions: tuple[ContributionView, ...]
+class FirePlanDetail:
+    plan: FirePlanView
     events: tuple[EventView, ...]
-    expense_exclusion_ids: tuple[UUID, ...] = ()
+    active_events: tuple[EventView, ...]
+    archived_events: tuple[EventView, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioList:
-    active: tuple[FireScenarioView, ...]
-    archived: tuple[FireScenarioView, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ValidatedScenario:
-    """A fully checked scenario, ready to save or project."""
-
+class LegacyScenarioView:
+    id: UUID
     name: str
-    name_key: str
+    start_year: int
+    age_at_start: int
+    currency: str
+    is_default: bool
+    archived: bool
+    event_count: int
+    invalid: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class FirePlanMigrationResult:
+    plan_id: UUID
+    legacy_name: str
+    deleted_count: int
+    zeroed_fields: tuple[str, ...]
+    archived_event_count: int
+    already_migrated: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class PlanEntry:
+    plan: FirePlanView | None
+    legacy: tuple[LegacyScenarioView, ...] = ()
+    migration: FirePlanMigrationResult | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedPlan:
     birth_year: int
     horizon_age: int
     stop_working_age: int
@@ -227,31 +207,18 @@ class ValidatedScenario:
     income_growth_bp: int
     rule: Rule
     swr_bp: int | None
-    income_mode: IncomeMode
-    income_manual_minor: int | None
-    expenses_mode: ExpensesMode
-    expenses_manual_minor: int | None
-    portfolio_mode: PortfolioMode
-    portfolio_manual_minor: int | None
-    expense_exclusion_ids: tuple[UUID, ...]
-    contributions: tuple[ContributionInput, ...]
+    income_minor: int
+    expenses_minor: int
+    portfolio_minor: int
     events: tuple[EventInput, ...]
-    # True when a changed rate is outside its ordinary range and the form should say so. A preview
-    # reports it without blocking; a save only continues when the confirmation box is ticked.
     needs_extreme_confirmation: bool = False
+
+
+RateTuple = tuple[int, int, int, int | None]
 
 
 def _require_viewer(ctx: Context) -> None:
     require_role(ctx, Role.VIEWER)
-
-
-def _mode[T: (IncomeMode, ExpensesMode, PortfolioMode)](
-    enum: type[T], value: str, field: str, code: str
-) -> T:
-    try:
-        return enum(value)
-    except ValueError:
-        raise FireError(field, code) from None
 
 
 def _integer(value: object, field: str, code: str) -> int:
@@ -267,15 +234,7 @@ def _rate(value: object, field: str, code: str) -> int:
     return rate
 
 
-def _manual_minor(
-    field: str,
-    mode: IncomeMode | ExpensesMode | PortfolioMode,
-    amount: Money | None,
-    currency: str,
-) -> int | None:
-    """A manual starting amount, or ``None`` for a mode resolved from the app's data."""
-    if mode.value != "manual":
-        return None
+def _amount(field: str, amount: Money | None, currency: str) -> int:
     if amount is None or amount.currency != currency:
         raise FireError(field, "invalid_amount")
     if not 0 <= amount.amount_minor <= MAX_AMOUNT_MINOR:
@@ -283,42 +242,32 @@ def _manual_minor(
     return amount.amount_minor
 
 
-RateTuple = tuple[int, int, int, int | None]
-
-
-def validate_scenario_input(
-    scenario: FireScenarioInput,
+def validate_plan_input(
+    plan: FirePlanInput,
     *,
-    start_year: int,
+    current_year: int,
     currency: str,
     default_horizon: int,
     previous_rates: RateTuple | None = None,
+    saved_events: dict[UUID, int] | None = None,
     preview: bool = False,
-) -> ValidatedScenario:
-    """Check every field, amount, row and rate of a scenario.
+    allow_events: bool = True,
+) -> ValidatedPlan:
+    """Check every field, amount, row and rate of a plan.
 
-    ``previous_rates`` is the saved ``(inflation, real return, income growth, withdrawal)`` tuple,
-    so only a rate the edit actually changed asks for confirmation again. ``preview`` validates
-    the same inputs without enforcing the unusual-rate confirmation (the result reports
-    ``needs_extreme_confirmation`` so the preview can warn); name uniqueness is a repository
-    check and never runs here, which is also what the preview needs.
+    ``saved_events`` maps saved event ids to their saved year. It lets an old event that became
+    past (or a saving override that became the current year after rollover) stay on the form
+    without blocking an unrelated save; a new row still may not be created in the past.
     """
-    try:
-        name = clean_scenario_name(scenario.name)
-    except ValueError:
-        raise FireError("name", "invalid_name") from None
-    if not name or len(name) > MAX_NAME_LENGTH:
-        raise FireError("name", "invalid_name")
-
-    if scenario.birth_year is None:
+    if plan.birth_year is None:
         raise FireError("birth_year", "birth_year_required")
-    birth_year = _integer(scenario.birth_year, "birth_year", "invalid_birth_year")
-    if not MIN_YEAR <= birth_year <= MAX_YEAR or birth_year > start_year:
+    birth_year = _integer(plan.birth_year, "birth_year", "invalid_birth_year")
+    if not MIN_YEAR <= birth_year <= MAX_YEAR or birth_year > current_year:
         raise FireError("birth_year", "invalid_birth_year")
-    age = age_at_start(start_year, birth_year)
+    age = age_at_start(current_year, birth_year)
 
     horizon_age = _integer(
-        scenario.horizon_age if scenario.horizon_age is not None else default_horizon,
+        plan.horizon_age if plan.horizon_age is not None else default_horizon,
         "horizon_age",
         "invalid_horizon",
     )
@@ -326,51 +275,32 @@ def validate_scenario_input(
         raise FireError("horizon_age", "invalid_horizon")
     if horizon_age <= age:
         raise FireError("horizon_age", "horizon_not_after_age")
+    if birth_year + horizon_age > MAX_YEAR:
+        raise FireError("horizon_age", "invalid_horizon")
 
-    stop_working_age = _integer(scenario.stop_working_age, "stop_working_age", "invalid_stop_age")
+    stop_working_age = _integer(plan.stop_working_age, "stop_working_age", "invalid_stop_age")
     if not 0 <= stop_working_age <= MAX_STOP_WORKING_AGE:
         raise FireError("stop_working_age", "invalid_stop_age")
-    if stop_working_age < age:
-        raise FireError("stop_working_age", "stop_before_age")
 
-    inflation_bp = _rate(scenario.inflation_bp, "inflation", "invalid_rate")
-    real_return_bp = _rate(scenario.real_return_bp, "real_return", "invalid_rate")
-    income_growth_bp = _rate(scenario.income_growth_bp, "income_growth", "invalid_rate")
+    inflation_bp = _rate(plan.inflation_bp, "inflation", "invalid_rate")
+    real_return_bp = _rate(plan.real_return_bp, "real_return", "invalid_rate")
+    income_growth_bp = _rate(plan.income_growth_bp, "income_growth", "invalid_rate")
 
     try:
-        rule = Rule(scenario.rule)
+        rule = Rule(plan.rule)
     except ValueError:
         raise FireError("rule", "invalid_rule") from None
     swr_bp: int | None = None
     if rule is Rule.SWR:
-        swr_bp = _integer(scenario.swr_bp, "swr", "invalid_swr")
+        swr_bp = _integer(plan.swr_bp, "swr", "invalid_swr")
         if not SWR_HARD_MIN_BP <= swr_bp <= SWR_HARD_MAX_BP:
             raise FireError("swr", "invalid_swr")
     else:
         swr_bp = None
 
-    income_mode = _mode(IncomeMode, scenario.income_mode, "income_mode", "invalid_income_mode")
-    expenses_mode = _mode(
-        ExpensesMode, scenario.expenses_mode, "expenses_mode", "invalid_expenses_mode"
-    )
-    portfolio_mode = _mode(
-        PortfolioMode, scenario.portfolio_mode, "portfolio_mode", "invalid_portfolio_mode"
-    )
-    income_manual = _manual_minor("income_manual", income_mode, scenario.income_manual, currency)
-    expenses_manual = _manual_minor(
-        "expenses_manual", expenses_mode, scenario.expenses_manual, currency
-    )
-    portfolio_manual = _manual_minor(
-        "portfolio_manual", portfolio_mode, scenario.portfolio_manual, currency
-    )
-    exclusion_ids: list[UUID] = []
-    seen_exclusions: set[UUID] = set()
-    for exclusion_id in scenario.expense_exclusion_ids:
-        if type(exclusion_id) is not UUID:
-            raise FireError("expense_exclusions", "invalid_expense_exclusion")
-        if exclusion_id not in seen_exclusions:
-            seen_exclusions.add(exclusion_id)
-            exclusion_ids.append(exclusion_id)
+    income_minor = _amount("income", plan.income, currency)
+    expenses_minor = _amount("expenses", plan.expenses, currency)
+    portfolio_minor = _amount("portfolio", plan.portfolio, currency)
 
     needs_confirmation = extreme_rate_change(
         inflation_bp=inflation_bp,
@@ -379,36 +309,21 @@ def validate_scenario_input(
         swr_bp=swr_bp,
         previous=previous_rates,
     )
-    if needs_confirmation and not scenario.extreme_rates_confirmed and not preview:
+    if needs_confirmation and not plan.extreme_rates_confirmed and not preview:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")
 
-    if len(scenario.contributions) > MAX_CONTRIBUTION_ROWS:
-        raise FireError("contributions", "too_many_contributions")
-    years = contribution_years(start_year, birth_year, horizon_age)
-    seen_contributions: set[int] = set()
-    contributions: list[ContributionInput] = []
-    for row in scenario.contributions:
-        if not year_in_window(row.year, years):
-            raise FireError("contributions", "rows_outside_window")
-        if row.year in seen_contributions:
-            raise FireError("contributions", "duplicate_contribution_year")
-        seen_contributions.add(row.year)
-        if type(row.amount_minor) is not int or abs(row.amount_minor) > MAX_AMOUNT_MINOR:
-            raise FireError("contributions", "invalid_amount")
-        contributions.append(row)
-
-    if len(scenario.events) > MAX_EVENT_ROWS:
+    if not allow_events and plan.events:
+        raise FireError("events", "events_not_allowed_on_create")
+    if len(plan.events) > MAX_EVENT_ROWS:
         raise FireError("events", "too_many_events")
-    event_window = event_years(start_year, birth_year, horizon_age)
+    last_year = birth_year + horizon_age
     events: list[EventInput] = []
-    seen_event_ids: set[UUID] = set()
-    for row in scenario.events:
-        if not year_in_window(row.year, event_window):
+    seen_ids: set[UUID] = set()
+    override_years: set[int] = set()
+    for row in plan.events:
+        year = _integer(row.year, "events", "invalid_year")
+        if not MIN_YEAR <= year <= last_year:
             raise FireError("events", "rows_outside_window")
-        if row.id is not None:
-            if row.id in seen_event_ids:
-                raise FireError("events", "duplicate_event")
-            seen_event_ids.add(row.id)
         try:
             kind = EventKind(row.kind)
         except ValueError:
@@ -419,9 +334,27 @@ def validate_scenario_input(
             label = clean_event_label(row.label)
         except ValueError:
             raise FireError("events", "invalid_label") from None
+        if row.id is not None:
+            if row.id in seen_ids:
+                raise FireError("events", "duplicate_event")
+            seen_ids.add(row.id)
+            saved_year = (saved_events or {}).get(row.id)
+            if saved_year is None:
+                raise FireError("events", "invalid_event")
+            if kind is EventKind.SAVING_OVERRIDE and year <= current_year and year != saved_year:
+                raise FireError("events", "saving_override_current_year")
+        else:
+            if year < current_year:
+                raise FireError("events", "rows_outside_window")
+            if kind is EventKind.SAVING_OVERRIDE and year <= current_year:
+                raise FireError("events", "saving_override_current_year")
+        if kind is EventKind.SAVING_OVERRIDE:
+            if year in override_years:
+                raise FireError("events", "duplicate_saving_override")
+            override_years.add(year)
         events.append(
             EventInput(
-                year=row.year,
+                year=year,
                 kind=kind.value,
                 amount_minor=row.amount_minor,
                 label=label,
@@ -429,9 +362,7 @@ def validate_scenario_input(
             )
         )
 
-    return ValidatedScenario(
-        name=name,
-        name_key=text_key(name),
+    return ValidatedPlan(
         birth_year=birth_year,
         horizon_age=horizon_age,
         stop_working_age=stop_working_age,
@@ -440,28 +371,56 @@ def validate_scenario_input(
         income_growth_bp=income_growth_bp,
         rule=rule,
         swr_bp=swr_bp,
-        income_mode=income_mode,
-        income_manual_minor=income_manual,
-        expenses_mode=expenses_mode,
-        expenses_manual_minor=expenses_manual,
-        portfolio_mode=portfolio_mode,
-        portfolio_manual_minor=portfolio_manual,
-        expense_exclusion_ids=tuple(exclusion_ids),
-        contributions=tuple(contributions),
+        income_minor=income_minor,
+        expenses_minor=expenses_minor,
+        portfolio_minor=portfolio_minor,
         events=tuple(events),
         needs_extreme_confirmation=needs_confirmation,
     )
 
 
-def _view(row: FireScenario, *, contribution_count: int, event_count: int) -> FireScenarioView:
+def event_is_active(year: int, kind: str, current_year: int, last_year: int) -> bool:
+    """Whether an event applies to the projection; past events stay as archived history."""
+    if year > last_year:
+        return False
+    if kind == EventKind.SAVING_OVERRIDE.value:
+        return year >= current_year + 1
+    return year >= current_year
+
+
+def _event_views(
+    rows: tuple[FireEvent, ...], current_year: int, last_year: int, currency: str
+) -> tuple[tuple[EventView, ...], tuple[EventView, ...]]:
+    active: list[EventView] = []
+    archived: list[EventView] = []
+    for row in rows:
+        view = EventView(
+            id=row.id,
+            year=row.year,
+            kind=row.kind,
+            amount=Money(row.amount_minor, currency),
+            label=row.label,
+            archived=not event_is_active(row.year, row.kind, current_year, last_year),
+        )
+        (archived if view.archived else active).append(view)
+    return tuple(active), tuple(archived)
+
+
+def _view(
+    row: FireScenario,
+    *,
+    current_year: int,
+    base_currency: str,
+    event_count: int,
+    archived_event_count: int,
+) -> FirePlanView:
     currency = row.currency
-    return FireScenarioView(
+    return FirePlanView(
         id=row.id,
-        name=row.name,
         currency=currency,
         birth_year=row.birth_year,
-        start_year=row.start_year,
-        age_at_start=age_at_start(row.start_year, row.birth_year),
+        current_year=current_year,
+        age_at_start=age_at_start(current_year, row.birth_year),
         inflation_bp=row.inflation_bp,
         real_return_bp=row.real_return_bp,
         income_growth_bp=row.income_growth_bp,
@@ -469,178 +428,111 @@ def _view(row: FireScenario, *, contribution_count: int, event_count: int) -> Fi
         horizon_age=row.horizon_age,
         rule=row.rule,
         swr_bp=row.swr_bp,
-        income_mode=row.income_mode,
-        income_manual=Money(row.income_manual_minor, currency)
-        if row.income_manual_minor is not None
-        else None,
-        expenses_mode=row.expenses_mode,
-        expenses_manual=Money(row.expenses_manual_minor, currency)
-        if row.expenses_manual_minor is not None
-        else None,
-        portfolio_mode=row.portfolio_mode,
-        portfolio_manual=Money(row.portfolio_manual_minor, currency)
-        if row.portfolio_manual_minor is not None
-        else None,
-        is_default=row.is_default,
-        archived_at=row.archived_at,
-        contribution_count=contribution_count,
+        income=Money(row.income_minor or 0, currency),
+        expenses=Money(row.expenses_minor or 0, currency),
+        portfolio=Money(row.portfolio_minor or 0, currency),
+        needs_review=row.needs_review,
+        currency_mismatch=currency != base_currency,
+        event_count=event_count,
+        archived_event_count=archived_event_count,
+        import_key=row.import_key,
+    )
+
+
+def _detail_in_session(
+    session: Session, ctx: Context, row: FireScenario, *, current_year: int, base_currency: str
+) -> FirePlanDetail:
+    event_rows = tuple(FireEventRepository(session, ctx).for_plan(row.id))
+    active, archived = _event_views(
+        event_rows, current_year, row.birth_year + row.horizon_age, row.currency
+    )
+    return FirePlanDetail(
+        plan=_view(
+            row,
+            current_year=current_year,
+            base_currency=base_currency,
+            event_count=len(event_rows),
+            archived_event_count=len(archived),
+        ),
+        events=active + archived,
+        active_events=active,
+        archived_events=archived,
+    )
+
+
+def _parse_legacy(row: FireScenario) -> dict[str, Any]:
+    if not row.legacy:
+        raise FireError("plan", "legacy_invalid")
+    try:
+        loaded = json.loads(row.legacy)
+    except ValueError:
+        raise FireError("plan", "legacy_invalid") from None
+    if not isinstance(loaded, dict):
+        raise FireError("plan", "legacy_invalid")
+    data = cast("dict[str, Any]", loaded)
+    if data.get("v") != 1:
+        raise FireError("plan", "legacy_invalid")
+    modes = (data.get("income_mode"), data.get("expenses_mode"), data.get("portfolio_mode"))
+    if not all(isinstance(mode, str) for mode in modes):
+        raise FireError("plan", "legacy_invalid")
+    for key in ("name", "name_key"):
+        if not isinstance(data.get(key), str):
+            raise FireError("plan", "legacy_invalid")
+    if type(data.get("start_year")) is not int or type(data.get("is_default")) is not bool:
+        raise FireError("plan", "legacy_invalid")
+    if data.get("archived_at") is not None and not isinstance(data.get("archived_at"), str):
+        raise FireError("plan", "legacy_invalid")
+    for key in (
+        "income_manual_minor",
+        "expenses_manual_minor",
+        "portfolio_manual_minor",
+    ):
+        value = data.get(key)
+        if value is not None and type(value) is not int:
+            raise FireError("plan", "legacy_invalid")
+    exclusions = data.get("expense_exclusion_ids", [])
+    if not isinstance(exclusions, list) or not all(
+        isinstance(item, str) for item in cast("list[object]", exclusions)
+    ):
+        raise FireError("plan", "legacy_invalid")
+    return data
+
+
+def _legacy_summary(row: FireScenario, current_year: int, event_count: int) -> LegacyScenarioView:
+    try:
+        data = _parse_legacy(row)
+    except FireError:
+        return LegacyScenarioView(
+            id=row.id,
+            name=LEGACY_NAME,
+            start_year=current_year,
+            age_at_start=age_at_start(current_year, row.birth_year),
+            currency=row.currency,
+            is_default=False,
+            archived=False,
+            event_count=event_count,
+            invalid=True,
+        )
+    start_year = cast("int", data["start_year"])
+    archived_at = data.get("archived_at")
+    return LegacyScenarioView(
+        id=row.id,
+        name=str(data["name"]),
+        start_year=start_year,
+        age_at_start=age_at_start(start_year, row.birth_year),
+        currency=row.currency,
+        is_default=bool(data["is_default"]),
+        archived=bool(archived_at),
         event_count=event_count,
     )
 
 
-def _scenario_values(validated: ValidatedScenario) -> dict[str, object]:
-    return {
-        "name": validated.name,
-        "name_key": validated.name_key,
-        "birth_year": validated.birth_year,
-        "inflation_bp": validated.inflation_bp,
-        "real_return_bp": validated.real_return_bp,
-        "income_growth_bp": validated.income_growth_bp,
-        "stop_working_age": validated.stop_working_age,
-        "horizon_age": validated.horizon_age,
-        "rule": validated.rule.value,
-        "swr_bp": validated.swr_bp,
-        "income_mode": validated.income_mode.value,
-        "income_manual_minor": validated.income_manual_minor,
-        "expenses_mode": validated.expenses_mode.value,
-        "expenses_manual_minor": validated.expenses_manual_minor,
-        "portfolio_mode": validated.portfolio_mode.value,
-        "portfolio_manual_minor": validated.portfolio_manual_minor,
-    }
-
-
-def _free_copy_name(name: str, active_keys: set[str]) -> str:
-    """A free active name: ``Name (copy)``, then ``Name (copy 2)``, ``Name (copy 3)``…"""
-    for number in range(1, 10_000):
-        suffix = " (copy)" if number == 1 else f" (copy {number})"
-        base = name[: max(1, MAX_NAME_LENGTH - len(suffix))]
-        candidate = f"{base}{suffix}"
-        if text_key(candidate) not in active_keys:
-            return candidate
-    raise FireError("name", "duplicate_name")
-
-
-def _audit(session: Session, ctx: Context, action: str, row: FireScenario) -> None:
-    AuditEventRepository(session, ctx).record(
-        actor_user_id=ctx.user.id,
-        action=action,
-        entity_type="fire_scenario",
-        entity_id=str(row.id),
-        ts=ctx.clock.now(),
-        data={"name": row.name},
-    )
-
-
-def _check_expense_exclusions(session: Session, ctx: Context, validated: ValidatedScenario) -> None:
+def _legacy_rank(row: FireScenario) -> tuple[int, str, str]:
     try:
-        validate_expense_exclusions_in_session(session, ctx, validated.expense_exclusion_ids)
-    except ExpenseExclusionError:
-        raise FireError("expense_exclusions", "invalid_expense_exclusion") from None
-
-
-def _reconcile_rows(
-    session: Session,
-    ctx: Context,
-    scenario_id: UUID,
-    validated: ValidatedScenario,
-) -> None:
-    """Make the saved child rows match the editor, keeping the identity of unchanged rows.
-
-    Contributions are matched by year (unique per scenario). Events carry a hidden row id, so
-    two events in the same year can be edited independently. A row omitted from the editor is
-    deleted, a new row is created and a changed row is updated; an event id that does not belong
-    to this scenario is refused instead of silently creating a second row. Stable child ids and
-    timestamps matter for the F8.6 archive lineage and for an honest audit trail.
-    """
-    contributions = FireContributionRepository(session, ctx)
-    existing_contributions = {row.year: row for row in contributions.for_scenario(scenario_id)}
-    wanted_years = {row.year for row in validated.contributions}
-    for row in validated.contributions:
-        current = existing_contributions.get(row.year)
-        if current is None:
-            contributions.create(
-                scenario_id=scenario_id, year=row.year, net_amount_minor=row.amount_minor
-            )
-        elif current.net_amount_minor != row.amount_minor:
-            contributions.update(current.id, net_amount_minor=row.amount_minor)
-    for year, current in existing_contributions.items():
-        if year not in wanted_years:
-            contributions.delete(current)
-
-    events = FireEventRepository(session, ctx)
-    existing_events = {row.id: row for row in events.for_scenario(scenario_id)}
-    for row in validated.events:
-        if row.id is None:
-            events.create(
-                scenario_id=scenario_id,
-                year=row.year,
-                kind=row.kind,
-                amount_minor=row.amount_minor,
-                label=row.label,
-            )
-            continue
-        current = existing_events.pop(row.id, None)
-        if current is None:
-            raise FireError("events", "invalid_event")
-        if (
-            current.year,
-            current.kind,
-            current.amount_minor,
-            current.label,
-        ) != (row.year, row.kind, row.amount_minor, row.label):
-            # source_loan_id is not an editor field: a one-click payoff event keeps its loan
-            # link when the label, year, kind or amount is edited.
-            events.update(
-                current.id,
-                year=row.year,
-                kind=row.kind,
-                amount_minor=row.amount_minor,
-                label=row.label,
-            )
-    for current in existing_events.values():
-        events.delete(current)
-
-    exclusions = FireExpenseExclusionRepository(session, ctx)
-    existing_exclusions = {row.category_id: row for row in exclusions.for_scenario(scenario_id)}
-    wanted_exclusions = set(validated.expense_exclusion_ids)
-    for category_id in validated.expense_exclusion_ids:
-        if category_id not in existing_exclusions:
-            exclusions.create(scenario_id=scenario_id, category_id=category_id)
-    for category_id, current in existing_exclusions.items():
-        if category_id not in wanted_exclusions:
-            exclusions.delete(current)
-
-
-def _copy_rows(session: Session, ctx: Context, source: UUID, target: UUID) -> None:
-    contributions = FireContributionRepository(session, ctx)
-    for row in contributions.for_scenario(source):
-        contributions.create(
-            scenario_id=target, year=row.year, net_amount_minor=row.net_amount_minor
-        )
-    events = FireEventRepository(session, ctx)
-    for row in events.for_scenario(source):
-        events.create(
-            scenario_id=target,
-            year=row.year,
-            kind=row.kind,
-            amount_minor=row.amount_minor,
-            label=row.label,
-            source_loan_id=row.source_loan_id,
-        )
-    exclusions = FireExpenseExclusionRepository(session, ctx)
-    for row in exclusions.for_scenario(source):
-        exclusions.create(scenario_id=target, category_id=row.category_id)
-
-
-def _promote_default(
-    session: Session, ctx: Context, repository: FireScenarioRepository, row: FireScenario
-) -> None:
-    current = repository.active_default()
-    if current is not None and current.id == row.id:
-        return
-    if current is not None:
-        repository.update(current.id, is_default=False)
-    repository.update(row.id, is_default=True)
+        data = _parse_legacy(row)
+    except FireError:
+        return (0, "", str(row.id))
+    return (1 if data.get("archived_at") else 0, str(data.get("name_key") or ""), str(row.id))
 
 
 def _profile(session: Session, ctx: Context) -> tuple[int | None, int]:
@@ -650,16 +542,18 @@ def _profile(session: Session, ctx: Context) -> tuple[int | None, int]:
     return user.birth_year, default_horizon_age(user.life_expectancy)
 
 
-def scenario_defaults(factory: sessionmaker[Session], ctx: Context) -> FireScenarioDefaults:
-    """The new-scenario form's prefill: the profile's birth year and life expectancy."""
+def _current_year(ctx: Context) -> int:
+    return ctx.clock.today(ctx.workspace.timezone).year
+
+
+def plan_defaults(factory: sessionmaker[Session], ctx: Context) -> FirePlanDefaults:
+    """The create form's prefill: the profile's birth year and life expectancy."""
     _require_viewer(ctx)
     with factory() as session:
         birth_year, life_expectancy = _profile(session, ctx)
-        # The Context is a request-time snapshot; read the current row for the form's currency.
         currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-    today = ctx.clock.today(ctx.workspace.timezone)
-    return FireScenarioDefaults(
-        start_year=today.year,
+    return FirePlanDefaults(
+        current_year=_current_year(ctx),
         currency=currency,
         birth_year=birth_year,
         life_expectancy=life_expectancy,
@@ -670,168 +564,183 @@ def scenario_defaults(factory: sessionmaker[Session], ctx: Context) -> FireScena
     )
 
 
-def list_fire_scenarios(factory: sessionmaker[Session], ctx: Context) -> FireScenarioList:
-    """Active and archived scenarios with their row counts (four queries, no N+1)."""
-    _require_viewer(ctx)
-    with factory() as session:
-        repository = FireScenarioRepository(session, ctx)
-        active = repository.active()
-        archived = repository.archived()
-        contribution_counts = FireContributionRepository(session, ctx).counts_by_scenario()
-        event_counts = FireEventRepository(session, ctx).counts_by_scenario()
-    return FireScenarioList(
-        active=tuple(
-            _view(
-                row,
-                contribution_count=contribution_counts.get(row.id, 0),
-                event_count=event_counts.get(row.id, 0),
-            )
-            for row in active
-        ),
-        archived=tuple(
-            _view(
-                row,
-                contribution_count=contribution_counts.get(row.id, 0),
-                event_count=event_counts.get(row.id, 0),
-            )
-            for row in archived
-        ),
-    )
-
-
-def _detail(
-    row: FireScenario,
-    contributions: tuple[FireContribution, ...],
-    events: tuple[FireEvent, ...],
-    exclusion_category_ids: tuple[UUID, ...],
-) -> FireScenarioDetail:
-    currency = row.currency
-    return FireScenarioDetail(
-        scenario=_view(row, contribution_count=len(contributions), event_count=len(events)),
-        contributions=tuple(
-            ContributionView(
-                id=item.id,
-                year=item.year,
-                amount=Money(item.net_amount_minor, currency),
-            )
-            for item in contributions
-        ),
-        events=tuple(
-            EventView(
-                id=item.id,
-                year=item.year,
-                kind=item.kind,
-                amount=Money(item.amount_minor, currency),
-                label=item.label,
-                source_loan_id=item.source_loan_id,
-            )
-            for item in events
-        ),
-        expense_exclusion_ids=exclusion_category_ids,
-    )
-
-
-def details_in_session(
-    session: Session, ctx: Context, scenario_ids: tuple[UUID, ...]
-) -> tuple[FireScenarioDetail, ...]:
-    """Bulk-load details for several scenarios: four queries, ordered like ``scenario_ids``.
-
-    A missing id, including one from another workspace, raises :class:`NotFound` before any
-    detail is built. Child rows are loaded for all scenarios at once, so the query count does
-    not grow with the number of contribution or event rows (F8.5 comparison).
-    """
-    _require_viewer(ctx)
-    if not scenario_ids:
-        return ()
-    rows = {row.id: row for row in FireScenarioRepository(session, ctx).by_ids(scenario_ids)}
-    for scenario_id in scenario_ids:
-        if scenario_id not in rows:
-            raise NotFound
-
-    contributions: dict[UUID, list[FireContribution]] = {}
-    for row in FireContributionRepository(session, ctx).for_scenarios(scenario_ids):
-        contributions.setdefault(row.scenario_id, []).append(row)
-    events: dict[UUID, list[FireEvent]] = {}
-    for row in FireEventRepository(session, ctx).for_scenarios(scenario_ids):
-        events.setdefault(row.scenario_id, []).append(row)
-    exclusions: dict[UUID, list[UUID]] = {}
-    for row in FireExpenseExclusionRepository(session, ctx).for_scenarios(scenario_ids):
-        exclusions.setdefault(row.scenario_id, []).append(row.category_id)
-
-    return tuple(
-        _detail(
-            rows[scenario_id],
-            tuple(contributions.get(scenario_id, ())),
-            tuple(events.get(scenario_id, ())),
-            tuple(exclusions.get(scenario_id, ())),
+def _plan_entry_in_session(session: Session, ctx: Context, *, current_year: int) -> PlanEntry:
+    repository = FireScenarioRepository(session, ctx)
+    live = repository.live()
+    base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    if live is not None:
+        detail = _detail_in_session(
+            session, ctx, live, current_year=current_year, base_currency=base_currency
         )
-        for scenario_id in scenario_ids
+        return PlanEntry(plan=detail.plan)
+    legacy_rows = sorted(repository.legacy(), key=_legacy_rank)
+    if not legacy_rows:
+        return PlanEntry(plan=None)
+    counts = FireEventRepository(session, ctx).counts_by_scenario()
+    return PlanEntry(
+        plan=None,
+        legacy=tuple(
+            _legacy_summary(row, current_year, counts.get(row.id, 0)) for row in legacy_rows
+        ),
     )
 
 
-def get_fire_scenario(
-    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID
-) -> FireScenarioDetail:
-    """One scenario with its contribution overrides and events; viewers may read it."""
+def plan_entry(
+    factory: sessionmaker[Session], ctx: Context, *, auto_migrate: bool = True
+) -> PlanEntry:
+    """The `/fire` entry point: live plan, legacy chooser or an empty workspace."""
+    _require_viewer(ctx)
+    current_year = _current_year(ctx)
     with factory() as session:
-        return details_in_session(session, ctx, (scenario_id,))[0]
+        entry = _plan_entry_in_session(session, ctx, current_year=current_year)
+    if entry.plan is not None or not entry.legacy:
+        return entry
+    if len(entry.legacy) == 1 and auto_migrate and ctx.role is not Role.VIEWER:
+        migration = migrate_legacy_plan(factory, ctx, None)
+        return PlanEntry(plan=None, legacy=(), migration=migration)
+    return entry
 
 
-def create_fire_scenario(
-    factory: sessionmaker[Session], ctx: Context, scenario: FireScenarioInput
-) -> UUID:
-    """Create an active scenario; the first one becomes the default."""
+def get_fire_plan(factory: sessionmaker[Session], ctx: Context) -> FirePlanDetail:
+    detail = get_fire_plan_if_any(factory, ctx)
+    if detail is None:
+        raise NotFound
+    return detail
+
+
+def get_fire_plan_if_any(factory: sessionmaker[Session], ctx: Context) -> FirePlanDetail | None:
+    _require_viewer(ctx)
+    with factory() as session:
+        row = FireScenarioRepository(session, ctx).live()
+        if row is None:
+            return None
+        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        return _detail_in_session(
+            session, ctx, row, current_year=_current_year(ctx), base_currency=base_currency
+        )
+
+
+def _check_currency(session: Session, ctx: Context, row: FireScenario) -> None:
+    if row.currency != CurrentWorkspaceRepository(session, ctx).get().base_currency:
+        raise FireError("plan", "plan_currency_mismatch")
+
+
+def _audit(
+    session: Session,
+    ctx: Context,
+    action: str,
+    row: FireScenario,
+    data: dict[str, str | int | bool] | None = None,
+) -> None:
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action=action,
+        entity_type="fire_plan",
+        entity_id=str(row.id),
+        ts=ctx.clock.now(),
+        data=data or {},
+    )
+
+
+def create_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePlanInput) -> UUID:
+    """Create the single plan; only when no plan or legacy row exists."""
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         workspace = CurrentWorkspaceRepository(session, ctx)
         workspace.lock(exclusive=True)
-        # The Context is a request-time snapshot; the locked row is the current base currency.
+        repository = FireScenarioRepository(session, ctx)
+        if repository.live() is not None:
+            raise FireError("plan", "plan_exists")
+        if repository.legacy_count():
+            raise FireError("plan", "migration_required")
         currency = workspace.get().base_currency
-        start_year = ctx.clock.today(ctx.workspace.timezone).year
+        current_year = _current_year(ctx)
         _, profile_horizon = _profile(session, ctx)
-        validated = validate_scenario_input(
-            scenario,
-            start_year=start_year,
+        validated = validate_plan_input(
+            plan,
+            current_year=current_year,
             currency=currency,
             default_horizon=profile_horizon,
+            allow_events=False,
         )
-        _check_expense_exclusions(session, ctx, validated)
-        repository = FireScenarioRepository(session, ctx)
-        if repository.active_by_name_key(validated.name_key) is not None:
-            raise FireError("name", "duplicate_name")
         row = repository.create(
-            **{
-                **_scenario_values(validated),
-                "currency": currency,
-                "start_year": start_year,
-                "is_default": repository.active_default() is None,
-            }
+            currency=currency,
+            birth_year=validated.birth_year,
+            stop_working_age=validated.stop_working_age,
+            horizon_age=validated.horizon_age,
+            inflation_bp=validated.inflation_bp,
+            real_return_bp=validated.real_return_bp,
+            income_growth_bp=validated.income_growth_bp,
+            rule=validated.rule.value,
+            swr_bp=validated.swr_bp,
+            income_minor=validated.income_minor,
+            expenses_minor=validated.expenses_minor,
+            portfolio_minor=validated.portfolio_minor,
+            needs_review=False,
+            is_live=True,
+            legacy=None,
         )
-        _reconcile_rows(session, ctx, row.id, validated)
-        _audit(session, ctx, "fire_scenario.created", row)
+        _audit(session, ctx, "fire_plan.created", row)
         return row.id
 
     return run_immediate(factory, write)
 
 
-def update_fire_scenario(
-    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID, scenario: FireScenarioInput
-) -> UUID:
-    """Replace an active scenario's inputs and both child lists in one write."""
+def _reconcile_events(
+    session: Session, ctx: Context, plan_id: UUID, validated: ValidatedPlan
+) -> None:
+    events = FireEventRepository(session, ctx)
+    existing = {row.id: row for row in events.for_plan(plan_id)}
+    for row in validated.events:
+        if row.id is None:
+            events.create(
+                scenario_id=plan_id,
+                year=row.year,
+                kind=row.kind,
+                amount_minor=row.amount_minor,
+                label=row.label,
+            )
+            continue
+        current = existing.pop(row.id, None)
+        if current is None:
+            raise FireError("events", "invalid_event")
+        if (current.year, current.kind, current.amount_minor, current.label) != (
+            row.year,
+            row.kind,
+            row.amount_minor,
+            row.label,
+        ):
+            events.update(
+                current.id,
+                year=row.year,
+                kind=row.kind,
+                amount_minor=row.amount_minor,
+                label=row.label,
+            )
+    for row in existing.values():
+        events.delete(row)
+
+
+def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePlanInput) -> UUID:
+    """Replace the live plan's inputs and event list; clears ``needs_review``."""
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         repository = FireScenarioRepository(session, ctx)
-        row = repository.get_or_raise(scenario_id)
-        if row.archived_at is not None:
-            raise FireError("scenario", "archived")
-        validated = validate_scenario_input(
-            scenario,
-            start_year=row.start_year,
+        row = repository.live()
+        if row is None:
+            raise NotFound
+        _check_currency(session, ctx, row)
+        saved_events = {
+            event.id: event.year for event in FireEventRepository(session, ctx).for_plan(row.id)
+        }
+        validated = validate_plan_input(
+            plan,
+            current_year=_current_year(ctx),
             currency=row.currency,
             default_horizon=row.horizon_age,
             previous_rates=(
@@ -840,155 +749,224 @@ def update_fire_scenario(
                 row.income_growth_bp,
                 row.swr_bp,
             ),
+            saved_events=saved_events,
         )
-        _check_expense_exclusions(session, ctx, validated)
-        existing = repository.active_by_name_key(validated.name_key)
-        if existing is not None and existing.id != row.id:
-            raise FireError("name", "duplicate_name")
-        repository.update(row.id, **_scenario_values(validated))
-        _reconcile_rows(session, ctx, row.id, validated)
-        _audit(session, ctx, "fire_scenario.updated", row)
-        return row.id
-
-    return run_immediate(factory, write)
-
-
-def duplicate_fire_scenario(
-    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID
-) -> UUID:
-    """Copy a scenario (active or archived) under a free ``(copy)`` name."""
-    require_role(ctx, Role.EDITOR)
-
-    def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        repository = FireScenarioRepository(session, ctx)
-        source = repository.get_or_raise(scenario_id)
-        name = _free_copy_name(source.name, repository.active_name_keys())
-        row = repository.create(
-            name=name,
-            name_key=text_key(name),
-            currency=source.currency,
-            birth_year=source.birth_year,
-            start_year=source.start_year,
-            inflation_bp=source.inflation_bp,
-            real_return_bp=source.real_return_bp,
-            income_growth_bp=source.income_growth_bp,
-            stop_working_age=source.stop_working_age,
-            horizon_age=source.horizon_age,
-            rule=source.rule,
-            swr_bp=source.swr_bp,
-            income_mode=source.income_mode,
-            income_manual_minor=source.income_manual_minor,
-            expenses_mode=source.expenses_mode,
-            expenses_manual_minor=source.expenses_manual_minor,
-            portfolio_mode=source.portfolio_mode,
-            portfolio_manual_minor=source.portfolio_manual_minor,
-            is_default=False,
-        )
-        _copy_rows(session, ctx, source.id, row.id)
-        _audit(session, ctx, "fire_scenario.duplicated", row)
-        return row.id
-
-    return run_immediate(factory, write)
-
-
-def archive_fire_scenario(factory: sessionmaker[Session], ctx: Context, scenario_id: UUID) -> UUID:
-    """Archive an active scenario; the next active one becomes the default if needed."""
-    require_role(ctx, Role.EDITOR)
-
-    def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        repository = FireScenarioRepository(session, ctx)
-        row = repository.get_or_raise(scenario_id)
-        if row.archived_at is not None:
-            return row.id
-        was_default = row.is_default
-        repository.update(row.id, archived_at=ctx.clock.now(), is_default=False)
-        if was_default:
-            next_row = repository.first_active()
-            if next_row is not None:
-                _promote_default(session, ctx, repository, next_row)
-        _audit(session, ctx, "fire_scenario.archived", row)
-        return row.id
-
-    return run_immediate(factory, write)
-
-
-def restore_fire_scenario(factory: sessionmaker[Session], ctx: Context, scenario_id: UUID) -> UUID:
-    """Restore an archived scenario; it becomes the default when no active one is left."""
-    require_role(ctx, Role.EDITOR)
-
-    def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        repository = FireScenarioRepository(session, ctx)
-        row = repository.get_or_raise(scenario_id)
-        if row.archived_at is None:
-            return row.id
-        active_keys = repository.active_name_keys()
-        name = row.name
-        if row.name_key in active_keys:
-            name = _free_copy_name(row.name, active_keys)
         repository.update(
             row.id,
-            archived_at=None,
-            is_default=False,
-            name=name,
-            name_key=text_key(name),
+            birth_year=validated.birth_year,
+            stop_working_age=validated.stop_working_age,
+            horizon_age=validated.horizon_age,
+            inflation_bp=validated.inflation_bp,
+            real_return_bp=validated.real_return_bp,
+            income_growth_bp=validated.income_growth_bp,
+            rule=validated.rule.value,
+            swr_bp=validated.swr_bp,
+            income_minor=validated.income_minor,
+            expenses_minor=validated.expenses_minor,
+            portfolio_minor=validated.portfolio_minor,
+            needs_review=False,
         )
-        if repository.active_default() is None:
-            _promote_default(session, ctx, repository, row)
-        _audit(session, ctx, "fire_scenario.restored", row)
+        _reconcile_events(session, ctx, row.id, validated)
+        _audit(session, ctx, "fire_plan.updated", row)
         return row.id
 
     return run_immediate(factory, write)
 
 
-def set_default_fire_scenario(
-    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID
-) -> UUID:
-    """Mark one active scenario as the default (the previous default is cleared)."""
+def delete_fire_plan(
+    factory: sessionmaker[Session], ctx: Context, *, confirmed: bool = False
+) -> None:
+    """Hard-delete the plan and its events, after the UI's typed confirmation."""
     require_role(ctx, Role.EDITOR)
+    if not confirmed:
+        raise FireError("plan", "confirmation_required")
 
-    def write(session: Session) -> UUID:
+    def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         repository = FireScenarioRepository(session, ctx)
-        row = repository.get_or_raise(scenario_id)
-        if row.archived_at is not None:
-            raise FireError("scenario", "archived")
-        if not row.is_default:
-            _promote_default(session, ctx, repository, row)
-            _audit(session, ctx, "fire_scenario.default_changed", row)
-        return row.id
+        row = repository.live()
+        if row is None:
+            raise NotFound
+        events = FireEventRepository(session, ctx)
+        rows = events.for_plan(row.id)
+        count = len(rows)
+        for event in rows:
+            events.delete(event)
+        repository.delete(row)
+        _audit(session, ctx, "fire_plan.deleted", row, {"events_deleted": count})
+
+    run_immediate(factory, write)
+
+
+def _linked_amount(
+    linked: LinkedInputs | None, field: str, direction: str
+) -> tuple[int | None, bool]:
+    if linked is not None and any(block.field == field for block in linked.blocks):
+        return None, True
+    if linked is None:
+        return None, True
+    if direction == "portfolio":
+        total = linked.portfolio.total if linked.portfolio is not None else None
+    else:
+        series = linked.income if direction == "income" else linked.expenses
+        total = series.annual_total if series is not None else None
+    return (total.amount_minor if total is not None else None), total is None
+
+
+def migrate_legacy_plan(
+    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID | None
+) -> FirePlanMigrationResult:
+    """Choose one old scenario (or auto-migrate the only one), migrate and delete the rest."""
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> FirePlanMigrationResult:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        repository = FireScenarioRepository(session, ctx)
+        live = repository.live()
+        if live is not None:
+            base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+            detail = _detail_in_session(
+                session, ctx, live, current_year=_current_year(ctx), base_currency=base_currency
+            )
+            return FirePlanMigrationResult(
+                plan_id=live.id,
+                legacy_name="",
+                deleted_count=0,
+                zeroed_fields=(),
+                archived_event_count=len(detail.archived_events),
+                already_migrated=True,
+            )
+        rows = sorted(repository.legacy(), key=_legacy_rank)
+        if scenario_id is None:
+            if len(rows) != 1:
+                raise FireError("plan", "choice_required")
+            chosen = rows[0]
+        else:
+            chosen = next((row for row in rows if row.id == scenario_id), None)
+            if chosen is None:
+                raise NotFound
+        legacy = _parse_legacy(chosen)
+        current_year = _current_year(ctx)
+        modes = (
+            str(legacy["income_mode"]),
+            str(legacy["expenses_mode"]),
+            str(legacy["portfolio_mode"]),
+        )
+        linked: LinkedInputs | None = None
+        if any(mode != "manual" for mode in modes):
+            raw_exclusions = cast("list[object]", legacy.get("expense_exclusion_ids", []))
+            exclusion_ids = tuple(UUID(str(item)) for item in raw_exclusions)
+            linked = linked_inputs_in_session(
+                session,
+                ctx,
+                currency=chosen.currency,
+                start_year=current_year,
+                income_mode=modes[0],
+                expenses_mode=modes[1],
+                portfolio_mode=modes[2],
+                expense_exclusion_ids=exclusion_ids,
+            )
+        zeroed: list[str] = []
+
+        def amount(mode: str, manual: object, field: str, direction: str) -> int:
+            if mode == "manual":
+                if type(manual) is not int:
+                    zeroed.append(field)
+                    return 0
+                return manual
+            resolved, missing = _linked_amount(linked, field, direction)
+            if missing or resolved is None:
+                zeroed.append(field)
+                return 0
+            return resolved
+
+        income_minor = amount(
+            str(legacy["income_mode"]), legacy.get("income_manual_minor"), "income_manual", "income"
+        )
+        expenses_minor = amount(
+            str(legacy["expenses_mode"]),
+            legacy.get("expenses_manual_minor"),
+            "expenses_manual",
+            "expenses",
+        )
+        portfolio_minor = amount(
+            str(legacy["portfolio_mode"]),
+            legacy.get("portfolio_manual_minor"),
+            "portfolio_manual",
+            "portfolio",
+        )
+        repository.update(
+            chosen.id,
+            income_minor=income_minor,
+            expenses_minor=expenses_minor,
+            portfolio_minor=portfolio_minor,
+            is_live=True,
+            legacy=None,
+            needs_review=True,
+        )
+        deleted = 0
+        for row in rows:
+            if row.id == chosen.id:
+                continue
+            repository.delete(row)
+            deleted += 1
+        event_rows = tuple(FireEventRepository(session, ctx).for_plan(chosen.id))
+        archived_count = sum(
+            1
+            for event in event_rows
+            if not event_is_active(
+                event.year,
+                event.kind,
+                current_year,
+                chosen.birth_year + chosen.horizon_age,
+            )
+        )
+        _audit(
+            session,
+            ctx,
+            "fire_plan.migrated",
+            chosen,
+            {
+                "legacy_name": str(legacy["name"]),
+                "deleted_scenarios": deleted,
+                "zeroed_fields": ", ".join(zeroed),
+                "archived_event_count": archived_count,
+            },
+        )
+        return FirePlanMigrationResult(
+            plan_id=chosen.id,
+            legacy_name=str(legacy["name"]),
+            deleted_count=deleted,
+            zeroed_fields=tuple(zeroed),
+            archived_event_count=archived_count,
+        )
 
     return run_immediate(factory, write)
 
 
 __all__ = [
-    "ContributionInput",
-    "ContributionView",
     "EventInput",
     "EventView",
     "FireError",
-    "FireScenarioDefaults",
-    "FireScenarioDetail",
-    "FireScenarioInput",
-    "FireScenarioList",
-    "FireScenarioView",
+    "FirePlanDefaults",
+    "FirePlanDetail",
+    "FirePlanInput",
+    "FirePlanMigrationResult",
+    "FirePlanView",
+    "LegacyScenarioView",
+    "PlanEntry",
     "RateTuple",
-    "ValidatedScenario",
-    "archive_fire_scenario",
-    "create_fire_scenario",
-    "details_in_session",
-    "duplicate_fire_scenario",
-    "get_fire_scenario",
-    "list_fire_scenarios",
-    "restore_fire_scenario",
-    "scenario_defaults",
-    "set_default_fire_scenario",
-    "update_fire_scenario",
-    "validate_scenario_input",
+    "ValidatedPlan",
+    "create_fire_plan",
+    "delete_fire_plan",
+    "event_is_active",
+    "get_fire_plan",
+    "get_fire_plan_if_any",
+    "migrate_legacy_plan",
+    "plan_defaults",
+    "plan_entry",
+    "update_fire_plan",
+    "validate_plan_input",
 ]

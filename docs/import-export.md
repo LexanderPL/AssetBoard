@@ -31,10 +31,8 @@ instruments, allocations, buy/sell transactions (undated lots included), bond te
 manual and provider prices, stored FX rates, and provider settings without their API keys,
 and the loan configuration: reference rates and their values, loans (including installment
 plans), fixed and variable rate segments, cost components, planned overpayments, actual payments, balance
-checkpoints and saved scenarios. The FIRE planner is included too: scenarios, contribution
-overrides, events and expense-category exclusions, with the linked starting values stored as
-resolved fallbacks. Schedules and projections are not archived; they are recomputed from those
-terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
+checkpoints and saved loan scenarios. The FIRE planner is included too: one plan and its
+adjustments. Schedules and projections are not archived; they are recomputed from those terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
 archive version yet. Notification channels and delivery logs are never exported, because channel URLs
 can contain secrets; provider API keys are not exported either.
 
@@ -95,18 +93,16 @@ Restore writes, all at once:
    archived ids when the target database does not already use them, so linked net-worth items
    and installment-plan references keep pointing at the right loan;
 9. the saved risk targets and the investment cost basis;
-10. FIRE scenarios, contribution overrides, events and expense exclusions. A linked starting
-    value stays linked only when the archive carries what it needs: regular income or expense
-    rows in the trailing window, every excluded category as a regular expense category, an
-    investable portfolio source, and the scenario's own currency. Otherwise it becomes a
-    manual value from the archived fallback; when that is blank too, it becomes 0 and the
-    report says so. A missing exclusion is skipped, and a missing source loan clears the event
-    link, both with a warning. The first active scenario becomes the default when the archive
-    has none.
+10. The FIRE plan and its adjustments. A 2.0 archive carries one plan with manual amounts and
+    `needs_review`. A 1.8 archive is upgraded: one scenario is kept (default active, else first
+    active, else first archived), linked values use the archived fallbacks, contribution
+    overrides become saving overrides, one-click loan-payoff events are dropped, and the other
+    scenarios are reported as skipped. A blank linked fallback becomes 0 with a warning. Export
+    before the one-time scenario choice resolves linked values once; a blocked value is exported
+    as 0 and listed in the `workspace.exported` audit event under `fire_plan_zeroed_fields`.
 
 A plan's projection is not stored: after a restore it is recomputed from the same inputs and
-gives the same result. One-click payoff events keep their loan link, so adding the same payoff
-again remains idempotent.
+gives the same result.
 
 A net-worth item linked to a portfolio class or holding is linked to the restored row when the
 archive carries its target (1.4 archives do). A link whose target is not in the archive —
@@ -135,7 +131,7 @@ closed months, net-worth files, investment files and loan files are listed for i
 never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
 archive lists its investment files once with the same kind of warning, a 1.5+ archive lists
 its loan files once with `loan_restore_only`, and a 1.8+ archive lists its FIRE files once with
-`fire_restore_only`. The settings diff also
+`fire_restore_only` (a legacy 1.8 archive's four FIRE files use the same warning). The settings diff also
 reports the investment cost basis and risk targets when they differ. The archive's base currency
 must match the workspace's; otherwise the whole archive is refused. Existing net-worth,
 investment and FIRE data is left untouched. To merge a valuation history, import its
@@ -180,7 +176,7 @@ A lone reference-rate-values file creates a series named by the file when it doe
 For an existing series, the same series and effective date makes an identical value a duplicate
 (`already_imported`) and a different value a conflict (`reference_rate_value_differs`); the
 stored value is kept. The other loan archive files and every FIRE archive file are restore-only:
-`loans.csv`, `fire_scenarios.csv` and their companions have no standalone importer.
+`loans.csv`, `fire_plan.csv` and `fire_events.csv` have no standalone importer.
 
 Investment transactions are matched by instrument name. A name that matches an active instrument
 is mapped automatically; an unknown name needs the **Instrument mapping** step: map it to an
@@ -327,8 +323,8 @@ shows what will be removed.
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
   rates, provider settings and risk targets it wrote; valuations created by the batch are removed
-  only through this explicit batch rollback. It also removes the FIRE scenarios, contribution
-  overrides, events and expense exclusions it wrote, before the loans their events may link to.
+  only through this explicit batch rollback. It also removes the FIRE plan and its events it
+  wrote, before the loans.
   It is refused, with the reason, once anything changed
   after the restore: a new or edited entry, category, planned value, net-worth or investment
   row, a closed or reopened month, a changed setting, or a new recurring item, income source,

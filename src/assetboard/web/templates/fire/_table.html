@@ -7,7 +7,7 @@
         {% if basis == "real" %}{{ _("Every amount is in today's money.") }}{% else %}{{ _("Every amount is in that year's money.") }}{% endif %}
       </p>
     </div>
-    <a href="{{ scoped_url(request, 'fire_scenario_csv', scenario_id=detail.scenario.id) }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>
+    <a href="{{ scoped_url(request, 'fire_scenario_csv', scenario_id=detail.plan.id) }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>
   </div>
   <div class="mt-4 overflow-x-auto" role="region" aria-label="{{ _('Year-by-year projection') }}" tabindex="0" data-fire-table-scroll>
     <table class="sheet w-full min-w-[48rem] text-sm" data-fire-table data-fire-basis="{{ basis }}">
@@ -51,6 +51,6 @@
       </tbody>
     </table>
   </div>
-  <p class="mt-3 text-xs text-muted" data-fire-zero-note>{{ _("In the start year, net saving shows the starting portfolio, as in the original spreadsheet. Its gain is earned on that portfolio.") }}</p>
+  <p class="mt-3 text-xs text-muted" data-fire-zero-note>{{ _("In the first year, net saving shows the starting portfolio. Its gain is earned on that portfolio.") }}</p>
   <p class="mt-1 text-xs text-muted">{{ _("FIRE rows are highlighted. Rows after income stops are muted; a depleted row is marked in red.") }}</p>
 </section>

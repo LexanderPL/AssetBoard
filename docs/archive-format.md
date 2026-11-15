@@ -1,4 +1,4 @@
-# Workspace archive format (v1.8)
+# Workspace archive format (v2.0)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -42,10 +42,8 @@ assetboard-home-20261018-143000Z.zip
 ├── loan_balance_checkpoints.csv
 ├── loan_scenarios.csv
 ├── installment_plans.csv
-├── fire_scenarios.csv
-├── fire_contributions.csv
-├── fire_events.csv
-└── fire_expense_exclusions.csv
+├── fire_plan.csv
+└── fire_events.csv
 ```
 
 All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
@@ -75,8 +73,12 @@ The manifest's `format_version` is `MAJOR.MINOR`.
 - A **newer minor** version imports with a warning that lists the ignored files, keys and
   columns. Minor versions only add data; a new column may be required in that version when an
   older archive can be read with a documented default.
-- An **older major** version would pass through the reader's upgrade functions; 1.x is the
-  first format, so none exist yet.
+- An **older major** version passes through the reader's upgrade functions: every 1.x archive
+  is upgraded to 2.0 in memory. A 1.8 archive keeps its four FIRE files and is converted to the
+  one-plan format when read (default active scenario, else first active, else first archived;
+  linked inputs use the archived fallback values; contribution overrides become saving
+  overrides; one-click loan-payoff events are dropped). A 1.7 or older archive has no FIRE
+  rows.
 
 **Version history.** 1.0: first release. 1.1 (additive): `workspace.json` gains the optional
 `taxes_enabled` and `upcoming_days` keys; a 1.0 archive reads without them, and a 1.0 reader
@@ -94,10 +96,12 @@ rows, and a 1.5 archive requires every new file (header only when empty). 1.6 (a
 `loan_rate_changes.csv` gains `mode`, `reference_rate_id`, `reference_rate` and `margin_bp`;
 a 1.5 archive reads its old rows as fixed. 1.7 (additive): adds `loan_transfers.csv`;
 `loans.csv` gains `drawdown_mode` and `interest_only_months`, and a 1.6 archive reads every
-loan as `full_at_origination` with no interest-only phase. 1.8 (additive): adds the four FIRE
-files below; a 1.7 archive reads with no FIRE scenarios, and a 1.8 archive requires every new
-file (header only when empty). Schedules and projections are not archived and are recomputed
-from the restored terms. Golden archives of all nine versions are in `tests/fixtures/`.
+loan as `full_at_origination` with no interest-only phase. 1.8 (additive): adds the four legacy
+FIRE files, which format 2.0 upgrades; a 1.7 archive reads with no FIRE plan, and a 1.8 archive
+requires every new file (header only when empty). Format 2.0 (breaking): replaces those four
+files with `fire_plan.csv` and the new `fire_events.csv`. Schedules and projections are not
+archived and are recomputed from the restored terms. Golden archives of every released version
+are in `tests/fixtures/`.
 
 ## `manifest.json`
 
@@ -860,117 +864,78 @@ id,loan_id,loan,category_id,category,installment,remaining_count,end_date,closed
 a6b7c8d9-e0f1-4a61-97d3-5e6f708192a3,f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,1000.00,3,2026-06-05,
 ```
 
-## `fire_scenarios.csv` (restore only)
+## `fire_plan.csv` (restore only)
 
-A FIRE plan, its rates, the three starting amounts and how each amount is resolved. The
-currency is the scenario's own; it may differ from the archive base currency, but then every
-linked starting value falls back on restore.
+The single FIRE plan of the workspace. The file has exactly one data row, or only its header
+row when the workspace has no plan. The currency is the plan's snapshot; it may differ from the
+archive base currency, and the app then shows a blocking review notice instead of reinterpreting
+the amounts.
 
 | Column | Required | Values |
 |---|---|---|
 | `id` | yes | UUID (lineage id) |
-| `name` | yes | 1–200 characters; active names are unique ignoring case |
 | `currency` | yes | ISO 4217 code |
-| `birth_year` | yes | integer 1900–2199, not after `start_year` |
-| `start_year` | yes | integer 1900–2199 |
+| `birth_year` | yes | integer 1900–2199, not after the current year when restored |
 | `inflation_bp` | yes | integer −2000 to 5000 (basis points) |
 | `real_return_bp` | yes | integer −2000 to 5000 |
 | `income_growth_bp` | yes | integer −2000 to 5000 |
-| `stop_working_age` | yes | integer 0–120, not before the start age |
-| `horizon_age` | yes | integer 1–120, after the start age; the last year stays within 2199 |
+| `stop_working_age` | yes | integer 0–120 |
+| `horizon_age` | yes | integer 1–120; the last year stays within 2199 |
 | `rule` | yes | `returns_cover_expenses` \| `swr` |
 | `swr_bp` | with the `swr` rule | integer 50–2000; blank for `returns_cover_expenses` |
-| `income_mode` | yes | `manual` \| `trailing_12m` |
-| `income_manual` | with `manual` | decimal ≥ 0; blank for a linked mode |
-| `income_fallback` | linked only | decimal ≥ 0 resolved at export, or blank when export could not resolve it |
-| `expenses_mode` | yes | `manual` \| `trailing_12m` |
-| `expenses_manual` | with `manual` | decimal ≥ 0; blank for a linked mode |
-| `expenses_fallback` | linked only | decimal ≥ 0 resolved at export, or blank when blocked |
-| `portfolio_mode` | yes | `manual` \| `linked_investable` |
-| `portfolio_manual` | with `manual` | decimal ≥ 0; blank for a linked mode |
-| `portfolio_fallback` | linked only | decimal ≥ 0 resolved at export, or blank when blocked |
-| `is_default` | no (default `false`) | `true` \| `false`; an archived scenario cannot be the default, and at most one active default is allowed |
-| `archived_at` | no | timestamp; set = archived |
+| `income` | yes | decimal ≥ 0 in the plan currency |
+| `expenses` | yes | decimal ≥ 0 in the plan currency |
+| `portfolio` | yes | decimal ≥ 0 in the plan currency |
+| `needs_review` | no (default `false`) | `true` \| `false`; a migrated or 1.8 plan is `true` |
 
-Export order: active before archived, name key, lineage id. A linked starting value is exported
-as its resolved value in the scenario currency, so a restore can still show a sensible amount
-when the archive lacks the ledger, portfolio or price data. The fallback is blank when the
-export itself was blocked (for example no data in the trailing window); a restore then uses the
-archived fallback, or 0 with a warning when it is blank too. The amount columns are validated
-in the scenario's currency, never the archive base currency.
+Amounts are annual, in the plan currency and at the current year's money. The projection starts
+in the year the archive is restored, not in a stored start year. Events and projection results
+are derived; suggested values, resolved loan data and the year-by-year schedule are never stored.
 
 ```csv
-id,name,currency,birth_year,start_year,inflation_bp,real_return_bp,income_growth_bp,stop_working_age,horizon_age,rule,swr_bp,income_mode,income_manual,income_fallback,expenses_mode,expenses_manual,expenses_fallback,portfolio_mode,portfolio_manual,portfolio_fallback,is_default,archived_at
-d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f,Lean FIRE,EUR,1985,2026,250,500,300,55,90,swr,400,manual,3000.00,,manual,2000.00,,manual,100000.00,,true,
-e2f3a4b5-c6d7-4e8f-90a1-2b3c4d5e6f70,Coast plan,EUR,1990,2026,250,500,300,60,95,returns_cover_expenses,,trailing_12m,,2500.00,trailing_12m,,1800.00,linked_investable,,80000.00,false,2026-09-30T20:00:00Z
-```
-
-## `fire_contributions.csv` (restore only)
-
-A yearly net-saving override for one scenario. The amount is signed: positive saves, negative
-dissaves.
-
-| Column | Required | Values |
-|---|---|---|
-| `id` | yes | UUID (lineage id) |
-| `scenario_id` | yes | UUID from `fire_scenarios.csv` |
-| `scenario` | yes | the scenario name (must match `scenario_id`) |
-| `year` | yes | the year after the start through the horizon year |
-| `net_amount` | yes | signed decimal in the scenario currency; at most its minor digits |
-
-Export order: scenario order, year, lineage id. A scenario has at most one contribution per
-year.
-
-```csv
-id,scenario_id,scenario,year,net_amount
-f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081,d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f,Lean FIRE,2027,1200.00
+id,currency,birth_year,inflation_bp,real_return_bp,income_growth_bp,stop_working_age,horizon_age,rule,swr_bp,income,expenses,portfolio,needs_review
+d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f,EUR,1985,250,500,300,55,90,swr,400,3000.00,2000.00,100000.00,false
 ```
 
 ## `fire_events.csv` (restore only)
 
-A one-off cash flow or a permanent annual expense/income change in a plan year.
+One adjustment in a plan year. Events are stored and exported as calendar years; an event before
+the current year is kept as archived history and is not applied to the projection.
 
 | Column | Required | Values |
 |---|---|---|
 | `id` | yes | UUID (lineage id) |
-| `scenario_id` | yes | UUID from `fire_scenarios.csv` |
-| `scenario` | yes | the scenario name (must match `scenario_id`) |
-| `year` | yes | the start year through the horizon year |
-| `kind` | yes | `cash` \| `expense_change` \| `income_change` |
-| `amount` | yes | signed decimal in the scenario currency; at most its minor digits |
+| `year` | yes | integer 1900 through `birth_year + horizon_age` |
+| `kind` | yes | `cash` \| `income_change` \| `expense_change` \| `saving_override` |
+| `amount` | yes | signed decimal in the plan currency; at most its minor digits |
 | `label` | yes | 1–200 characters |
-| `source_loan_id` | no | loan lineage id of a one-click payoff event |
 
-Export order: scenario order, year, lineage id. A missing source loan clears the link and keeps
-the event, with a restore warning.
-
-```csv
-id,scenario_id,scenario,year,kind,amount,label,source_loan_id
-a4b5c6d7-e8f9-4a01-b2c3-4d5e6f708192,d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f,Lean FIRE,2030,cash,-5000.00,Home renovation,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a
-```
-
-## `fire_expense_exclusions.csv` (restore only)
-
-Regular expense categories left out of a scenario's linked trailing expenses.
-
-| Column | Required | Values |
-|---|---|---|
-| `id` | yes | UUID (lineage id) |
-| `scenario_id` | yes | UUID from `fire_scenarios.csv` |
-| `scenario` | yes | the scenario name (must match `scenario_id`) |
-| `category_id` | yes | UUID from `categories.csv`; a missing, wrong-kind or non-regular category skips the exclusion on restore |
-| `category` | yes | the category name (must match `category_id` when it is present) |
-
-Export order: scenario order, category order, lineage id. A scenario excludes a category at
-most once. A category missing from the archive, or one that is not a regular expense category,
-is skipped with a warning; a present category whose name differs from the `category` companion
-is an archive error. If the scenario's expenses are linked, the skipped exclusion makes them
-fall back to the archived manual amount rather than silently changing the total.
+A `saving_override` replaces that year's net saving, is unique per year, and is not applied in
+the current year (the current row uses the starting portfolio). Other kinds may repeat in one
+year and are summed by kind. Export order: year, lineage id.
 
 ```csv
-id,scenario_id,scenario,category_id,category
-b5c6d7e8-f9a0-4b12-83c4-5d6e7f8091a2,e2f3a4b5-c6d7-4e8f-90a1-2b3c4d5e6f70,Coast plan,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food
+id,year,kind,amount,label
+f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081,2027,saving_override,-1200.00,Sabbatical
+a4b5c6d7-e8f9-4a01-b2c3-4d5e6f708192,2030,cash,-5000.00,Home renovation
 ```
+
+## Legacy FIRE files (format 1.8 only)
+
+A 1.8 archive carries `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv` and
+`fire_expense_exclusions.csv`. The reader upgrades them to `fire_plan.csv` and the 2.0
+`fire_events.csv`: it keeps the default active scenario, else the first active, else the first
+archived one; manual amounts are kept, linked amounts use their exported `*_fallback`, and a blank
+fallback becomes `0` with a warning. Contribution overrides become `saving_override` events and
+one-click loan-payoff events are dropped. A 1.8 archive with several scenarios reports the
+skipped ones. Readers do not write these files anymore.
+
+Exporting a workspace before its one-time choice writes the default active legacy scenario
+(else the first active, else the first archived) as `fire_plan.csv`, marks it
+`needs_review=true` and counts the others in the `workspace.exported` audit event
+(`fire_legacy_scenarios_skipped`). A linked legacy input is resolved at export time; if it is
+blocked or has no value it is written as `0` and its field is recorded in the same audit event
+(`fire_plan_zeroed_fields`) instead of disappearing silently.
 
 ## Reader limits
 
@@ -981,7 +946,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.8)
+## Not in the archive (format 2.0)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
@@ -997,7 +962,8 @@ in `workspace.json`.
 
 Net-worth, investment, loan and FIRE files are restore-only in a full archive merge: they are
 ignored and listed once as a warning (`networth_restore_only`, `investment_restore_only`,
-`loan_restore_only` and `fire_restore_only`). A lone `item_valuations.csv`, a lone
+`loan_restore_only` and `fire_restore_only`). A legacy 1.8 archive's four FIRE files are covered by
+the same `fire_restore_only` warning. A lone `item_valuations.csv`, a lone
 `investment_transactions.csv` and a lone `reference_rate_values.csv` can be merged. The other
 loan and FIRE files are refused as standalone uploads (`loans.csv` alone has no importer), because
-their rows reference loans, scenarios and planned values that a merge does not carry.
+their rows reference loans, plans and planned values that a merge does not carry.

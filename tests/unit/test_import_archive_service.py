@@ -2159,6 +2159,13 @@ def _as_v1_2_without_estimate(content: bytes) -> bytes:
         )
     )
     manifest["format_version"] = "1.2"
+    files.pop("fire_plan.csv", None)
+    files.pop("fire_events.csv", None)
+    manifest["files"] = [
+        entry
+        for entry in manifest["files"]
+        if entry["path"] not in {"fire_plan.csv", "fire_events.csv"}
+    ]
     files["manifest.json"] = json.dumps(manifest).encode("utf-8")
     archive = BytesIO()
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as target:
@@ -2263,12 +2270,12 @@ def test_newer_major_archive_is_refused_and_newer_minor_warns(
 ) -> None:
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
-    major_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.0"), ctx=ctx)
+    major_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "3.0"), ctx=ctx)
     major = _plan(db, data_dir, major_batch, ctx=ctx)
     assert major["errors"][0]["code"] == "newer_major_version"
     assert major["counts"]["invalid"] == 1
 
-    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "1.9"), ctx=ctx)
+    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.1"), ctx=ctx)
     minor = _plan(db, data_dir, minor_batch, ctx=ctx)
     assert minor["counts"]["invalid"] == 0
     assert any(warning["code"] == "newer_minor_version" for warning in minor["warnings"])

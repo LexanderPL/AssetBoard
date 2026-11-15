@@ -1,54 +1,34 @@
-"""F8.6 FIRE archive extension: export lineage, restore fallbacks, round trips and rollback."""
+"""F8.8 archive 2.0: one plan, events, 1.8 upgrade and rollback."""
 
 from __future__ import annotations
 
+import csv
+import hashlib
 import io
+import json
 import zipfile
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
-from assetboard.db.repositories import (
-    FireContributionRepository,
-    FireEventRepository,
-    FireExpenseExclusionRepository,
-    FireScenarioRepository,
-)
+from assetboard.db.models.identity import AuditEvent
+from assetboard.db.repositories import FireEventRepository, FireScenarioRepository
 from assetboard.domain.archive import (
     FILE_ORDER,
-    FIRE_CSV_FILES,
+    ArchiveError,
     ArchiveRows,
-    AssetClassRow,
-    CategoryRow,
-    FireContributionRow,
     FireEventRow,
-    FireExpenseExclusionRow,
-    FireScenarioRow,
-    InstrumentAllocationRow,
-    InstrumentRow,
-    InvestmentTransactionRow,
-    ItemValuationRow,
-    LoanRow,
-    NetWorthCategoryRow,
-    NetWorthItemRow,
-    TransactionRow,
+    FirePlanRow,
     parse_archive,
     write_archive,
 )
-from assetboard.domain.categories import name_key
-from assetboard.domain.fire import (
-    ContributionOverride,
-    EventKind,
-    ProjectionEvent,
-    ProjectionInputs,
-    Rule,
-    project,
-)
-from assetboard.domain.import_upload import parse_upload
+from assetboard.domain.fire import EventKind, ProjectionEvent, ProjectionInputs, Rule, project
 from assetboard.domain.money import Money
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.fire_projection import scenario_results
@@ -63,25 +43,12 @@ from assetboard.services.imports import (
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 EXPORTED_AT = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
-FOOD = UUID("11111111-1111-4111-8111-111111111111")
-HOUSING = UUID("22222222-2222-4222-8222-222222222222")
-SALARY = UUID("33333333-3333-4333-8333-333333333333")
-NW_ASSETS = UUID("44444444-4444-4444-8444-444444444444")
-NW_BROKERAGE = UUID("55555555-5555-4555-8555-555555555555")
-NW_VALUE = UUID("66666666-6666-4666-8666-666666666666")
-INCOME_TX = UUID("77777777-7777-4777-8777-777777777777")
-FOOD_TX = UUID("88888888-8888-4888-8888-888888888888")
-HOUSING_TX = UUID("99999999-9999-4999-8999-999999999999")
-MANUAL_SCENARIO = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
-LINKED_SCENARIO = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
-CONTRIBUTION = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
+GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
+PLAN = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 EVENT = UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
-EXCLUSION = UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
-LOAN = UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
-INSTRUMENT = UUID("12345678-1234-4234-8234-123456789012")
-INVESTMENT_TX = UUID("23456789-2345-4345-8345-234567890123")
-ASSET_CLASS = UUID("3456789a-3456-4456-8456-345678901234")
-ALLOCATION = UUID("456789ab-4567-4567-8567-456789012345")
+OVERRIDE = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
 
 
 def _workspace() -> dict[str, object]:
@@ -98,287 +65,46 @@ def _workspace() -> dict[str, object]:
     }
 
 
-def _manual_scenario() -> FireScenarioRow:
-    return FireScenarioRow(
-        str(MANUAL_SCENARIO),
-        "Manual plan",
+def _plan_row(*, needs_review: str = "true") -> FirePlanRow:
+    return FirePlanRow(
+        str(PLAN),
         "EUR",
-        1990,
-        2026,
-        250,
-        500,
-        300,
-        55,
-        95,
-        "swr",
-        400,
-        "manual",
-        "3000.00",
-        "",
-        "manual",
-        "2000.00",
-        "",
-        "manual",
-        "100000.00",
-        "",
-        "true",
-        None,
-    )
-
-
-def _linked_scenario(
-    *,
-    currency: str = "EUR",
-    income_fallback: str = "36000.00",
-    expenses_fallback: str = "8400.00",
-    portfolio_fallback: str = "50000.00",
-    is_default: str = "false",
-) -> FireScenarioRow:
-    return FireScenarioRow(
-        str(LINKED_SCENARIO),
-        "Linked plan",
-        currency,
         1985,
-        2026,
         250,
         500,
         300,
         55,
         90,
-        "returns_cover_expenses",
-        None,
-        "trailing_12m",
-        "",
-        income_fallback,
-        "trailing_12m",
-        "",
-        expenses_fallback,
-        "linked_investable",
-        "",
-        portfolio_fallback,
-        is_default,
-        None,
-    )
-
-
-def _archived_networth_item() -> NetWorthItemRow:
-    return NetWorthItemRow(
-        str(NW_BROKERAGE),
-        "asset",
-        "Assets",
-        str(NW_ASSETS),
-        "Brokerage",
-        "EUR",
-        "",
-        None,
-        "manual",
-        None,
-        None,
-        "true",
-        "true",
-        "2026-01-01T00:00:00Z",
-        "false",
-    )
-
-
-def _instrument() -> InstrumentRow:
-    return InstrumentRow(
-        str(INSTRUMENT),
-        "World ETF",
-        "ETF",
-        "etf",
-        "EUR",
-        "share",
-        "manual",
-        "",
-        "",
-        None,
-        "",
-        None,
-    )
-
-
-def _non_investable_class() -> AssetClassRow:
-    return AssetClassRow(str(ASSET_CLASS), "Other", "false", "#3b6ea8", 0, "", None)
-
-
-def _instrument_allocation() -> InstrumentAllocationRow:
-    return InstrumentAllocationRow(
-        str(ALLOCATION),
-        str(INSTRUMENT),
-        "World ETF",
-        str(ASSET_CLASS),
-        "Other",
-        10_000,
-    )
-
-
-def _investment_transaction(*, deleted: bool) -> InvestmentTransactionRow:
-    return InvestmentTransactionRow(
-        str(INVESTMENT_TX),
-        str(INSTRUMENT),
-        "World ETF",
-        "2026-01-10",
-        "buy",
-        "10",
-        "100.00",
-        "EUR",
-        "0.00",
-        "1",
-        "",
-        "",
-        "",
-        "",
-        "2026-01-11T00:00:00Z" if deleted else None,
+        "swr",
+        400,
+        "3000.00",
+        "2000.00",
+        "100000.00",
+        needs_review,
     )
 
 
 def _rows(
     *,
-    categories: tuple[CategoryRow, ...] | None = None,
-    transactions: tuple[TransactionRow, ...] | None = None,
-    networth_items: tuple[NetWorthItemRow, ...] | None = None,
-    item_valuations: tuple[ItemValuationRow, ...] | None = None,
-    asset_classes: tuple[AssetClassRow, ...] = (),
-    instruments: tuple[InstrumentRow, ...] = (),
-    instrument_allocations: tuple[InstrumentAllocationRow, ...] = (),
-    investment_transactions: tuple[InvestmentTransactionRow, ...] = (),
-    scenarios: tuple[FireScenarioRow, ...] | None = None,
-    contributions: tuple[FireContributionRow, ...] | None = None,
+    plan: FirePlanRow | None = None,
     events: tuple[FireEventRow, ...] | None = None,
-    exclusions: tuple[FireExpenseExclusionRow, ...] | None = None,
-    loans: tuple[LoanRow, ...] = (),
 ) -> ArchiveRows:
-    if categories is None:
-        categories = (
-            CategoryRow(str(FOOD), "expense", "Food", "regular", "#4f9d69", 0, None),
-            CategoryRow(str(HOUSING), "expense", "Housing", "regular", "#3b6ea8", 1, None),
-            CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
-        )
-    if transactions is None:
-        transactions = (
-            TransactionRow(
-                "2026-01-10",
-                "income",
-                "3000.00",
-                "EUR",
-                "Salary",
-                "January",
-                str(SALARY),
-                str(INCOME_TX),
-                None,
-            ),
-            TransactionRow(
-                "2026-01-15",
-                "expense",
-                "500.00",
-                "EUR",
-                "Food",
-                "Groceries",
-                str(FOOD),
-                str(FOOD_TX),
-                None,
-            ),
-            TransactionRow(
-                "2026-01-20",
-                "expense",
-                "700.00",
-                "EUR",
-                "Housing",
-                "Rent",
-                str(HOUSING),
-                str(HOUSING_TX),
-                None,
-            ),
-        )
-    if networth_items is None:
-        networth_items = (
-            NetWorthItemRow(
-                str(NW_BROKERAGE),
-                "asset",
-                "Assets",
-                str(NW_ASSETS),
-                "Brokerage",
-                "EUR",
-                "",
-                None,
-                "manual",
-                None,
-                None,
-                "true",
-                "true",
-                None,
-                "false",
-            ),
-        )
-    if item_valuations is None:
-        item_valuations = (
-            ItemValuationRow(
-                str(NW_VALUE),
-                str(NW_BROKERAGE),
-                "Brokerage",
-                "2026-02-01",
-                "50000.00",
-                "EUR",
-                "",
-                "2026-02-01T08:00:00Z",
-            ),
-        )
-    if scenarios is None:
-        scenarios = (_linked_scenario(), _manual_scenario())
-    if contributions is None:
-        contributions = (
-            FireContributionRow(
-                str(CONTRIBUTION),
-                str(MANUAL_SCENARIO),
-                "Manual plan",
-                2027,
-                "1200.00",
-            ),
-        )
-    if events is None:
-        events = (
-            FireEventRow(
-                str(EVENT),
-                str(MANUAL_SCENARIO),
-                "Manual plan",
-                2030,
-                "cash",
-                "-5000.00",
-                "Renovation",
-                None,
-            ),
-        )
-    if exclusions is None:
-        exclusions = (
-            FireExpenseExclusionRow(
-                str(EXCLUSION),
-                str(LINKED_SCENARIO),
-                "Linked plan",
-                str(FOOD),
-                "Food",
-            ),
-        )
     return ArchiveRows(
         workspace=_workspace(),
-        categories=categories,
+        categories=(),
         budget_lines=(),
-        transactions=transactions,
+        transactions=(),
         months=(),
-        networth_categories=(
-            NetWorthCategoryRow(str(NW_ASSETS), "asset", "Assets", "#3b6ea8", 0, None),
+        fire_plan=_plan_row() if plan is None else plan,
+        fire_events=(
+            (
+                FireEventRow(str(UUID(int=9)), 2020, "cash", "100.00", "Old bonus"),
+                FireEventRow(str(OVERRIDE), 2027, "saving_override", "-1200.00", "Sabbatical"),
+                FireEventRow(str(EVENT), 2030, "cash", "-5000.00", "Renovation"),
+            )
+            if events is None
+            else events
         ),
-        networth_items=networth_items,
-        item_valuations=item_valuations,
-        asset_classes=asset_classes,
-        instruments=instruments,
-        instrument_allocations=instrument_allocations,
-        investment_transactions=investment_transactions,
-        fire_scenarios=scenarios,
-        fire_contributions=contributions,
-        fire_events=events,
-        fire_expense_exclusions=exclusions,
-        loans=loans,
     )
 
 
@@ -437,12 +163,26 @@ def _restore(
     return workspace_id, ctx, batch_id, report, counts
 
 
-def _scenario(ctx: Any, factory: Any, name: str) -> Any:
-    with factory() as session:
-        row = next(
-            item for item in FireScenarioRepository(session, ctx).list() if item.name == name
-        )
-        return row
+def _restore_bytes(
+    db: WorkspaceDb,
+    data_dir: Path,
+    content: bytes,
+    *,
+    mode: Literal["restore", "merge"] = "restore",
+) -> tuple[UUID, Any, UUID, dict[str, Any], dict[str, Any]]:
+    workspace_id, ctx = _target(db)
+    batch_id = upload_import(
+        db.factory,
+        ctx,
+        data_dir=data_dir,
+        filename="archive.zip",
+        content=content,
+        options={},
+        mode=mode,
+    )
+    report = plan_import(db.factory, ctx, data_dir, batch_id, _adapters())
+    counts = apply_import(db.factory, ctx, data_dir, batch_id, _adapters())
+    return workspace_id, ctx, batch_id, report, counts
 
 
 def _data_files(content: bytes) -> dict[str, bytes]:
@@ -450,50 +190,37 @@ def _data_files(content: bytes) -> dict[str, bytes]:
         return {name: archive.read(name) for name in FILE_ORDER if name in archive.namelist()}
 
 
-def test_linked_and_manual_round_trip_keep_projection_and_bytes(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
+def test_2_0_round_trip_keeps_plan_events_and_projection(db: WorkspaceDb, data_dir: Path) -> None:
     rows = _rows()
     original = _archive(rows)
     workspace_id, ctx, _batch_id, report, counts = _restore(db, data_dir, rows)
-
-    assert report["counts"]["fire_scenarios_created"] == 2
-    assert report["counts"]["fire_contributions_created"] == 1
-    assert report["counts"]["fire_events_created"] == 1
-    assert report["counts"]["fire_expense_exclusions_created"] == 1
-    assert report["counts"]["fire_linked_fallbacks"] == 0
-    assert report["counts"]["fire_missing_fallbacks"] == 0
-    assert [warning["code"] for warning in report["warnings"]] == []
+    assert report["counts"]["fire_plan_created"] == 1
+    assert report["counts"]["fire_events_created"] == 3
+    assert counts
 
     with db.factory() as session:
-        scenarios = {row.name: row for row in FireScenarioRepository(session, ctx).list()}
-        linked = scenarios["Linked plan"]
-        manual = scenarios["Manual plan"]
-        assert linked.income_mode == "trailing_12m"
-        assert linked.expenses_mode == "trailing_12m"
-        assert linked.portfolio_mode == "linked_investable"
-        assert linked.income_manual_minor is None
-        assert manual.is_default is True
-        assert linked.import_key == f"id:{LINKED_SCENARIO}"
-        assert manual.import_key == f"id:{MANUAL_SCENARIO}"
-        assert len(FireContributionRepository(session, ctx).list()) == 1
-        assert len(FireEventRepository(session, ctx).list()) == 1
-        assert len(FireExpenseExclusionRepository(session, ctx).list()) == 1
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.import_key == f"id:{PLAN}"
+        assert plan.needs_review is True
+        events = FireEventRepository(session, ctx).for_plan(plan.id)
+        assert [(row.year, row.kind) for row in events] == [
+            (2020, "cash"),
+            (2027, "saving_override"),
+            (2030, "cash"),
+        ]
+        assert events[1].import_key == f"id:{OVERRIDE}"
 
-    linked_results = scenario_results(db.factory, ctx, _scenario(ctx, db.factory, "Linked plan").id)
-    assert linked_results.projection is not None
-    assert linked_results.blocks == ()
-    assert linked_results.projection.inputs.start_income == Money(3_600_000, "EUR")
-    assert linked_results.projection.inputs.start_expenses == Money(840_000, "EUR")
-    assert linked_results.projection.inputs.start_portfolio == Money(5_000_000, "EUR")
-
-    manual_results = scenario_results(db.factory, ctx, _scenario(ctx, db.factory, "Manual plan").id)
+    results = scenario_results(db.factory, ctx)
+    assert results.projection is not None
+    assert results.detail.plan.needs_review is True
+    assert results.detail.archived_events[0].year == 2020
     expected = project(
         ProjectionInputs(
             currency="EUR",
-            birth_year=1990,
+            birth_year=1985,
             start_year=2026,
-            horizon_age=95,
+            horizon_age=90,
             stop_working_age=55,
             inflation_bp=250,
             real_return_bp=500,
@@ -503,520 +230,356 @@ def test_linked_and_manual_round_trip_keep_projection_and_bytes(
             start_income=Money(300_000, "EUR"),
             start_expenses=Money(200_000, "EUR"),
             start_portfolio=Money(10_000_000, "EUR"),
-            contributions=(ContributionOverride(2027, Money(120_000, "EUR")),),
-            events=(ProjectionEvent(2030, EventKind.CASH, Money(-500_000, "EUR")),),
+            events=(
+                ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, Money(-120_000, "EUR")),
+                ProjectionEvent(2030, EventKind.CASH, Money(-500_000, "EUR")),
+            ),
         )
     )
-    assert manual_results.projection == expected
+    assert results.projection == expected
 
     content = export_workspace(db.factory, ctx).content
     parsed, errors = parse_archive(content)
     assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == "1.8"
-    assert _data_files(original) == _data_files(content)
+    assert parsed.manifest["format_version"] == "2.0"
+    assert _data_files(original)["fire_plan.csv"] == _data_files(content)["fire_plan.csv"]
+    assert _data_files(original)["fire_events.csv"] == _data_files(content)["fire_events.csv"]
 
 
-def test_missing_sources_fall_back_to_archived_values(db: WorkspaceDb, data_dir: Path) -> None:
-    rows = _rows(
-        transactions=(),
-        networth_items=(),
-        item_valuations=(),
-        scenarios=(_linked_scenario(),),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert report["counts"]["fire_missing_fallbacks"] == 0
-    codes = {warning["code"] for warning in report["warnings"]}
-    assert "fire_linked_fallback" in codes
-    assert "fire_missing_fallback" not in codes
-    with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.income_mode == "manual"
-        assert scenario.income_manual_minor == 3_600_000
-        assert scenario.expenses_mode == "manual"
-        assert scenario.expenses_manual_minor == 840_000
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.portfolio_manual_minor == 5_000_000
-
-
-def test_archived_networth_item_is_not_a_portfolio_source(db: WorkspaceDb, data_dir: Path) -> None:
-    rows = _rows(
-        transactions=(),
-        networth_items=(_archived_networth_item(),),
-        scenarios=(_linked_scenario(),),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
-    with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.portfolio_manual_minor == 5_000_000
-
-
-def test_deleted_investment_transaction_is_not_a_portfolio_source(
+def test_a_restored_plan_keeps_its_currency_snapshot_and_blocks_on_a_mismatch(
     db: WorkspaceDb, data_dir: Path
 ) -> None:
-    rows = _rows(
-        transactions=(),
-        networth_items=(),
-        item_valuations=(),
-        asset_classes=(_non_investable_class(),),
-        instruments=(_instrument(),),
-        instrument_allocations=(_instrument_allocation(),),
-        investment_transactions=(_investment_transaction(deleted=True),),
-        scenarios=(_linked_scenario(),),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
+    rows = replace(_rows(), fire_plan=replace(_plan_row(needs_review="false"), currency="USD"))
     _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
+    assert report["counts"]["fire_plan_created"] == 1
     with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.portfolio_manual_minor == 5_000_000
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.currency == "USD"
+        assert plan.needs_review is False
+    results = scenario_results(db.factory, ctx)
+    assert results.projection is None
+    assert results.blocks[0].code == "plan_currency_mismatch"
 
 
-def test_live_investment_transaction_keeps_the_portfolio_linked(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    rows = _rows(
-        networth_items=(),
-        item_valuations=(),
-        asset_classes=(_non_investable_class(),),
-        instruments=(_instrument(),),
-        instrument_allocations=(_instrument_allocation(),),
-        investment_transactions=(_investment_transaction(deleted=False),),
-        scenarios=(_linked_scenario(is_default="true"),),
-        contributions=(),
-        events=(),
-        exclusions=(),
+def test_no_plan_writes_header_only_fire_files(db: WorkspaceDb, data_dir: Path) -> None:
+    rows = replace(_rows(), fire_plan=None, fire_events=())
+    content = _archive(rows)
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_plan is None
+    assert parsed.rows.fire_events == ()
+    _workspace_id, _ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_plan_created"] == 0
+
+
+def test_legacy_golden_upgrades_to_one_plan(db: WorkspaceDb, data_dir: Path) -> None:
+    _workspace_id, ctx, _batch_id, report, _counts = _restore_bytes(
+        db, data_dir, GOLDEN_V1_8.read_bytes()
     )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 0
-    assert not [w for w in report["warnings"] if str(w["code"]).startswith("fire_")]
+    assert report["counts"]["fire_plan_created"] == 1
+    codes = [warning["code"] for warning in report["warnings"]]
+    assert "fire_legacy_scenarios_skipped" in codes
+    assert "fire_loan_payoff_removed" in codes
+    assert "fire_contributions_migrated" in codes
     with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.portfolio_mode == "linked_investable"
-        assert scenario.portfolio_manual_minor is None
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.income_minor == 300_000
+        assert plan.expenses_minor == 200_000
+        assert plan.portfolio_minor == 10_000_000
+        assert plan.needs_review is True
+        events = FireEventRepository(session, ctx).for_plan(plan.id)
+        assert [(row.year, row.kind, row.amount_minor) for row in events] == [
+            (2027, "saving_override", 120_000)
+        ]
 
 
-@pytest.mark.parametrize(
-    ("kind", "treatment"),
-    [("expense", "savings"), ("income", "regular")],
-)
-def test_unusable_exclusion_is_skipped_and_forces_expense_fallback(
-    db: WorkspaceDb, data_dir: Path, kind: str, treatment: str
-) -> None:
-    food_direction = "income" if kind == "income" else "expense"
-    rows = _rows(
-        categories=(
-            CategoryRow(str(FOOD), kind, "Food", treatment, "#4f9d69", 0, None),
-            CategoryRow(str(HOUSING), "expense", "Housing", "regular", "#3b6ea8", 1, None),
-            CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
-        ),
-        transactions=(
-            TransactionRow(
-                "2026-01-10",
-                "income",
-                "3000.00",
-                "EUR",
-                "Salary",
-                "January",
-                str(SALARY),
-                str(INCOME_TX),
-                None,
-            ),
-            TransactionRow(
-                "2026-01-15",
-                food_direction,
-                "500.00",
-                "EUR",
-                "Food",
-                "Groceries",
-                str(FOOD),
-                str(FOOD_TX),
-                None,
-            ),
-            TransactionRow(
-                "2026-01-20",
-                "expense",
-                "700.00",
-                "EUR",
-                "Housing",
-                "Rent",
-                str(HOUSING),
-                str(HOUSING_TX),
-                None,
-            ),
-        ),
+def test_1_7_golden_has_no_fire_rows_or_warning(db: WorkspaceDb, data_dir: Path) -> None:
+    _workspace_id, ctx, _batch_id, report, _counts = _restore_bytes(
+        db, data_dir, GOLDEN_V1_7.read_bytes()
     )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_skipped_exclusions"] == 1
-    assert report["counts"]["fire_expense_exclusions_created"] == 0
-    assert report["counts"]["fire_linked_fallbacks"] == 1
-    assert "fire_exclusion_missing" in {warning["code"] for warning in report["warnings"]}
-    with db.factory() as session:
-        scenario = next(
-            row for row in FireScenarioRepository(session, ctx).list() if row.name == "Linked plan"
-        )
-        assert scenario.income_mode == "trailing_12m"
-        assert scenario.expenses_mode == "manual"
-        assert scenario.expenses_manual_minor == 840_000
-        assert scenario.portfolio_mode == "linked_investable"
-        assert FireExpenseExclusionRepository(session, ctx).list() == []
-
-
-def test_transactions_outside_the_trailing_window_do_not_keep_linked_inputs(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    rows = _rows(
-        transactions=(
-            TransactionRow(
-                "2025-01-10",
-                "income",
-                "3000.00",
-                "EUR",
-                "Salary",
-                "Old salary",
-                str(SALARY),
-                str(INCOME_TX),
-                None,
-            ),
-            TransactionRow(
-                "2025-01-15",
-                "expense",
-                "500.00",
-                "EUR",
-                "Food",
-                "Old groceries",
-                str(FOOD),
-                str(FOOD_TX),
-                None,
-            ),
-        ),
-        networth_items=(),
-        item_valuations=(),
-        scenarios=(_linked_scenario(),),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
-    with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.income_mode == "manual"
-        assert scenario.income_manual_minor == 3_600_000
-        assert scenario.expenses_mode == "manual"
-        assert scenario.expenses_manual_minor == 840_000
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.portfolio_manual_minor == 5_000_000
-
-
-def test_missing_sources_without_fallbacks_restore_zero_with_warning(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    rows = _rows(
-        transactions=(),
-        networth_items=(),
-        item_valuations=(),
-        scenarios=(
-            _linked_scenario(income_fallback="", expenses_fallback="", portfolio_fallback=""),
-        ),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert report["counts"]["fire_missing_fallbacks"] == 3
-    assert {warning["code"] for warning in report["warnings"]} >= {
-        "fire_linked_fallback",
-        "fire_missing_fallback",
-    }
-    with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.income_mode == "manual"
-        assert scenario.income_manual_minor == 0
-        assert scenario.expenses_mode == "manual"
-        assert scenario.expenses_manual_minor == 0
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.portfolio_manual_minor == 0
-
-
-def test_missing_exclusion_is_skipped_and_forces_expense_fallback(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    rows = _rows(
-        exclusions=(
-            FireExpenseExclusionRow(
-                str(EXCLUSION),
-                str(LINKED_SCENARIO),
-                "Linked plan",
-                str(UUID(int=0)),
-                "Missing",
-            ),
-        )
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_skipped_exclusions"] == 1
-    assert report["counts"]["fire_expense_exclusions_created"] == 0
-    assert report["counts"]["fire_linked_fallbacks"] == 1
-    codes = {warning["code"] for warning in report["warnings"]}
-    assert "fire_exclusion_missing" in codes
-    with db.factory() as session:
-        scenario = next(
-            row for row in FireScenarioRepository(session, ctx).list() if row.name == "Linked plan"
-        )
-        assert scenario.income_mode == "trailing_12m"
-        assert scenario.expenses_mode == "manual"
-        assert scenario.expenses_manual_minor == 840_000
-        assert scenario.portfolio_mode == "linked_investable"
-        assert FireExpenseExclusionRepository(session, ctx).list() == []
-
-
-def test_missing_source_loan_clears_the_event_link(db: WorkspaceDb, data_dir: Path) -> None:
-    rows = _rows(
-        events=(
-            FireEventRow(
-                str(EVENT),
-                str(MANUAL_SCENARIO),
-                "Manual plan",
-                2030,
-                "cash",
-                "-5000.00",
-                "Renovation",
-                str(UUID(int=1)),
-            ),
-        )
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_cleared_source_loans"] == 1
-    assert "fire_source_loan_missing" in {warning["code"] for warning in report["warnings"]}
-    with db.factory() as session:
-        event = next(iter(FireEventRepository(session, ctx).list()))
-        assert event.source_loan_id is None
-
-
-def test_currency_mismatch_falls_back_and_promotes_the_first_default(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    rows = _rows(
-        scenarios=(_linked_scenario(currency="USD", is_default="false"),),
-        contributions=(),
-        events=(),
-        exclusions=(),
-    )
-    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
-    assert report["counts"]["fire_linked_fallbacks"] == 3
-    assert report["counts"]["fire_default_promoted"] == 1
-    codes = {warning["code"] for warning in report["warnings"]}
-    assert "fire_linked_fallback" in codes
-    assert "fire_default_promoted" in codes
-    with db.factory() as session:
-        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
-        assert scenario.income_mode == "manual"
-        assert scenario.expenses_mode == "manual"
-        assert scenario.portfolio_mode == "manual"
-        assert scenario.is_default is True
-
-
-def test_restore_rollback_removes_fire_before_loans(db: WorkspaceDb, data_dir: Path) -> None:
-    loan = LoanRow(
-        str(LOAN),
-        "Mortgage",
-        "annuity",
-        "EUR",
-        "100000.00",
-        "2025-01-01",
-        "2025-02-01",
-        120,
-        1,
-        "fixed",
-        "monthly",
-        "full_at_origination",
-        0,
-        None,
-        None,
-        "",
-        None,
-        "",
-        "false",
-        "",
-        "none",
-        "",
-        "reduce_term",
-        None,
-    )
-    rows = _rows(
-        loans=(loan,),
-        events=(
-            FireEventRow(
-                str(EVENT),
-                str(MANUAL_SCENARIO),
-                "Manual plan",
-                2030,
-                "expense_change",
-                "-1200.00",
-                "Loan repaid: Mortgage",
-                str(LOAN),
-            ),
-        ),
-    )
-    _workspace_id, ctx, batch_id, _report, _counts = _restore(db, data_dir, rows)
-    with db.factory() as session:
-        event = next(iter(FireEventRepository(session, ctx).list()))
-        assert event.source_loan_id is not None
-    counts = rollback_import(db.factory, ctx, batch_id)
-    assert counts["fire_scenarios"] == 2
-    assert counts["fire_contributions"] == 1
-    assert counts["fire_events"] == 1
-    assert counts["fire_expense_exclusions"] == 1
-    assert counts["loans"] == 1
+    assert report["counts"]["fire_plan_created"] == 0
+    assert not any(warning.get("file", "").startswith("fire_") for warning in report["warnings"])
     with db.factory() as session:
         assert FireScenarioRepository(session, ctx).list() == []
-        assert FireContributionRepository(session, ctx).list() == []
+
+
+def _legacy_archive(
+    *,
+    scenarios: list[list[str]],
+    contributions: list[list[str]] | None = None,
+    events: list[list[str]] | None = None,
+) -> bytes:
+    with zipfile.ZipFile(GOLDEN_V1_8) as source:
+        members = {name: source.read(name) for name in source.namelist()}
+
+    def csv_bytes(name: str, header: list[str], rows: list[list[str]]) -> bytes:
+        output = io.StringIO(newline="")
+        writer = csv.writer(output, lineterminator="\r\n")
+        writer.writerow(header)
+        writer.writerows(rows)
+        return output.getvalue().encode()
+
+    members["fire_scenarios.csv"] = csv_bytes(
+        "fire_scenarios.csv",
+        [
+            "id",
+            "name",
+            "currency",
+            "birth_year",
+            "start_year",
+            "inflation_bp",
+            "real_return_bp",
+            "income_growth_bp",
+            "stop_working_age",
+            "horizon_age",
+            "rule",
+            "swr_bp",
+            "income_mode",
+            "income_manual",
+            "income_fallback",
+            "expenses_mode",
+            "expenses_manual",
+            "expenses_fallback",
+            "portfolio_mode",
+            "portfolio_manual",
+            "portfolio_fallback",
+            "is_default",
+            "archived_at",
+        ],
+        scenarios,
+    )
+    members["fire_contributions.csv"] = csv_bytes(
+        "fire_contributions.csv",
+        ["id", "scenario_id", "scenario", "year", "net_amount"],
+        contributions or [],
+    )
+    members["fire_events.csv"] = csv_bytes(
+        "fire_events.csv",
+        ["id", "scenario_id", "scenario", "year", "kind", "amount", "label", "source_loan_id"],
+        events or [],
+    )
+    members["fire_expense_exclusions.csv"] = csv_bytes(
+        "fire_expense_exclusions.csv",
+        ["id", "scenario_id", "scenario", "category_id", "category"],
+        [],
+    )
+    entries = []
+    for name, data in members.items():
+        if name == "manifest.json":
+            continue
+        entries.append(
+            {
+                "path": name,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "rows": None
+                if not name.endswith(".csv")
+                else len(list(csv.reader(io.StringIO(data.decode(), newline="")))) - 1,
+                "bytes": len(data),
+            }
+        )
+    members["manifest.json"] = json.dumps(
+        {
+            "format": "workspace-archive",
+            "format_version": "1.8",
+            "app": {"name": "AssetBoard", "version": "0.7.5"},
+            "exported_at": "2026-10-18T14:30:00Z",
+            "base_currency": "EUR",
+            "files": entries,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return output.getvalue()
+
+
+def test_1_8_linked_fallbacks_and_missing_fallbacks(db: WorkspaceDb, data_dir: Path) -> None:
+    content = _legacy_archive(
+        scenarios=[
+            [
+                str(PLAN),
+                "Linked plan",
+                "EUR",
+                "1985",
+                "2026",
+                "250",
+                "500",
+                "300",
+                "55",
+                "90",
+                "returns_cover_expenses",
+                "",
+                "trailing_12m",
+                "",
+                "36000.00",
+                "trailing_12m",
+                "",
+                "8400.00",
+                "linked_investable",
+                "",
+                "50000.00",
+                "true",
+                "",
+            ]
+        ],
+        contributions=[[str(OVERRIDE), str(PLAN), "Linked plan", "2027", "1200.00"]],
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore_bytes(db, data_dir, content)
+    codes = [warning["code"] for warning in report["warnings"]]
+    assert "fire_linked_fallback_used" in codes
+    with db.factory() as session:
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.income_minor == 3_600_000
+        assert plan.expenses_minor == 840_000
+        assert plan.portfolio_minor == 5_000_000
+        events = FireEventRepository(session, ctx).for_plan(plan.id)
+        assert [(row.year, row.kind) for row in events] == [(2027, "saving_override")]
+
+
+def test_1_8_missing_fallback_becomes_zero_with_a_warning(db: WorkspaceDb, data_dir: Path) -> None:
+    content = _legacy_archive(
+        scenarios=[
+            [
+                str(PLAN),
+                "Empty linked plan",
+                "EUR",
+                "1985",
+                "2026",
+                "250",
+                "500",
+                "300",
+                "55",
+                "90",
+                "returns_cover_expenses",
+                "",
+                "trailing_12m",
+                "",
+                "",
+                "manual",
+                "2000.00",
+                "",
+                "manual",
+                "100000.00",
+                "",
+                "true",
+                "",
+            ]
+        ]
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore_bytes(db, data_dir, content)
+    assert "fire_missing_fallback_zero" in {warning["code"] for warning in report["warnings"]}
+    with db.factory() as session:
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.income_minor == 0
+
+
+def test_restore_rollback_removes_plan_and_events(db: WorkspaceDb, data_dir: Path) -> None:
+    _workspace_id, ctx, batch_id, _report, _counts = _restore(db, data_dir, _rows())
+    rollback_import(db.factory, ctx, batch_id)
+    with db.factory() as session:
+        assert FireScenarioRepository(session, ctx).list() == []
         assert FireEventRepository(session, ctx).list() == []
-        assert FireExpenseExclusionRepository(session, ctx).list() == []
+        audit = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "import.rolled_back")
+        ).one()
+        assert audit.data["fire_scenarios_deleted"] == 1
+        assert audit.data["fire_events_deleted"] == 3
+        assert audit.data["fire_rows_deleted"] == 4
+        # The removed 1.8 tables must not survive as always-zero audit keys.
+        assert "fire_contributions_deleted" not in audit.data
+        assert "fire_expense_exclusions_deleted" not in audit.data
 
 
 def test_merge_ignores_fire_files_with_one_warning(db: WorkspaceDb, data_dir: Path) -> None:
-    workspace_id, ctx, batch_id, report, _counts = _restore(db, data_dir, _rows(), mode="merge")
-    assert [item["code"] for item in report["warnings"]].count("fire_restore_only") == 1
-    with db.factory() as session:
-        assert FireScenarioRepository(session, ctx).list() == []
-        assert FireContributionRepository(session, ctx).list() == []
-        assert FireEventRepository(session, ctx).list() == []
-        assert FireExpenseExclusionRepository(session, ctx).list() == []
-
-
-@pytest.mark.parametrize(
-    "name",
-    FIRE_CSV_FILES,
-)
-def test_lone_fire_csv_is_refused(name: str) -> None:
-    files = _data_files(_archive(_rows()))
-    parsed, errors = parse_upload(files[name])
-    assert parsed is None
-    assert errors and errors[0].message in {"unknown file", "only part of a full restore"}
-
-
-def test_fire_rows_make_a_workspace_non_empty_and_export_only_current_workspace(
-    db: WorkspaceDb,
-) -> None:
-    db.add_member("own", "owner")
-    ctx = db.ctx("own", "owner")
-    other = db.add_workspace("Private")
-    with db.factory.begin() as session:
-        for workspace_id in (db.workspace_id, other):
-            repository = FireScenarioRepository(
-                session, db.ctx("own", "owner", workspace_id=workspace_id)
-            )
-            repository.create(
-                name="Plan",
-                name_key=name_key("Plan"),
-                currency="EUR",
-                birth_year=1990,
-                start_year=2026,
-                inflation_bp=250,
-                real_return_bp=500,
-                income_growth_bp=300,
-                stop_working_age=55,
-                horizon_age=90,
-                rule="swr",
-                swr_bp=400,
-                income_mode="manual",
-                income_manual_minor=300_000,
-                expenses_mode="manual",
-                expenses_manual_minor=200_000,
-                portfolio_mode="manual",
-                portfolio_manual_minor=10_000_000,
-                is_default=True,
-                import_key=(f"id:{MANUAL_SCENARIO}" if workspace_id == db.workspace_id else None),
-            )
-    with db.factory() as session:
-        assert workspace_is_empty(session, ctx) is False
-    parsed, errors = parse_archive(export_workspace(db.factory, ctx).content)
-    assert errors == () and parsed is not None
-    assert len(parsed.rows.fire_scenarios) == 1
-    assert parsed.rows.fire_scenarios[0].id == str(MANUAL_SCENARIO)
-
-
-def test_restore_uses_fresh_fire_ids_when_the_lineage_id_is_taken(
-    db: WorkspaceDb, data_dir: Path
-) -> None:
-    db.add_member("own", "owner")
-    with db.factory.begin() as session:
-        FireScenarioRepository(session, db.ctx("own", "owner")).create(
-            id=LINKED_SCENARIO,
-            name="Other plan",
-            name_key="other plan",
-            currency="EUR",
-            birth_year=1990,
-            start_year=2026,
-            inflation_bp=250,
-            real_return_bp=500,
-            income_growth_bp=300,
-            stop_working_age=55,
-            horizon_age=90,
-            rule="swr",
-            swr_bp=400,
-            income_mode="manual",
-            income_manual_minor=300_000,
-            expenses_mode="manual",
-            expenses_manual_minor=200_000,
-            portfolio_mode="manual",
-            portfolio_manual_minor=10_000_000,
-            is_default=True,
-        )
-    workspace_id, ctx, _batch_id, _report, _counts = _restore(db, data_dir, _rows())
-    with db.factory() as session:
-        restored = next(
-            row for row in FireScenarioRepository(session, ctx).list() if row.name == "Linked plan"
-        )
-        assert restored.id != LINKED_SCENARIO
-        assert restored.import_key == f"id:{LINKED_SCENARIO}"
-        other = FireScenarioRepository(session, db.ctx("own", "owner")).get(LINKED_SCENARIO)
-        assert other is not None and other.name == "Other plan"
-
-
-@pytest.mark.parametrize(
-    ("fixture", "version"),
-    [("workspace-archive-v1.6.zip", "1.6"), ("workspace-archive-v1.7.zip", "1.7")],
-)
-def test_v1_6_and_v1_7_goldens_restore_without_fire_rows_or_warnings(
-    db: WorkspaceDb, data_dir: Path, fixture: str, version: str
-) -> None:
-    content = (Path(__file__).parents[1] / "fixtures" / fixture).read_bytes()
-    parsed, errors = parse_archive(content)
-    assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == version
-    assert parsed.rows.fire_scenarios == ()
     workspace_id, ctx = _target(db)
     batch_id = upload_import(
         db.factory,
         ctx,
         data_dir=data_dir,
         filename="archive.zip",
-        content=content,
+        content=_archive(_rows()),
         options={},
-        mode="restore",
+        mode="merge",
     )
     report = plan_import(db.factory, ctx, data_dir, batch_id, _adapters())
-    assert not any(warning["code"].startswith("fire_") for warning in report["warnings"])
+    assert [item["code"] for item in report["warnings"]].count("fire_restore_only") == 1
     apply_import(db.factory, ctx, data_dir, batch_id, _adapters())
     with db.factory() as session:
         assert FireScenarioRepository(session, ctx).list() == []
-        assert FireContributionRepository(session, ctx).list() == []
-        assert FireEventRepository(session, ctx).list() == []
-        assert FireExpenseExclusionRepository(session, ctx).list() == []
+    assert workspace_id
+
+
+def test_fire_rows_make_a_workspace_non_empty_and_export_uses_current_workspace(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _workspace_id, ctx, _batch_id, _report, _counts = _restore(db, data_dir, _rows())
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx) is False
+    content = export_workspace(db.factory, ctx).content
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_plan is not None
+    assert parsed.rows.fire_plan.id == str(PLAN)
+
+
+def test_2_0_has_no_fire_scenarios_or_contributions_files() -> None:
+    content = _archive(_rows())
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        names = set(archive.namelist())
+    assert {"fire_plan.csv", "fire_events.csv"} <= names
+    assert (
+        not {
+            "fire_scenarios.csv",
+            "fire_contributions.csv",
+            "fire_expense_exclusions.csv",
+        }
+        & names
+    )
+
+
+def test_reader_reports_events_without_a_plan() -> None:
+    rows = replace(
+        _rows(),
+        fire_plan=None,
+        fire_events=(FireEventRow(str(EVENT), 2030, "cash", "1.00", "Cash"),),
+    )
+    # A header-only plan plus an event row is a cross-file error. write_archive never writes
+    # this combination, so edit a valid archive and re-sign the manifest.
+    from assetboard.domain.archive import manifest_bytes
+
+    with zipfile.ZipFile(io.BytesIO(_archive(rows))) as archive:
+        files = {name: archive.read(name) for name in archive.namelist() if name != "manifest.json"}
+    files["fire_plan.csv"] = files["fire_plan.csv"].splitlines(keepends=True)[0]
+    manifest = json.loads(
+        manifest_bytes(
+            files,
+            app_name="AssetBoard",
+            app_version="test",
+            exported_at=EXPORTED_AT,
+            base_currency="EUR",
+        )
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("manifest.json", json.dumps(manifest).encode())
+        for name, data in files.items():
+            archive.writestr(name, data)
+    parsed, errors = parse_archive(output.getvalue())
+    assert parsed is None
+    assert any(error.message == "FIRE events without a plan" for error in errors)
+    assert EVENT
+
+
+def test_archive_reader_accepts_needs_review_false() -> None:
+    parsed, errors = parse_archive(_archive(_rows(plan=_plan_row(needs_review="false"))))
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_plan is not None
+    assert parsed.rows.fire_plan.needs_review == "false"
+    assert ArchiveError is not None

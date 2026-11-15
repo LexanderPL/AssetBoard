@@ -9,6 +9,7 @@ Adding a workspace-owned model without an entry here fails
 from __future__ import annotations
 
 import itertools
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
@@ -18,12 +19,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
-from assetboard.db.models.fire import (
-    FireContribution,
-    FireEvent,
-    FireExpenseExclusion,
-    FireScenario,
-)
+from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
@@ -697,14 +693,25 @@ def make_loan_scenario(session: Session, workspace_id: UUID) -> LoanScenario:
 
 
 def make_fire_scenario(session: Session, workspace_id: UUID) -> FireScenario:
-    name = f"FIRE plan {uuid4().hex[:8]}"
+    payload = {
+        "v": 1,
+        "name": f"FIRE plan {uuid4().hex[:8]}",
+        "name_key": "fire plan",
+        "start_year": 2026,
+        "is_default": False,
+        "archived_at": None,
+        "income_mode": "manual",
+        "expenses_mode": "manual",
+        "portfolio_mode": "manual",
+        "income_manual_minor": 500_000,
+        "expenses_manual_minor": 300_000,
+        "portfolio_manual_minor": 10_000_000,
+        "expense_exclusion_ids": [],
+    }
     return FireScenario(
         workspace_id=workspace_id,
-        name=name,
-        name_key=name.casefold(),
         currency="EUR",
         birth_year=1985,
-        start_year=2026,
         inflation_bp=250,
         real_return_bp=500,
         income_growth_bp=300,
@@ -712,31 +719,53 @@ def make_fire_scenario(session: Session, workspace_id: UUID) -> FireScenario:
         horizon_age=90,
         rule="returns_cover_expenses",
         swr_bp=None,
-        income_mode="manual",
-        income_manual_minor=500_000,
-        expenses_mode="manual",
-        expenses_manual_minor=300_000,
-        portfolio_mode="manual",
-        portfolio_manual_minor=10_000_000,
-        is_default=False,
-        archived_at=None,
+        income_minor=500_000,
+        expenses_minor=300_000,
+        portfolio_minor=10_000_000,
+        needs_review=True,
+        is_live=False,
+        legacy=json.dumps(payload, sort_keys=True),
     )
 
 
-def make_fire_contribution(session: Session, workspace_id: UUID) -> FireContribution:
-    scenario = make_fire_scenario(session, workspace_id)
-    session.add(scenario)
-    session.flush()
-    return FireContribution(
+def make_legacy_fire_scenario(session: Session, workspace_id: UUID) -> FireScenario:
+    payload = {
+        "v": 1,
+        "name": f"Old FIRE plan {uuid4().hex[:8]}",
+        "name_key": "old fire plan",
+        "start_year": 2026,
+        "is_default": True,
+        "archived_at": None,
+        "income_mode": "manual",
+        "expenses_mode": "manual",
+        "portfolio_mode": "manual",
+        "income_manual_minor": 500_000,
+        "expenses_manual_minor": 300_000,
+        "portfolio_manual_minor": 10_000_000,
+        "expense_exclusion_ids": [],
+    }
+    return FireScenario(
         workspace_id=workspace_id,
-        scenario_id=scenario.id,
-        year=2027,
-        net_amount_minor=120_000,
+        currency="EUR",
+        birth_year=1985,
+        inflation_bp=250,
+        real_return_bp=500,
+        income_growth_bp=300,
+        stop_working_age=55,
+        horizon_age=90,
+        rule="returns_cover_expenses",
+        swr_bp=None,
+        income_minor=500_000,
+        expenses_minor=300_000,
+        portfolio_minor=10_000_000,
+        needs_review=True,
+        is_live=False,
+        legacy=json.dumps(payload, sort_keys=True),
     )
 
 
 def make_fire_event(session: Session, workspace_id: UUID) -> FireEvent:
-    scenario = make_fire_scenario(session, workspace_id)
+    scenario = make_legacy_fire_scenario(session, workspace_id)
     session.add(scenario)
     session.flush()
     return FireEvent(
@@ -746,18 +775,6 @@ def make_fire_event(session: Session, workspace_id: UUID) -> FireEvent:
         kind="expense_change",
         amount_minor=-50_000,
         label="Mortgage repaid",
-    )
-
-
-def make_fire_expense_exclusion(session: Session, workspace_id: UUID) -> FireExpenseExclusion:
-    scenario = make_fire_scenario(session, workspace_id)
-    category = make_category(session, workspace_id)
-    session.add_all([scenario, category])
-    session.flush()
-    return FireExpenseExclusion(
-        workspace_id=workspace_id,
-        scenario_id=scenario.id,
-        category_id=category.id,
     )
 
 
@@ -897,11 +914,6 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     LoanScenario: TenantCase(make_loan_scenario, update_values={"name": "Updated scenario"}),
     LoanPayment: TenantCase(make_loan_payment, update_values={"note": "Updated payment"}),
     InstallmentPlan: TenantCase(make_installment_plan, update_values={"remaining_count": 9}),
-    FireScenario: TenantCase(make_fire_scenario, update_values={"name": "Updated FIRE plan"}),
-    FireContribution: TenantCase(make_fire_contribution, update_values={"net_amount_minor": 1}),
+    FireScenario: TenantCase(make_fire_scenario, update_values={"income_minor": 600_000}),
     FireEvent: TenantCase(make_fire_event, update_values={"label": "Updated event"}),
-    FireExpenseExclusion: TenantCase(
-        make_fire_expense_exclusion,
-        unsupported=frozenset({"update"}),
-    ),
 }

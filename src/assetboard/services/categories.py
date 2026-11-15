@@ -63,7 +63,6 @@ from assetboard.i18n import gettext
 from assetboard.services.budget import category_usage as budget_line_usage
 from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
-from assetboard.services.fire_usage import category_usage as fire_usage
 from assetboard.services.income import category_usage as income_usage
 from assetboard.services.scheduled import category_usage as scheduled_usage
 from assetboard.services.transactions import category_usage as transaction_usage
@@ -76,7 +75,6 @@ USAGE_SOURCES: list[UsageSource] = [
     budget_line_usage,
     scheduled_usage,
     income_usage,
-    fire_usage,
 ]
 
 

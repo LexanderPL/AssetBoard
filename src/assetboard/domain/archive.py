@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from assetboard.domain.bonds import (
     MAX_ANNUAL_RATE_BP,
@@ -40,7 +40,6 @@ from assetboard.domain.fire import (
     Rule,
     clean_event_label,
     clean_scenario_name,
-    contribution_years,
     event_years,
 )
 from assetboard.domain.holdings import MAX_NOTE_LENGTH, InvestmentTransactionType
@@ -69,7 +68,7 @@ from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, S
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.8"
+FORMAT_VERSION = "2.0"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -318,6 +317,33 @@ CSV_COLUMNS = {
         "end_date",
         "closed_at",
     ),
+    "fire_plan.csv": (
+        "id",
+        "currency",
+        "birth_year",
+        "inflation_bp",
+        "real_return_bp",
+        "income_growth_bp",
+        "stop_working_age",
+        "horizon_age",
+        "rule",
+        "swr_bp",
+        "income",
+        "expenses",
+        "portfolio",
+        "needs_review",
+    ),
+    "fire_events.csv": ("id", "year", "kind", "amount", "label"),
+}
+
+# Format 1.x FIRE files are read-only compatibility input for the 2.0 upgrade.
+LEGACY_FIRE_CSV_FILES = (
+    "fire_scenarios.csv",
+    "fire_contributions.csv",
+    "fire_events.csv",
+    "fire_expense_exclusions.csv",
+)
+LEGACY_CSV_COLUMNS = {
     "fire_scenarios.csv": (
         "id",
         "name",
@@ -343,13 +369,7 @@ CSV_COLUMNS = {
         "is_default",
         "archived_at",
     ),
-    "fire_contributions.csv": (
-        "id",
-        "scenario_id",
-        "scenario",
-        "year",
-        "net_amount",
-    ),
+    "fire_contributions.csv": ("id", "scenario_id", "scenario", "year", "net_amount"),
     "fire_events.csv": (
         "id",
         "scenario_id",
@@ -397,15 +417,11 @@ LOAN_CSV_FILES = (
     "loan_scenarios.csv",
     "installment_plans.csv",
 )
-FIRE_CSV_FILES = (
-    "fire_scenarios.csv",
-    "fire_contributions.csv",
-    "fire_events.csv",
-    "fire_expense_exclusions.csv",
-)
+FIRE_CSV_FILES = ("fire_plan.csv", "fire_events.csv")
 LOAN_TRANSFER_CSV_FILES = ("loan_transfers.csv",)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
+KNOWN_FILES = frozenset(REQUIRED_FILES) | frozenset(LEGACY_FIRE_CSV_FILES)
 LINK_TYPES = frozenset({"portfolio_asset_class", "portfolio_holding", "loan_balance"})
 SNAPSHOT_SOURCES = frozenset({"auto", "manual", "backfill"})
 
@@ -434,7 +450,7 @@ def required_files(version: str) -> tuple[str, ...]:
     if minor >= 7:
         csv_files += LOAN_TRANSFER_CSV_FILES
     if minor >= 8:
-        csv_files += FIRE_CSV_FILES
+        csv_files += LEGACY_FIRE_CSV_FILES
     return ("manifest.json", "workspace.json", *csv_files)
 
 
@@ -790,12 +806,12 @@ class InstallmentPlanRow:
 
 
 @dataclass(frozen=True, slots=True)
-class FireScenarioRow:
+class FirePlanRow:
+    """The single plan row of format 2.0; amounts are plain decimal text."""
+
     id: str
-    name: str
     currency: str
     birth_year: int
-    start_year: int
     inflation_bp: int
     real_return_bp: int
     income_growth_bp: int
@@ -803,47 +819,19 @@ class FireScenarioRow:
     horizon_age: int
     rule: str
     swr_bp: int | None
-    income_mode: str
-    income_manual: str
-    income_fallback: str
-    expenses_mode: str
-    expenses_manual: str
-    expenses_fallback: str
-    portfolio_mode: str
-    portfolio_manual: str
-    portfolio_fallback: str
-    is_default: str
-    archived_at: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class FireContributionRow:
-    id: str
-    scenario_id: str
-    scenario: str
-    year: int
-    net_amount: str
+    income: str
+    expenses: str
+    portfolio: str
+    needs_review: str
 
 
 @dataclass(frozen=True, slots=True)
 class FireEventRow:
     id: str
-    scenario_id: str
-    scenario: str
     year: int
     kind: str
     amount: str
     label: str
-    source_loan_id: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class FireExpenseExclusionRow:
-    id: str
-    scenario_id: str
-    scenario: str
-    category_id: str
-    category: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -877,10 +865,8 @@ class ArchiveRows:
     loan_balance_checkpoints: tuple[LoanBalanceCheckpointRow, ...] = ()
     loan_scenarios: tuple[LoanScenarioRow, ...] = ()
     installment_plans: tuple[InstallmentPlanRow, ...] = ()
-    fire_scenarios: tuple[FireScenarioRow, ...] = ()
-    fire_contributions: tuple[FireContributionRow, ...] = ()
+    fire_plan: FirePlanRow | None = None
     fire_events: tuple[FireEventRow, ...] = ()
-    fire_expense_exclusions: tuple[FireExpenseExclusionRow, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -982,12 +968,10 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         ),
         "loan_scenarios.csv": csv_bytes("loan_scenarios.csv", rows.loan_scenarios),
         "installment_plans.csv": csv_bytes("installment_plans.csv", rows.installment_plans),
-        "fire_scenarios.csv": csv_bytes("fire_scenarios.csv", rows.fire_scenarios),
-        "fire_contributions.csv": csv_bytes("fire_contributions.csv", rows.fire_contributions),
-        "fire_events.csv": csv_bytes("fire_events.csv", rows.fire_events),
-        "fire_expense_exclusions.csv": csv_bytes(
-            "fire_expense_exclusions.csv", rows.fire_expense_exclusions
+        "fire_plan.csv": csv_bytes(
+            "fire_plan.csv", (rows.fire_plan,) if rows.fire_plan is not None else ()
         ),
+        "fire_events.csv": csv_bytes("fire_events.csv", rows.fire_events),
     }
 
 
@@ -1152,15 +1136,15 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
     current_major, current_minor = (int(part) for part in FORMAT_VERSION.split("."))
     if major > current_major:
         return None, (ArchiveError("manifest.json", "made by a newer version of the app"),)
-    if major < current_major:  # no 0.x upgrade path exists; 1.x is the first format
+    if major < 1:  # 1.x is the first format; it upgrades to 2.0 in the reader
         return None, (ArchiveError("manifest.json", "unsupported archive version"),)
     required = required_files(str(version))
     if not set(required) <= set(names):
         return None, (ArchiveError("archive", "missing required members"),)
     warnings = [
-        ArchiveError(name, "unknown file ignored") for name in names if name not in REQUIRED_FILES
+        ArchiveError(name, "unknown file ignored") for name in names if name not in KNOWN_FILES
     ]
-    if minor > current_minor:
+    if major == current_major and minor > current_minor:
         warnings.append(ArchiveError("manifest.json", f"newer minor version: {version}"))
     warnings.extend(
         ArchiveError("manifest.json", f"unknown key: {key}")
@@ -1584,6 +1568,11 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
         return chosen
+    if column == "needs_review":
+        chosen = value or "false"
+        if chosen not in {"true", "false"}:
+            raise ValueError("invalid boolean")
+        return chosen
     if column == "estimate_between":
         if value not in {"", "true", "false"}:
             raise ValueError("invalid boolean")
@@ -1644,6 +1633,10 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
     ):
         if not value:
             return ""
+        return _plain_decimal(value, allow_zero=True)
+    if file == "fire_plan.csv" and column in ("income", "expenses", "portfolio"):
+        if not value:
+            raise ValueError("required value missing")
         return _plain_decimal(value, allow_zero=True)
     if file in {"fire_contributions.csv", "fire_events.csv"} and column in {
         "net_amount",
@@ -1736,6 +1729,7 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             "networth_items.csv",
             "item_valuations.csv",
             "networth_snapshots.csv",
+            "fire_plan.csv",
             "fire_scenarios.csv",
         }:
             return _valid_currency(value)
@@ -2036,6 +2030,24 @@ _REQUIRED_COLUMNS = {
         "remaining_count",
         "end_date",
     },
+    "fire_plan.csv": {
+        "id",
+        "currency",
+        "birth_year",
+        "inflation_bp",
+        "real_return_bp",
+        "income_growth_bp",
+        "stop_working_age",
+        "horizon_age",
+        "rule",
+        "income",
+        "expenses",
+        "portfolio",
+    },
+    "fire_events.csv": {"id", "year", "kind", "amount", "label"},
+}
+
+_LEGACY_REQUIRED_COLUMNS = {
     "fire_scenarios.csv": {
         "id",
         "name",
@@ -2068,6 +2080,8 @@ def required_columns(version: str) -> dict[str, set[str]]:
     """CSV columns required by a compatible ``MAJOR.MINOR`` version."""
     columns = {name: set(names) for name, names in _REQUIRED_COLUMNS.items()}
     major, minor = (int(part) for part in version.split(".", 1))
+    if major == 1:
+        columns.update({name: set(names) for name, names in _LEGACY_REQUIRED_COLUMNS.items()})
     if major == 1 and minor >= 3:
         columns["networth_items.csv"].add("estimate_between")
     if major == 1 and minor >= 6:
@@ -2075,6 +2089,348 @@ def required_columns(version: str) -> dict[str, set[str]]:
     if major == 1 and minor >= 7:
         columns["loans.csv"].update({"drawdown_mode", "interest_only_months"})
     return columns
+
+
+def _validate_legacy_fire(
+    tables: dict[str, list[dict[str, str]]],
+    errors: list[ArchiveError],
+    warnings: list[ArchiveError],
+) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...]]:
+    """Validate 1.x FIRE files and pick the one scenario format 2.0 can keep.
+
+    The default active scenario wins, then the first active scenario, then the first archived
+    one. Linked values use the archive's exported fallback; a blank fallback becomes zero with a
+    warning. One-click loan-payoff events are removed because live loans replace them.
+    """
+    scenarios = tables["fire_scenarios.csv"]
+    scenarios_by_id: dict[str, dict[str, str]] = {}
+    active_names: set[str] = set()
+    active_defaults = 0
+    for row in scenarios:
+        scenario_id = row["id"]
+        if scenario_id in scenarios_by_id:
+            errors.append(ArchiveError("fire_scenarios.csv", "duplicate FIRE scenario id"))
+        scenarios_by_id[scenario_id] = row
+        key = name_key(row["name"])
+        if not row["archived_at"]:
+            if key in active_names:
+                errors.append(
+                    ArchiveError("fire_scenarios.csv", "duplicate active FIRE scenario name")
+                )
+            active_names.add(key)
+        if row["is_default"] == "true":
+            if row["archived_at"]:
+                errors.append(ArchiveError("fire_scenarios.csv", "archived default scenario"))
+            else:
+                active_defaults += 1
+                if active_defaults > 1:
+                    errors.append(ArchiveError("fire_scenarios.csv", "duplicate default scenario"))
+        birth_year = int(row["birth_year"])
+        start_year = int(row["start_year"])
+        horizon_age = int(row["horizon_age"])
+        stop_working_age = int(row["stop_working_age"])
+        age = start_year - birth_year
+        if birth_year > start_year:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario years"))
+        if horizon_age <= age or birth_year + horizon_age > MAX_YEAR:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario horizon"))
+        if stop_working_age < age:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE stop-working age"))
+        if row["rule"] == "swr":
+            if not row["swr_bp"]:
+                errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
+        elif row["swr_bp"]:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
+        currency = row["currency"]
+        for mode_column, manual_column, fallback_column in (
+            ("income_mode", "income_manual", "income_fallback"),
+            ("expenses_mode", "expenses_manual", "expenses_fallback"),
+            ("portfolio_mode", "portfolio_manual", "portfolio_fallback"),
+        ):
+            mode = row[mode_column]
+            manual = row[manual_column]
+            fallback = row[fallback_column]
+            if mode == "manual":
+                if not manual:
+                    errors.append(ArchiveError("fire_scenarios.csv", "missing manual FIRE amount"))
+                else:
+                    try:
+                        _nonnegative_money_minor(manual, currency)
+                    except ValueError as exc:
+                        errors.append(
+                            ArchiveError("fire_scenarios.csv", str(exc), column=manual_column)
+                        )
+                if fallback:
+                    errors.append(
+                        ArchiveError("fire_scenarios.csv", "fallback for a manual FIRE input")
+                    )
+            else:
+                if manual:
+                    errors.append(
+                        ArchiveError("fire_scenarios.csv", "manual value for a linked FIRE input")
+                    )
+                if fallback:
+                    try:
+                        _nonnegative_money_minor(fallback, currency)
+                    except ValueError as exc:
+                        errors.append(
+                            ArchiveError("fire_scenarios.csv", str(exc), column=fallback_column)
+                        )
+
+    contribution_ids: set[str] = set()
+    contribution_keys: set[tuple[str, str]] = set()
+    for row in tables["fire_contributions.csv"]:
+        scenario = scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "FIRE scenario reference mismatch")
+            )
+            continue
+        if row["id"] in contribution_ids:
+            errors.append(ArchiveError("fire_contributions.csv", "duplicate FIRE contribution id"))
+        contribution_ids.add(row["id"])
+        key = (row["scenario_id"], row["year"])
+        if key in contribution_keys:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "duplicate FIRE contribution year")
+            )
+        contribution_keys.add(key)
+        year = int(row["year"])
+        first = int(scenario["start_year"]) + 1
+        last = int(scenario["birth_year"]) + int(scenario["horizon_age"])
+        if not first <= year <= last:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "FIRE contribution outside the plan window")
+            )
+        try:
+            _signed_money_minor(row["net_amount"], scenario["currency"])
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_contributions.csv", str(exc), column="net_amount"))
+
+    event_ids: set[str] = set()
+    for row in tables["fire_events.csv"]:
+        scenario = scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(ArchiveError("fire_events.csv", "FIRE scenario reference mismatch"))
+            continue
+        if row["id"] in event_ids:
+            errors.append(ArchiveError("fire_events.csv", "duplicate FIRE event id"))
+        event_ids.add(row["id"])
+        year = int(row["year"])
+        window = event_years(
+            int(scenario["start_year"]),
+            int(scenario["birth_year"]),
+            int(scenario["horizon_age"]),
+        )
+        if year not in window:
+            errors.append(ArchiveError("fire_events.csv", "FIRE event outside the plan window"))
+        try:
+            _signed_money_minor(row["amount"], scenario["currency"])
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_events.csv", str(exc), column="amount"))
+
+    exclusion_ids: set[str] = set()
+    exclusion_keys: set[tuple[str, str]] = set()
+    for row in tables["fire_expense_exclusions.csv"]:
+        scenario = scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(
+                ArchiveError("fire_expense_exclusions.csv", "FIRE scenario reference mismatch")
+            )
+            continue
+        if row["id"] in exclusion_ids:
+            errors.append(
+                ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion id")
+            )
+        exclusion_ids.add(row["id"])
+        key = (row["scenario_id"], row["category_id"])
+        if key in exclusion_keys:
+            errors.append(ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion"))
+        exclusion_keys.add(key)
+
+    if not scenarios:
+        return None, ()
+
+    chosen: dict[str, str] | None = None
+    for row in scenarios:
+        if not row["archived_at"] and row["is_default"] == "true":
+            chosen = row
+            break
+    if chosen is None:
+        chosen = next((row for row in scenarios if not row["archived_at"]), None)
+    if chosen is None:
+        chosen = scenarios[0]
+    skipped = [row for row in scenarios if row["id"] != chosen["id"]]
+    if skipped:
+        warnings.append(
+            ArchiveError("fire_scenarios.csv", "legacy FIRE scenarios skipped", column="id")
+        )
+    warnings.append(ArchiveError("fire_scenarios.csv", "legacy FIRE scenario chosen", column="id"))
+    currency = chosen["currency"]
+
+    def chosen_amount(mode: str, manual: str, fallback: str, column: str) -> str:
+        if mode == "manual":
+            return manual
+        if fallback:
+            warnings.append(
+                ArchiveError("fire_scenarios.csv", "FIRE linked input used its archived fallback")
+            )
+            return fallback
+        warnings.append(
+            ArchiveError(
+                "fire_scenarios.csv",
+                "FIRE linked input had no fallback and was restored as zero",
+                column=column,
+            )
+        )
+        return "0"
+
+    plan = FirePlanRow(
+        id=chosen["id"],
+        currency=currency,
+        birth_year=int(chosen["birth_year"]),
+        inflation_bp=int(chosen["inflation_bp"]),
+        real_return_bp=int(chosen["real_return_bp"]),
+        income_growth_bp=int(chosen["income_growth_bp"]),
+        stop_working_age=int(chosen["stop_working_age"]),
+        horizon_age=int(chosen["horizon_age"]),
+        rule=chosen["rule"],
+        swr_bp=int(chosen["swr_bp"]) if chosen["swr_bp"] else None,
+        income=chosen_amount(
+            chosen["income_mode"], chosen["income_manual"], chosen["income_fallback"], "income"
+        ),
+        expenses=chosen_amount(
+            chosen["expenses_mode"],
+            chosen["expenses_manual"],
+            chosen["expenses_fallback"],
+            "expenses",
+        ),
+        portfolio=chosen_amount(
+            chosen["portfolio_mode"],
+            chosen["portfolio_manual"],
+            chosen["portfolio_fallback"],
+            "portfolio",
+        ),
+        needs_review="true",
+    )
+
+    events: list[FireEventRow] = []
+    used_ids: set[str] = set()
+    payoff_removed = 0
+    for row in tables["fire_events.csv"]:
+        if row["scenario_id"] != chosen["id"]:
+            continue
+        if row["source_loan_id"]:
+            payoff_removed += 1
+            continue
+        events.append(
+            FireEventRow(
+                id=row["id"],
+                year=int(row["year"]),
+                kind=row["kind"],
+                amount=row["amount"],
+                label=row["label"],
+            )
+        )
+        used_ids.add(row["id"])
+    converted = 0
+    for row in tables["fire_contributions.csv"]:
+        if row["scenario_id"] != chosen["id"]:
+            continue
+        event_id = row["id"] if row["id"] not in used_ids else str(uuid4())
+        used_ids.add(event_id)
+        events.append(
+            FireEventRow(
+                id=event_id,
+                year=int(row["year"]),
+                kind="saving_override",
+                amount=row["net_amount"],
+                label="Saving override",
+            )
+        )
+        converted += 1
+    events.sort(key=lambda row: (row.year, row.id))
+    if payoff_removed:
+        warnings.append(
+            ArchiveError("fire_events.csv", "FIRE loan payoff events were removed", column="kind")
+        )
+    if converted:
+        warnings.append(
+            ArchiveError(
+                "fire_contributions.csv",
+                "FIRE contribution overrides became saving overrides",
+                column="net_amount",
+            )
+        )
+    return plan, tuple(events)
+
+
+def _validate_current_fire(
+    tables: dict[str, list[dict[str, str]]], errors: list[ArchiveError]
+) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...]]:
+    plan_rows = tables["fire_plan.csv"]
+    events = tables["fire_events.csv"]
+    if len(plan_rows) > 1:
+        errors.append(ArchiveError("fire_plan.csv", "more than one FIRE plan"))
+    if not plan_rows and events:
+        errors.append(ArchiveError("fire_events.csv", "FIRE events without a plan"))
+    if not plan_rows:
+        return None, ()
+    row = plan_rows[0]
+    currency = row["currency"]
+    for column in ("income", "expenses", "portfolio"):
+        try:
+            _nonnegative_money_minor(row[column], currency)
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_plan.csv", str(exc), column=column))
+    plan = FirePlanRow(
+        id=row["id"],
+        currency=currency,
+        birth_year=int(row["birth_year"]),
+        inflation_bp=int(row["inflation_bp"]),
+        real_return_bp=int(row["real_return_bp"]),
+        income_growth_bp=int(row["income_growth_bp"]),
+        stop_working_age=int(row["stop_working_age"]),
+        horizon_age=int(row["horizon_age"]),
+        rule=row["rule"],
+        swr_bp=int(row["swr_bp"]) if row["swr_bp"] else None,
+        income=row["income"],
+        expenses=row["expenses"],
+        portfolio=row["portfolio"],
+        needs_review=row["needs_review"],
+    )
+    last_year = plan.birth_year + plan.horizon_age
+    if last_year > MAX_YEAR:
+        errors.append(ArchiveError("fire_plan.csv", "invalid FIRE scenario horizon"))
+    event_ids: set[str] = set()
+    override_years: set[int] = set()
+    out: list[FireEventRow] = []
+    for row in events:
+        if row["id"] in event_ids:
+            errors.append(ArchiveError("fire_events.csv", "duplicate FIRE event id"))
+        event_ids.add(row["id"])
+        year = int(row["year"])
+        if not MIN_YEAR <= year <= last_year:
+            errors.append(ArchiveError("fire_events.csv", "FIRE event outside the plan window"))
+        if row["kind"] == "saving_override":
+            if year in override_years:
+                errors.append(ArchiveError("fire_events.csv", "duplicate FIRE saving override"))
+            override_years.add(year)
+        try:
+            _signed_money_minor(row["amount"], currency)
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_events.csv", str(exc), column="amount"))
+        out.append(
+            FireEventRow(
+                id=row["id"],
+                year=year,
+                kind=row["kind"],
+                amount=row["amount"],
+                label=row["label"],
+            )
+        )
+    out.sort(key=lambda row: (row.year, row.id))
+    return plan, tuple(out)
 
 
 def _read_rows(
@@ -2088,8 +2444,14 @@ def _read_rows(
     risk_policy: RiskTargetPolicyRow | None = None,
 ) -> ArchiveRows:
     required = required_columns(version)
+    major = int(version.split(".", 1)[0])
+    read_columns: dict[str, tuple[str, ...]] = {
+        name: tuple(columns) for name, columns in CSV_COLUMNS.items()
+    }
+    if major == 1:
+        read_columns.update({name: tuple(columns) for name, columns in LEGACY_CSV_COLUMNS.items()})
     tables: dict[str, list[dict[str, str]]] = {}
-    for name, columns in CSV_COLUMNS.items():
+    for name, columns in read_columns.items():
         rows: list[dict[str, str]] = []
         tables[name] = rows
         if name not in files:
@@ -2818,165 +3180,10 @@ def _read_rows(
                 ArchiveError("installment_plans.csv", "installment plan category mismatch")
             )
 
-    fire_scenarios = tables["fire_scenarios.csv"]
-    fire_scenarios_by_id: dict[str, dict[str, str]] = {}
-    active_fire_names: set[str] = set()
-    active_fire_defaults = 0
-    for row in fire_scenarios:
-        scenario_id = row["id"]
-        if scenario_id in fire_scenarios_by_id:
-            errors.append(ArchiveError("fire_scenarios.csv", "duplicate FIRE scenario id"))
-        fire_scenarios_by_id[scenario_id] = row
-        key = name_key(row["name"])
-        if not row["archived_at"]:
-            if key in active_fire_names:
-                errors.append(
-                    ArchiveError("fire_scenarios.csv", "duplicate active FIRE scenario name")
-                )
-            active_fire_names.add(key)
-        if row["is_default"] == "true":
-            if row["archived_at"]:
-                errors.append(ArchiveError("fire_scenarios.csv", "archived default scenario"))
-            else:
-                active_fire_defaults += 1
-                if active_fire_defaults > 1:
-                    errors.append(ArchiveError("fire_scenarios.csv", "duplicate default scenario"))
-        birth_year = int(row["birth_year"])
-        start_year = int(row["start_year"])
-        horizon_age = int(row["horizon_age"])
-        stop_working_age = int(row["stop_working_age"])
-        age = start_year - birth_year
-        if birth_year > start_year:
-            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario years"))
-        if horizon_age <= age or birth_year + horizon_age > MAX_YEAR:
-            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario horizon"))
-        if stop_working_age < age:
-            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE stop-working age"))
-        if row["rule"] == "swr":
-            if not row["swr_bp"]:
-                errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
-        elif row["swr_bp"]:
-            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
-        currency = row["currency"]
-        for mode_column, manual_column, fallback_column in (
-            ("income_mode", "income_manual", "income_fallback"),
-            ("expenses_mode", "expenses_manual", "expenses_fallback"),
-            ("portfolio_mode", "portfolio_manual", "portfolio_fallback"),
-        ):
-            mode = row[mode_column]
-            manual = row[manual_column]
-            fallback = row[fallback_column]
-            if mode == "manual":
-                if not manual:
-                    errors.append(ArchiveError("fire_scenarios.csv", "missing manual FIRE amount"))
-                else:
-                    try:
-                        _nonnegative_money_minor(manual, currency)
-                    except ValueError as exc:
-                        errors.append(
-                            ArchiveError("fire_scenarios.csv", str(exc), column=manual_column)
-                        )
-                if fallback:
-                    errors.append(
-                        ArchiveError("fire_scenarios.csv", "fallback for a manual FIRE input")
-                    )
-            else:
-                if manual:
-                    errors.append(
-                        ArchiveError("fire_scenarios.csv", "manual value for a linked FIRE input")
-                    )
-                if fallback:
-                    try:
-                        _nonnegative_money_minor(fallback, currency)
-                    except ValueError as exc:
-                        errors.append(
-                            ArchiveError("fire_scenarios.csv", str(exc), column=fallback_column)
-                        )
-
-    contributions = tables["fire_contributions.csv"]
-    contribution_ids: set[str] = set()
-    contribution_keys: set[tuple[str, str]] = set()
-    for row in contributions:
-        scenario = fire_scenarios_by_id.get(row["scenario_id"])
-        if scenario is None or row["scenario"] != scenario["name"]:
-            errors.append(
-                ArchiveError("fire_contributions.csv", "FIRE scenario reference mismatch")
-            )
-            continue
-        if row["id"] in contribution_ids:
-            errors.append(ArchiveError("fire_contributions.csv", "duplicate FIRE contribution id"))
-        contribution_ids.add(row["id"])
-        key = (row["scenario_id"], row["year"])
-        if key in contribution_keys:
-            errors.append(
-                ArchiveError("fire_contributions.csv", "duplicate FIRE contribution year")
-            )
-        contribution_keys.add(key)
-        year = int(row["year"])
-        window = contribution_years(
-            int(scenario["start_year"]),
-            int(scenario["birth_year"]),
-            int(scenario["horizon_age"]),
-        )
-        if year not in window:
-            errors.append(
-                ArchiveError("fire_contributions.csv", "FIRE contribution outside the plan window")
-            )
-        try:
-            _signed_money_minor(row["net_amount"], scenario["currency"])
-        except ValueError as exc:
-            errors.append(ArchiveError("fire_contributions.csv", str(exc), column="net_amount"))
-
-    events = tables["fire_events.csv"]
-    event_ids: set[str] = set()
-    for row in events:
-        scenario = fire_scenarios_by_id.get(row["scenario_id"])
-        if scenario is None or row["scenario"] != scenario["name"]:
-            errors.append(ArchiveError("fire_events.csv", "FIRE scenario reference mismatch"))
-            continue
-        if row["id"] in event_ids:
-            errors.append(ArchiveError("fire_events.csv", "duplicate FIRE event id"))
-        event_ids.add(row["id"])
-        year = int(row["year"])
-        window = event_years(
-            int(scenario["start_year"]),
-            int(scenario["birth_year"]),
-            int(scenario["horizon_age"]),
-        )
-        if year not in window:
-            errors.append(ArchiveError("fire_events.csv", "FIRE event outside the plan window"))
-        try:
-            _signed_money_minor(row["amount"], scenario["currency"])
-        except ValueError as exc:
-            errors.append(ArchiveError("fire_events.csv", str(exc), column="amount"))
-
-    exclusions = tables["fire_expense_exclusions.csv"]
-    exclusion_ids: set[str] = set()
-    exclusion_keys: set[tuple[str, str]] = set()
-    for row in exclusions:
-        scenario = fire_scenarios_by_id.get(row["scenario_id"])
-        if scenario is None or row["scenario"] != scenario["name"]:
-            errors.append(
-                ArchiveError("fire_expense_exclusions.csv", "FIRE scenario reference mismatch")
-            )
-            continue
-        if row["id"] in exclusion_ids:
-            errors.append(
-                ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion id")
-            )
-        exclusion_ids.add(row["id"])
-        key = (row["scenario_id"], row["category_id"])
-        if key in exclusion_keys:
-            errors.append(ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion"))
-        exclusion_keys.add(key)
-        category = by_id.get(row["category_id"])
-        # A wrong-kind or non-regular category is not an archive error: the restore skips the
-        # exclusion with a warning and falls linked expenses back to their archived amount.
-        # Only a present category with a different companion name is a cross-file mismatch.
-        if category is not None and row["category"] != category["name"]:
-            errors.append(
-                ArchiveError("fire_expense_exclusions.csv", "FIRE exclusion category mismatch")
-            )
+    if major == 1:
+        fire_plan, fire_events = _validate_legacy_fire(tables, errors, warnings)
+    else:
+        fire_plan, fire_events = _validate_current_fire(tables, errors)
 
     return ArchiveRows(
         workspace=workspace,
@@ -3333,65 +3540,6 @@ def _read_rows(
             )
             for row in plans
         ),
-        fire_scenarios=tuple(
-            FireScenarioRow(
-                row["id"],
-                row["name"],
-                row["currency"],
-                int(row["birth_year"]),
-                int(row["start_year"]),
-                int(row["inflation_bp"]),
-                int(row["real_return_bp"]),
-                int(row["income_growth_bp"]),
-                int(row["stop_working_age"]),
-                int(row["horizon_age"]),
-                row["rule"],
-                int(row["swr_bp"]) if row["swr_bp"] else None,
-                row["income_mode"],
-                row["income_manual"],
-                row["income_fallback"],
-                row["expenses_mode"],
-                row["expenses_manual"],
-                row["expenses_fallback"],
-                row["portfolio_mode"],
-                row["portfolio_manual"],
-                row["portfolio_fallback"],
-                row["is_default"],
-                row["archived_at"] or None,
-            )
-            for row in fire_scenarios
-        ),
-        fire_contributions=tuple(
-            FireContributionRow(
-                row["id"],
-                row["scenario_id"],
-                row["scenario"],
-                int(row["year"]),
-                row["net_amount"],
-            )
-            for row in contributions
-        ),
-        fire_events=tuple(
-            FireEventRow(
-                row["id"],
-                row["scenario_id"],
-                row["scenario"],
-                int(row["year"]),
-                row["kind"],
-                row["amount"],
-                row["label"],
-                row["source_loan_id"] or None,
-            )
-            for row in events
-        ),
-        fire_expense_exclusions=tuple(
-            FireExpenseExclusionRow(
-                row["id"],
-                row["scenario_id"],
-                row["scenario"],
-                row["category_id"],
-                row["category"],
-            )
-            for row in exclusions
-        ),
+        fire_plan=fire_plan,
+        fire_events=fire_events,
     )

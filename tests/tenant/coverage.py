@@ -409,28 +409,18 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("FireScenarioRepository", method): "test_fire_queries_stay_in_their_workspace"
-        for method in (
-            "create",
-            "active",
-            "archived",
-            "by_ids",
-            "active_by_name_key",
-            "active_default",
-            "first_active",
-            "active_name_keys",
-        )
-    },
-    **{
-        ("FireContributionRepository", method): "test_fire_queries_stay_in_their_workspace"
-        for method in ("create", "for_scenario", "for_scenarios", "counts_by_scenario")
+        for method in ("create", "live", "legacy", "legacy_count")
     },
     **{
         ("FireEventRepository", method): "test_fire_queries_stay_in_their_workspace"
-        for method in ("create", "for_scenario", "for_scenarios", "counts_by_scenario")
-    },
-    **{
-        ("FireExpenseExclusionRepository", method): "test_fire_queries_stay_in_their_workspace"
-        for method in ("create", "for_scenario", "for_scenarios", "counts_by_category")
+        for method in (
+            "create",
+            "for_plan",
+            "for_plans",
+            "count_for_plan",
+            "counts_by_scenario",
+            "saving_override_years",
+        )
     },
     **{
         ("LoanRateChangeRepository", method): "test_loan_queries_stay_in_their_workspace"

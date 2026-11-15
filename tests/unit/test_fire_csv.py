@@ -6,7 +6,6 @@ import csv
 import io
 
 from assetboard.domain.fire import (
-    ContributionOverride,
     EventKind,
     ProjectionEvent,
     ProjectionInputs,
@@ -46,8 +45,14 @@ def _inputs(**overrides: object) -> ProjectionInputs:
 def test_the_header_and_rows_are_exact_crlf_and_include_both_bases() -> None:
     projection = project(
         _inputs(
-            contributions=(ContributionOverride(2027, Money(-125_050, "EUR")),),
-            events=(ProjectionEvent(2028, kind=EventKind.CASH, amount=Money(250_000, "EUR")),),
+            events=(
+                ProjectionEvent(
+                    2027,
+                    kind=EventKind.SAVING_OVERRIDE,
+                    amount=Money(-125_050, "EUR"),
+                ),
+                ProjectionEvent(2028, kind=EventKind.CASH, amount=Money(250_000, "EUR")),
+            ),
         )
     )
     text = fire_scenario_csv(projection)

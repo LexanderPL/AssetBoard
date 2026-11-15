@@ -14,7 +14,6 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from assetboard.db.base import Base, WorkspaceOwned
 from assetboard.domain.archive import (
     ArchiveError,
     ArchiveRows,
@@ -22,10 +21,8 @@ from assetboard.domain.archive import (
     BondTermsRow,
     BudgetLineRow,
     CategoryRow,
-    FireContributionRow,
     FireEventRow,
-    FireExpenseExclusionRow,
-    FireScenarioRow,
+    FirePlanRow,
     FxRateRow,
     InstallmentPlanRow,
     InstrumentAllocationRow,
@@ -54,10 +51,10 @@ from assetboard.domain.archive import (
     parse_archive,
     write_archive,
 )
-from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.8.zip"
+GOLDEN = FIXTURES / "workspace-archive-v2.0.zip"
+GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
 GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
 GOLDEN_V1_6 = FIXTURES / "workspace-archive-v1.6.zip"
 GOLDEN_V1_5 = FIXTURES / "workspace-archive-v1.5.zip"
@@ -102,11 +99,9 @@ def _rows() -> ArchiveRows:
     checkpoint_id = "e4f5a6b7-c8d9-4e4f-95b1-3c4d5e6f7081"
     scenario_id = "f5a6b7c8-d9e0-4f50-86c2-4d5e6f708192"
     installment_plan_id = "a6b7c8d9-e0f1-4a61-97d3-5e6f708192a3"
-    fire_scenario_id = "d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f"
-    fire_archived_id = "e2f3a4b5-c6d7-4e8f-90a1-2b3c4d5e6f70"
-    fire_contribution_id = "f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081"
+    fire_plan_id = "d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f"
     fire_event_id = "a4b5c6d7-e8f9-4a01-b2c3-4d5e6f708192"
-    fire_exclusion_id = "b5c6d7e8-f9a0-4b12-83c4-5d6e7f8091a2"
+    fire_override_id = "f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081"
     breakdown = (
         '{"categories":[{"category_id":"'
         + networth_category_id
@@ -500,86 +495,36 @@ def _rows() -> ArchiveRows:
                 None,
             ),
         ),
-        fire_scenarios=(
-            FireScenarioRow(
-                fire_scenario_id,
-                "Lean FIRE",
-                "EUR",
-                1985,
-                2026,
-                250,
-                500,
-                300,
-                55,
-                90,
-                "swr",
-                400,
-                "manual",
-                "3000.00",
-                "",
-                "manual",
-                "2000.00",
-                "",
-                "manual",
-                "100000.00",
-                "",
-                "true",
-                None,
-            ),
-            FireScenarioRow(
-                fire_archived_id,
-                "Coast plan",
-                "EUR",
-                1990,
-                2026,
-                250,
-                500,
-                300,
-                60,
-                95,
-                "returns_cover_expenses",
-                None,
-                "trailing_12m",
-                "",
-                "2500.00",
-                "trailing_12m",
-                "",
-                "1800.00",
-                "linked_investable",
-                "",
-                "80000.00",
-                "false",
-                "2026-09-30T20:00:00Z",
-            ),
-        ),
-        fire_contributions=(
-            FireContributionRow(
-                fire_contribution_id,
-                fire_scenario_id,
-                "Lean FIRE",
-                2027,
-                "1200.00",
-            ),
+        fire_plan=FirePlanRow(
+            fire_plan_id,
+            "EUR",
+            1985,
+            250,
+            500,
+            300,
+            55,
+            90,
+            "swr",
+            400,
+            "3000.00",
+            "2000.00",
+            "100000.00",
+            "true",
         ),
         fire_events=(
             FireEventRow(
+                fire_override_id,
+                2027,
+                "saving_override",
+                "-1200.00",
+                "Sabbatical",
+            ),
+            FireEventRow(
                 fire_event_id,
-                fire_scenario_id,
-                "Lean FIRE",
                 2030,
                 "cash",
                 "-5000.00",
                 "Home renovation",
-                loan_id,
-            ),
-        ),
-        fire_expense_exclusions=(
-            FireExpenseExclusionRow(
-                fire_exclusion_id,
-                fire_archived_id,
-                "Coast plan",
-                category_id,
-                "Food",
             ),
         ),
     )
@@ -657,7 +602,7 @@ def test_v1_3_requires_the_estimate_column() -> None:
     output = io.StringIO(newline="")
     csv.writer(output, lineterminator="\r\n").writerows(rows)
     files["networth_items.csv"] = output.getvalue().encode("utf-8")
-    parsed, errors = parse_archive(_rewrite(files))
+    parsed, errors = parse_archive(_rewrite(files, format_version="1.2"))
     assert parsed is None
     assert any(error.message == "invalid or missing header" for error in errors)
 
@@ -737,10 +682,8 @@ def test_v1_6_workspace_adds_the_rate_segment_type() -> None:
     ]
     assert [row.interest_only_months for row in parsed.rows.loans] == [0, 0, 0]
     assert parsed.rows.loan_transfers == ()
-    assert parsed.rows.fire_scenarios == ()
-    assert parsed.rows.fire_contributions == ()
+    assert parsed.rows.fire_plan is None
     assert parsed.rows.fire_events == ()
-    assert parsed.rows.fire_expense_exclusions == ()
 
 
 def test_v1_7_workspace_adds_loan_transfers() -> None:
@@ -759,44 +702,51 @@ def test_v1_7_workspace_adds_loan_transfers() -> None:
     assert transfer.date == "2026-01-15"
     assert transfer.amount == "50000.00"
     assert transfer.note == "First tranche"
-    assert parsed.rows.fire_scenarios == ()
-    assert parsed.rows.fire_contributions == ()
+    assert parsed.rows.fire_plan is None
     assert parsed.rows.fire_events == ()
-    assert parsed.rows.fire_expense_exclusions == ()
 
 
-def test_v1_8_workspace_carries_fire_scenarios_and_children() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+def test_v1_8_workspace_upgrades_to_one_plan_and_events() -> None:
+    parsed, errors = parse_archive(GOLDEN_V1_8.read_bytes())
     assert errors == ()
-    assert parsed is not None and parsed.warnings == ()
+    assert parsed is not None
     assert parsed.manifest["format_version"] == "1.8"
-    assert [row.name for row in parsed.rows.fire_scenarios] == ["Lean FIRE", "Coast plan"]
-    assert parsed.rows.fire_scenarios[0].rule == "swr"
-    assert parsed.rows.fire_scenarios[0].swr_bp == 400
-    assert parsed.rows.fire_scenarios[0].income_manual == "3000.00"
-    assert parsed.rows.fire_scenarios[1].income_mode == "trailing_12m"
-    assert parsed.rows.fire_scenarios[1].income_fallback == "2500.00"
-    assert parsed.rows.fire_scenarios[1].archived_at == "2026-09-30T20:00:00Z"
-    assert parsed.rows.fire_contributions[0].net_amount == "1200.00"
-    assert parsed.rows.fire_events[0].amount == "-5000.00"
-    assert parsed.rows.fire_events[0].source_loan_id == ("d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a")
-    assert parsed.rows.fire_expense_exclusions[0].category == "Food"
-    assert parsed.rows.loan_transfers[0].note == "First tranche"
+    plan = parsed.rows.fire_plan
+    assert plan is not None
+    assert plan.id == "d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f"
+    assert plan.rule == "swr"
+    assert plan.swr_bp == 400
+    assert plan.income == "3000.00"
+    assert plan.expenses == "2000.00"
+    assert plan.portfolio == "100000.00"
+    assert plan.needs_review == "true"
+    assert [(row.year, row.kind, row.amount) for row in parsed.rows.fire_events] == [
+        (2027, "saving_override", "1200.00"),
+    ]
+    codes = [warning.message for warning in parsed.warnings]
+    assert "legacy FIRE scenarios skipped" in codes
+    assert "FIRE loan payoff events were removed" in codes
+    assert "FIRE contribution overrides became saving overrides" in codes
 
 
-def test_fire_files_are_required_in_1_8_and_absent_before_it() -> None:
-    from assetboard.domain.archive import FIRE_CSV_FILES, required_files
+def test_fire_files_are_required_in_2_0_and_legacy_files_before_it() -> None:
+    from assetboard.domain.archive import LEGACY_FIRE_CSV_FILES, required_files
 
-    assert not any(name in required_files("1.6") for name in FIRE_CSV_FILES)
-    assert not any(name in required_files("1.7") for name in FIRE_CSV_FILES)
-    assert all(name in required_files("1.8") for name in FIRE_CSV_FILES)
-    for missing in FIRE_CSV_FILES:
+    assert not any(name in required_files("1.6") for name in LEGACY_FIRE_CSV_FILES)
+    assert not any(name in required_files("1.7") for name in LEGACY_FIRE_CSV_FILES)
+    assert all(name in required_files("1.8") for name in LEGACY_FIRE_CSV_FILES)
+    assert all(name in required_files("2.0") for name in ("fire_plan.csv", "fire_events.csv"))
+    assert not any(
+        name in required_files("2.0")
+        for name in ("fire_scenarios.csv", "fire_contributions.csv", "fire_expense_exclusions.csv")
+    )
+    for missing in ("fire_plan.csv", "fire_events.csv"):
         with ZipFile(io.BytesIO(_archive())) as source:
-            files = {name: source.read(name) for name in source.namelist() if name != missing}
+            members = {name: source.read(name) for name in source.namelist() if name != missing}
         output = io.BytesIO()
         with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-            for name, content in files.items():
-                archive.writestr(name, content)
+            for name, data in members.items():
+                archive.writestr(name, data)
         parsed, errors = parse_archive(output.getvalue())
         assert parsed is None
         assert errors == (ArchiveError("archive", "missing required members"),)
@@ -808,340 +758,6 @@ def _edit_csv(files: dict[str, bytes], name: str, row: int, column: str, value: 
     output = io.StringIO(newline="")
     csv.writer(output, lineterminator="\r\n").writerows(rows)
     files[name] = output.getvalue().encode()
-
-
-@pytest.mark.parametrize(
-    ("name", "row", "column", "value"),
-    [
-        ("fire_scenarios.csv", 0, "income_mode", "linked"),
-        ("fire_scenarios.csv", 0, "expenses_mode", "trailing_12m"),
-        ("fire_scenarios.csv", 0, "portfolio_mode", "linked_investable"),
-        ("fire_scenarios.csv", 0, "rule", "invalid"),
-        ("fire_scenarios.csv", 0, "inflation_bp", "5001"),
-        ("fire_scenarios.csv", 0, "inflation_bp", "-2001"),
-        ("fire_scenarios.csv", 0, "birth_year", "2200"),
-        ("fire_scenarios.csv", 0, "horizon_age", "0"),
-        ("fire_scenarios.csv", 0, "stop_working_age", "40"),
-        ("fire_scenarios.csv", 0, "currency", "EURO"),
-        ("fire_scenarios.csv", 0, "id", "not-a-uuid"),
-        ("fire_scenarios.csv", 0, "archived_at", "2026-09-30T20:00:00"),
-        ("fire_scenarios.csv", 0, "income_manual", "3000.001"),
-        ("fire_scenarios.csv", 0, "income_fallback", "1.00"),
-        ("fire_scenarios.csv", 0, "swr_bp", ""),
-        ("fire_scenarios.csv", 1, "swr_bp", "400"),
-        ("fire_scenarios.csv", 1, "income_manual", "1.00"),
-        ("fire_scenarios.csv", 1, "income_fallback", "-1.00"),
-        ("fire_scenarios.csv", 1, "is_default", "true"),
-        ("fire_contributions.csv", 0, "year", "2026"),
-        ("fire_contributions.csv", 0, "net_amount", "12.345"),
-        ("fire_contributions.csv", 0, "scenario", "Different"),
-        ("fire_events.csv", 0, "kind", "transfer"),
-        ("fire_events.csv", 0, "year", "2025"),
-        ("fire_events.csv", 0, "amount", "12.345"),
-        ("fire_events.csv", 0, "label", ""),
-        ("fire_events.csv", 0, "source_loan_id", "not-a-uuid"),
-        ("fire_expense_exclusions.csv", 0, "category", "Different"),
-        ("fire_expense_exclusions.csv", 0, "category_id", "not-a-uuid"),
-    ],
-)
-def test_reader_validates_fire_rows(name: str, row: int, column: str, value: str) -> None:
-    files = _files()
-    _edit_csv(files, name, row, column, value)
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and errors, (name, column, value)
-    assert any(error.file == name for error in errors), (name, column, value)
-
-
-@pytest.mark.parametrize(
-    ("name", "row", "column", "value", "expected_column", "message"),
-    [
-        ("fire_scenarios.csv", 0, "income_manual", "", None, "missing manual FIRE amount"),
-        (
-            "fire_scenarios.csv",
-            0,
-            "income_fallback",
-            "1.00",
-            None,
-            "fallback for a manual FIRE input",
-        ),
-        (
-            "fire_scenarios.csv",
-            1,
-            "income_manual",
-            "1.00",
-            None,
-            "manual value for a linked FIRE input",
-        ),
-        ("fire_scenarios.csv", 0, "swr_bp", "", None, "invalid FIRE withdrawal rate"),
-        ("fire_scenarios.csv", 1, "swr_bp", "400", None, "invalid FIRE withdrawal rate"),
-        ("fire_scenarios.csv", 1, "is_default", "true", None, "archived default scenario"),
-        (
-            "fire_scenarios.csv",
-            0,
-            "stop_working_age",
-            "40",
-            None,
-            "invalid FIRE stop-working age",
-        ),
-        ("fire_scenarios.csv", 0, "horizon_age", "0", "horizon_age", "invalid age"),
-        ("fire_scenarios.csv", 0, "currency", "EURO", "currency", "invalid currency"),
-        (
-            "fire_contributions.csv",
-            0,
-            "year",
-            "2026",
-            None,
-            "FIRE contribution outside the plan window",
-        ),
-        ("fire_contributions.csv", 0, "net_amount", "12.345", "net_amount", "too many decimals"),
-        (
-            "fire_contributions.csv",
-            0,
-            "scenario",
-            "Different",
-            None,
-            "FIRE scenario reference mismatch",
-        ),
-        (
-            "fire_events.csv",
-            0,
-            "year",
-            "2025",
-            None,
-            "FIRE event outside the plan window",
-        ),
-        ("fire_events.csv", 0, "amount", "12.345", "amount", "too many decimals"),
-        ("fire_events.csv", 0, "label", "", "label", "required value missing"),
-        (
-            "fire_expense_exclusions.csv",
-            0,
-            "category",
-            "Different",
-            None,
-            "FIRE exclusion category mismatch",
-        ),
-    ],
-)
-def test_reader_reports_the_fire_file_column_and_message(
-    name: str, row: int, column: str, value: str, expected_column: str | None, message: str
-) -> None:
-    files = _files()
-    _edit_csv(files, name, row, column, value)
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None
-    error = next(error for error in errors if error.message == message)
-    assert error.file == name
-    assert error.column == expected_column
-
-
-def test_reader_accepts_a_fire_scenario_currency_different_from_the_base() -> None:
-    files = _files()
-    _edit_csv(files, "fire_scenarios.csv", 0, "currency", "USD")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert errors == () and parsed is not None
-    assert parsed.rows.fire_scenarios[0].currency == "USD"
-
-
-def test_reader_accepts_an_unusable_exclusion_category_for_restore_handling() -> None:
-    # A wrong-kind category is not an archive error: restore skips the exclusion with a warning
-    # and falls linked expenses back, as the reader cannot repair the user's data.
-    files = _files()
-    _edit_csv(files, "categories.csv", 0, "kind", "income")
-    _edit_csv(files, "transactions.csv", 0, "direction", "income")
-    _edit_csv(files, "budget_lines.csv", 0, "kind", "income")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert errors == () and parsed is not None
-    assert parsed.rows.categories[0].kind == "income"
-
-    # A non-regular treatment is likewise accepted; only the companion name must match.
-    files = _files()
-    _edit_csv(files, "categories.csv", 0, "treatment", "savings")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert errors == () and parsed is not None
-
-    files = _files()
-    _edit_csv(files, "fire_expense_exclusions.csv", 0, "category", "Different")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None
-    assert any(
-        error.file == "fire_expense_exclusions.csv"
-        and error.message == "FIRE exclusion category mismatch"
-        for error in errors
-    )
-
-
-def test_reader_rejects_duplicate_fire_ids_names_defaults_and_children() -> None:
-    files = _files()
-    _edit_csv(files, "fire_scenarios.csv", 1, "id", "d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(error.message == "duplicate FIRE scenario id" for error in errors)
-
-    files = _files()
-    _edit_csv(files, "fire_scenarios.csv", 1, "archived_at", "")
-    _edit_csv(files, "fire_scenarios.csv", 1, "name", "Lean FIRE")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(
-        error.message == "duplicate active FIRE scenario name" for error in errors
-    )
-
-    files = _files()
-    _edit_csv(files, "fire_scenarios.csv", 1, "is_default", "true")
-    _edit_csv(files, "fire_scenarios.csv", 1, "archived_at", "")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(error.message == "duplicate default scenario" for error in errors)
-
-    files = _files()
-    _edit_csv(files, "fire_scenarios.csv", 1, "is_default", "true")
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(error.message == "archived default scenario" for error in errors)
-
-    files = _files()
-    header, row = files["fire_contributions.csv"].splitlines()[:2]
-    files["fire_contributions.csv"] = header + b"\r\n" + row + b"\r\n" + row + b"\r\n"
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(
-        error.message == "duplicate FIRE contribution id" for error in errors
-    )
-
-    files = _files()
-    _edit_csv(files, "fire_expense_exclusions.csv", 0, "category_id", str(uuid4()))
-    parsed, errors = parse_archive(_rewrite(files))
-    assert errors == () and parsed is not None
-
-    files = _files()
-    header, row = files["fire_expense_exclusions.csv"].splitlines()[:2]
-    files["fire_expense_exclusions.csv"] = header + b"\r\n" + row + b"\r\n" + row + b"\r\n"
-    parsed, errors = parse_archive(_rewrite(files))
-    assert parsed is None and any(
-        error.message == "duplicate FIRE exclusion id" for error in errors
-    )
-
-
-def test_loan_files_are_optional_before_1_5_and_required_in_1_5() -> None:
-    from assetboard.domain.archive import required_files
-
-    assert "loans.csv" not in required_files("1.4")
-    assert "installment_plans.csv" not in required_files("1.4")
-    for name in (
-        "loans.csv",
-        "loan_rate_changes.csv",
-        "reference_rates.csv",
-        "reference_rate_values.csv",
-        "loan_cost_components.csv",
-        "loan_overpayments.csv",
-        "loan_payments.csv",
-        "loan_balance_checkpoints.csv",
-        "loan_scenarios.csv",
-        "installment_plans.csv",
-    ):
-        assert name in required_files("1.5")
-
-
-def test_v1_5_requires_every_loan_file() -> None:
-    with ZipFile(io.BytesIO(_archive())) as source:
-        files = {name: source.read(name) for name in source.namelist() if name != "loans.csv"}
-    output = io.BytesIO()
-    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-        for name, content in files.items():
-            archive.writestr(name, content)
-    parsed, errors = parse_archive(output.getvalue())
-    assert parsed is None
-    assert errors == (ArchiveError("archive", "missing required members"),)
-
-
-@pytest.mark.parametrize(
-    ("key", "value", "valid"),
-    [
-        ("taxes_enabled", False, True),
-        ("taxes_enabled", "yes", False),
-        ("taxes_enabled", 1, False),
-        ("upcoming_days", None, True),
-        ("upcoming_days", 1, True),
-        ("upcoming_days", 365, True),
-        ("upcoming_days", 0, False),
-        ("upcoming_days", 366, False),
-        ("upcoming_days", True, False),
-        ("upcoming_days", "14", False),
-    ],
-)
-def test_reader_validates_the_1_1_workspace_keys(key: str, value: object, valid: bool) -> None:
-    import json
-
-    files = _files()
-    workspace = json.loads(files["workspace.json"])
-    workspace[key] = value
-    files["workspace.json"] = json.dumps(workspace).encode()
-    parsed, errors = parse_archive(_rewrite(files))
-    assert (parsed is not None) is valid
-    if not valid:
-        assert errors == (ArchiveError("workspace.json", "invalid workspace settings"),)
-
-
-def test_reader_checks_checksums() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
-    assert errors == ()
-    assert parsed is not None
-    assert parsed.manifest["base_currency"] == "EUR"
-
-    with ZipFile(GOLDEN) as source:
-        files = {name: source.read(name) for name in source.namelist()}
-    files["categories.csv"] = files["categories.csv"].replace(b"Food", b"Meal")
-    corrupted = io.BytesIO()
-    with ZipFile(corrupted, "w", ZIP_DEFLATED) as archive:
-        for name, content in files.items():
-            archive.writestr(name, content)
-    parsed, errors = parse_archive(corrupted.getvalue())
-    assert parsed is None
-    assert any(error.message == "checksum mismatch" for error in errors)
-
-
-def test_investment_and_loan_models_are_archived_in_1_5() -> None:
-    for model in (
-        "AssetClass",
-        "RiskTargetPolicy",
-        "Instrument",
-        "InstrumentAllocation",
-        "InvestmentTransaction",
-        "BondTerms",
-        "PricePoint",
-        "FxRate",
-        "PriceSourceConfig",
-        "ReferenceRate",
-        "ReferenceRateValue",
-        "Loan",
-        "LoanRateChange",
-        "LoanTransfer",
-        "LoanCostComponent",
-        "LoanOverpayment",
-        "LoanPayment",
-        "LoanBalanceCheckpoint",
-        "LoanScenario",
-        "InstallmentPlan",
-    ):
-        assert model in ARCHIVE_INCLUDED_MODELS
-    assert "ProviderError" in ARCHIVE_EXCLUDED_MODELS
-
-
-def test_fire_models_are_archived() -> None:
-    for model in (
-        "FireScenario",
-        "FireContribution",
-        "FireEvent",
-        "FireExpenseExclusion",
-    ):
-        assert model in ARCHIVE_INCLUDED_MODELS
-        assert model not in ARCHIVE_EXCLUDED_MODELS
-
-
-def test_every_workspace_owned_model_is_archived_or_excluded() -> None:
-    owned = {
-        mapper.class_
-        for mapper in Base.registry.mappers
-        if issubclass(mapper.class_, WorkspaceOwned)
-    }
-    owned_names = {model.__name__ for model in owned}
-    assert ARCHIVE_INCLUDED_MODELS | set(ARCHIVE_EXCLUDED_MODELS) == owned_names
-    assert not (ARCHIVE_INCLUDED_MODELS & set(ARCHIVE_EXCLUDED_MODELS))
 
 
 def _rewrite(members: dict[str, bytes], **manifest_changes: object) -> bytes:
@@ -1174,6 +790,77 @@ def _files() -> dict[str, bytes]:
     return build_files(_rows())
 
 
+@pytest.mark.parametrize(
+    ("name", "row", "column", "value"),
+    [
+        ("fire_plan.csv", 0, "rule", "invalid"),
+        ("fire_plan.csv", 0, "inflation_bp", "5001"),
+        ("fire_plan.csv", 0, "inflation_bp", "-2001"),
+        ("fire_plan.csv", 0, "birth_year", "2200"),
+        ("fire_plan.csv", 0, "birth_year", "2190"),
+        ("fire_plan.csv", 0, "horizon_age", "0"),
+        ("fire_plan.csv", 0, "stop_working_age", "121"),
+        ("fire_plan.csv", 0, "currency", "EURO"),
+        ("fire_plan.csv", 0, "id", "not-a-uuid"),
+        ("fire_plan.csv", 0, "income", "3000.001"),
+        ("fire_plan.csv", 0, "needs_review", "maybe"),
+        ("fire_events.csv", 0, "kind", "transfer"),
+        ("fire_events.csv", 0, "year", "1899"),
+        ("fire_events.csv", 0, "year", "2076"),
+        ("fire_events.csv", 0, "amount", "12.345"),
+        ("fire_events.csv", 0, "label", ""),
+        ("fire_events.csv", 0, "id", "not-a-uuid"),
+    ],
+)
+def test_reader_validates_fire_rows(name: str, row: int, column: str, value: str) -> None:
+    files = _files()
+    _edit_csv(files, name, row, column, value)
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None and errors, (name, column, value)
+    assert any(error.file == name for error in errors), (name, column, value)
+
+
+def test_reader_rejects_two_fire_plans_and_duplicate_saving_overrides() -> None:
+    files = _files()
+    plan_lines = files["fire_plan.csv"].splitlines(keepends=True)
+    files["fire_plan.csv"] = plan_lines[0] + plan_lines[1] + plan_lines[1]
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "more than one FIRE plan" for error in errors)
+
+    files = _files()
+    _edit_csv(files, "fire_events.csv", 1, "year", "2027")
+    _edit_csv(files, "fire_events.csv", 1, "kind", "saving_override")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "duplicate FIRE saving override" for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("name", "row", "column", "value", "expected_column", "message"),
+    [
+        ("fire_plan.csv", 0, "income", "", "income", "required value missing"),
+        ("fire_plan.csv", 0, "income", "12.345", "income", "too many decimals"),
+        ("fire_events.csv", 0, "year", "2076", None, "FIRE event outside the plan window"),
+        ("fire_events.csv", 0, "label", "", "label", "required value missing"),
+        ("fire_events.csv", 0, "amount", "12.345", "amount", "too many decimals"),
+    ],
+)
+def test_reader_reports_the_fire_file_column_and_message(
+    name: str, row: int, column: str, value: str, expected_column: str | None, message: str
+) -> None:
+    files = _files()
+    _edit_csv(files, name, row, column, value)
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(
+        error.file == name
+        and error.message == message
+        and (expected_column is None or error.column == expected_column)
+        for error in errors
+    ), (name, column, value, errors)
+
+
 def test_reader_checks_counts_currency_and_versions() -> None:
     import json
 
@@ -1194,7 +881,7 @@ def test_reader_checks_counts_currency_and_versions() -> None:
     assert parsed is None and any(e.message == "row count mismatch" for e in errors)
     for changes, message in [
         ({"base_currency": "PLN"}, "base currency differs from manifest"),
-        ({"format_version": "2.0"}, "made by a newer version of the app"),
+        ({"format_version": "3.0"}, "made by a newer version of the app"),
         ({"format_version": "0.9"}, "unsupported archive version"),
     ]:
         parsed, errors = parse_archive(_rewrite(files, **changes))
@@ -1206,12 +893,12 @@ def test_reader_accepts_reordered_columns_bom_defaults_and_future_minor() -> Non
     files["categories.csv"] = (
         "\ufeffname,id,kind,future\nFood,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,expense,x\n"
     ).encode()
-    parsed, errors = parse_archive(_rewrite(files, format_version="1.9", future=True))
+    parsed, errors = parse_archive(_rewrite(files, format_version="2.1", future=True))
     assert not errors and parsed is not None
     assert parsed.rows.categories[0].treatment == "regular"
     assert parsed.rows.categories[0].sort_order == 0
     assert sorted(w.message for w in parsed.warnings) == [
-        "newer minor version: 1.9",
+        "newer minor version: 2.1",
         "unknown column: future",
         "unknown key: future",
     ]
@@ -1988,7 +1675,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 39)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 37)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 38)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 36)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

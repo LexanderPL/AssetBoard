@@ -296,20 +296,15 @@ def test_every_transaction_action_has_a_label_keys_and_a_group() -> None:
 # FIRE events (F8.1)
 
 FIRE_ACTIONS = {
-    "fire_scenario.created",
-    "fire_scenario.updated",
-    "fire_scenario.duplicated",
-    "fire_scenario.archived",
-    "fire_scenario.restored",
-    "fire_scenario.default_changed",
-    "fire_scenario.loan_payoff_event",
+    "fire_plan.created",
+    "fire_plan.updated",
+    "fire_plan.deleted",
+    "fire_plan.migrated",
 }
 
 
 def test_every_fire_action_has_a_label_keys_and_a_group() -> None:
-    assert {action for action in ACTION_LABELS if action.startswith("fire_scenario.")} == (
-        FIRE_ACTIONS
-    )
+    assert {action for action in ACTION_LABELS if action.startswith("fire_plan.")} == FIRE_ACTIONS
     assert set(GROUPS["workspace"]["fire"]) == FIRE_ACTIONS
     assert "fire" in GROUP_LABELS
     keys = {key for action in FIRE_ACTIONS for key in DATA_KEYS[action]}

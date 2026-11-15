@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "fire/_macros.html" import badge with context %}
+{% block title %}{{ _("Choose your FIRE plan") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Choose your FIRE plan") }}{% endblock %}
+{% block content %}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+<section class="panel p-6 sm:p-7" aria-labelledby="choose-heading" data-fire-choose>
+  <h2 id="choose-heading" class="text-base font-semibold">{{ _("This workspace has old FIRE scenarios") }}</h2>
+  <p class="mt-2 text-sm text-muted">{{ _("The FIRE planner now keeps one plan per workspace. Choose the scenario to keep; the other scenarios and their adjustments will be deleted. Before you confirm, download a backup from the workspace data page if you want a copy of the old scenarios.") }}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("The chosen plan will be converted to the one-plan format and marked for review. Linked values are resolved once during this conversion.") }}</p>
+
+  {% if can_edit %}
+  <form method="post" action="{{ scoped_url(request, 'fire_scenario_choose') }}" class="mt-5 space-y-4" data-fire-choose-form>
+    {{ csrf_input() }}
+    <ul class="divide-y divide-line">
+      {% for s in legacy %}
+      <li class="py-3" data-fire-legacy="{{ s.id }}">
+        <label class="flex items-start gap-3 text-sm">
+          <input type="radio" name="scenario_id" value="{{ s.id }}" class="mt-1 h-4 w-4 accent-primary" required>
+          <span class="min-w-0">
+            <span class="font-semibold">{{ s.name }}</span>
+            {% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}
+            {% if s.archived %}{{ badge(_("Archived")) }}{% endif %}
+            {% if s.invalid %}{{ badge(_("Needs attention"), "neutral") }}{% endif %}
+            <span class="mt-1 block text-xs text-muted">{{ _("Start year %(year)d · age %(age)d · %(currency)s · %(count)d adjustment(s)", year=s.start_year, age=s.age_at_start, currency=s.currency, count=s.event_count) }}</span>
+          </span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="confirm" value="1" class="mt-0.5 h-4 w-4 rounded border-line accent-primary" required> <span>{{ _("I understand that the other old FIRE scenarios and their adjustments will be deleted.") }}</span></label>
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" class="btn-primary" data-fire-choose-confirm>{{ _("Keep this plan and delete the others") }}</button>
+      <a href="{{ scoped_url(request, 'workspace_data') }}" class="btn">{{ _("Download a backup") }}</a>
+    </div>
+  </form>
+  {% else %}
+  <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-editor-required>{{ _("An editor or owner must choose one of these scenarios before the FIRE planner can be used.") }}</p>
+  <ul class="mt-4 divide-y divide-line">
+    {% for s in legacy %}
+    <li class="py-3 text-sm" data-fire-legacy="{{ s.id }}">
+      <span class="font-semibold">{{ s.name }}</span>
+      {% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}
+      {% if s.archived %}{{ badge(_("Archived")) }}{% endif %}
+      <span class="mt-1 block text-xs text-muted">{{ _("Start year %(year)d · age %(age)d · %(currency)s · %(count)d adjustment(s)", year=s.start_year, age=s.age_at_start, currency=s.currency, count=s.event_count) }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

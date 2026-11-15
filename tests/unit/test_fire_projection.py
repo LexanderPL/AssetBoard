@@ -18,7 +18,6 @@ import pytest
 
 from assetboard.domain.fire import (
     MAX_YEAR,
-    ContributionOverride,
     EventKind,
     FireProjectionError,
     Projection,
@@ -54,7 +53,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
     inflation = Fraction(10_000 + inputs.inflation_bp, 10_000)
     growth = Fraction(10_000 + inputs.income_growth_bp, 10_000)
 
-    overrides = {row.year: row.amount.amount_minor for row in inputs.contributions}
+    overrides: dict[int, int] = {}
     cash: defaultdict[int, int] = defaultdict(int)
     income_changes: defaultdict[int, int] = defaultdict(int)
     expense_changes: defaultdict[int, int] = defaultdict(int)
@@ -64,8 +63,10 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
             cash[event.year] += amount
         elif event.kind is EventKind.INCOME_CHANGE:
             income_changes[event.year] += amount
-        else:
+        elif event.kind is EventKind.EXPENSE_CHANGE:
             expense_changes[event.year] += amount
+        else:
+            overrides[event.year] = amount
 
     income_exact = Fraction(inputs.start_income.amount_minor)
     expenses_exact = Fraction(inputs.start_expenses.amount_minor)
@@ -253,9 +254,10 @@ _G2 = _variant(
     start_portfolio=_eur(1_000_000),
 )
 _G3 = _variant(
-    contributions=tuple(
-        ContributionOverride(
+    events=tuple(
+        ProjectionEvent(
             2027 + index,
+            EventKind.SAVING_OVERRIDE,
             _eur(amount),
         )
         for index, amount in enumerate(
@@ -377,11 +379,11 @@ def test_an_override_replaces_the_net_line_but_keeps_cash_and_shown_series() -> 
         start_income=_eur(100_000),
         start_expenses=_eur(40_000),
         start_portfolio=_eur(1_000_000),
-        contributions=(
-            ContributionOverride(2027, _eur(0)),
-            ContributionOverride(2028, _eur(-200_000)),
+        events=(
+            ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(0)),
+            ProjectionEvent(2028, EventKind.SAVING_OVERRIDE, _eur(-200_000)),
+            ProjectionEvent(2027, EventKind.CASH, _eur(50_000)),
         ),
-        events=(ProjectionEvent(2027, EventKind.CASH, _eur(50_000)),),
     )
     result = project(inputs)
     zero_override, negative_override = result.rows[1], result.rows[2]
@@ -465,11 +467,11 @@ def test_income_changes_continue_after_the_salary_stop() -> None:
     assert rows[2].income_stopped
 
 
-def test_start_year_income_is_paid_even_when_the_salary_stops_at_the_current_age() -> None:
+def test_start_year_income_is_zero_when_the_salary_stops_at_the_current_age() -> None:
     inputs = _edge(horizon_age=43, stop_working_age=41, start_income=_eur(100_000))
     rows = project(inputs).rows
-    # The spreadsheet always pays start_income in row 0; the stop applies from row 1.
-    assert rows[0].income == _eur(100_000)
+    # v2: income is paid only while age < stop age, including the current row.
+    assert rows[0].income == _eur(0)
     assert not rows[0].income_stopped
     assert rows[1].income == _eur(0)
     assert rows[1].income_stopped
@@ -480,8 +482,10 @@ def test_negative_overrides_and_series_are_not_clamped() -> None:
         horizon_age=43,
         start_income=_eur(100_000),
         start_expenses=_eur(50_000),
-        contributions=(ContributionOverride(2027, _eur(-300_000)),),
-        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),),
+        events=(
+            ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(-300_000)),
+            ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),
+        ),
     )
     rows = project(inputs).rows
     assert rows[0].expenses == _eur(-150_000)
@@ -540,8 +544,10 @@ def test_negative_opening_net_worth_blocks_the_fire_predicate() -> None:
         horizon_age=45,
         start_expenses=_eur(10_000),
         start_portfolio=_eur(100_000),
-        contributions=(ContributionOverride(2027, _eur(-200_000)),),
-        events=(ProjectionEvent(2028, EventKind.EXPENSE_CHANGE, _eur(-20_000)),),
+        events=(
+            ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(-200_000)),
+            ProjectionEvent(2028, EventKind.EXPENSE_CHANGE, _eur(-20_000)),
+        ),
     )
     result = project(inputs)
     assert result.rows[1].net_worth == _eur(-100_000)
@@ -695,7 +701,6 @@ def test_projection_returns_inputs_with_the_canonical_currency() -> None:
 def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
     hints = []
     for cls in (
-        ContributionOverride,
         ProjectionEvent,
         ProjectionInputs,
         ProjectionRow,
@@ -728,7 +733,6 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
             "horizon_age",
             "invalid_horizon",
         ),
-        ({"stop_working_age": 40}, "stop_working_age", "stop_before_age"),
         ({"stop_working_age": 121}, "stop_working_age", "invalid_stop_age"),
         ({"stop_working_age": -1}, "stop_working_age", "invalid_stop_age"),
         ({"stop_working_age": 55.0}, "stop_working_age", "invalid_stop_age"),
@@ -748,33 +752,37 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
         ({"start_expenses": _eur(MAX_AMOUNT_MINOR + 1)}, "start_expenses", "invalid_amount"),
         ({"start_portfolio": _eur(-1)}, "start_portfolio", "invalid_amount"),
         (
-            {"contributions": (ContributionOverride(2026, _eur(1)),)},
-            "contributions",
-            "rows_outside_window",
+            {"events": (ProjectionEvent(2026, EventKind.SAVING_OVERRIDE, _eur(1)),)},
+            "events",
+            "saving_override_current_year",
         ),
         (
-            {"contributions": (ContributionOverride(2076, _eur(1)),)},
-            "contributions",
+            {"events": (ProjectionEvent(2076, EventKind.SAVING_OVERRIDE, _eur(1)),)},
+            "events",
             "rows_outside_window",
         ),
         (
             {
-                "contributions": (
-                    ContributionOverride(2027, _eur(1)),
-                    ContributionOverride(2027, _eur(2)),
+                "events": (
+                    ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(1)),
+                    ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(2)),
                 )
             },
-            "contributions",
-            "duplicate_contribution_year",
+            "events",
+            "duplicate_saving_override",
         ),
         (
-            {"contributions": (ContributionOverride(2027, _eur(MAX_AMOUNT_MINOR + 1)),)},
-            "contributions",
+            {
+                "events": (
+                    ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(MAX_AMOUNT_MINOR + 1)),
+                )
+            },
+            "events",
             "invalid_amount",
         ),
         (
-            {"contributions": (ContributionOverride(2027, Money(1, "USD")),)},
-            "contributions",
+            {"events": (ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, Money(1, "USD")),)},
+            "events",
             "invalid_currency",
         ),
         (

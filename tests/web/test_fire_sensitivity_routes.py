@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import re
-from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
+
+from assetboard.db.models.fire import FireScenario
 from assetboard.db.models.identity import User, Workspace
-from assetboard.db.repositories import CategoryRepository, TransactionRepository
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 
 
 def _form(**overrides: str) -> dict[str, str]:
     data = {
-        "name": "Retire at 55",
         "birth_year": "1985",
         "inflation": "2.5",
         "real_return": "5",
@@ -22,14 +22,9 @@ def _form(**overrides: str) -> dict[str, str]:
         "horizon_age": "90",
         "rule": "returns_cover_expenses",
         "swr": "4",
-        "income_mode": "manual",
         "income_manual": "50000",
-        "expenses_mode": "manual",
         "expenses_manual": "30000",
-        "portfolio_mode": "manual",
         "portfolio_manual": "1000000",
-        "contribution_year_1": "",
-        "contribution_amount_1": "",
         "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",
@@ -41,9 +36,17 @@ def _form(**overrides: str) -> dict[str, str]:
 
 
 def _create(owner, **overrides: str) -> UUID:
-    response = owner.post("/fire", _form(**overrides), token_from="/fire/new")
+    response = owner.post("/fire", _form(), token_from="/fire")
     assert response.status_code == 303, response.text
-    return UUID(response.headers["location"].split("?")[0].rsplit("/", 1)[-1])
+    plan_id = UUID(response.headers["location"].split("?")[0].rsplit("/", 1)[-1])
+    if overrides:
+        response = owner.post(
+            f"/fire/{plan_id}",
+            _form(**overrides),
+            token_from=f"/fire/{plan_id}?edit=1",
+        )
+        assert response.status_code == 303, response.text
+    return plan_id
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -68,34 +71,6 @@ def _context(owner, role: Role = Role.OWNER) -> Context:
             ),
             role=role,
             clock=owner.app.state.clock,
-        )
-
-
-def _category(owner, name: str) -> UUID:
-    with owner.app.state.session_factory.begin() as session:
-        row = CategoryRepository(session, _context(owner)).create(
-            name=name,
-            name_key=name.casefold(),
-            kind="expense",
-            treatment="regular",
-            color="#16a34a",
-            sort_order=0,
-        )
-        return row.id
-
-
-def _spend(owner, category_id: UUID, amount_minor: int) -> None:
-    with owner.app.state.session_factory.begin() as session:
-        TransactionRepository(session, _context(owner)).create(
-            direction="expense",
-            day=date(2026, 2, 10),
-            amount_minor=amount_minor,
-            currency="EUR",
-            category_id=category_id,
-            description="Synthetic",
-            description_key="synthetic",
-            source="manual",
-            created_by_user_id=None,
         )
 
 
@@ -206,30 +181,34 @@ def test_no_js_fallback_server_renders_the_loaded_grid(owner) -> None:
     assert page.text.index("data-fire-sensitivity-grid") > form_end
 
 
-def test_linked_expenses_and_exclusions_resolve_for_the_base_cell(owner) -> None:
-    counted = _category(owner, "Test groceries")
-    excluded = _category(owner, "Test unusual")
-    _spend(owner, counted, 100_000)
-    _spend(owner, excluded, 50_000)
-    scenario_id = _create(
-        owner,
-        expenses_mode="trailing_12m",
-        expenses_manual="",
-        **{"expense_exclusion": str(excluded)},
+def test_a_saving_override_changes_the_base_cell(owner) -> None:
+    plan_id = _create(owner, real_return="2", expenses_manual="50000", portfolio_manual="300000")
+    before = _base_age(owner.client.get(f"/fire/{plan_id}/sensitivity").text)
+    response = owner.post(
+        f"/fire/{plan_id}",
+        _form(
+            event_year_1="2027",
+            event_kind_1="saving_override",
+            event_amount_1="-5000000",
+            event_label_1="Sabbatical",
+        ),
+        token_from=f"/fire/{plan_id}?edit=1",
     )
-    results = owner.client.get(f"/fire/{scenario_id}").text
-    fragment = owner.client.get(f"/fire/{scenario_id}/sensitivity")
-    assert fragment.status_code == 200
-    assert "data-fire-sensitivity-grid" in fragment.text
-    assert _base_age(fragment.text) == _fire_age(results)
+    assert response.status_code == 303
+    after = _base_age(owner.client.get(f"/fire/{plan_id}/sensitivity").text)
+    assert after != before
 
 
 def test_a_blocked_scenario_shows_the_block_panel_without_a_grid(owner) -> None:
-    scenario_id = _create(owner, income_mode="trailing_12m")
-    fragment = owner.client.get(f"/fire/{scenario_id}/sensitivity")
+    plan_id = _create(owner)
+    with owner.db() as session:
+        row = session.scalars(select(FireScenario).where(FireScenario.id == plan_id)).one()
+        row.currency = "USD"
+        session.commit()
+    fragment = owner.client.get(f"/fire/{plan_id}/sensitivity")
     assert fragment.status_code == 200
     assert "data-fire-sensitivity-blocked" in fragment.text
-    assert 'data-fire-sensitivity-block="no_income_data"' in fragment.text
+    assert 'data-fire-sensitivity-block="plan_currency_mismatch"' in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
     assert "Open plan inputs" in fragment.text
 
@@ -243,12 +222,13 @@ def test_an_extreme_base_return_shows_the_axis_error(owner) -> None:
     assert "data-fire-sensitivity-grid" not in fragment.text
 
 
-def test_archived_scenarios_and_viewers_can_load_the_grid(owner) -> None:
-    scenario_id = _create(owner)
-    archived = owner.post(f"/fire/{scenario_id}/archive", token_from=f"/fire/{scenario_id}")
-    assert archived.status_code == 303
+def test_viewers_can_load_the_grid(owner) -> None:
+    plan_id = _create(owner)
     owner.set_admin_role("viewer")
-    fragment = owner.client.get(f"/fire/{scenario_id}/sensitivity")
-    assert fragment.status_code == 200
-    assert "data-fire-sensitivity-grid" in fragment.text
-    assert "data-fire-sensitivity-error" not in fragment.text
+    try:
+        fragment = owner.client.get(f"/fire/{plan_id}/sensitivity")
+        assert fragment.status_code == 200
+        assert "data-fire-sensitivity-grid" in fragment.text
+        assert "data-fire-sensitivity-error" not in fragment.text
+    finally:
+        owner.set_admin_role("owner")

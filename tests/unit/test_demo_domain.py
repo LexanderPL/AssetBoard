@@ -113,9 +113,7 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         "LoanPayment",
         "InstallmentPlan",
         "FireScenario",
-        "FireContribution",
         "FireEvent",
-        "FireExpenseExclusion",
     }
     assert all(reason.strip() for reason in DEMO_EXCLUDED_MODELS.values())
     assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"
@@ -123,7 +121,7 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         DEMO_EXCLUDED_MODELS["LoanPayment"] == "actual payments are user records, not sample data"
     )
     assert (
-        DEMO_EXCLUDED_MODELS["FireScenario"] == "FIRE scenarios are user what-ifs, not sample data"
+        DEMO_EXCLUDED_MODELS["FireScenario"] == "the FIRE plan is a user what-if, not sample data"
     )
 
 
