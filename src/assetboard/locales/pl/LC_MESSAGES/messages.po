@@ -6829,13 +6829,6 @@ msgstr ""
 "Aktywne kredyty są uwzględniane w planie po jego utworzeniu. Możesz "
 "zignorować kredyt w trybie edycji."
 
-msgid ""
-"Live loans are not part of the plan yet. Enter yearly expenses that "
-"include your loan payments."
-msgstr ""
-"Kredyty nie są jeszcze częścią planu. Wpisz roczne wydatki wraz z ratami "
-"kredytów."
-
 #, python-format
 msgid "Bar capped at 100%%, exact value %(value)s"
 msgstr "Pasek ograniczony do 100%%, dokładna wartość %(value)s"
@@ -14712,4 +14705,13 @@ msgstr "Usuń obszar roboczy…"
 #~ " 200 rocznie po spłacie kredytu; 500"
 #~ " rocznie dodatkowego dochodu z najmu; "
 #~ "korekta oszczędności na cały rok."
+
+#~ msgid ""
+#~ "Live loans are not part of the "
+#~ "plan yet. Enter yearly expenses that "
+#~ "include your loan payments."
+#~ msgstr ""
+#~ "Kredyty nie są jeszcze częścią planu."
+#~ " Wpisz roczne wydatki wraz z ratami"
+#~ " kredytów."
 

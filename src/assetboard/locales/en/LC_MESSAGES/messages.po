@@ -6297,11 +6297,6 @@ msgid ""
 "in edit mode."
 msgstr ""
 
-msgid ""
-"Live loans are not part of the plan yet. Enter yearly expenses that "
-"include your loan payments."
-msgstr ""
-
 #, python-format
 msgid "Bar capped at 100%%, exact value %(value)s"
 msgstr ""
@@ -13868,5 +13863,11 @@ msgstr ""
 #~ "Active loans are not listed during "
 #~ "setup yet. They will be included "
 #~ "in the plan after you create it."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Live loans are not part of the "
+#~ "plan yet. Enter yearly expenses that "
+#~ "include your loan payments."
 #~ msgstr ""
 
