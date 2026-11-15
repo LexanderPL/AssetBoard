@@ -146,4 +146,33 @@
   for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
     document.addEventListener(eventName, syncPreviewError);
   }
+
+  // F8.14: the withdrawal rate applies only to the withdrawal-rate rule. The server renders the
+  // field visible so a no-JavaScript user can still use it; this script hides and disables it for
+  // the other rule. The server ignores a valid posted rate for a non-SWR rule.
+  function syncSwrFields() {
+    document.querySelectorAll("[data-fire-swr-field]").forEach((wrapper) => {
+      if (!(wrapper instanceof HTMLElement)) return;
+      const owner = wrapper.closest("form");
+      const rule = owner?.querySelector('select[name="rule"]');
+      const input = wrapper.querySelector('input[name="swr"]');
+      if (!(rule instanceof HTMLSelectElement) || !(input instanceof HTMLInputElement)) return;
+      const active = rule.value === "swr";
+      wrapper.hidden = !active;
+      // Tailwind's `.grid` would override the user-agent `[hidden]` rule, so toggle the utility
+      // class as well; the attribute keeps the semantic state for tests and assistive technology.
+      wrapper.classList.toggle("hidden", !active);
+      input.disabled = !active;
+    });
+  }
+
+  document.querySelectorAll("[data-fire-form], [data-fire-wizard-form]").forEach((element) => {
+    element.addEventListener("change", (event) => {
+      if (event.target instanceof HTMLSelectElement && event.target.name === "rule") {
+        syncSwrFields();
+      }
+    });
+  });
+
+  syncSwrFields();
 })();
