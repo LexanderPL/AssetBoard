@@ -185,6 +185,11 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-basis-toggle]")).to_have_count(0)
             expect(page.get_by_text("Plan progress")).to_be_visible()
             expect(page.get_by_text("Sheet progress")).to_have_count(0)
+            fire_number = page.locator("[data-fire-number]")
+            fire_year = fire_number.get_attribute("data-fire-number-year")
+            assert fire_year
+            expect(fire_number).to_contain_text(f"({fire_year})")
+            expect(page.get_by_text("Today's money")).to_have_count(0)
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
             ).to_have_attribute("data-chart-ready", "true")

@@ -611,6 +611,34 @@ def test_zero_expenses_with_a_positive_rate_give_a_zero_fire_number() -> None:
     # The FIRE row's net worth is zero, so progress has no positive denominator.
     assert result.plan_progress_bp is None
 
+    returns_zero = _edge(
+        horizon_age=43,
+        real_return_bp=1_000,
+        start_expenses=_eur(0),
+        start_portfolio=_eur(1_000_000),
+    )
+    result = project(returns_zero)
+    assert result.fire_index == 0
+    assert result.fire_number == _eur(0)
+
+
+def test_negative_fire_row_expenses_keep_a_negative_target_unclamped() -> None:
+    result = project(
+        _edge(
+            horizon_age=43,
+            rule=Rule.SWR,
+            swr_bp=400,
+            start_expenses=_eur(100_000),
+            start_portfolio=_eur(1_000_000),
+            events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-500_000)),),
+        )
+    )
+    assert result.fire_index == 0
+    # -400,000 / 4% = -10,000,000: the literal metric is not clamped to zero.
+    assert result.fire_number == _eur(-10_000_000)
+    # The row's net worth is the starting portfolio (no gain or cash), so progress is 100%.
+    assert result.plan_progress_bp == 10_000
+
 
 def test_plan_progress_uses_the_starting_portfolio_not_the_first_row() -> None:
     result = project(_BASE)

@@ -113,6 +113,7 @@ def test_the_metrics_show_fire_number_with_year_and_plan_progress(owner) -> None
     assert 'data-fire-progress="sheet"' not in page.text
     assert "FIRE number" in page.text
     assert "Plan progress" in page.text
+    assert "projected nominal net worth at FIRE" in page.text
     assert "All amounts are nominal" in page.text
     assert "Nominal amounts. The first age after income stops" in page.text
     assert "Sheet progress" not in page.text
@@ -127,6 +128,42 @@ def test_a_never_fire_plan_shows_dashes_and_the_reason(owner) -> None:
     assert "data-fire-never" in page.text
     assert "data-fire-number-note" not in page.text
     assert "With these inputs, returns never cover expenses" in page.text
+
+
+def test_plan_progress_shows_the_exact_percentage_and_caps_the_bar(owner) -> None:
+    plan_id = _create(
+        owner,
+        income_manual="0",
+        expenses_manual="1000000",
+        portfolio_manual="10000000",
+    )
+    with owner.db() as session, session.begin():
+        session.add_all(
+            [
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2027,
+                    kind="cash",
+                    amount_minor=-800_000_000,
+                    label="Large one-off expense",
+                ),
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2028,
+                    kind="expense_change",
+                    amount_minor=-90_000_000,
+                    label="Lower expenses",
+                ),
+            ]
+        )
+    page = owner.client.get("/fire")
+    # Starting portfolio / net worth at FIRE = 10,000,000 / 2,616,031.25 = 382.26%.
+    assert 'data-fire-progress="plan" data-progress-bp="38226"' in page.text
+    assert 'aria-valuetext="382.26%"' in page.text
+    assert 'aria-valuenow="100"' in page.text
+    assert 'width="100"' in page.text
 
 
 def test_the_view_has_no_real_money_or_spreadsheet_wording(owner) -> None:
