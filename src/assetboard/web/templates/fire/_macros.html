@@ -1,5 +1,12 @@
-{% macro hint(text) -%}
-<span class="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-line-strong align-middle text-xs font-semibold text-muted" tabindex="0" role="note" aria-label="{{ text }}" title="{{ text }}">?</span>
+{% macro hint(text, id=none) -%}
+<span{% if id %} id="{{ id }}"{% endif %} class="ml-1 inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-line-strong align-middle text-xs font-semibold text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary" tabindex="0" role="note" aria-label="{{ text }}" title="{{ text }}" data-fire-hint>?</span>
+{%- endmacro %}
+
+{% macro field_label(name, label, help=none) -%}
+<span class="flex flex-wrap items-center">
+  <label for="{{ name }}" class="text-sm font-medium">{{ label }}</label>
+  {% if help %}{{ hint(help, id=name ~ "-hint") }}{% endif %}
+</span>
 {%- endmacro %}
 
 {% macro badge(text, tone="neutral") -%}
@@ -11,6 +18,6 @@
 {% if error_field == field %}<span id="{{ field }}-error" class="text-sm text-danger" data-field-error="{{ field }}">{{ error }}</span>{% endif %}
 {%- endmacro %}
 
-{% macro field_attrs(error_field, field) -%}
-{% if error_field == field %} aria-invalid="true" aria-describedby="{{ field }}-error"{% endif %}
+{% macro field_attrs(error_field, field, described_by=none) -%}
+{% if error_field == field %} aria-invalid="true" aria-describedby="{{ field }}-error{% if described_by %} {{ described_by }}{% endif %}"{% elif described_by %} aria-describedby="{{ described_by }}"{% endif %}
 {%- endmacro %}

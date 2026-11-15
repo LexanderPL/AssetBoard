@@ -1,4 +1,4 @@
-{% from "fire/_macros.html" import field_attrs, field_error, hint with context %}
+{% from "fire/_macros.html" import field_attrs, field_error, field_label with context %}
 {% from "fire/_suggestion.html" import amount_suggestion, portfolio_suggestion with context %}
 {% set input_class = "form-control px-3 py-2" %}
 
@@ -7,20 +7,53 @@
     <div class="mt-4 grid gap-4 sm:grid-cols-2">
       <label class="grid gap-1 text-sm font-medium">{{ _("First projected year") }}<input value="{{ current_year }}" readonly class="{{ input_class }} font-normal text-muted"><span class="text-xs font-normal text-muted">{{ _("The projection always starts in the current calendar year.") }}</span></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Currency") }}<input value="{{ values.get('currency', currency) }}" readonly class="{{ input_class }} font-normal text-muted"><span class="text-xs font-normal text-muted">{{ _("Snapshotted from the workspace base currency when the plan is created.") }}</span></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Birth year") }} {{ hint(_("Used to turn plan years into ages. It is stored with the plan and prefilled from your profile.")) }}<input name="birth_year" value="{{ values.get('birth_year', '') }}" inputmode="numeric" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "birth_year") }}>{{ field_error(error_field, "birth_year", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. You can change it for this plan without changing your profile.") }}</span></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Horizon age") }} {{ hint(_("The last age shown in the projection. It defaults from your profile's life expectancy.")) }}<input name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>{{ field_error(error_field, "horizon_age", error) }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Income stops at age") }} {{ hint(_("The age at which income stops; from then on the plan spends from the portfolio. If this age is in the past, income is zero and the page explains it.")) }}<input name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>{{ field_error(error_field, "stop_working_age", error) }}</label>
+      <div class="grid gap-1" data-fire-field="birth_year">
+        {{ field_label("birth_year", _("Birth year")) }}
+        <input id="birth_year" name="birth_year" value="{{ values.get('birth_year', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "birth_year", "birth_year-source") }}>
+        {{ field_error(error_field, "birth_year", error) }}
+        <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="plan">{{ _("New plans prefill this from your profile. This plan keeps the birth year saved with it.") }}</span>
+      </div>
+      <div class="grid gap-1" data-fire-field="horizon_age">
+        {{ field_label("horizon_age", _("Horizon age")) }}
+        <input id="horizon_age" name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>
+        {{ field_error(error_field, "horizon_age", error) }}
+      </div>
+      <div class="grid gap-1" data-fire-field="stop_working_age">
+        {{ field_label("stop_working_age", _("Income stops at age")) }}
+        <input id="stop_working_age" name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>
+        {{ field_error(error_field, "stop_working_age", error) }}
+      </div>
     </div>
   </section>
 
   <section class="panel p-6 sm:p-7" aria-labelledby="assumptions-heading">
     <h2 id="assumptions-heading" class="text-base font-semibold">{{ _("Assumptions") }}</h2>
     <div class="mt-4 grid gap-4 sm:grid-cols-3">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Inflation (%%)") }} {{ hint(_("The yearly rise in prices. It reduces what the portfolio can buy.")) }}<input name="inflation" value="{{ values.get('inflation', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "inflation") }}>{{ field_error(error_field, "inflation", error) }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Return above inflation (%%)") }} {{ hint(_("The yearly investment return above inflation. The projection adds it to inflation to get the nominal gain rate. It is not a promise of future returns.")) }}<input name="real_return" value="{{ values.get('real_return', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "real_return") }}>{{ field_error(error_field, "real_return", error) }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Income growth (%%)") }} {{ hint(_("How much your income grows each year until it stops.")) }}<input name="income_growth" value="{{ values.get('income_growth', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_growth") }}>{{ field_error(error_field, "income_growth", error) }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Independence rule") }} {{ hint(_("Returns cover expenses: independent when the portfolio's return pays the inflated expenses. Withdrawal rate: independent when the portfolio is large enough for a chosen safe withdrawal rate.")) }}<select name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ field_error(error_field, "rule", error) }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Withdrawal rate (%%)") }} {{ hint(_("Only used with the withdrawal-rate rule. The share of the portfolio withdrawn in the first year of retirement. 4%% is a common example, not a rule.")) }}<input name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr") }}>{{ field_error(error_field, "swr", error) }}</label>
+      <div class="grid gap-1" data-fire-field="inflation">
+        {{ field_label("inflation", _("Inflation (%%)")) }}
+        <input id="inflation" name="inflation" value="{{ values.get('inflation', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "inflation") }}>
+        {{ field_error(error_field, "inflation", error) }}
+      </div>
+      <div class="grid gap-1" data-fire-field="real_return">
+        {{ field_label("real_return", _("Return above inflation (%%)"), _("Investment return after inflation. It is added to inflation; it is not a promise of future returns.")) }}
+        <input id="real_return" name="real_return" value="{{ values.get('real_return', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "real_return", "real_return-hint") }}>
+        {{ field_error(error_field, "real_return", error) }}
+      </div>
+      <div class="grid gap-1" data-fire-field="income_growth">
+        {{ field_label("income_growth", _("Income growth (%%)")) }}
+        <input id="income_growth" name="income_growth" value="{{ values.get('income_growth', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_growth") }}>
+        {{ field_error(error_field, "income_growth", error) }}
+      </div>
+      <div class="grid gap-1" data-fire-field="rule">
+        {{ field_label("rule", _("Independence rule"), _("Returns cover expenses compares the portfolio's return with expenses. Withdrawal rate uses the rate below.")) }}
+        <select id="rule" name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule", "rule-hint") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        {{ field_error(error_field, "rule", error) }}
+      </div>
+      <div class="grid gap-1" data-fire-field="swr" data-fire-swr-field>
+        {{ field_label("swr", _("Withdrawal rate (%%)"), _("Share of the portfolio withdrawn in the first year of retirement. 4%% is an example, not a rule.")) }}
+        <input id="swr" name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr", "swr-hint") }}>
+        {{ field_error(error_field, "swr", error) }}
+      </div>
     </div>
     <div class="mt-5 border-t border-line pt-4">
       <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="extreme_rates_confirmed" value="1"{% if values.get('extreme_rates_confirmed') == '1' %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{{ field_attrs(error_field, "extreme_rates_confirmed") }}> <span>{{ _("I confirm these unusual rates are intentional") }}<span class="block text-xs text-muted">{{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</span></span></label>
@@ -30,22 +63,33 @@
 
   <section id="amounts" class="panel p-6 sm:p-7" aria-labelledby="amounts-heading">
     <h2 id="amounts-heading" class="text-base font-semibold">{{ _("Starting amounts") }}</h2>
-    <p class="mt-1 text-sm text-muted">{{ _("All amounts are in %(currency)s and in the current year's money. Later years are projected in their own nominal money. Enter your after-tax income and expenses, including the taxes you actually pay and your loan payments.", currency=currency) }}</p>
+    <p class="mt-1 text-sm text-muted">{{ _("All amounts are in %(currency)s and in the current year's money. Later years are projected in their own nominal money. Income and expenses are the amounts recorded in your ledger. Income may be gross; expenses should include the taxes you actually pay and your loan payments. The planner does not model taxes separately.", currency=currency) }}</p>
     <div class="mt-4 grid gap-5 lg:grid-cols-2">
       <div class="grid content-start gap-3">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Annual income") }} {{ hint(_("Regular income you receive in the current year: earnings, dividends and interest. Use the after-tax amount.")) }}<input name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_manual") }}>{{ field_error(error_field, "income_manual", error) }}</label>
-        {% if suggestions %}{{ amount_suggestion(suggestions, "income_manual", "income", _("Suggested annual income"), locale, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("income_manual"), copy_input=suggested_inputs.get("income_manual")) }}{% endif %}
+        <div class="grid gap-1" data-fire-field="income_manual">
+          {{ field_label("income_manual", _("Annual income")) }}
+          <input id="income_manual" name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_manual") }}>
+          {{ field_error(error_field, "income_manual", error) }}
+        </div>
+        {% if suggestions %}{{ amount_suggestion(suggestions, "income_manual", "income", _("Suggested annual income"), locale, show_categories=true, categories_caption=_("Income by category in the window"), messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("income_manual"), copy_input=suggested_inputs.get("income_manual")) }}{% endif %}
       </div>
       <div class="grid content-start gap-3">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending in the current year, excluding savings and transfers. Include the taxes you actually pay and your loan payments; the planner will remove an included loan's payment after its payoff later.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}</label>
-        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("expenses_manual"), copy_input=suggested_inputs.get("expenses_manual"), scheduled_loan_total=loan_section.active_total_label if loan_section and loan_section.rows else none, scheduled_loan_count=loan_section.rows|length if loan_section else 0) }}{% endif %}
+        <div class="grid gap-1" data-fire-field="expenses_manual">
+          {{ field_label("expenses_manual", _("Annual expenses"), _("Include the taxes you actually pay and your loan payments.")) }}
+          <input id="expenses_manual" name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual", "expenses_manual-hint") }}>
+          {{ field_error(error_field, "expenses_manual", error) }}
+        </div>
+        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, categories_caption=_("Expenses by category in the window"), messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("expenses_manual"), copy_input=suggested_inputs.get("expenses_manual"), scheduled_loan_total=loan_section.active_total_label if loan_section and loan_section.rows else none, scheduled_loan_count=loan_section.rows|length if loan_section else 0) }}{% endif %}
       </div>
       <div class="grid content-start gap-3 lg:col-span-2">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets today: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal lg:max-w-[calc(50%-0.625rem)]"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}</label>
+        <div class="grid gap-1" data-fire-field="portfolio_manual">
+          {{ field_label("portfolio_manual", _("Starting portfolio")) }}
+          <input id="portfolio_manual" name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal lg:max-w-[calc(50%-0.625rem)]"{{ field_attrs(error_field, "portfolio_manual") }}>
+          {{ field_error(error_field, "portfolio_manual", error) }}
+        </div>
         {% if suggestions %}{{ portfolio_suggestion(suggestions, "portfolio_manual", locale, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("portfolio_manual"), copy_input=suggested_inputs.get("portfolio_manual")) }}{% endif %}
       </div>
     </div>
-    <p class="mt-4 text-xs text-muted">{{ _("A suggestion never fills a field by itself. Press Use suggested value to copy one, then change it if you want. The saved amount changes only when you press Save changes.") }}</p>
   </section>
 
   {% include "fire/_adjustments_edit.html" %}

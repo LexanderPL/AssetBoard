@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent, User, Workspace
@@ -27,7 +27,10 @@ from assetboard.domain.money import Money
 from assetboard.i18n.numbers import format_amount_input
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
-from tests.fire_helpers import create_plan
+from assetboard.services.investment_transactions import create_transaction
+from assetboard.services.investments import create_asset_class, create_instrument
+from assetboard.services.prices import save_manual_price
+from tests.fire_helpers import create_plan, field_html, suggestion_html
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -193,6 +196,61 @@ def _seed_portfolio(owner, value_minor: int = 5_000_000) -> UUID:
             currency="EUR",
         )
         return item.id
+
+
+def _seed_asset_class(owner, name: str, *, investable: bool = True, price: str = "100") -> UUID:
+    ctx = _context(owner)
+    factory = owner.app.state.session_factory
+    asset_class = create_asset_class(
+        factory,
+        ctx,
+        name=name,
+        color="#2563eb",
+        investable=investable,
+    )
+    instrument = create_instrument(
+        factory,
+        ctx,
+        name=f"Fund test {name}",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(asset_class.id, 10_000)],
+        locale="en",
+    )
+    create_transaction(
+        factory,
+        ctx,
+        instrument_id=instrument.id,
+        type_value="buy",
+        date_value="2026-02-27",
+        quantity_value="1",
+        unit_price_value=price,
+        fee_value="0",
+        fx_value="1",
+        note_value="",
+        locale="en",
+    )
+    save_manual_price(
+        factory,
+        ctx,
+        instrument.id,
+        price_id=None,
+        date_value="2026-03-01",
+        price_value=price,
+        locale="en",
+    )
+    return asset_class.id
+
+
+def _linked_item_id(owner, class_id: UUID) -> UUID:
+    with owner.db() as session:
+        return next(
+            row.id
+            for row in NetWorthItemRepository(session, _context(owner)).ordered()
+            if row.link_type == "portfolio_asset_class" and row.link_id == class_id
+        )
 
 
 def _link_loan_payment(owner, transaction_id: UUID, total_minor: int) -> UUID:
@@ -1024,6 +1082,140 @@ def test_the_edit_page_and_suggestion_cards_never_write(owner) -> None:
     assert _snapshot(owner, plan_id) == before
 
 
+def test_the_edit_form_explains_the_saved_birth_year_source(owner) -> None:
+    plan_id = create_plan(owner, birth_year="1985")
+    with owner.db() as session, session.begin():
+        session.execute(update(User).where(User.id == owner.admin_id).values(birth_year=1980))
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    field = field_html(page.text, "birth_year")
+    assert 'name="birth_year"' in field and " required" in field
+    assert 'id="birth_year"' in field
+    assert 'for="birth_year"' in field
+    assert 'data-fire-birth-year-source="plan"' in field
+    assert (
+        "New plans prefill this from your profile. This plan keeps the birth year saved with it."
+        in field
+    )
+    assert _input_value(page.text, "birth_year") == "1985"
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).birth_year == 1985
+
+
+def test_the_edit_form_has_no_required_boilerplate_or_suggestion_paragraph(owner) -> None:
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    assert "Required. Enter 0" not in text
+    assert "Required. Add it to your profile" not in text
+    assert "A suggestion never fills" not in text
+
+
+def test_only_the_non_obvious_edit_fields_keep_a_hint_beside_the_label(owner) -> None:
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    for name in (
+        "birth_year",
+        "horizon_age",
+        "stop_working_age",
+        "inflation",
+        "income_growth",
+        "income_manual",
+        "portfolio_manual",
+    ):
+        assert "data-fire-hint" not in field_html(text, name), name
+    for name in ("real_return", "rule", "swr", "expenses_manual"):
+        field = field_html(text, name)
+        assert "data-fire-hint" in field, name
+        control = "<select" if name == "rule" else "<input"
+        assert field.index("data-fire-hint") < field.index(control)
+        assert 'role="note"' in field
+        assert 'tabindex="0"' in field
+        assert "aria-label=" in field and "title=" in field
+        assert f'aria-describedby="{name}-hint"' in field
+
+
+def test_the_edit_income_suggestion_shows_the_category_breakdown_with_its_caption(owner) -> None:
+    _seed_ledger(owner)
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    income = suggestion_html(text, "income")
+    expenses = suggestion_html(text, "expenses")
+    assert 'data-fire-suggestion-categories="income"' in income
+    assert 'data-fire-suggestion-categories="expenses"' in expenses
+    assert "Income by category in the window" in income
+    assert "Expenses by category in the window" in expenses
+    assert "Salary test" in income and "Food test" in expenses
+    assert "data-fire-loan-portion" not in income
+    assert "data-fire-loan-portion" in expenses
+
+
+def test_the_edit_portfolio_suggestion_lists_skipped_sources_without_an_amount(owner) -> None:
+    _seed_portfolio(owner)
+    non_investable = _seed_asset_class(owner, "Home test", investable=False)
+    investable = _seed_asset_class(owner, "Stocks test", investable=True)
+    linked_item = _linked_item_id(owner, investable)
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    assert "data-fire-suggestion-skipped" in text
+    assert ">Skipped<" in text
+    assert "These sources are not counted in the amount above." in text
+    assert f'href="/investments/classes#asset-class-{non_investable}"' in text
+    assert f'href="/net-worth?side=asset#item-{linked_item}"' in text
+    assert 'data-fire-suggestion-skipped-source="portfolio_class"' in text
+    assert 'data-fire-suggestion-skipped-source="networth_item"' in text
+    assert 'data-fire-suggestion-skipped-reason="non_investable_class"' in text
+    assert 'data-fire-suggestion-skipped-reason="linked_item_double_count"' in text
+    assert text.count("data-suggested-minor=") == 1
+
+
+def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(owner) -> None:
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    field = field_html(text, "swr")
+    assert 'name="swr"' in field
+    assert " disabled" not in field
+    assert " hidden" not in field
+    assert "data-fire-swr-field" in field
+    assert "js/fire.js" in text
+    assert not re.search(r"<script(?![^>]*\bsrc=)", text)
+    assert "onclick=" not in text
+
+
+def test_a_valid_posted_swr_is_ignored_unless_the_rule_uses_it(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(rule="returns_cover_expenses", swr="4"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+    response = owner.post("/fire/edit", _form(rule="swr", swr="4"), token_from="/fire/edit")
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp == 400
+
+
+def test_a_malformed_posted_swr_is_ignored_unless_the_rule_uses_it(owner) -> None:
+    plan_id = create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(rule="returns_cover_expenses", swr="not-a-rate"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+    response = owner.post(
+        "/fire/edit", _form(rule="swr", swr="not-a-rate"), token_from="/fire/edit"
+    )
+    assert response.status_code == 400
+    assert 'data-field-error="swr"' in response.text
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+
+
 def test_suggestions_show_all_three_cards_and_never_prefill(owner) -> None:
     _seed_ledger(owner)
     _seed_portfolio(owner)
@@ -1193,19 +1385,24 @@ def test_the_preview_query_count_does_not_grow_with_events(owner) -> None:
     assert quiet <= 20
 
 
-def test_the_edit_and_view_copy_state_after_tax_cash_flows(owner) -> None:
+def test_the_edit_view_and_wizard_copy_use_ledger_amounts_without_a_tax_promise(owner) -> None:
     create_plan(owner)
     edit = owner.client.get("/fire/edit").text
     view = owner.client.get("/fire").text
-    assert "Use the after-tax amount." in edit
-    assert "Enter your after-tax income" in edit
-    assert "before tax" not in edit
+    assert "Income and expenses are the amounts recorded in your ledger" in edit
+    assert "Income may be gross" in edit
+    assert "taxes you actually pay" in edit
+    assert "does not model taxes separately" in edit
     assert "does not model taxes separately" in view
-    assert "after-tax" in view
-    assert "no taxes" not in view
+    assert "recorded in your ledger" in view
+    assert "Income may be gross" in view
+    assert "after-tax" not in edit and "after tax" not in edit
+    assert "after-tax" not in view and "after tax" not in view
+    assert "before tax" not in edit
 
 
 def test_the_edit_page_renders_in_polish(owner) -> None:
+    _seed_ledger(owner)
     create_plan(owner)
     owner.client.headers["Accept-Language"] = "pl"
     try:

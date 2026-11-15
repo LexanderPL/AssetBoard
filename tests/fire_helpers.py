@@ -54,6 +54,24 @@ def review_signature(text: str) -> str:
     return text[start : text.index('"', start)]
 
 
+def field_html(markup: str, name: str) -> str:
+    """The rendered block of one form field, located by its stable ``data-fire-field`` marker."""
+    marker = f'data-fire-field="{name}"'
+    index = markup.index(marker)
+    start = markup.rindex("<", 0, index)
+    end = markup.index("</div>", index) + len("</div>")
+    return markup[start:end]
+
+
+def suggestion_html(markup: str, kind: str) -> str:
+    """The rendered block of one suggestion card, located by its ``data-fire-suggestion`` kind."""
+    marker = f'data-fire-suggestion="{kind}"'
+    index = markup.index(marker)
+    start = markup.rindex("<", 0, index)
+    end = markup.index("</section>", index) + len("</section>")
+    return markup[start:end]
+
+
 def _hidden_values(text: str) -> dict[str, str]:
     """The wizard fields carried by the page's hidden inputs, as the browser would post them."""
     return {
