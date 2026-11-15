@@ -2636,6 +2636,13 @@ msgstr ""
 msgid "FIRE at age %(age)d (%(year)d)"
 msgstr ""
 
+msgid "Loan paid off"
+msgstr ""
+
+#, python-format
+msgid "Loan payments end in %(year)d"
+msgstr ""
+
 msgid "Income stops"
 msgstr ""
 
@@ -2662,10 +2669,109 @@ msgstr ""
 msgid "Net worth in today's money"
 msgstr ""
 
+msgid "Loan payments end this year"
+msgstr ""
+
 msgid "Expenses"
 msgstr ""
 
 msgid "Investment gain"
+msgstr ""
+
+msgid "Included"
+msgstr ""
+
+msgid "Ignored"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Paid off"
+msgstr ""
+
+msgid "Not drawn"
+msgstr ""
+
+msgid "Another currency"
+msgstr ""
+
+msgid "Schedule unavailable"
+msgstr ""
+
+#, fuzzy
+msgid "No payment"
+msgstr ""
+
+msgid "Amount unavailable"
+msgstr ""
+
+msgid "Installment plan"
+msgstr ""
+
+msgid "Archived in Loans; it is not part of the plan."
+msgstr ""
+
+msgid "Paid off; there is no payment to include."
+msgstr ""
+
+msgid "No drawdown yet; there is no payment to include."
+msgstr ""
+
+#, python-format
+msgid "The loan is in %(loan_currency)s, not the plan currency %(plan_currency)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"The loan's schedule cannot be built (%(code)s); it is excluded from the "
+"plan."
+msgstr ""
+
+msgid "No scheduled payment remains; it is excluded from the plan."
+msgstr ""
+
+msgid ""
+"The annual payment is outside the supported amount; it is excluded from "
+"the plan."
+msgstr ""
+
+msgid ""
+"Installment plans do not have a live loan schedule yet; they are excluded"
+" from the plan."
+msgstr ""
+
+msgid "The next payment is interest-only; the payment will change later."
+msgstr ""
+
+msgid ""
+"A future drawdown will change the payment; this is the next scheduled "
+"payment."
+msgstr ""
+
+msgid "Stays in expenses through the plan horizon."
+msgstr ""
+
+#, python-format
+msgid "No drop within the plan horizon; the payoff is in %(year)d."
+msgstr ""
+
+#, python-format
+msgid "Removed from %(year)d onward; %(amount)s a year returns to the plan."
+msgstr ""
+
+msgid ""
+"No active loans. Enter annual expenses that include any loan payments you"
+" make."
+msgstr ""
+
+msgid "No loan is included in the plan. The reasons are listed below."
+msgstr ""
+
+msgid ""
+"Your annual expenses are lower than the scheduled loan payments. Check "
+"that the expenses include these payments, or ignore the loan if it is not"
+" part of this plan."
 msgstr ""
 
 msgid "Enter your birth year, or add it to your profile first."
@@ -2772,6 +2878,17 @@ msgid "Confirm that the other old FIRE scenarios will be deleted."
 msgstr ""
 
 msgid "The adjustment rows are missing. Reload the page and try again."
+msgstr ""
+
+msgid ""
+"A loan in the request is no longer available. Reload the page and try "
+"again."
+msgstr ""
+
+msgid "The same loan appears twice. Reload the page and try again."
+msgstr ""
+
+msgid "Choose Included or Ignored for each loan."
 msgstr ""
 
 msgid ""
@@ -6166,9 +6283,81 @@ msgid ""
 "you press Save changes."
 msgstr ""
 
+#, python-format
+msgid "Live loan data as of %(date)s"
+msgstr ""
+
 msgid ""
-"Live loans are not part of the plan yet. Enter yearly expenses that "
-"include your loan payments."
+"Your annual expenses are expected to include these loan payments. An "
+"included loan is removed from the projection from its payoff year; an "
+"ignored loan stays in the forecast through the horizon. Loan payments are"
+" fixed nominal amounts and are not inflated."
+msgstr ""
+
+msgid ""
+"These cards show the saved choices and their effect. The preview above "
+"shows the choices and totals from the form before you save; Save changes "
+"applies them."
+msgstr ""
+
+msgid ""
+"Loans cannot be included while the plan currency does not match the "
+"workspace currency. Reset the plan to review them in the current "
+"currency."
+msgstr ""
+
+msgid "No loan information is available for this plan."
+msgstr ""
+
+msgid "Included in the plan"
+msgstr ""
+
+msgid "Ignored in the plan"
+msgstr ""
+
+msgid "Loan component of expenses"
+msgstr ""
+
+#, python-format
+msgid "The first included loan payoff is in %(year)d."
+msgstr ""
+
+msgid "Loans included or ignored in the plan"
+msgstr ""
+
+msgid "Annual payment"
+msgstr ""
+
+msgid "monthly"
+msgstr ""
+
+msgid "payoff"
+msgstr ""
+
+msgid "Current balance"
+msgstr ""
+
+msgid "Effect on the plan"
+msgstr ""
+
+msgid "Include in plan"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d loan is not included"
+msgid_plural "%(num)d loans are not included"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Monthly installment"
+msgstr ""
+
+msgid "ends"
+msgstr ""
+
+msgid ""
+"Active loans are included in the plan after creation. You can ignore one "
+"in edit mode."
 msgstr ""
 
 #, python-format
@@ -6275,6 +6464,20 @@ msgstr ""
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr ""
 
+msgid "Loan choices in this preview:"
+msgstr ""
+
+msgid "Loan choices:"
+msgstr ""
+
+#, python-format
+msgid "Included loans: %(amount)s a year"
+msgstr ""
+
+#, python-format
+msgid "Ignored loans: %(amount)s a year"
+msgstr ""
+
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
 "assumes constant rates and does not model taxes separately; real life "
@@ -6373,9 +6576,6 @@ msgstr ""
 msgid "Window total"
 msgstr ""
 
-msgid "Archived"
-msgstr ""
-
 #, python-format
 msgid ""
 "Loan payments linked to ledger expenses in this window: %(amount)s in "
@@ -6386,6 +6586,12 @@ msgid ""
 "No ledger expenses in this window are linked to recorded loan payments. "
 "If you pay loans, make sure the amount you enter includes those payments."
 msgstr ""
+
+#, python-format
+msgid "Scheduled loan payments (live): %(amount)s a year from %(num)d loan."
+msgid_plural "Scheduled loan payments (live): %(amount)s a year from %(num)d loans."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Suggested starting portfolio"
 msgstr ""
@@ -6422,6 +6628,9 @@ msgstr ""
 msgid "each year's money"
 msgstr ""
 
+msgid "Loan payments"
+msgstr ""
+
 msgid "Net saving"
 msgstr ""
 
@@ -6429,6 +6638,10 @@ msgid "Cash"
 msgstr ""
 
 msgid "No income"
+msgstr ""
+
+#, python-format
+msgid "Loan paid off: %(names)s"
 msgstr ""
 
 msgid ""
@@ -6442,8 +6655,9 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Active loans are not listed during setup yet. They will be included in "
-"the plan after you create it."
+"Loan payments are the part of that year's expenses still attributable to "
+"loans. Included loans stop counting at their payoff year; ignored loans "
+"continue through the horizon."
 msgstr ""
 
 msgid "Choose your FIRE plan"
@@ -8458,15 +8672,6 @@ msgstr ""
 msgid "Equal principal"
 msgstr ""
 
-msgid "Installment plan"
-msgstr ""
-
-msgid "Paid off"
-msgstr ""
-
-msgid "Not drawn"
-msgstr ""
-
 msgid "Repaid principal"
 msgstr ""
 
@@ -8607,9 +8812,6 @@ msgid "No variance yet for this checkpoint."
 msgstr ""
 
 msgid "No actual payments recorded yet."
-msgstr ""
-
-msgid "Schedule unavailable"
 msgstr ""
 
 msgid ""
@@ -9162,9 +9364,6 @@ msgid "Entry"
 msgstr ""
 
 msgid "Original terms"
-msgstr ""
-
-msgid "Current balance"
 msgstr ""
 
 msgid "Interest-only"
@@ -9854,9 +10053,6 @@ msgid ""
 msgstr ""
 
 msgid "Archive plan"
-msgstr ""
-
-msgid "Monthly installment"
 msgstr ""
 
 msgid "Total remaining"
@@ -11412,9 +11608,6 @@ msgid "Categories in the file"
 msgstr ""
 
 msgid "Mapped"
-msgstr ""
-
-msgid "Ignored"
 msgstr ""
 
 msgid "Unresolved"
@@ -13718,5 +13911,17 @@ msgstr ""
 #~ "applies again when the horizon in "
 #~ "this form covers it. The preview "
 #~ "already includes it."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Active loans are not listed during "
+#~ "setup yet. They will be included "
+#~ "in the plan after you create it."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Live loans are not part of the "
+#~ "plan yet. Enter yearly expenses that "
+#~ "include your loan payments."
 #~ msgstr ""
 

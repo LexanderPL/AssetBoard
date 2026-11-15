@@ -1094,7 +1094,7 @@ def test_query_budget_does_not_grow_with_events(team: WorkspaceDb) -> None:
         _add_event(team, plan_id, 2027 + (index % 40), index + 1)
     loud = count(lambda: fire_scenarios.get_fire_plan(team.factory, ctx))
     assert quiet == loud
-    assert quiet <= 4
+    assert quiet <= 6
 
 
 def test_year_rollover_moves_the_anchor_and_archives_events(team: WorkspaceDb) -> None:

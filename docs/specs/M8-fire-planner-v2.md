@@ -94,8 +94,11 @@ expenses_minor, portfolio_minor, currency, needs_review)`
 - `income_minor`, `expenses_minor` and `portfolio_minor` are non-negative integer minor
   units in `currency`; zero is allowed but shown as zero, not as missing.
 - There is no user-facing plan name. The page is titled **FIRE plan**.
-- Deleting/resetting the plan hard-deletes the row and its events after typed confirmation;
-  an audit event is recorded. A workspace with no plan opens the wizard.
+- `FireLoanSetting(workspace_id, scenario_id, loan_id, included)` stores one row only for an
+  ignored loan; absence means included. Composite workspace foreign keys cascade with the plan
+  and restrict loan deletion. Existing plans start with every loan included.
+- Deleting/resetting the plan hard-deletes the row, its events and its loan settings after typed
+  confirmation; an audit event is recorded. A workspace with no plan opens the wizard.
 
 ### 4.2 Events (adjustments)
 
@@ -295,10 +298,11 @@ For each active loan in the plan currency:
   loan portion so a user who enters expenses without loan payments can correct it. The
   suggested expenses include the loan payments found in the ledger.
 
-Open detail for implementation: the exact definition of "annual payment" when the next
-12 months contain a one-off overpayment or the payoff falls inside the year. The spec's
-intent is: use the recurring monthly outflow (including regular overpayment) × 12, not the
-sum of the remaining rows and never a saved snapshot.
+Resolved in F8.12: the annual payment is the next scheduled monthly payment in a schedule
+that keeps past/current one-off overpayments but excludes future ones, multiplied by twelve.
+It includes interest, principal, costs and the regular overpayment. A future one-off changes
+only the projected payoff year. The drop starts in the payoff year, is not prorated and is not
+inflated. The ignored-loan choice is persisted per plan and archived in format 2.1.
 
 ---
 
@@ -350,11 +354,14 @@ The archive extension is updated in the same feature that reshapes the model, so
 never describes a model that no longer exists.
 
 - Format version **2.0** (a breaking layout change from 1.8; import support for ≤1.8 remains).
-- Files: `fire_plan.csv` (one row, header-only when no plan) and `fire_events.csv`.
-  No `fire_contributions.csv`, `fire_expense_exclusions.csv` or `fire_scenarios.csv`.
+- Format **2.1** adds `fire_loan_settings.csv` to the 2.0 files `fire_plan.csv` (one row,
+  header-only when no plan) and `fire_events.csv`. No `fire_contributions.csv`,
+  `fire_expense_exclusions.csv` or `fire_scenarios.csv`. A 2.0 archive still reads with every
+  loan included.
 - The plan row contains birth year, stop/horizon ages, rates, rule/SWR, manual amounts,
-  currency and `needs_review`. Suggested values, resolved loan data and projection results
-  are derived and not archived.
+  currency and `needs_review`. Suggested values, loan schedules and projection results are
+  derived and not archived; the plan's ignored-loan choices are user intent and are stored in
+  `fire_loan_settings.csv`.
 - Events export kind, year, amount and label. Past events are included as archived history;
   they are not applied on restore unless still in the future.
 - 1.8 archives import through the migration mapping in §8.2; multiple FIRE scenarios follow
@@ -706,6 +713,62 @@ projection, include/ignore, regular-overpayment-aware annual payments and transp
 UI. Remove the saved loan-payoff event action.
 ```
 
+### As built (M8.F8.12)
+
+- **Persistence.** `fire_loan_settings` stores one row only for an ignored loan; absence means
+  included. Composite workspace FKs cascade with the plan and restrict loan deletion. Migration
+  `0064_f812_fire_loan_settings` creates the table and existing plans default to every loan
+  included, with no `needs_review` change.
+- **Resolution.** `services.fire_loans` bulk-loads every schedule loan and its children once
+  (no per-loan SQL), builds the actual schedule and a recurring schedule that keeps one-off
+  overpayments dated on or before today but excludes future ones. The next recurring row's
+  interest + principal + costs + regular overpayment ×12 is the annual payment. The actual
+  schedule's summary gives the payoff date. The resolver returns included, ignored, archived,
+  paid-off, not-drawn, currency-mismatch, schedule-error, no-payment, amount-invalid and
+  installment-plan rows with totals and payoff years; it never writes. A tranche loan with no
+  drawn balance and undrawn principal is **not drawn**, even when it has a future transfer. The
+  first-payoff line and payoff badges use included loans only.
+- **Projection.** `ProjectionInputs.loans` and `ProjectionRow.loan_payment` /
+  `real_loan_payment` were added. `ProjectionRow.expenses` is the net line after included
+  loans stop being paid; `loan_payment` is the part still attributable to included loans before
+  payoff and ignored loans throughout. `net = income - expenses`. No-loan behaviour and the
+  independent oracle are unchanged; property tests cover the loan drop.
+- **UI.** The view has a read-only Loans panel with name, annual/monthly payment, payoff,
+  included/ignored badge, effect, totals, payoff badges and excluded reasons. The editor has
+  native Included/Ignored radio cards inside the plan form; **Save changes** writes them with
+  the plan, **Discard changes** restores them, and preview uses posted toggles without writing.
+  The wizard review lists active loans read-only. The table has a **Loan payments** column and
+  a payoff badge; charts mark included payoffs. The expense suggestion card adds the live
+  scheduled annual payment separately from the ledger-linked window portion. In edit mode the
+  results summary is labelled as the live preview of the posted choices while the detailed
+  cards below keep showing the saved choice until save; the understated-expenses warning lives
+  in the results summary and uses the validated posted expenses during a preview.
+- **Forged toggles.** Only a loan the live resolver currently marks included or ignored can be
+  posted. A request naming an archived, paid-off, not-drawn, broken, currency-mismatched,
+  amount-invalid or installment-plan loan is rejected without touching its saved setting, so an
+  ignored loan keeps that choice through archiving and restore; a save whose form has no loan
+  section changes no setting.
+- **Warnings and approximations.** An included payment greater than the entered expenses shows
+  a warning, but the drop is not capped and the plan is not blocked. The drop is fixed nominal
+  and is not inflated; sensitivity scales the whole expense line including each loan's scaled
+  annual payment, with payoff years fixed; a payoff inside a year removes the full annual
+  payment from that year; a final balloon row is annualised as specified. These are documented
+  in `docs/fire.md`. The shared loan view tolerates a missing loan start only for the FIRE
+  resolver; the loan pages keep their existing strict error.
+- **Archive 2.1.** `FORMAT_VERSION` is 2.1. `required_files`/`required_columns` keep 2.0 archives
+  readable and require the new file only for 2.1. Export writes ignored rows; restore maps loan
+  lineage ids, skips a missing loan with a warning, accepts `included=true` as a no-op and
+  counts/audits only created settings. `EMPTINESS_CHECKS`, demo exclusions, tenant
+  factories/coverage/isolation, the migration table set, model exports and the golden 2.1
+  fixture cover the new table. Merge still reports `fire_restore_only`.
+- **Tests.** Annual-payment/regular-overpayment, target-total, interest-only and future-one-off
+  tests, payoff changes, ignore toggles, first-included-payoff, multiple loans,
+  currency/paid-off/archived/not-drawn/broken/installment states, projection integration,
+  sensitivity loan scaling, preview/save/no-write, forged ineligible toggles with a preserved
+  saved ignore, query budgets, tenant/roles/CSRF, archive round-trip, 2.0 compatibility,
+  duplicate/invalid/no-op settings, Polish i18n and Chromium coverage. All tests were run
+  single-core.
+
 ### F8.13 — Nominal-only results and wording
 
 **Acceptance**
@@ -744,7 +807,7 @@ the UI and user docs.
   the tenant suite; cross-workspace IDs are 404, not empty.
 - **Empty states:** no plan, no events, no loans, no suggestions and blocked suggestions all
   have explicit copy and never show a fake zero.
-- **Archive:** format 2.0 as in §9, with 1.8 compatibility and golden fixtures.
+- **Archive:** format 2.1 as in §9, with 2.0 and 1.8 compatibility and golden fixtures.
 - **Docs:** every feature updates `docs/fire.md`, the spec's as-built section, and the
   archive docs where relevant. User docs never mention the spreadsheet.
 - **Accessibility:** wizard steps, view/edit controls, archived-event sections, loan

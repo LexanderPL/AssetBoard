@@ -281,6 +281,20 @@ class ProjectionEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectionLoan:
+    """One live loan's recurring payment and projected payoff year.
+
+    ``annual_payment`` is the next scheduled monthly payment times twelve, including its
+    regular overpayment and costs. Future one-off overpayments change only ``payoff_year``.
+    An ignored loan keeps its payment in the plan through the horizon and has no drop.
+    """
+
+    annual_payment: Money
+    payoff_year: int
+    included: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectionInputs:
     """Everything the pure projection needs; every amount is in ``currency``."""
 
@@ -298,12 +312,17 @@ class ProjectionInputs:
     start_expenses: Money
     start_portfolio: Money
     events: tuple[ProjectionEvent, ...] = ()
+    loans: tuple[ProjectionLoan, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class ProjectionRow:
     """One plan year, nominal and in the start year's money.
 
+    ``expenses`` is the net expense line after included loans stop being paid: the gross
+    inflated expenses minus the recurring payment of every included loan whose payoff year has
+    arrived. ``loan_payment`` is the part of that net line still attributable to loans in this
+    year: included loans before their payoff and ignored loans for the whole horizon.
     ``net`` at ``t = 0`` is the starting portfolio (the spreadsheet reuses that column), so the
     first row's net worth is ``net + gain + cash``; later rows add ``net`` and ``cash`` to the
     opening net worth. ``income_stopped`` marks the first year whose base salary is zero, not
@@ -314,12 +333,14 @@ class ProjectionRow:
     age: int
     income: Money
     expenses: Money
+    loan_payment: Money
     net: Money
     gain: Money
     cash: Money
     net_worth: Money
     real_income: Money
     real_expenses: Money
+    real_loan_payment: Money
     real_net: Money
     real_gain: Money
     real_cash: Money
@@ -388,6 +409,13 @@ class SensitivityGrid:
 
 
 @dataclass(frozen=True, slots=True)
+class _ProjectionLoan:
+    annual_payment_minor: int
+    payoff_year: int
+    included: bool
+
+
+@dataclass(frozen=True, slots=True)
 class _ProjectionPlan:
     currency: str
     birth_year: int
@@ -406,6 +434,7 @@ class _ProjectionPlan:
     cash_by_year: dict[int, int]
     income_changes: dict[int, int]
     expense_changes: dict[int, int]
+    loans: tuple[_ProjectionLoan, ...]
 
 
 def _integer(value: object, field: str, code: str) -> int:
@@ -520,6 +549,29 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
                 raise FireProjectionError("events", "duplicate_saving_override")
             overrides[year] = amount
 
+    loans: list[_ProjectionLoan] = []
+    included_total = 0
+    for loan in inputs.loans:
+        annual = _money_minor(loan.annual_payment, "loans", currency, signed=False)
+        if annual <= 0:
+            raise FireProjectionError("loans", "invalid_amount")
+        payoff_year = _integer(loan.payoff_year, "loans", "invalid_payoff_year")
+        if not start_year <= payoff_year <= MAX_YEAR:
+            raise FireProjectionError("loans", "invalid_payoff_year")
+        if type(loan.included) is not bool:
+            raise FireProjectionError("loans", "invalid_loan")
+        if loan.included:
+            included_total += annual
+        loans.append(
+            _ProjectionLoan(
+                annual_payment_minor=annual,
+                payoff_year=payoff_year,
+                included=loan.included,
+            )
+        )
+    if included_total > MAX_AMOUNT_MINOR:
+        raise FireProjectionError("loans", "invalid_amount")
+
     return _ProjectionPlan(
         currency=currency,
         birth_year=birth_year,
@@ -538,6 +590,7 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
         cash_by_year=cash_by_year,
         income_changes=income_changes,
         expense_changes=expense_changes,
+        loans=tuple(loans),
     )
 
 
@@ -571,6 +624,13 @@ def project(inputs: ProjectionInputs) -> Projection:
     components inflated from the start year and active from their event year. Contribution
     overrides replace the net line for their year but leave the shown income, expenses and cash
     untouched. All series continue to the horizon after FIRE and after income stops.
+
+    A live loan is part of the expenses baseline. From an included loan's payoff year onward the
+    projection subtracts its recurring annual payment, so the expense line is net of payments
+    that have ended. A future one-off overpayment moves the payoff year but never enters the
+    annual payment. Ignored loans never produce a drop and keep their payment in the baseline for
+    the whole horizon. ``loan_payment`` reports the part of the net expense line still
+    attributable to loans; it is not an additional subtraction.
 
     Under ``returns_cover_expenses`` the first row with ``expenses < gain`` and a non-negative
     opening net worth is the FIRE row. The strict comparison and the previous-year gain mean the
@@ -611,9 +671,20 @@ def project(inputs: ProjectionInputs) -> Projection:
         income = base_income + _active_changes(
             plan.income_changes, plan.income_growth_bp, offset, year
         )
-        expenses = base_expenses + _active_changes(
+        gross_expenses = base_expenses + _active_changes(
             plan.expense_changes, plan.inflation_bp, offset, year
         )
+        loan_drop = sum(
+            loan.annual_payment_minor
+            for loan in plan.loans
+            if loan.included and loan.payoff_year <= year
+        )
+        loan_payment = sum(
+            loan.annual_payment_minor
+            for loan in plan.loans
+            if not loan.included or loan.payoff_year > year
+        )
+        expenses = gross_expenses - loan_drop
         net = (
             plan.start_portfolio_minor
             if offset == 0
@@ -640,12 +711,16 @@ def project(inputs: ProjectionInputs) -> Projection:
                 age=row_age,
                 income=Money(income, currency),
                 expenses=Money(expenses, currency),
+                loan_payment=Money(loan_payment, currency),
                 net=Money(net, currency),
                 gain=Money(gain, currency),
                 cash=Money(cash, currency),
                 net_worth=Money(net_worth, currency),
                 real_income=Money(_deflate(income, plan.inflation_bp, offset), currency),
                 real_expenses=Money(_deflate(expenses, plan.inflation_bp, offset), currency),
+                real_loan_payment=Money(
+                    _deflate(loan_payment, plan.inflation_bp, offset), currency
+                ),
                 real_net=Money(_deflate(net, plan.inflation_bp, offset), currency),
                 real_gain=Money(_deflate(gain, plan.inflation_bp, offset), currency),
                 real_cash=Money(_deflate(cash, plan.inflation_bp, offset), currency),
@@ -740,7 +815,9 @@ def sensitivity(
 
     Each cell changes only the real return (``base + delta``) and the starting expenses
     (``base * factor / 10000``, rounded half away from zero once); contribution overrides, cash
-    events, income and the expense-change events keep their saved values. The axes must include
+    events, income and the expense-change events keep their saved values. A live loan is part of
+    the expense baseline, so its recurring annual payment is scaled by the same factor with one
+    rounding per loan; its payoff year and included flag stay as projected. The axes must include
     the base cell (delta 0 and factor 10000), are otherwise free, and are validated before any
     projection: exact integers, unique, non-empty, at most nine values each and 81 cells, with
     every effective return inside the projection's hard rate bounds and every scaled starting
@@ -765,6 +842,7 @@ def sensitivity(
     base_expenses = inputs.start_expenses.amount_minor
     currency = inputs.start_expenses.currency
     scaled_expenses: dict[int, int] = {}
+    scaled_loans: dict[int, tuple[ProjectionLoan, ...]] = {}
     for factor in factors:
         if not 0 <= factor <= 100_000:
             raise SensitivityError("expense_factors_bp", "expense_factor_out_of_range")
@@ -772,6 +850,27 @@ def sensitivity(
         if scaled > MAX_AMOUNT_MINOR:
             raise SensitivityError("expense_factors_bp", "expense_too_large")
         scaled_expenses[factor] = scaled
+        loans: list[ProjectionLoan] = []
+        included_total = 0
+        for loan in inputs.loans:
+            annual = round_ratio(loan.annual_payment.amount_minor * factor, 10_000)
+            if annual > MAX_AMOUNT_MINOR:
+                raise SensitivityError("expense_factors_bp", "expense_too_large")
+            if annual <= 0:
+                # A zero factor (or an extremely small one) leaves no payment to drop; the
+                # projection's own validation requires a positive loan payment.
+                continue
+            if loan.included:
+                included_total += annual
+            loans.append(
+                replace(
+                    loan,
+                    annual_payment=Money(annual, loan.annual_payment.currency),
+                )
+            )
+        if included_total > MAX_AMOUNT_MINOR:
+            raise SensitivityError("expense_factors_bp", "expense_too_large")
+        scaled_loans[factor] = tuple(loans)
     for delta in deltas:
         if not RATE_HARD_MIN_BP <= base_return + delta <= RATE_HARD_MAX_BP:
             raise SensitivityError("return_deltas_bp", "return_out_of_range")
@@ -789,6 +888,7 @@ def sensitivity(
                     inputs,
                     real_return_bp=effective_return,
                     start_expenses=Money(scaled_expenses[factor], currency),
+                    loans=scaled_loans[factor],
                 )
             )
             cell = SensitivityCell(

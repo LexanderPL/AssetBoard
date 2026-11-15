@@ -23,7 +23,9 @@ from assetboard.domain.fire import (
     project,
 )
 from assetboard.domain.money import Money
+from assetboard.services import fire_loans
 from assetboard.services.context import Context, Role, require_role
+from assetboard.services.fire_loans import FireLoanData
 from assetboard.services.fire_scenarios import (
     EventView,
     FireError,
@@ -47,6 +49,7 @@ class ResultsBlock:
 class FirePlanResults:
     detail: FirePlanDetail
     projection: Projection | None
+    loans: FireLoanData | None = None
     blocks: tuple[ResultsBlock, ...] = ()
     preview: bool = False
     needs_extreme_confirmation: bool = False
@@ -68,9 +71,13 @@ FireScenarioResults = FirePlanResults
 
 
 def projection_inputs(
-    plan: FirePlanView, events: tuple[EventView, ...], *, current_year: int
+    plan: FirePlanView,
+    events: tuple[EventView, ...],
+    *,
+    current_year: int,
+    loans: FireLoanData | None = None,
 ) -> ProjectionInputs:
-    """Map the live plan and its active events to the pure projection's input."""
+    """Map the live plan, its active events and live loans to the pure projection's input."""
     currency = plan.currency
     return ProjectionInputs(
         currency=currency,
@@ -90,11 +97,16 @@ def projection_inputs(
             ProjectionEvent(year=row.year, kind=EventKind(row.kind), amount=row.amount)
             for row in events
         ),
+        loans=loans.projection_loans() if loans is not None else (),
     )
 
 
 def inputs_from_validated(
-    plan: FirePlanView, validated: object, *, current_year: int
+    plan: FirePlanView,
+    validated: object,
+    *,
+    current_year: int,
+    loans: FireLoanData | None = None,
 ) -> ProjectionInputs:
     """Map a validated unsaved form to the pure projection's input."""
     # Imported here to avoid a circular import in annotations.
@@ -126,35 +138,62 @@ def inputs_from_validated(
             for row in validated.events
             if event_is_active(row.year, row.kind, current_year, last_year)
         ),
+        loans=loans.projection_loans() if loans is not None else (),
     )
 
 
-def results_from_detail(detail: FirePlanDetail) -> FirePlanResults:
+def results_from_detail(
+    detail: FirePlanDetail, *, loans: FireLoanData | None = None
+) -> FirePlanResults:
     """Project a loaded plan; a currency mismatch or invalid saved plan becomes a block."""
     plan = detail.plan
     if plan.currency_mismatch:
         return FirePlanResults(
             detail=detail,
             projection=None,
+            loans=None,
             blocks=(ResultsBlock(code="plan_currency_mismatch", field="currency"),),
         )
     if plan.horizon_reached:
         return FirePlanResults(
             detail=detail,
             projection=None,
+            loans=loans,
             blocks=(ResultsBlock(code="horizon_not_after_age", field="horizon_age"),),
         )
     try:
         projection = project(
-            projection_inputs(plan, detail.active_events, current_year=plan.current_year)
+            projection_inputs(
+                plan,
+                detail.active_events,
+                current_year=plan.current_year,
+                loans=loans,
+            )
         )
     except FireProjectionError as exc:
         return FirePlanResults(
             detail=detail,
             projection=None,
+            loans=loans,
             blocks=(ResultsBlock(code=exc.code, field=exc.field),),
         )
-    return FirePlanResults(detail=detail, projection=projection)
+    return FirePlanResults(detail=detail, projection=projection, loans=loans)
+
+
+def results_for_detail(
+    factory: sessionmaker[Session], ctx: Context, detail: FirePlanDetail
+) -> FirePlanResults:
+    """Load the plan's live loans once, then project the already-loaded plan detail."""
+    plan = detail.plan
+    loans = None
+    if not plan.currency_mismatch:
+        loans = fire_loans.load_fire_loans(
+            factory,
+            ctx,
+            currency=plan.currency,
+            ignored_loan_ids=detail.ignored_loan_ids,
+        )
+    return results_from_detail(detail, loans=loans)
 
 
 def scenario_results(
@@ -166,7 +205,7 @@ def scenario_results(
         from assetboard.db.repositories import NotFound
 
         raise NotFound
-    return results_from_detail(detail)
+    return results_for_detail(factory, ctx, detail)
 
 
 def preview_plan_results(
@@ -208,15 +247,28 @@ def preview_plan_results(
     needs_confirmation = (
         validated.needs_extreme_confirmation and not plan_input.extreme_rates_confirmed
     )
+    loans = None
+    if factory is not None:
+        overrides = {
+            setting.loan_id: setting.included for setting in (plan_input.loan_settings or ())
+        }
+        loans = fire_loans.load_fire_loans(
+            factory,
+            ctx,
+            currency=saved.currency,
+            ignored_loan_ids=detail.ignored_loan_ids,
+            included_overrides=overrides,
+        )
     try:
         projection = project(
-            inputs_from_validated(saved, validated, current_year=saved.current_year)
+            inputs_from_validated(saved, validated, current_year=saved.current_year, loans=loans)
         )
     except FireProjectionError as exc:
         raise FireError(exc.field, exc.code) from None
     return FirePlanResults(
         detail=detail,
         projection=projection,
+        loans=loans,
         preview=True,
         needs_extreme_confirmation=needs_confirmation,
     )

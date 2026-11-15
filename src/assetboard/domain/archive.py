@@ -68,7 +68,7 @@ from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, S
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "2.0"
+FORMAT_VERSION = "2.1"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -334,6 +334,7 @@ CSV_COLUMNS = {
         "needs_review",
     ),
     "fire_events.csv": ("id", "year", "kind", "amount", "label"),
+    "fire_loan_settings.csv": ("id", "loan_id", "loan", "included"),
 }
 
 # Format 1.x FIRE files are read-only compatibility input for the 2.0 upgrade.
@@ -417,7 +418,8 @@ LOAN_CSV_FILES = (
     "loan_scenarios.csv",
     "installment_plans.csv",
 )
-FIRE_CSV_FILES = ("fire_plan.csv", "fire_events.csv")
+FIRE_CSV_FILES = ("fire_plan.csv", "fire_events.csv", "fire_loan_settings.csv")
+FIRE_2_1_ONLY_FILES = ("fire_loan_settings.csv",)
 LOAN_TRANSFER_CSV_FILES = ("loan_transfers.csv",)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
@@ -440,6 +442,10 @@ MAX_DECIMAL_MAJOR = Decimal(MAX_AMOUNT_MINOR)
 def required_files(version: str) -> tuple[str, ...]:
     """Archive members required by a compatible ``MAJOR.MINOR`` version."""
     major, minor = (int(part) for part in version.split(".", 1))
+    if major == 2:
+        if minor < 1:
+            return tuple(name for name in REQUIRED_FILES if name not in FIRE_2_1_ONLY_FILES)
+        return REQUIRED_FILES
     if major != 1:
         return REQUIRED_FILES
     csv_files = BASE_CSV_FILES + (NETWORTH_CSV_FILES if minor >= 2 else ())
@@ -835,6 +841,16 @@ class FireEventRow:
 
 
 @dataclass(frozen=True, slots=True)
+class FireLoanSettingRow:
+    """One ignored-loan choice; absence means the loan is included."""
+
+    id: str
+    loan_id: str
+    loan: str
+    included: str
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
@@ -867,6 +883,7 @@ class ArchiveRows:
     installment_plans: tuple[InstallmentPlanRow, ...] = ()
     fire_plan: FirePlanRow | None = None
     fire_events: tuple[FireEventRow, ...] = ()
+    fire_loan_settings: tuple[FireLoanSettingRow, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -972,6 +989,7 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
             "fire_plan.csv", (rows.fire_plan,) if rows.fire_plan is not None else ()
         ),
         "fire_events.csv": csv_bytes("fire_events.csv", rows.fire_events),
+        "fire_loan_settings.csv": csv_bytes("fire_loan_settings.csv", rows.fire_loan_settings),
     }
 
 
@@ -2045,6 +2063,7 @@ _REQUIRED_COLUMNS = {
         "portfolio",
     },
     "fire_events.csv": {"id", "year", "kind", "amount", "label"},
+    "fire_loan_settings.csv": {"id", "loan_id", "loan", "included"},
 }
 
 _LEGACY_REQUIRED_COLUMNS = {
@@ -2080,6 +2099,8 @@ def required_columns(version: str) -> dict[str, set[str]]:
     """CSV columns required by a compatible ``MAJOR.MINOR`` version."""
     columns = {name: set(names) for name, names in _REQUIRED_COLUMNS.items()}
     major, minor = (int(part) for part in version.split(".", 1))
+    if major == 2 and minor < 1:
+        columns["fire_loan_settings.csv"] = set()
     if major == 1:
         columns.update({name: set(names) for name, names in _LEGACY_REQUIRED_COLUMNS.items()})
     if major == 1 and minor >= 3:
@@ -2095,7 +2116,7 @@ def _validate_legacy_fire(
     tables: dict[str, list[dict[str, str]]],
     errors: list[ArchiveError],
     warnings: list[ArchiveError],
-) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...]]:
+) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...], tuple[FireLoanSettingRow, ...]]:
     """Validate 1.x FIRE files and pick the one scenario format 2.0 can keep.
 
     The default active scenario wins, then the first active scenario, then the first archived
@@ -2249,7 +2270,7 @@ def _validate_legacy_fire(
         exclusion_keys.add(key)
 
     if not scenarios:
-        return None, ()
+        return None, (), ()
 
     chosen: dict[str, str] | None = None
     for row in scenarios:
@@ -2362,20 +2383,28 @@ def _validate_legacy_fire(
                 column="net_amount",
             )
         )
-    return plan, tuple(events)
+    return plan, tuple(events), ()
 
 
 def _validate_current_fire(
-    tables: dict[str, list[dict[str, str]]], errors: list[ArchiveError]
-) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...]]:
+    tables: dict[str, list[dict[str, str]]],
+    errors: list[ArchiveError],
+    warnings: list[ArchiveError],
+) -> tuple[FirePlanRow | None, tuple[FireEventRow, ...], tuple[FireLoanSettingRow, ...]]:
     plan_rows = tables["fire_plan.csv"]
     events = tables["fire_events.csv"]
+    setting_rows = tables["fire_loan_settings.csv"]
     if len(plan_rows) > 1:
         errors.append(ArchiveError("fire_plan.csv", "more than one FIRE plan"))
     if not plan_rows and events:
         errors.append(ArchiveError("fire_events.csv", "FIRE events without a plan"))
+    if not plan_rows and setting_rows:
+        warnings.append(
+            ArchiveError("fire_loan_settings.csv", "FIRE loan settings without a plan were skipped")
+        )
+        setting_rows = []
     if not plan_rows:
-        return None, ()
+        return None, (), ()
     row = plan_rows[0]
     currency = row["currency"]
     for column in ("income", "expenses", "portfolio"):
@@ -2430,7 +2459,45 @@ def _validate_current_fire(
             )
         )
     out.sort(key=lambda row: (row.year, row.id))
-    return plan, tuple(out)
+
+    loans_by_id = {loan["id"]: loan for loan in tables["loans.csv"]}
+    setting_ids: set[str] = set()
+    seen_loans: set[str] = set()
+    settings_out: list[FireLoanSettingRow] = []
+    for setting in setting_rows:
+        if setting["id"] in setting_ids:
+            errors.append(ArchiveError("fire_loan_settings.csv", "duplicate FIRE loan setting id"))
+        setting_ids.add(setting["id"])
+        if setting["loan_id"] in seen_loans:
+            errors.append(ArchiveError("fire_loan_settings.csv", "duplicate FIRE loan setting"))
+        seen_loans.add(setting["loan_id"])
+        if setting["included"] not in ("true", "false"):
+            errors.append(
+                ArchiveError(
+                    "fire_loan_settings.csv",
+                    "invalid FIRE loan setting",
+                    column="included",
+                )
+            )
+            continue
+        if setting["loan_id"] not in loans_by_id:
+            warnings.append(
+                ArchiveError(
+                    "fire_loan_settings.csv",
+                    "FIRE loan setting for a missing loan was skipped",
+                    column="loan_id",
+                )
+            )
+            continue
+        settings_out.append(
+            FireLoanSettingRow(
+                id=setting["id"],
+                loan_id=setting["loan_id"],
+                loan=setting["loan"],
+                included=setting["included"],
+            )
+        )
+    return plan, tuple(out), tuple(settings_out)
 
 
 def _read_rows(
@@ -3181,9 +3248,11 @@ def _read_rows(
             )
 
     if major == 1:
-        fire_plan, fire_events = _validate_legacy_fire(tables, errors, warnings)
+        fire_plan, fire_events, fire_loan_settings = _validate_legacy_fire(tables, errors, warnings)
     else:
-        fire_plan, fire_events = _validate_current_fire(tables, errors)
+        fire_plan, fire_events, fire_loan_settings = _validate_current_fire(
+            tables, errors, warnings
+        )
 
     return ArchiveRows(
         workspace=workspace,
@@ -3542,4 +3611,5 @@ def _read_rows(
         ),
         fire_plan=fire_plan,
         fire_events=fire_events,
+        fire_loan_settings=fire_loan_settings,
     )

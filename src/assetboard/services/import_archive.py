@@ -38,6 +38,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     FireEventRepository,
+    FireLoanSettingRepository,
     FireScenarioRepository,
     FxRateRepository,
     ImportCategoryMappingRepository,
@@ -184,6 +185,7 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "installment_plans_created": 0,
         "fire_plan_created": 0,
         "fire_events_created": 0,
+        "fire_loan_settings_created": 0,
         **values,
     }
 
@@ -345,6 +347,7 @@ def _restore_counts_for(
     linked = sum(
         _link_target_missing(row, asset_class_ids, instrument_ids) for row in rows.networth_items
     )
+    fire_loan_settings = sum(1 for row in rows.fire_loan_settings if row.included == "false")
     return _restore_counts(
         to_create=(
             len(rows.categories)
@@ -375,6 +378,7 @@ def _restore_counts_for(
             + len(rows.installment_plans)
             + (1 if rows.fire_plan is not None else 0)
             + len(rows.fire_events)
+            + fire_loan_settings
             + (1 if rows.risk_target_policy is not None else 0)
         ),
         categories_created=len(rows.categories),
@@ -410,6 +414,7 @@ def _restore_counts_for(
         loan_balance_checkpoints_created=len(rows.loan_balance_checkpoints),
         loan_scenarios_created=len(rows.loan_scenarios),
         installment_plans_created=len(rows.installment_plans),
+        fire_loan_settings_created=fire_loan_settings,
     )
 
 
@@ -1480,15 +1485,24 @@ def _restore_fire(
     archive: ParsedArchive,
     *,
     restore_now: datetime,
+    loan_ids: Mapping[UUID, UUID],
 ) -> dict[str, int]:
-    """Recreate the one plan and its events last, after their categories and loans exist."""
+    """Recreate the one plan, its events and the ignored-loan choices last."""
     plan_row: FirePlanRow | None = archive.rows.fire_plan
     if plan_row is None:
         batch.report = {
             **(batch.report or {}),
-            "restored_fire_ids": {"fire_scenarios": [], "fire_events": []},
+            "restored_fire_ids": {
+                "fire_scenarios": [],
+                "fire_events": [],
+                "fire_loan_settings": [],
+            },
         }
-        return {"fire_plan_created": 0, "fire_events_created": 0}
+        return {
+            "fire_plan_created": 0,
+            "fire_events_created": 0,
+            "fire_loan_settings_created": 0,
+        }
     scenarios = FireScenarioRepository(session, ctx)
     plan = scenarios.create(
         currency=plan_row.currency,
@@ -1522,14 +1536,38 @@ def _restore_fire(
             created_at=restore_now + timedelta(microseconds=index),
         )
         event_ids.append(str(event.id))
+    settings = FireLoanSettingRepository(session, ctx)
+    setting_ids: list[str] = []
+    for index, row in enumerate(archive.rows.fire_loan_settings):
+        if row.included == "true":
+            continue
+        loan_id = loan_ids.get(UUID(row.loan_id))
+        if loan_id is None:
+            continue
+        setting_id = _create_preserving_id(
+            session,
+            settings,
+            row.id,
+            scenario_id=plan.id,
+            loan_id=loan_id,
+            included=False,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        setting_ids.append(str(setting_id))
     batch.report = {
         **(batch.report or {}),
         "restored_fire_ids": {
             "fire_scenarios": [str(plan.id)],
             "fire_events": event_ids,
+            "fire_loan_settings": setting_ids,
         },
     }
-    return {"fire_plan_created": 1, "fire_events_created": len(event_ids)}
+    return {
+        "fire_plan_created": 1,
+        "fire_events_created": len(event_ids),
+        "fire_loan_settings_created": len(setting_ids),
+    }
 
 
 def _restore_report(
@@ -1559,6 +1597,9 @@ def _restore_report(
     )
     counts["fire_plan_created"] = 1 if archive.rows.fire_plan is not None else 0
     counts["fire_events_created"] = len(archive.rows.fire_events)
+    counts["fire_loan_settings_created"] = sum(
+        1 for row in archive.rows.fire_loan_settings if row.included == "false"
+    )
     counts["invalid"] = len(errors)
     asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
@@ -1664,6 +1705,7 @@ def _plan_restore(
         archive.rows.installment_plans,
         (archive.rows.fire_plan,) if archive.rows.fire_plan is not None else (),
         archive.rows.fire_events,
+        archive.rows.fire_loan_settings,
     ):
         for number, _row in enumerate(rows, start=1):
             if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
@@ -2602,6 +2644,7 @@ def _apply_restore(
         batch,
         archive,
         restore_now=restore_now,
+        loan_ids=loan_ids,
     )
     session.flush()
     AuditEventRepository(session, ctx).record(
@@ -2642,6 +2685,7 @@ def _apply_restore(
             "installment_plans": len(archive.rows.installment_plans),
             "fire_plan": 1 if archive.rows.fire_plan is not None else 0,
             "fire_events": len(archive.rows.fire_events),
+            "fire_loan_settings": len(archive.rows.fire_loan_settings),
             "risk_policy": archive.rows.risk_target_policy is not None,
             "settings_fields": ",".join(settings_diff),
             "suggested_categories_removed": len(removed),

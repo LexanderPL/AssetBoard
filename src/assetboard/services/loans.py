@@ -656,7 +656,16 @@ def _view(
     transfers: list[LoanTransfer],
     reference_data: _ReferenceData,
     today: date,
+    *,
+    tolerant_rates: bool = False,
 ) -> LoanView:
+    """One loan view.
+
+    ``tolerant_rates`` is for callers that must list a loan whose schedule is broken (the FIRE
+    planner's live-loan resolver): a missing loan start leaves an empty rate timeline and the
+    top-level rate fields instead of raising. The loan pages keep the strict default, where a
+    missing anchor on a schedule loan is a real data error.
+    """
     entry = _entry_path(loan)
     latest_checkpoint = None
     if checkpoints:
@@ -770,10 +779,21 @@ def _view(
         timeline = rate_timeline(view)
     except LoanValidationError:
         timeline = []
+    except LoanError:
+        if not tolerant_rates:
+            raise
+        timeline = []
     initial_on = loan.origination_date or (
         min(row.as_of for row in checkpoints) if checkpoints else None
     )
-    current_mode, current_name, current_margin = _current_rate_source(view, today)
+    try:
+        current_mode, current_name, current_margin = _current_rate_source(view, today)
+    except LoanError:
+        if not tolerant_rates:
+            raise
+        current_mode = RateMode(loan.rate_mode)
+        current_name = initial_reference.name if initial_reference is not None else None
+        current_margin = loan.margin_bp
     return replace(
         view,
         current_rate_bp=_rate_on_or_none(timeline, today),
@@ -920,7 +940,9 @@ def load_loan_views_in_session(
 
     Rates, cost components, overpayments, checkpoints and reference-rate values are loaded once
     and grouped by loan (or reference rate). Installment plans are not schedule loans and are
-    omitted, matching ``list_loans``.
+    omitted, matching ``list_loans``. The rate fields tolerate a loan whose start is missing so a
+    caller such as the FIRE resolver can still show the row with a reason; schedule builders then
+    raise their own error for that loan.
     """
     repository = LoanRepository(session, ctx)
     requested = set(loan_ids) if loan_ids is not None else None
@@ -975,6 +997,7 @@ def load_loan_views_in_session(
             transfers_by_loan.get(row.id, []),
             reference_data,
             today,
+            tolerant_rates=True,
         )
         for row in rows
     ]

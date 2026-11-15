@@ -38,7 +38,7 @@
       </div>
       <div class="grid content-start gap-3">
         <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending in the current year, excluding savings and transfers. Include the taxes you actually pay and your loan payments; the planner will remove an included loan's payment after its payoff later.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}</label>
-        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("expenses_manual"), copy_input=suggested_inputs.get("expenses_manual")) }}{% endif %}
+        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, saved=saved_amounts.get("expenses_manual"), copy_input=suggested_inputs.get("expenses_manual"), scheduled_loan_total=loan_section.active_total_label if loan_section and loan_section.rows else none, scheduled_loan_count=loan_section.rows|length if loan_section else 0) }}{% endif %}
       </div>
       <div class="grid content-start gap-3 lg:col-span-2">
         <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets today: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal lg:max-w-[calc(50%-0.625rem)]"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}</label>
@@ -49,3 +49,5 @@
   </section>
 
   {% include "fire/_adjustments_edit.html" %}
+
+  {% include "fire/_loans.html" %}

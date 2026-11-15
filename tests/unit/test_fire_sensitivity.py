@@ -13,6 +13,7 @@ from assetboard.domain.fire import (
     DEFAULT_RETURN_DELTAS_BP,
     MAX_AMOUNT_MINOR,
     ProjectionInputs,
+    ProjectionLoan,
     Rule,
     SensitivityError,
     project,
@@ -127,6 +128,66 @@ def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
         assert item.inflation_bp == inputs.inflation_bp
         assert item.income_growth_bp == inputs.income_growth_bp
         assert item.events == inputs.events
+
+
+def test_a_live_loan_scales_with_the_expense_factor_and_keeps_its_payoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = replace(
+        _inputs(start_expenses=Money(1_000_001, "EUR")),
+        loans=(
+            ProjectionLoan(Money(333_337, "EUR"), 2030, True),
+            ProjectionLoan(Money(100_001, "EUR"), 2028, False),
+        ),
+    )
+    captured: list[ProjectionInputs] = []
+    real_project = fire.project
+
+    def recording(value: ProjectionInputs) -> fire.Projection:
+        captured.append(value)
+        return real_project(value)
+
+    monkeypatch.setattr(fire, "project", recording)
+    grid = sensitivity(inputs, (0,), (5_000, 10_000, 15_000))
+    by_factor = {item.start_expenses.amount_minor: item for item in captured}
+    assert set(by_factor) == {500_001, 1_000_001, 1_500_002}
+    assert [
+        (loan.annual_payment.amount_minor, loan.payoff_year, loan.included)
+        for loan in by_factor[500_001].loans
+    ] == [(166_669, 2030, True), (50_001, 2028, False)]
+    assert [
+        (loan.annual_payment.amount_minor, loan.payoff_year, loan.included)
+        for loan in by_factor[1_000_001].loans
+    ] == [(333_337, 2030, True), (100_001, 2028, False)]
+    assert [
+        (loan.annual_payment.amount_minor, loan.payoff_year, loan.included)
+        for loan in by_factor[1_500_002].loans
+    ] == [(500_006, 2030, True), (150_002, 2028, False)]
+    base = grid.base_cell
+    expected = project(inputs)
+    assert (base.fire_age, base.fire_year) == (expected.fire_age, expected.fire_year)
+
+
+def test_a_zero_expense_factor_leaves_no_loan_payment_to_drop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = replace(
+        _inputs(),
+        loans=(ProjectionLoan(Money(1_000_000, "EUR"), 2030, True),),
+    )
+    captured: list[ProjectionInputs] = []
+    real_project = fire.project
+
+    def recording(value: ProjectionInputs) -> fire.Projection:
+        captured.append(value)
+        return real_project(value)
+
+    monkeypatch.setattr(fire, "project", recording)
+    sensitivity(inputs, (0,), (0, 10_000))
+    zero = next(item for item in captured if item.start_expenses.amount_minor == 0)
+    assert zero.loans == ()
+    base = next(item for item in captured if item.start_expenses.amount_minor == 3_000_000)
+    assert base.loans == inputs.loans
 
 
 def test_never_cells_keep_none_and_the_age_range_covers_reached_cells_only() -> None:

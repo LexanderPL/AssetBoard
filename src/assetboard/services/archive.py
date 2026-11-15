@@ -28,6 +28,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     FireEventRepository,
+    FireLoanSettingRepository,
     FireScenarioRepository,
     FxRateRepository,
     IncomeSourceRepository,
@@ -69,6 +70,7 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     FireEventRow,
+    FireLoanSettingRow,
     FirePlanRow,
     FxRateRow,
     InstallmentPlanRow,
@@ -521,6 +523,10 @@ def _has_fire_events(session: Session, ctx: Context) -> bool:
     return FireEventRepository(session, ctx).any_exists()
 
 
+def _has_fire_loan_settings(session: Session, ctx: Context) -> bool:
+    return FireLoanSettingRepository(session, ctx).any_exists()
+
+
 def _has_reference_rates(session: Session, ctx: Context) -> bool:
     return ReferenceRateRepository(session, ctx).any_exists()
 
@@ -567,6 +573,7 @@ EMPTINESS_CHECKS = (
     _has_installment_plans,
     _has_fire_scenarios,
     _has_fire_events,
+    _has_fire_loan_settings,
 )
 
 
@@ -1161,6 +1168,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             legacy_skipped = len(legacy_plans) - 1
         fire_plan_row: FirePlanRow | None = None
         fire_event_rows: tuple[FireEventRow, ...] = ()
+        fire_loan_setting_rows: tuple[FireLoanSettingRow, ...] = ()
         fire_zeroed_fields: set[str] = set()
         if export_plan is not None:
             if export_plan.is_live:
@@ -1252,6 +1260,17 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 )
                 for row in FireEventRepository(session, ctx).for_plan(export_plan.id)
             )
+            if export_plan.is_live:
+                fire_loan_setting_rows = tuple(
+                    FireLoanSettingRow(
+                        id=str(setting.id),
+                        loan_id=str(loan_lineage.get(setting.loan_id, setting.loan_id)),
+                        loan=loans_by_id[setting.loan_id].name,
+                        included="false",
+                    )
+                    for setting in FireLoanSettingRepository(session, ctx).for_plan(export_plan.id)
+                    if not setting.included and setting.loan_id in loans_by_id
+                )
         asset_class_rows = tuple(
             AssetClassRow(
                 id=str(asset_class_lineage[row.id]),
@@ -1512,6 +1531,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             installment_plans=installment_plan_rows,
             fire_plan=fire_plan_row,
             fire_events=fire_event_rows,
+            fire_loan_settings=fire_loan_setting_rows,
         )
         counts = {
             "categories": len(category_rows),
@@ -1543,6 +1563,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "installment_plans": len(installment_plan_rows),
             "fire_plan": 1 if fire_plan_row is not None else 0,
             "fire_events": len(fire_event_rows),
+            "fire_loan_settings": len(fire_loan_setting_rows),
             "fire_legacy_scenarios_skipped": legacy_skipped,
             # A linked legacy input whose value cannot be resolved is exported as 0 and its
             # field is named here, so it is never a silent zero (see docs/archive-format.md).

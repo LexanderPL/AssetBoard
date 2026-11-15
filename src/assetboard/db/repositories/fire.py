@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
-from assetboard.db.models.fire import FireEvent, FireScenario
+from assetboard.db.models.fire import FireEvent, FireLoanSetting, FireScenario
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -88,3 +88,18 @@ class FireEventRepository(ScopedRepository[FireEvent]):
             FireEvent.kind == "saving_override",
         )
         return set(self._session.scalars(statement))
+
+
+class FireLoanSettingRepository(ScopedRepository[FireLoanSetting]):
+    model = FireLoanSetting
+
+    def create(self, **values: object) -> FireLoanSetting:
+        return self.add(FireLoanSetting(**values))
+
+    def for_plan(self, plan_id: UUID) -> list[FireLoanSetting]:
+        statement = (
+            self._scoped_select()
+            .where(FireLoanSetting.scenario_id == plan_id)
+            .order_by(FireLoanSetting.loan_id)
+        )
+        return list(self._session.scalars(statement))

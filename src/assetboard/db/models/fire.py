@@ -198,3 +198,38 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     label: Mapped[str] = mapped_column(String(MAX_LABEL_LENGTH), nullable=False)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+
+
+class FireLoanSetting(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """A saved non-default FIRE choice for one loan; absence means included.
+
+    Only ignored loans are written as rows (``included=false``). A row survives archiving the
+    loan so restoring the loan restores the choice. The plan and loan foreign keys are composite
+    so a setting can never point at another workspace's plan or loan.
+    """
+
+    __tablename__ = "fire_loan_settings"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "scenario_id", "loan_id", name="uq_fire_loan_settings_plan_loan"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "scenario_id"],
+            ["fire_scenarios.workspace_id", "fire_scenarios.id"],
+            name="fk_fire_loan_settings_workspace_scenario",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_fire_loan_settings_workspace_loan",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_fire_loan_settings_workspace_scenario", "workspace_id", "scenario_id"),
+    )
+
+    scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    included: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )

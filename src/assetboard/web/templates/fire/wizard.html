@@ -49,7 +49,7 @@
       </div>
       <div class="grid content-start gap-3">
         <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending, including your loan payments. Savings and transfers are not expenses.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. Enter 0 if this does not apply.") }}</span></label>
-        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text) }}{% endif %}
+        {% if suggestions %}{{ amount_suggestion(suggestions, "expenses_manual", "expenses", _("Suggested annual expenses"), locale, show_categories=true, messages=suggestion_block_messages, fallback=suggestion_block_fallback, warning_text=suggestion_warning_text, scheduled_loan_total=loan_section.active_total_label if loan_section and loan_section.rows else none, scheduled_loan_count=loan_section.rows|length if loan_section else 0) }}{% endif %}
       </div>
     </div>
     <p class="border border-line bg-subtle px-4 py-3 text-sm text-muted">{{ _("A suggestion never fills a field by itself. Press Use suggested value to copy one, then change it if you want.") }}</p>

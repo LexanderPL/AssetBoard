@@ -52,6 +52,7 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "InstallmentPlan": "installment plans are user records, not sample data",
         "FireScenario": "the FIRE plan is a user what-if, not sample data",
         "FireEvent": "FIRE adjustments belong to a user's plan",
+        "FireLoanSetting": "a FIRE loan choice belongs to a user's plan",
     }
 )
 

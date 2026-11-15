@@ -24,12 +24,16 @@ from assetboard.domain.archive import (
     ArchiveError,
     ArchiveRows,
     FireEventRow,
+    FireLoanSettingRow,
     FirePlanRow,
+    LoanRateChangeRow,
+    LoanRow,
     parse_archive,
     write_archive,
 )
 from assetboard.domain.fire import EventKind, ProjectionEvent, ProjectionInputs, Rule, project
 from assetboard.domain.money import Money
+from assetboard.services import fire_scenarios
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.fire_projection import scenario_results
 from assetboard.services.import_csv import default_import_adapters
@@ -46,9 +50,13 @@ EXPORTED_AT = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
 GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
+GOLDEN_V2_0 = FIXTURES / "workspace-archive-v2.0.zip"
 PLAN = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 EVENT = UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
 OVERRIDE = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+LOAN = UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+LOAN_RATE = UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
+LOAN_SETTING = UUID("11111111-1111-4111-8111-111111111111")
 
 
 def _workspace() -> dict[str, object]:
@@ -241,7 +249,7 @@ def test_2_0_round_trip_keeps_plan_events_and_projection(db: WorkspaceDb, data_d
     content = export_workspace(db.factory, ctx).content
     parsed, errors = parse_archive(content)
     assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == "2.0"
+    assert parsed.manifest["format_version"] == "2.1"
     assert _data_files(original)["fire_plan.csv"] == _data_files(content)["fire_plan.csv"]
     assert _data_files(original)["fire_events.csv"] == _data_files(content)["fire_events.csv"]
 
@@ -583,3 +591,118 @@ def test_archive_reader_accepts_needs_review_false() -> None:
     assert parsed.rows.fire_plan is not None
     assert parsed.rows.fire_plan.needs_review == "false"
     assert ArchiveError is not None
+
+
+def _loan_rows() -> tuple[tuple[LoanRow, ...], tuple[LoanRateChangeRow, ...]]:
+    return (
+        (
+            LoanRow(
+                str(LOAN),
+                "Mortgage",
+                "annuity",
+                "EUR",
+                "100000.00",
+                "2026-01-01",
+                "2026-02-01",
+                24,
+                1,
+                "fixed",
+                "monthly",
+                "full_at_origination",
+                0,
+                None,
+                None,
+                "",
+                None,
+                "",
+                "false",
+                "",
+                "none",
+                "",
+                "reduce_term",
+                None,
+            ),
+        ),
+        (LoanRateChangeRow(str(LOAN_RATE), str(LOAN), "Mortgage", "2026-01-01", 600),),
+    )
+
+
+def test_fire_loan_settings_round_trip_and_ignored_projection(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    loan_rows, rate_rows = _loan_rows()
+    rows = replace(
+        _rows(),
+        loans=loan_rows,
+        loan_rate_changes=rate_rows,
+        fire_loan_settings=(FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Mortgage", "false"),),
+    )
+    _workspace_id, ctx, _batch_id, _report, counts = _restore(db, data_dir, rows)
+    assert counts["counts"]["fire_loan_settings_created"] == 1, counts
+    results = scenario_results(db.factory, ctx)
+    assert results.loans is not None
+    row = next(item for item in results.loans.rows if item.loan_id == LOAN)
+    assert row.state.value == "ignored"
+    assert results.loans.included_annual_total.amount_minor == 0
+    assert results.loans.ignored_annual_total.amount_minor > 0
+    content = export_workspace(db.factory, ctx).content
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_loan_settings[0].loan_id == str(LOAN)
+
+
+def test_a_missing_loan_setting_is_a_warning_and_is_skipped(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = replace(
+        _rows(),
+        fire_loan_settings=(FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Missing", "false"),),
+    )
+    parsed, errors = parse_archive(_archive(rows))
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_loan_settings == ()
+    assert any("missing loan" in warning.message for warning in parsed.warnings)
+    _workspace_id, ctx, _batch_id, _report, counts = _restore(db, data_dir, rows)
+    assert counts["counts"].get("fire_loan_settings_created", 0) == 0
+
+
+def test_released_2_0_archive_reads_with_every_loan_included() -> None:
+    parsed, errors = parse_archive(GOLDEN_V2_0.read_bytes())
+    assert errors == () and parsed is not None
+    assert parsed.manifest["format_version"] == "2.0"
+    assert parsed.rows.fire_loan_settings == ()
+
+
+def test_duplicate_and_invalid_fire_loan_settings_are_errors() -> None:
+    loan_rows, rate_rows = _loan_rows()
+    duplicated = FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Mortgage", "false")
+    invalid = FireLoanSettingRow(str(UUID(int=8)), str(LOAN), "Mortgage", "maybe")
+    parsed, errors = parse_archive(
+        _archive(
+            replace(
+                _rows(),
+                loans=loan_rows,
+                loan_rate_changes=rate_rows,
+                fire_loan_settings=(duplicated, duplicated, invalid),
+            )
+        )
+    )
+    assert parsed is None
+    messages = {error.message for error in errors}
+    assert "duplicate FIRE loan setting id" in messages
+    assert "duplicate FIRE loan setting" in messages
+    assert "invalid FIRE loan setting" in messages
+
+
+def test_an_included_true_setting_is_accepted_as_a_no_op(db: WorkspaceDb, data_dir: Path) -> None:
+    loan_rows, rate_rows = _loan_rows()
+    rows = replace(
+        _rows(),
+        loans=loan_rows,
+        loan_rate_changes=rate_rows,
+        fire_loan_settings=(FireLoanSettingRow(str(LOAN_SETTING), str(LOAN), "Mortgage", "true"),),
+    )
+    _workspace_id, ctx, _batch_id, _report, counts = _restore(db, data_dir, rows)
+    assert counts["counts"]["fire_loan_settings_created"] == 0
+    detail = fire_scenarios.get_fire_plan(db.factory, ctx)
+    assert detail.ignored_loan_ids == frozenset()

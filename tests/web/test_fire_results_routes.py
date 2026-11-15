@@ -202,7 +202,7 @@ def test_the_csv_is_id_free_and_writes_nothing(owner) -> None:
     assert response.headers["content-type"].startswith("text/csv")
     assert response.headers["content-disposition"] == 'attachment; filename="fire-plan.csv"'
     header = response.text.splitlines()[0]
-    assert header.startswith("year,age,income,expenses,net,gain,cash,net_worth")
+    assert header.startswith("year,age,income,expenses,loan_payment,net,gain,cash,net_worth")
     assert "real_income" in header
     assert _snapshot(owner, plan_id) == before
     owner.set_admin_role("viewer")
@@ -283,3 +283,170 @@ def test_a_viewer_sees_the_needs_review_banner_without_a_link(owner) -> None:
 def test_csv_and_sensitivity_without_a_plan_are_not_found(owner) -> None:
     assert owner.client.get("/fire/results.csv").status_code == 404
     assert owner.client.get("/fire/sensitivity").status_code == 404
+
+
+def test_the_view_shows_live_loans_and_their_effect(owner) -> None:
+    from assetboard.db.models.fire import FireLoanSetting
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = _create(owner)
+    loan_id = create_loan(owner, name="Home mortgage")
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-loans" in page.text
+    assert "Home mortgage" in page.text
+    assert f'data-fire-loan="{loan_id}"' in page.text
+    assert 'data-fire-loan-state="included"' in page.text
+    assert "data-fire-loan-annual" in page.text
+    assert "data-fire-loan-payoff" in page.text
+    assert "data-fire-loan-effect" in page.text
+    assert 'name="loan_include_' not in page.text
+    assert "Loan payments" in page.text
+    assert "data-fire-loan-payment" in page.text
+    with owner.db() as session, session.begin():
+        session.add(
+            FireLoanSetting(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                loan_id=loan_id,
+                included=False,
+            )
+        )
+    ignored = owner.client.get("/fire")
+    assert ignored.status_code == 200
+    assert 'data-fire-loan-state="ignored"' in ignored.text
+    assert "Stays in expenses through the plan horizon." in ignored.text
+    assert "data-fire-loans-included-total" in ignored.text
+
+
+def test_archived_and_paid_off_loans_show_reasons_in_the_view(owner) -> None:
+    from assetboard.domain.money import Money
+    from tests.fire_loan_helpers import create_loan, owner_context
+
+    _create(owner)
+    archived = create_loan(owner, name="Archived loan")
+    with owner.db() as session, session.begin():
+        from assetboard.db.repositories import LoanRepository
+
+        LoanRepository(session, owner_context(owner)).get_or_raise(
+            archived
+        ).archived_at = owner.app.state.clock.now()
+    paid = create_loan(
+        owner,
+        name="Paid loan",
+        principal_original=Money(100_000, "EUR"),
+        term_months=1,
+    )
+    with owner.db() as session, session.begin():
+        from assetboard.db.repositories import LoanRepository
+
+        row = LoanRepository(session, owner_context(owner)).get_or_raise(paid)
+        row.name = "Paid loan"
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-loans-excluded" in page.text
+    assert "Paid off; there is no payment to include." in page.text
+
+
+def test_the_first_included_payoff_skips_ignored_loans(owner) -> None:
+    from assetboard.db.models.fire import FireLoanSetting
+    from tests.fire_loan_helpers import create_loan
+
+    plan_id = _create(owner)
+    early = create_loan(owner, name="Early loan", term_months=12)
+    create_loan(owner, name="Later loan", term_months=24)
+    with owner.db() as session, session.begin():
+        session.add(
+            FireLoanSetting(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                loan_id=early,
+                included=False,
+            )
+        )
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "The first included loan payoff is in 2028." in page.text
+    assert "The first included loan payoff is in 2027." not in page.text
+
+
+def test_a_loan_payment_warning_is_shown_when_expenses_are_too_low(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    _create(owner, expenses_manual="1000")
+    create_loan(owner)
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-loans-expense-warning" in page.text
+
+
+def test_the_view_query_count_does_not_grow_with_loans(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    _create(owner)
+    create_loan(owner, name="First")
+    seen = 0
+
+    def before(*_args: object) -> None:
+        nonlocal seen
+        seen += 1
+
+    def count() -> int:
+        nonlocal seen
+        seen = 0
+        engine = owner.app.state.database_engine
+        event.listen(engine, "before_cursor_execute", before)
+        try:
+            response = owner.client.get("/fire")
+            assert response.status_code == 200
+        finally:
+            event.remove(engine, "before_cursor_execute", before)
+        return seen
+
+    one = count()
+    create_loan(owner, name="Second")
+    create_loan(owner, name="Third")
+    many = count()
+    assert many == one
+    assert many <= 30
+
+
+def test_the_loan_panel_has_an_empty_state_and_no_fake_zero(owner) -> None:
+    _create(owner)
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "No active loans." in page.text
+    assert "data-fire-loans-summary" not in page.text
+
+
+def test_the_loan_panel_is_translated(owner) -> None:
+    from assetboard.db.models.identity import User, Workspace
+    from assetboard.services import loans as loan_service
+    from tests.fire_loan_helpers import create_loan, owner_context
+
+    _create(owner)
+    create_loan(owner, name="Kredyt hipoteczny")
+    archived = create_loan(owner, name="Stary kredyt")
+    loan_service.archive_loan(owner.app.state.session_factory, owner_context(owner), archived)
+    with owner.db() as session, session.begin():
+        session.get_one(Workspace, owner.home_id).locale = "pl"
+        session.get_one(User, owner.admin_id).locale = "pl"
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "Kredyty" in page.text
+    assert "Uwzględnione w planie" in page.text
+    assert "Rata roczna" in page.text or "Roczna rata" in page.text
+    assert "Raty kredytów" in page.text
+    assert "Zarchiwizowany w Kredytach; nie jest częścią planu." in page.text
+
+
+def test_a_plan_currency_mismatch_explains_the_loan_block(owner) -> None:
+    from assetboard.db.models.fire import FireScenario
+
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).currency = "USD"
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-loans" in page.text
+    assert "Loans cannot be included while the plan currency" in page.text

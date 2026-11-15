@@ -22,6 +22,7 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     FireEventRow,
+    FireLoanSettingRow,
     FirePlanRow,
     FxRateRow,
     InstallmentPlanRow,
@@ -53,7 +54,8 @@ from assetboard.domain.archive import (
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v2.0.zip"
+GOLDEN = FIXTURES / "workspace-archive-v2.1.zip"
+GOLDEN_V2_0 = FIXTURES / "workspace-archive-v2.0.zip"
 GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
 GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
 GOLDEN_V1_6 = FIXTURES / "workspace-archive-v1.6.zip"
@@ -495,6 +497,14 @@ def _rows() -> ArchiveRows:
                 None,
             ),
         ),
+        fire_loan_settings=(
+            FireLoanSettingRow(
+                "b2c3d4e5-f6a7-48b9-9c0d-1e2f3a4b5c6d",
+                loan_id,
+                "Home mortgage",
+                "false",
+            ),
+        ),
         fire_plan=FirePlanRow(
             fire_plan_id,
             "EUR",
@@ -736,6 +746,8 @@ def test_fire_files_are_required_in_2_0_and_legacy_files_before_it() -> None:
     assert not any(name in required_files("1.7") for name in LEGACY_FIRE_CSV_FILES)
     assert all(name in required_files("1.8") for name in LEGACY_FIRE_CSV_FILES)
     assert all(name in required_files("2.0") for name in ("fire_plan.csv", "fire_events.csv"))
+    assert "fire_loan_settings.csv" not in required_files("2.0")
+    assert "fire_loan_settings.csv" in required_files("2.1")
     assert not any(
         name in required_files("2.0")
         for name in ("fire_scenarios.csv", "fire_contributions.csv", "fire_expense_exclusions.csv")
@@ -893,12 +905,12 @@ def test_reader_accepts_reordered_columns_bom_defaults_and_future_minor() -> Non
     files["categories.csv"] = (
         "\ufeffname,id,kind,future\nFood,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,expense,x\n"
     ).encode()
-    parsed, errors = parse_archive(_rewrite(files, format_version="2.1", future=True))
+    parsed, errors = parse_archive(_rewrite(files, format_version="2.2", future=True))
     assert not errors and parsed is not None
     assert parsed.rows.categories[0].treatment == "regular"
     assert parsed.rows.categories[0].sort_order == 0
     assert sorted(w.message for w in parsed.warnings) == [
-        "newer minor version: 2.1",
+        "newer minor version: 2.2",
         "unknown column: future",
         "unknown key: future",
     ]
@@ -1675,7 +1687,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 37)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 38)
     assert parse_archive(_archive())[1] == ()
     monkeypatch.setattr(archive, "MAX_DATA_ROWS", 36)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

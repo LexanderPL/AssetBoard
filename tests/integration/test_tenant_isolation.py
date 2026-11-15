@@ -2716,13 +2716,22 @@ def test_loan_queries_stay_in_their_workspace(
 def test_fire_queries_stay_in_their_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any]
 ) -> None:
-    from assetboard.db.repositories import FireEventRepository, FireScenarioRepository
+    from assetboard.db.repositories import (
+        FireEventRepository,
+        FireLoanSettingRepository,
+        FireScenarioRepository,
+        LoanRepository,
+    )
 
     ctx_a, ctx_b = two_workspaces
     scenarios_a = FireScenarioRepository(db_session, ctx_a)
     scenarios_b = FireScenarioRepository(db_session, ctx_b)
     events_a = FireEventRepository(db_session, ctx_a)
     events_b = FireEventRepository(db_session, ctx_b)
+    settings_a = FireLoanSettingRepository(db_session, ctx_a)
+    settings_b = FireLoanSettingRepository(db_session, ctx_b)
+    loans_a = LoanRepository(db_session, ctx_a)
+    loans_b = LoanRepository(db_session, ctx_b)
 
     plan_values = {
         "currency": "EUR",
@@ -2777,6 +2786,38 @@ def test_fire_queries_stay_in_their_workspace(
     assert events_a.counts_by_scenario() == {live_a.id: 1}
     assert events_b.counts_by_scenario() == {live_b.id: 1}
     assert events_a.saving_override_years(live_a.id) == set()
+
+    loan_a = loans_a.create(
+        name="Mortgage A",
+        kind="annuity",
+        currency="EUR",
+        principal_original_minor=None,
+        origination_date=None,
+        first_payment_date=date(2026, 1, 1),
+        term_months=12,
+        payment_day=1,
+        rate_mode="fixed",
+        day_count="monthly",
+        margin_bp=None,
+        reference_rate_id=None,
+        installment_override_minor=None,
+        overpayment_mode="none",
+        overpayment_amount_minor=None,
+        overpayment_strategy="reduce_term",
+        archived_at=None,
+    )
+    setting_a = settings_a.create(scenario_id=live_a.id, loan_id=loan_a.id, included=False)
+    assert [row.id for row in settings_a.for_plan(live_a.id)] == [setting_a.id]
+    assert settings_b.for_plan(live_a.id) == []
+    assert loans_a.by_ids([loan_a.id]) == [loan_a]
+    assert loans_b.by_ids([loan_a.id]) == []
+    with pytest.raises(ForeignWorkspace):
+        settings_b.create(
+            workspace_id=ctx_a.workspace.id,
+            scenario_id=live_a.id,
+            loan_id=loan_a.id,
+            included=False,
+        )
 
     with pytest.raises(ForeignWorkspace):
         scenarios_b.create(workspace_id=ctx_a.workspace.id, **plan_values)
