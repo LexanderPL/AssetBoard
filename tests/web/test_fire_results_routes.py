@@ -57,19 +57,113 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert "data-fire-edit-page" not in page.text
 
 
-def test_the_view_basis_links_switch_the_table_and_charts(owner) -> None:
+def test_the_view_uses_nominal_values_only(owner) -> None:
     _create(owner)
     page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert 'href="/fire?basis=real#fire-results"' in page.text
-    assert 'href="/fire?basis=nominal#fire-results"' in page.text
+    assert "data-fire-basis" not in page.text
+    assert "?basis=" not in page.text
     assert 'name="basis"' not in page.text
-    page = owner.client.get("/fire?basis=real")
+    assert "Money basis" not in page.text
+    assert "Today's money" not in page.text
+    assert "Each year's money" not in page.text
+    ignored = owner.client.get("/fire?basis=real")
+    assert ignored.status_code == 200
+    assert "data-fire-basis" not in ignored.text
+    assert "Today's money" not in ignored.text
+    assert "Plan progress" in ignored.text
+
+
+def test_fire_templates_have_no_real_money_or_spreadsheet_wording() -> None:
+    from pathlib import Path
+
+    templates = Path(__file__).resolve().parents[2] / "src/assetboard/web/templates/fire"
+    text = "\n".join(path.read_text(encoding="utf-8") for path in templates.glob("*.html"))
+    for phrase in (
+        "Sheet progress",
+        "Today's-money progress",
+        "Today's money",
+        "today's money",
+        "Each year's money",
+        "Money basis",
+        "spreadsheet",
+        "real_income",
+        "real_expenses",
+        "real_loan_payment",
+        "real_net",
+        "real_gain",
+        "real_cash",
+        "real_net_worth",
+        "real_networth_at_fire",
+        "fire_number_today",
+        "data-fire-basis",
+        'name="basis"',
+    ):
+        assert phrase not in text
+    assert "real return" not in text.lower()
+
+
+def test_the_metrics_show_fire_number_with_year_and_plan_progress(owner) -> None:
+    _create(owner)
+    page = owner.client.get("/fire")
+    assert 'data-fire-number-value="' in page.text
+    assert re.search(r'data-fire-number-year="\d{4}"', page.text)
+    assert 'data-fire-progress="plan"' in page.text
+    assert 'data-fire-progress="today"' not in page.text
+    assert 'data-fire-progress="sheet"' not in page.text
+    assert "FIRE number" in page.text
+    assert "Plan progress" in page.text
+    assert "All amounts are nominal" in page.text
+    assert "Nominal amounts. The first age after income stops" in page.text
+    assert "Sheet progress" not in page.text
+    assert "Today's-money progress" not in page.text
+
+
+def test_a_never_fire_plan_shows_dashes_and_the_reason(owner) -> None:
+    _create(owner, income_manual="0", expenses_manual="1000000", portfolio_manual="0")
+    page = owner.client.get("/fire")
+    assert 'data-fire-number-value=""' in page.text
+    assert 'data-fire-progress="plan" data-progress-bp=""' in page.text
+    assert "data-fire-never" in page.text
+    assert "data-fire-number-note" not in page.text
+    assert "With these inputs, returns never cover expenses" in page.text
+
+
+def test_the_view_has_no_real_money_or_spreadsheet_wording(owner) -> None:
+    _create(owner)
+    page = owner.client.get("/fire")
+    text = page.text
+    for phrase in (
+        "Sheet progress",
+        "Today's-money progress",
+        "Today's money",
+        "today's money",
+        "Each year's money",
+        "Money basis",
+        "spreadsheet",
+        "real_income",
+        "real_expenses",
+        "real_loan_payment",
+        "real_net_worth",
+        "real_networth_at_fire",
+        "fire_number_today",
+    ):
+        assert phrase not in text
+
+
+def test_the_metrics_and_progress_are_translated(owner) -> None:
+    from assetboard.db.models.identity import User, Workspace
+
+    _create(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(Workspace, owner.home_id).locale = "pl"
+        session.get_one(User, owner.admin_id).locale = "pl"
+    page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert 'data-fire-basis="real"' in page.text
-    assert re.search(
-        r'<a[^>]*href="/fire\?basis=real#fire-results"[^>]*aria-current="true"', page.text
-    )
+    assert "Kwota FIRE" in page.text
+    assert "Postęp planu" in page.text
+    assert "Sheet progress" not in page.text
+    assert "Postęp arkusza" not in page.text
 
 
 def test_the_view_writes_nothing(owner) -> None:
@@ -202,8 +296,11 @@ def test_the_csv_is_id_free_and_writes_nothing(owner) -> None:
     assert response.headers["content-type"].startswith("text/csv")
     assert response.headers["content-disposition"] == 'attachment; filename="fire-plan.csv"'
     header = response.text.splitlines()[0]
-    assert header.startswith("year,age,income,expenses,loan_payment,net,gain,cash,net_worth")
-    assert "real_income" in header
+    assert header == (
+        "year,age,income,expenses,loan_payment,net,gain,cash,net_worth,"
+        "is_fire,income_stopped,currency"
+    )
+    assert "real" not in header
     assert _snapshot(owner, plan_id) == before
     owner.set_admin_role("viewer")
     try:

@@ -311,6 +311,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-view-plan" in page.text
     assert "data-fire-metrics" in page.text
     assert "data-fire-table" in page.text
+    assert 'data-fire-progress="plan"' in page.text
+    assert "data-fire-basis" not in page.text
+    assert "Return above inflation" in page.text
+    assert "Real return" not in page.text
     assert "data-fire-suggestion" in page.text
     assert "data-fire-sensitivity" not in page.text
     assert "data-fire-csv" not in page.text
@@ -456,12 +460,11 @@ def test_preview_does_not_clear_needs_review(owner) -> None:
         assert session.get_one(FireScenario, plan_id).needs_review is True
 
 
-def test_save_preserves_the_basis_and_events(owner) -> None:
+def test_save_preserves_events(owner) -> None:
     plan_id = create_plan(owner)
     response = owner.post(
         "/fire/edit",
         _form(
-            basis="real",
             event_year_1="2028",
             event_kind_1="saving_override",
             event_amount_1="-2000",
@@ -470,7 +473,7 @@ def test_save_preserves_the_basis_and_events(owner) -> None:
         token_from="/fire/edit",
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire?notice=saved&basis=real"
+    assert response.headers["location"] == "/fire?notice=saved"
     with owner.db() as session:
         events = session.scalars(select(FireEvent).where(FireEvent.scenario_id == plan_id)).all()
         assert [(row.year, row.kind) for row in events] == [(2028, "saving_override")]
@@ -917,12 +920,12 @@ def test_preview_returns_changed_results_and_writes_nothing(owner) -> None:
     before = _snapshot(owner, plan_id)
     response = owner.post(
         "/fire/edit/preview",
-        _form(expenses_manual="40000", basis="real"),
+        _form(expenses_manual="40000"),
         token_from="/fire/edit",
     )
     assert response.status_code == 200
     assert "Preview of unsaved changes" in response.text
-    assert 'data-fire-basis="real"' in response.text
+    assert "data-fire-basis" not in response.text
     assert "data-fire-metrics" in response.text
     assert "data-fire-table" in response.text
     assert "data-fire-chart" in response.text

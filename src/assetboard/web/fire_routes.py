@@ -147,8 +147,8 @@ SENSITIVITY_ERRORS = {
     "too_many_cells": _("The sensitivity grid has too many cells."),
     "missing_base": _("The sensitivity axes must include the saved plan."),
     "return_out_of_range": _(
-        "The real-return range would leave the supported -20 to 50 percent bounds. Adjust the "
-        "plan's return and try again."
+        "The return-above-inflation range would leave the supported -20 to 50 percent bounds. "
+        "Adjust the plan's return and try again."
     ),
     "expense_factor_out_of_range": _(
         "The expense range is outside the supported 0 to 1000 percent of the saved plan."
@@ -245,10 +245,6 @@ def _uuid(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise NotFound from None
-
-
-def _basis(value: str | None) -> str:
-    return "real" if value == "real" else "nominal"
 
 
 def _rate_input(rate_bp: int, locale: str) -> str:
@@ -628,8 +624,6 @@ def _results_context(
     ctx: Context,
     results: fire_projection_service.FirePlanResults,
     *,
-    basis: str,
-    editable_results: bool,
     in_editor: bool = False,
     preview_error: str | None = None,
     preview_error_field: str | None = None,
@@ -640,13 +634,9 @@ def _results_context(
         "detail": results.detail,
         "plan": results.detail.plan,
         "projection": projection,
-        "basis": basis,
-        "editable_results": editable_results,
         "in_editor": in_editor,
         "charts": (
-            build_fire_charts(projection, basis, request.state.locale)
-            if projection is not None
-            else None
+            build_fire_charts(projection, request.state.locale) if projection is not None else None
         ),
         "preview_error": preview_error,
         "preview_error_field": preview_error_field,
@@ -712,7 +702,6 @@ def _edit_context(
     *,
     results: fire_projection_service.FirePlanResults,
     suggestions: fire_linked_service.SetupSuggestions,
-    basis: str,
     values: dict[str, str] | None = None,
     adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None = None,
     error: str | None = None,
@@ -738,8 +727,6 @@ def _edit_context(
             request,
             ctx,
             results,
-            basis=basis,
-            editable_results=True,
             in_editor=True,
         )
     )
@@ -755,7 +742,6 @@ def _view_context(
     ctx: Context,
     results: fire_projection_service.FirePlanResults,
     *,
-    basis: str,
     sensitivity_loaded: bool,
     notice: str | None = None,
     error: str | None = None,
@@ -765,8 +751,6 @@ def _view_context(
         request,
         ctx,
         results,
-        basis=basis,
-        editable_results=False,
         in_editor=False,
     )
     context.update(
@@ -811,7 +795,6 @@ def _redirect(
     *,
     notice: str | None = None,
     error: str | None = None,
-    basis: str | None = None,
     **params: str,
 ) -> RedirectResponse:
     url = request.url_for(route, **params).path
@@ -820,8 +803,6 @@ def _redirect(
         query.append(f"notice={notice}")
     if error is not None:
         query.append(f"error={error}")
-    if basis == "real":
-        query.append("basis=real")
     if query:
         url = f"{url}?{'&'.join(query)}"
     return RedirectResponse(url, status_code=303)
@@ -1082,7 +1063,7 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
         return _redirect(request, "fire_scenarios", notice="migrated")
     if entry.detail is not None:
         if request.query_params.get("edit") == "1":
-            return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
+            return _redirect(request, "fire_edit")
         results = await run_in_threadpool(
             fire_projection_service.results_for_detail,
             request.app.state.session_factory,
@@ -1094,7 +1075,6 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
             request,
             ctx,
             results,
-            basis=_basis(request.query_params.get("basis")),
             sensitivity_loaded=request.query_params.get("sensitivity") == "1",
             notice=notice,
             error=error,
@@ -1136,7 +1116,6 @@ async def fire_edit_page(request: Request, ctx: CurrentContext) -> Response:
         request,
         ctx,
         detail,
-        basis=_basis(request.query_params.get("basis")),
         notice=_notice(
             request,
             "discarded"
@@ -1151,7 +1130,6 @@ async def _render_edit(
     ctx: Context,
     detail: fire_service.FirePlanDetail,
     *,
-    basis: str,
     values: dict[str, str] | None = None,
     adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None = None,
     error: str | None = None,
@@ -1195,7 +1173,6 @@ async def _render_edit(
         ctx,
         results=results,
         suggestions=suggestions,
-        basis=basis,
         values=values,
         adjustment_rows=adjustment_rows,
         error=error,
@@ -1217,7 +1194,6 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
     )
     if detail is None:
         raise NotFound
-    basis = _basis(values.get("basis"))
     try:
         plan = _plan_input(values, request.state.locale, detail.plan.currency)
         results = await run_in_threadpool(
@@ -1239,8 +1215,6 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
             request,
             ctx,
             saved,
-            basis=basis,
-            editable_results=True,
             in_editor=True,
             preview_error=_error(request, exc.code),
             preview_error_field=_preview_error_field(exc),
@@ -1251,8 +1225,6 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
         request,
         ctx,
         results,
-        basis=basis,
-        editable_results=True,
         in_editor=True,
     )
     return render_template(request, "fire/_results.html", context=context)
@@ -1263,7 +1235,6 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
     """Validate and save the plan; preview, navigation and discard never write."""
     require_role(ctx, Role.EDITOR)
     values = await _form_data(request)
-    basis = _basis(values.get("basis"))
     detail = await run_in_threadpool(
         fire_service.get_fire_plan_if_any, request.app.state.session_factory, ctx
     )
@@ -1276,7 +1247,6 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             request,
             ctx,
             detail,
-            basis=basis,
             values=values,
             error=_error(request, "missing_adjustments"),
             error_code="missing_adjustments",
@@ -1301,7 +1271,6 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             request,
             ctx,
             detail,
-            basis=basis,
             values=values,
             error=_error(request, exc.code),
             error_code=exc.code,
@@ -1310,7 +1279,7 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             dirty=True,
             status_code=400,
         )
-    return _redirect(request, "fire_scenarios", notice="saved", basis=basis)
+    return _redirect(request, "fire_scenarios", notice="saved")
 
 
 @router.get("/fire/sensitivity", name="fire_sensitivity")
@@ -1594,10 +1563,10 @@ async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id:
     if str(detail.plan.id) != scenario_id:
         raise NotFound
     if request.query_params.get("edit") == "1":
-        return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
+        return _redirect(request, "fire_edit")
     params = {
         key: value
-        for key in ("basis", "sensitivity", "notice", "error")
+        for key in ("sensitivity", "notice", "error")
         if (value := request.query_params.get(key))
     }
     anchor = "#sensitivity" if params.get("sensitivity") == "1" else ""
@@ -1630,7 +1599,7 @@ async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id:
     )
     if str(detail.plan.id) != scenario_id:
         raise NotFound
-    return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
+    return _redirect(request, "fire_edit")
 
 
 @router.get("/fire/{scenario_id}/results.csv", name="fire_scenario_csv")

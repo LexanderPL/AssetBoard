@@ -1,7 +1,7 @@
 {% from "fire/_macros.html" import hint with context %}
 {% set projection = results.projection %}
 
-{% macro progress_card(kind, label, definition, bp) %}
+{% macro progress_card(kind, label, definition, bp, note="") %}
 <div class="border border-line bg-surface p-4" data-fire-progress="{{ kind }}" data-progress-bp="{{ bp if bp is not none else '' }}">
   <dt class="text-xs font-medium text-muted">{{ label }} {{ hint(definition) }}</dt>
   <dd class="mt-1 flex items-baseline justify-between gap-2">
@@ -16,11 +16,13 @@
     {% endif %}
   </dd>
   <p class="mt-2 text-xs text-muted">{{ definition }}</p>
+  {% if note %}<p class="mt-1 text-xs text-muted" data-fire-progress-note>{{ note }}</p>{% endif %}
 </div>
 {% endmacro %}
 
 <section class="mb-6" aria-labelledby="metrics-heading" data-fire-metrics>
   <h2 id="metrics-heading" class="sr-only">{{ _("Key metrics") }}</h2>
+  <p class="mb-3 text-sm text-muted" data-fire-nominal-note>{{ _("All amounts are nominal: the actual money of each year, not adjusted for inflation.") }}</p>
   <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <div class="border border-line bg-surface p-4" data-fire-fire-age data-fire-fire-age-value="{{ projection.fire_age if projection.fire_age is not none else '' }}" data-fire-year-value="{{ projection.fire_year if projection.fire_year is not none else '' }}">
       <dt class="text-xs font-medium text-muted">{{ _("FIRE age") }} {{ hint(_("The age at which the plan first meets its independence rule. The year is shown beside it.")) }}</dt>
@@ -30,14 +32,14 @@
       <dt class="text-xs font-medium text-muted">{{ _("Years to FIRE") }} {{ hint(_("The number of plan years from the current year to the FIRE row. The current year counts as 0.")) }}</dt>
       <dd class="mt-1 text-lg font-semibold tabular-nums" data-fire-years-value>{% if projection.years_to_fire is not none %}{{ projection.years_to_fire }}{% else %}—{% endif %}</dd>
     </div>
-    <div class="border border-line bg-surface p-4" data-fire-number data-fire-number-value="{{ projection.fire_number_today.amount_minor if projection.fire_number_today is not none else '' }}">
-      <dt class="text-xs font-medium text-muted">{{ _("FIRE number (today's money)") }} {{ hint(_("The portfolio needed today for the plan's rule to cover its first year's expenses. It is expressed in today's money.")) }}</dt>
-      <dd class="mt-1 text-lg font-semibold tabular-nums">{% if projection.fire_number_today is not none %}{{ format_money(projection.fire_number_today, locale) }}{% else %}—{% endif %}</dd>
-      {% if projection.fire_number_today is none %}<p class="mt-1 text-xs text-muted">{{ _("Not defined with these rates.") }}</p>{% endif %}
+    <div class="border border-line bg-surface p-4" data-fire-number data-fire-number-value="{{ projection.fire_number.amount_minor if projection.fire_number is not none else '' }}" data-fire-number-year="{{ projection.fire_year if projection.fire_year is not none else '' }}">
+      <dt class="text-xs font-medium text-muted">{{ _("FIRE number") }} {{ hint(_("The nominal expenses in the FIRE year divided by the rate the independence rule uses: the withdrawal rate, or the nominal gain rate when returns must cover expenses. This is the portfolio the plan needs in that year.")) }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{% if projection.fire_number is not none %}{{ format_money(projection.fire_number, locale) }} <span class="text-sm font-normal text-muted">({{ projection.fire_year }})</span>{% else %}—{% endif %}</dd>
+      {% if projection.fire_age is not none and projection.fire_number is none %}<p class="mt-1 text-xs text-muted" data-fire-number-note>{{ _("Not defined: the plan's gain rate is not positive.") }}</p>{% endif %}
     </div>
     {% set sustainability_class = "border border-line bg-danger-soft" if projection.depletion_age is not none else "border border-line bg-surface" %}
     <div class="{{ sustainability_class }} p-4" data-fire-sustainability>
-      <dt class="text-xs font-medium text-muted">{{ _("Sustainability") }}</dt>
+      <dt class="text-xs font-medium text-muted">{{ _("Sustainability") }} {{ hint(_("Nominal amounts. The first age after income stops when the projected portfolio falls below zero, and the lowest net worth from then to the horizon.")) }}</dt>
       {% if projection.depletion_age is not none %}
       <dd class="mt-1 text-sm font-semibold text-danger-strong" data-fire-depletion>{{ _("The portfolio runs out at age %(age)d.", age=projection.depletion_age) }}</dd>
       {% if projection.min_networth_after_stop is not none %}<dd class="mt-1 text-xs text-muted">{{ _("Lowest net worth after income stops: %(amount)s", amount=format_money(projection.min_networth_after_stop, locale)) }}</dd>{% endif %}
@@ -51,8 +53,7 @@
   </dl>
 
   <dl class="mt-4 grid gap-4 sm:grid-cols-2">
-    {{ progress_card("sheet", _("Sheet progress"), _("Start net worth divided by net worth at FIRE, as in the original spreadsheet."), projection.progress_sheet_bp) }}
-    {{ progress_card("today", _("Today's-money progress"), _("Start portfolio divided by the FIRE number, both in today's money."), projection.progress_today_bp) }}
+    {{ progress_card("plan", _("Plan progress"), _("Starting portfolio divided by the projected net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target."), projection.plan_progress_bp, _("Not defined: net worth at FIRE is not positive.") if projection.fire_age is not none and projection.plan_progress_bp is none else "") }}
   </dl>
 
   {% if projection.fire_age is none %}

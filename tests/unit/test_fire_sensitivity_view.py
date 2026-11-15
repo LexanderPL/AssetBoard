@@ -66,6 +66,9 @@ def test_the_default_view_has_five_by_five_headers_rows_and_a_marked_base_cell()
     assert base.is_base is True and base.tone == "base"
     assert base.age_label == str(grid.base_cell.fire_age)
     assert base.sr_text.startswith("Base case:")
+    assert "return above inflation" in base.sr_text
+    assert "real return" not in base.sr_text.lower()
+    assert "return above inflation" in base.title
     assert "title" in base.title.lower() or "Age" in base.title
     assert view.min_fire_age == grid.min_fire_age
     assert view.max_fire_age == grid.max_fire_age

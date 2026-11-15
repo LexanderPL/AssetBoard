@@ -51,7 +51,7 @@
     <div><dt class="text-muted">{{ _("Annual expenses") }}</dt><dd class="font-medium tabular-nums">{{ format_money(s.expenses, locale) }}</dd></div>
     <div><dt class="text-muted">{{ _("Starting portfolio") }}</dt><dd class="font-medium tabular-nums">{{ format_money(s.portfolio, locale) }}</dd></div>
     <div><dt class="text-muted">{{ _("Inflation") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.inflation_bp, locale) }}</dd></div>
-    <div><dt class="text-muted">{{ _("Real return") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.real_return_bp, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Return above inflation") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.real_return_bp, locale) }}</dd></div>
     <div><dt class="text-muted">{{ _("Income growth") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.income_growth_bp, locale) }}</dd></div>
     <div class="sm:col-span-2 lg:col-span-3"><dt class="text-muted">{{ _("Independence rule") }}</dt><dd class="font-medium">{{ rule_labels.get(s.rule, s.rule) }}{% if s.swr_bp is not none %} · {{ _("withdrawal rate %(swr)s", swr=format_rate_short(s.swr_bp, locale)) }}{% endif %}</dd></div>
   </dl>

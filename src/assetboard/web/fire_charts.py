@@ -1,8 +1,8 @@
-"""FIRE result charts (F8.3): server-formatted series, axes, markers and plotted-data rows.
+"""FIRE result charts (F8.3): server-formatted nominal series, axes, markers and plotted rows.
 
-``static/js/charts.js`` only draws what this module prepares. The net-worth chart follows the
-page's nominal/real choice; the expenses-versus-gain chart is always nominal because the FIRE rule
-compares nominal values. Every label, amount and tooltip line is translated and formatted here.
+``static/js/charts.js`` only draws what this module prepares. Both charts show each year's
+nominal money, because the FIRE rule compares nominal values. Every label, amount and tooltip
+line is translated and formatted here.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ class ExpensesGainPoint:
 
 @dataclass(frozen=True, slots=True)
 class FireCharts:
-    basis: str
     net_worth: dict[str, object] | None
     net_worth_points: tuple[NetWorthPoint, ...]
     expenses_gain: dict[str, object] | None
@@ -126,15 +125,11 @@ def _markers(projection: Projection, locale: str) -> list[dict[str, object]]:
 
 
 def _net_worth_data(
-    projection: Projection, basis: str, locale: str
+    projection: Projection, locale: str
 ) -> tuple[dict[str, object], tuple[NetWorthPoint, ...]]:
     currency = projection.inputs.currency
-    real = basis == "real"
     labels = [str(row.year) for row in projection.rows]
-    values = [
-        row.real_net_worth.amount_minor if real else row.net_worth.amount_minor
-        for row in projection.rows
-    ]
+    values = [row.net_worth.amount_minor for row in projection.rows]
     amounts = [_amount(value, currency, locale) for value in values]
     low, high, step, axis_labels = money_axis(values, currency, locale)
     tooltips: list[list[str]] = []
@@ -162,9 +157,7 @@ def _net_worth_data(
         "labels": labels,
         "series": [
             {
-                "name": gettext("Net worth in today's money", locale)
-                if real
-                else gettext("Net worth", locale),
+                "name": gettext("Net worth", locale),
                 "values": values,
                 "amounts": amounts,
                 "color": "primary-ink",
@@ -261,11 +254,10 @@ def _expenses_gain_data(
     return data, points
 
 
-def build_fire_charts(projection: Projection | None, basis: str, locale: str) -> FireCharts:
-    """Prepare both charts and their accessible tables for one projection."""
+def build_fire_charts(projection: Projection | None, locale: str) -> FireCharts:
+    """Prepare both nominal charts and their accessible tables for one projection."""
     if projection is None or not projection.rows:
         return FireCharts(
-            basis=basis,
             net_worth=None,
             net_worth_points=(),
             expenses_gain=None,
@@ -275,11 +267,9 @@ def build_fire_charts(projection: Projection | None, basis: str, locale: str) ->
             fire_age=None,
             depletion_age=None,
         )
-    normalized = "real" if basis == "real" else "nominal"
-    net_worth, net_worth_points = _net_worth_data(projection, normalized, locale)
+    net_worth, net_worth_points = _net_worth_data(projection, locale)
     expenses_gain, expenses_gain_points = _expenses_gain_data(projection, locale)
     return FireCharts(
-        basis=normalized,
         net_worth=net_worth,
         net_worth_points=net_worth_points,
         expenses_gain=expenses_gain,

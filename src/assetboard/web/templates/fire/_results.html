@@ -11,24 +11,6 @@
 <p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-extreme-warning>{{ _("A changed rate is outside the usual range. Tick the confirmation box before saving.") }}</p>
 {% endif %}
 
-{% set active_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium bg-primary-soft text-primary-ink" %}
-{% set inactive_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle" %}
-{% set basis_label_class = "cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle has-[:checked]:bg-primary-soft has-[:checked]:text-primary-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3" data-fire-results-toolbar>
-  {% if editable_results %}
-  <div id="fire-basis-toggle" class="inline-flex rounded-xl border border-line bg-surface p-1" role="radiogroup" aria-label="{{ _('Money basis') }}" data-fire-basis-toggle hx-preserve="true">
-    <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="nominal" class="sr-only"{% if basis == 'nominal' %} checked{% endif %} data-fire-basis="nominal"><span>{{ _("Each year's money") }}</span></label>
-    <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="real" class="sr-only"{% if basis == 'real' %} checked{% endif %} data-fire-basis="real"><span>{{ _("Today's money") }}</span></label>
-  </div>
-  {% else %}
-  <div class="inline-flex rounded-xl border border-line bg-surface p-1" role="group" aria-label="{{ _('Money basis') }}" data-fire-basis-toggle>
-    <a href="{{ scoped_url(request, 'fire_scenarios') }}?basis=nominal#fire-results" class="{{ active_basis_class if basis == 'nominal' else inactive_basis_class }}"{% if basis == 'nominal' %} aria-current="true"{% endif %} data-fire-basis="nominal">{{ _("Each year's money") }}</a>
-    <a href="{{ scoped_url(request, 'fire_scenarios') }}?basis=real#fire-results" class="{{ active_basis_class if basis == 'real' else inactive_basis_class }}"{% if basis == 'real' %} aria-current="true"{% endif %} data-fire-basis="real">{{ _("Today's money") }}</a>
-  </div>
-  {% endif %}
-  <p class="text-xs text-muted">{{ _("A view preference; it is not saved with the plan.") }}</p>
-</div>
-
 {% if results.blocks %}
 <section class="panel p-6 sm:p-7" role="alert" data-fire-blocked="{{ results.blocked.code }}" data-fire-blocked-field="{{ results.blocked.field or '' }}">
   <h2 class="text-base font-semibold">{{ _("The projection is unavailable") }}</h2>
@@ -62,4 +44,4 @@
   {% include "fire/_charts.html" %}
 {% endif %}
 
-<p class="mt-6 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The projection assumes constant rates and does not model taxes separately; real life will differ.") }}</p>
+<p class="mt-6 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The projection assumes constant rates and does not model taxes separately; actual results will differ.") }}</p>
