@@ -1,13 +1,12 @@
-"""FIRE inputs linked to the app's own data (F8.4).
+"""FIRE inputs resolved from the app's own data.
 
-The service resolves the three linked starting values in one request/session without a per-row
-N+1: the investable portfolio (M6 look-through plus investable manual M5 items), trailing-12-
-full-month regular income and expenses from the ledger, per-scenario expense-category exclusions
-and one-click loan-payoff suggestions from the M7 schedules.
+F8.8 keeps the resolution internals for the one-time legacy migration and the F8.9 suggestions:
+the investable portfolio (M6 look-through plus investable manual M5 items), trailing-12-full-month
+regular income and expenses and optional expense-category exclusions.
 
-Reads never fall back to zero silently: missing data, a currency mismatch or an all-excluded
-expense list becomes a :class:`ResultsBlock`. Warnings cover fewer than twelve months of data,
-data older than the window, stale prices/FX and a source-backed portfolio that sums to zero.
+Reads never fall back to zero silently: missing data or a currency mismatch becomes a
+:class:`ResultsBlock`. Warnings cover fewer than twelve months of data, data older than the
+window, stale prices/FX and a source-backed portfolio that sums to zero.
 
 All amounts are integer minor units and rates are basis points. Trailing totals are scaled to a
 year once, half away from zero, from the **distinct months that have included rows**; gaps are
@@ -25,14 +24,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from assetboard.db.engine import run_immediate
 from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
-    AuditEventRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
-    FireEventRepository,
-    FireScenarioRepository,
     ItemValuationRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
@@ -40,39 +35,20 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.fire import (
-    MAX_AMOUNT_MINOR,
-    MAX_LABEL_LENGTH,
     TrailingWindow,
     annualize_minor,
     trailing_window,
 )
-from assetboard.domain.loans import LoanValidationError, ScheduleError, summarize_schedule
 from assetboard.domain.money import Money, minor_unit_for
 from assetboard.domain.networth import (
     ValuationPoint,
     current_valuation,
 )
-from assetboard.i18n import gettext
-from assetboard.services.context import Context, Role, require_role, require_role_now
-from assetboard.services.loan_schedule import (
-    build_inputs_schedule,
-    schedule_inputs_from_view,
-)
-from assetboard.services.loans import load_loan_views_in_session
+from assetboard.services.context import Context, Role, require_role
 from assetboard.services.portfolio import current_portfolio_data_in_session
 from assetboard.services.prices import latest_fx_rates_in_session
 
 SourceKind = Literal["portfolio_class", "portfolio_unallocated", "networth_item"]
-SuggestionState = Literal[
-    "available",
-    "already_paid_off",
-    "archived",
-    "schedule_error",
-    "out_of_window",
-    "currency_mismatch",
-    "amount_invalid",
-    "already_added",
-]
 
 
 class LinkedError(Exception):
@@ -82,13 +58,6 @@ class LinkedError(Exception):
         super().__init__(code)
         self.field = field
         self.code = code
-
-
-class ExpenseExclusionError(ValueError):
-    """An exclusion id is not a regular expense category of this workspace."""
-
-    field = "expense_exclusions"
-    code = "invalid_expense_exclusion"
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,53 +146,6 @@ class LinkedInputs:
     expenses: TrailingSeries | None
     warnings: tuple[LinkedWarning, ...]
     blocks: tuple[ResultsBlock, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ExpenseExclusionOption:
-    category_id: UUID
-    name: str
-    color: str
-    archived: bool
-    selected: bool
-
-
-@dataclass(frozen=True, slots=True)
-class LoanPayoffSuggestion:
-    """One loan's one-click payoff suggestion in the scenario's start money.
-
-    ``annual_amount`` is the sum of the next up to twelve contractual rows' interest, principal
-    and costs (overpayments excluded); ``None`` when the state has no usable amount.
-    """
-
-    loan_id: UUID
-    loan_name: str
-    currency: str
-    state: SuggestionState
-    payoff_year: int | None
-    annual_amount: Money | None
-    months_covered: int
-    as_of: date
-    # Stored event label in the user's/request locale, already capped at MAX_LABEL_LENGTH.
-    label: str
-    schedule_error: str | None = None
-
-    @property
-    def can_add(self) -> bool:
-        return self.state == "available"
-
-
-def _label_locale(ctx: Context) -> str:
-    """The label is written in the acting user's locale, else the workspace's."""
-    return ctx.user.locale or ctx.workspace.locale
-
-
-def payoff_label(name: str, locale: str) -> str:
-    """The stored payoff-event label, translated and capped to the event-label limit."""
-    label = gettext("Loan repaid: %(name)s", locale) % {"name": name}
-    if len(label) <= MAX_LABEL_LENGTH:
-        return label
-    return label[: MAX_LABEL_LENGTH - 1].rstrip() + "…"
 
 
 def _require_viewer(ctx: Context) -> None:
@@ -687,241 +609,15 @@ def linked_inputs(
         )
 
 
-def expense_exclusion_options(
-    factory: sessionmaker[Session],
-    ctx: Context,
-    *,
-    selected_ids: Collection[UUID] = (),
-) -> tuple[ExpenseExclusionOption, ...]:
-    """Regular expense categories offered as exclusions; archived ones only when selected."""
-    _require_viewer(ctx)
-    selected = set(selected_ids)
-    with factory() as session:
-        rows = CategoryRepository(session, ctx).ordered(kind="expense")
-        options = [
-            ExpenseExclusionOption(
-                category_id=row.id,
-                name=row.name,
-                color=row.color,
-                archived=row.archived_at is not None,
-                selected=row.id in selected,
-            )
-            for row in rows
-            if row.treatment == "regular" and (row.archived_at is None or row.id in selected)
-        ]
-    return tuple(options)
-
-
-def validate_expense_exclusions_in_session(
-    session: Session, ctx: Context, category_ids: Collection[UUID]
-) -> tuple[UUID, ...]:
-    """Deduplicate and validate exclusion ids (regular expense categories, archived allowed)."""
-    wanted = list(dict.fromkeys(category_ids))
-    if not wanted:
-        return ()
-    categories = _category_map(session, ctx)
-    for category_id in wanted:
-        category = categories.get(category_id)
-        if category is None or category.kind != "expense" or category.treatment != "regular":
-            raise ExpenseExclusionError
-    return tuple(wanted)
-
-
-def validate_expense_exclusions(
-    factory: sessionmaker[Session], ctx: Context, category_ids: Collection[UUID]
-) -> tuple[UUID, ...]:
-    _require_viewer(ctx)
-    with factory() as session:
-        return validate_expense_exclusions_in_session(session, ctx, category_ids)
-
-
-def loan_payoff_suggestions_in_session(
-    session: Session,
-    ctx: Context,
-    *,
-    currency: str,
-    start_year: int,
-    last_year: int,
-    added_loan_ids: Collection[UUID] = (),
-) -> tuple[LoanPayoffSuggestion, ...]:
-    """One suggestion per non-archived schedule loan, in a bounded number of queries.
-
-    ``added_loan_ids`` are the source loans of events already in the plan; the state is
-    ``already_added`` when the loan appears there, never when a translated label happens to
-    match. Labels are generated in the acting user's locale (or the workspace's) and capped.
-    """
-    _require_viewer(ctx)
-    today = ctx.clock.today(ctx.workspace.timezone)
-    locale = _label_locale(ctx)
-    added = set(added_loan_ids)
-    views = load_loan_views_in_session(session, ctx, today=today, include_archived=False)
-    suggestions: list[LoanPayoffSuggestion] = []
-    for view in views:
-        label = payoff_label(view.name, locale)
-        if view.currency != currency:
-            suggestions.append(
-                LoanPayoffSuggestion(
-                    loan_id=view.id,
-                    loan_name=view.name,
-                    currency=view.currency,
-                    state="currency_mismatch",
-                    payoff_year=None,
-                    annual_amount=None,
-                    months_covered=0,
-                    as_of=today,
-                    label=label,
-                )
-            )
-            continue
-        try:
-            inputs = schedule_inputs_from_view(view, today)
-            schedule = build_inputs_schedule(inputs)
-            summary = summarize_schedule(schedule, today)
-        except (ScheduleError, LoanValidationError) as exc:
-            suggestions.append(
-                LoanPayoffSuggestion(
-                    loan_id=view.id,
-                    loan_name=view.name,
-                    currency=view.currency,
-                    state="schedule_error",
-                    payoff_year=None,
-                    annual_amount=None,
-                    months_covered=0,
-                    as_of=today,
-                    label=label,
-                    schedule_error=exc.code,
-                )
-            )
-            continue
-        payoff_year = summary.payoff_date.year if summary.payoff_date is not None else None
-        future = [row for row in schedule.rows if row.date > today]
-        covered = future[:12]
-        annual = sum(
-            row.interest.amount_minor + row.principal.amount_minor + row.costs.amount_minor
-            for row in covered
-        )
-        if (
-            summary.remaining_principal.amount_minor == 0
-            and summary.undrawn_principal.amount_minor == 0
-        ):
-            state: SuggestionState = "already_paid_off"
-        elif payoff_year is None or annual <= 0 or annual > MAX_AMOUNT_MINOR:
-            state = "amount_invalid"
-        elif payoff_year < start_year or payoff_year > last_year:
-            state = "out_of_window"
-        elif view.id in added:
-            state = "already_added"
-        else:
-            state = "available"
-        suggestions.append(
-            LoanPayoffSuggestion(
-                loan_id=view.id,
-                loan_name=view.name,
-                currency=view.currency,
-                state=state,
-                payoff_year=payoff_year,
-                annual_amount=Money(annual, currency) if annual > 0 else None,
-                months_covered=len(covered),
-                as_of=today,
-                label=label,
-            )
-        )
-    return tuple(suggestions)
-
-
-def loan_payoff_suggestions(
-    factory: sessionmaker[Session],
-    ctx: Context,
-    *,
-    currency: str,
-    start_year: int,
-    last_year: int,
-    added_loan_ids: Collection[UUID] = (),
-) -> tuple[LoanPayoffSuggestion, ...]:
-    _require_viewer(ctx)
-    with factory() as session:
-        return loan_payoff_suggestions_in_session(
-            session,
-            ctx,
-            currency=currency,
-            start_year=start_year,
-            last_year=last_year,
-            added_loan_ids=added_loan_ids,
-        )
-
-
-def add_loan_payoff_event(
-    factory: sessionmaker[Session], ctx: Context, scenario_id: UUID, loan_id: UUID
-) -> Literal["added", "exists"]:
-    """Create the negative annual-expense-change event for a suggested loan, once."""
-    require_role(ctx, Role.EDITOR)
-
-    def write(session: Session) -> Literal["added", "exists"]:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        scenario = FireScenarioRepository(session, ctx).get_or_raise(scenario_id)
-        if scenario.archived_at is not None:
-            raise LinkedError("scenario", "archived")
-        existing = FireEventRepository(session, ctx).for_scenario(scenario.id)
-        added_loan_ids = {
-            event.source_loan_id for event in existing if event.source_loan_id is not None
-        }
-        suggestions = loan_payoff_suggestions_in_session(
-            session,
-            ctx,
-            currency=scenario.currency,
-            start_year=scenario.start_year,
-            last_year=scenario.birth_year + scenario.horizon_age,
-            added_loan_ids=added_loan_ids,
-        )
-        suggestion = next((item for item in suggestions if item.loan_id == loan_id), None)
-        if suggestion is None:
-            raise LinkedError("loan", "loan_payoff_unavailable")
-        if suggestion.state == "already_added":
-            return "exists"
-        if suggestion.state != "available" or suggestion.annual_amount is None:
-            raise LinkedError("loan", "loan_payoff_unavailable")
-        if suggestion.payoff_year is None:
-            raise LinkedError("loan", "loan_payoff_unavailable")
-        FireEventRepository(session, ctx).create(
-            scenario_id=scenario.id,
-            year=suggestion.payoff_year,
-            kind="expense_change",
-            amount_minor=-suggestion.annual_amount.amount_minor,
-            label=suggestion.label,
-            source_loan_id=loan_id,
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="fire_scenario.loan_payoff_event",
-            entity_type="fire_scenario",
-            entity_id=str(scenario.id),
-            ts=ctx.clock.now(),
-            data={"loan": suggestion.loan_name, "year": suggestion.payoff_year},
-        )
-        return "added"
-
-    return run_immediate(factory, write)
-
-
 __all__ = [
     "CategoryTotal",
-    "ExpenseExclusionError",
-    "ExpenseExclusionOption",
     "LinkedError",
     "LinkedInputs",
     "LinkedPortfolio",
     "LinkedWarning",
-    "LoanPayoffSuggestion",
     "PortfolioSourceRow",
     "ResultsBlock",
     "TrailingSeries",
-    "add_loan_payoff_event",
-    "expense_exclusion_options",
     "linked_inputs",
     "linked_inputs_in_session",
-    "loan_payoff_suggestions",
-    "loan_payoff_suggestions_in_session",
-    "validate_expense_exclusions",
-    "validate_expense_exclusions_in_session",
 ]
