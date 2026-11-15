@@ -58,6 +58,8 @@
     }
     const first = row.querySelector("[data-adjustment-year]");
     if (first instanceof HTMLElement) first.focus();
+    const empty = document.querySelector("[data-fire-adjustments-empty]");
+    if (empty instanceof HTMLElement) empty.hidden = true;
     announce(button.dataset.addedMessage || "");
     notifyChange();
     row.dispatchEvent(new Event("input", { bubbles: true }));

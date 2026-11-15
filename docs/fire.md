@@ -186,7 +186,9 @@ Adjustments from before the current year, after the plan's last year, and a savi
 has become the current year after a year rollover are kept as **Archived adjustments**. They stay
 visible in a collapsed section with the reason, are read-only, and are not applied to the
 projection. Editors and owners can delete an archived adjustment by ticking **Remove** and saving;
-viewers cannot. Archived history is never edited in place or moved to another year.
+viewers cannot. Archived history is never edited in place or moved to another year. An adjustment
+archived only because it is after the plan's last year applies again when you raise the horizon;
+the preview includes it before you save.
 
 ## Results
 

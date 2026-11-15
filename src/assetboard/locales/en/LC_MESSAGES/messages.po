@@ -5875,6 +5875,12 @@ msgstr ""
 msgid "Select Remove and save changes to delete one."
 msgstr ""
 
+msgid ""
+"An adjustment archived only because it is after the plan's last year "
+"applies again when you save a horizon that covers it. The preview already"
+" includes it."
+msgstr ""
+
 #, python-format
 msgid "the archived adjustment from %(year)d"
 msgstr ""
@@ -5943,6 +5949,11 @@ msgid "Replaces that year's net saving; a year can have only one override."
 msgstr ""
 
 msgid ""
+"No current adjustments. Use the new row below to model a one-off cash "
+"flow or a permanent change."
+msgstr ""
+
+msgid ""
 "No adjustments yet. Use the new row below to model a one-off cash flow or"
 " a permanent change."
 msgstr ""
@@ -5964,6 +5975,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Adjustments applied to the projection"
+msgstr ""
+
+msgid "No current adjustments."
 msgstr ""
 
 msgid "No adjustments yet."
@@ -13696,5 +13710,13 @@ msgstr ""
 #~ " in the current year) and are "
 #~ "not applied to the projection. They "
 #~ "stay in the plan as history."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An adjustment archived only because it"
+#~ " is after the plan's last year "
+#~ "applies again when the horizon in "
+#~ "this form covers it. The preview "
+#~ "already includes it."
 #~ msgstr ""
 

@@ -43,7 +43,7 @@
     <div><dt class="font-medium">{{ adjustment_kind_labels.get("saving_override", "saving_override") }}</dt><dd class="text-muted">{{ _("Replaces that year's net saving; a year can have only one override.") }}</dd></div>
   </dl>
 
-  {% if active_adjustment_count == 0 %}<p class="mt-4 text-sm text-muted" data-fire-adjustments-empty>{{ _("No adjustments yet. Use the new row below to model a one-off cash flow or a permanent change.") }}</p>{% endif %}
+  {% if adjustments_empty %}<p class="mt-4 text-sm text-muted" data-fire-adjustments-empty>{% if archived_adjustment_rows %}{{ _("No current adjustments. Use the new row below to model a one-off cash flow or a permanent change.") }}{% else %}{{ _("No adjustments yet. Use the new row below to model a one-off cash flow or a permanent change.") }}{% endif %}</p>{% endif %}
   <ol class="mt-4 space-y-3" data-adjustment-rows data-next-index="{{ next_adjustment_index }}">
     {% for row in adjustment_rows %}{{ adjustment_row(row) }}{% endfor %}
   </ol>

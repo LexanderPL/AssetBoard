@@ -587,6 +587,7 @@ def _form_context(
         detail, locale, removed_ids=removed_archived
     )
     window = fire_adjustments.adjustment_window(detail)
+    active_count = fire_adjustments.saved_active_count(adjustment_rows)
     return {
         "values": values,
         "current_year": detail.plan.current_year,
@@ -595,7 +596,9 @@ def _form_context(
         "archived_adjustment_rows": archived_adjustment_rows,
         "adjustment_window": window,
         "next_adjustment_index": fire_adjustments.next_adjustment_index(adjustment_rows),
-        "active_adjustment_count": fire_adjustments.saved_active_count(adjustment_rows),
+        "active_adjustment_count": active_count,
+        "adjustments_empty": active_count == 0
+        and not fire_adjustments.has_pending_adjustment(adjustment_rows),
         "archived_open": any(row.remove for row in archived_adjustment_rows),
         "adjustment_kind_labels": fire_adjustments.kind_labels(locale),
         "adjustment_error_messages": _adjustment_error_messages(request),

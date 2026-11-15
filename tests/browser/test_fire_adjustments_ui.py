@@ -111,6 +111,9 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
 
             expect(page.locator("[data-fire-adjustments-view]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments-empty]")).to_be_visible()
+            expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
+                "No adjustments yet"
+            )
             expect(page.locator('input[name="archived_remove_1"]')).to_have_count(0)
 
             with page.expect_navigation(wait_until="networkidle"):
@@ -118,10 +121,13 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-adjustments]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments] textarea")).to_have_count(0)
             expect(page.locator("[data-fire-archived-adjustments]")).to_have_count(0)
+            expect(page.locator("[data-fire-adjustments-empty]")).to_be_visible()
 
-            # Add one row, with focus and an announcement.
+            # Add one row, with focus and an announcement. The empty hint is for the blank editor
+            # only and disappears as soon as a row exists.
             page.locator("[data-add-adjustment]").click()
             expect(page.locator("[data-adjustment-status]")).to_have_text("Adjustment added.")
+            expect(page.locator("[data-fire-adjustments-empty]")).to_be_hidden()
             assert page.evaluate("document.activeElement && document.activeElement.name") == (
                 "event_year_1"
             )
@@ -154,9 +160,17 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             for label in ("Bonus", "Rent", "Loan repaid", "Sabbatical"):
                 expect(page.locator("[data-fire-adjustments-view]")).to_contain_text(label)
 
-            # Edit one row in place.
+            # The populated view and editor stay inside a 390px viewport.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.wait_for_timeout(200)
+            _no_page_overflow(page)
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
+            page.wait_for_timeout(200)
+            _no_page_overflow(page)
+            page.set_viewport_size({"width": 1440, "height": 900})
+
+            # Edit one row in place.
             rows = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])")
             first = rows.filter(has=page.locator('input[name^="event_label_"][value="Bonus"]'))
             first.locator('input[name^="event_amount_"]').fill("1500")
@@ -190,11 +204,34 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-fire-archived-adjustments] summary").click()
             archived = page.locator("[data-fire-archived-adjustment]").filter(has_text="Old bonus")
             expect(archived).to_be_visible()
+
+            # Remove every active row; the saved archived history stays and the editor says so.
+            removals = page.locator("[data-adjustment-row] [data-adjustment-remove]")
+            expect(removals).to_have_count(3)
+            for index in range(removals.count()):
+                removals.nth(index).check()
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-save]").click()
+            expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
+                "No current adjustments"
+            )
+            expect(page.locator("[data-fire-archived-adjustments]")).to_have_count(1)
+
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-edit]").click()
+            expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
+                "No current adjustments"
+            )
+            page.locator("[data-fire-archived-adjustments] summary").click()
+            archived = page.locator("[data-fire-archived-adjustment]").filter(has_text="Old bonus")
             archived.locator("[data-adjustment-archived-remove]").check()
             expect(archived.locator("[data-adjustment-removed-note]")).to_be_visible()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             expect(page.locator("[data-fire-archived-adjustments]")).to_have_count(0)
+            expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
+                "No adjustments yet"
+            )
 
             # Mobile layout stays inside the viewport in both modes.
             page.set_viewport_size({"width": 390, "height": 844})

@@ -753,6 +753,91 @@ def test_archived_adjustments_are_read_only_and_deleted_only_by_the_checkbox(own
         assert session.scalar(select(func.count()).select_from(FireEvent)) == 0
 
 
+def test_the_empty_adjustment_hint_distinguishes_archived_history_and_pending_rows(
+    owner,
+) -> None:
+    plan_id = create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    assert "No adjustments yet. Use the new row below" in page
+    assert "No current adjustments" not in page
+
+    with owner.db() as session, session.begin():
+        session.add(
+            FireEvent(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                year=2020,
+                kind="cash",
+                amount_minor=100_000,
+                label="Old bonus",
+            )
+        )
+    page = owner.client.get("/fire/edit").text
+    assert "No current adjustments. Use the new row below" in page
+    assert "No adjustments yet" not in page
+    assert "An adjustment archived only because it is after the plan's last year" not in page
+    view = owner.client.get("/fire").text
+    assert "No current adjustments." in view
+    assert "No adjustments yet." not in view
+
+    # A partially filled saved form is not empty, even though no row is saved yet.
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            event_year_1="2027",
+            event_kind_1="cash",
+            event_amount_1="not-money",
+            event_label_1="Pending row",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert "Pending row" in response.text
+    assert "data-fire-adjustments-empty" not in response.text
+
+
+def test_an_archived_adjustment_applies_when_the_submitted_horizon_covers_it(
+    owner,
+) -> None:
+    plan_id = create_plan(owner, horizon_age="80")  # birth year 1985 -> last year 2065
+    with owner.db() as session, session.begin():
+        later = FireEvent(
+            workspace_id=owner.home_id,
+            scenario_id=plan_id,
+            year=2070,
+            kind="cash",
+            amount_minor=100_000,
+            label="Later bonus",
+        )
+        session.add(later)
+        session.flush()
+        later_id = later.id
+    page = owner.client.get("/fire/edit").text
+    assert "After the plan" in page
+    assert (
+        "An adjustment archived only because it is after the plan's last year applies again" in page
+    )
+
+    preview = owner.post(
+        "/fire/edit/preview",
+        _form(horizon_age="90"),
+        token_from="/fire/edit",
+    )
+    assert preview.status_code == 200
+    assert "data-fire-preview-error" not in preview.text
+    assert ">2070<" in preview.text
+    assert "€1,000.00" in preview.text
+
+    response = owner.post("/fire/edit", _form(horizon_age="90"), token_from="/fire/edit")
+    assert response.status_code == 303
+    view = owner.client.get("/fire").text
+    assert "Later bonus" in view
+    assert "data-fire-archived-adjustments" not in view
+    assert "data-fire-adjustments-empty" not in view
+    with owner.db() as session:
+        assert session.get_one(FireEvent, later_id).year == 2070
+
+
 def test_the_adjustments_editor_has_no_bulk_paste_or_contribution_controls(owner) -> None:
     create_plan(owner)
     page = owner.client.get("/fire/edit").text

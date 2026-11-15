@@ -660,7 +660,9 @@ and bulk-paste code.
   current year, after the plan's last year, or a saving override in the current year. They are
   not editable or movable; editors and owners can delete one only by ticking Remove and saving.
   Unchanged events may keep a year outside a changed horizon: shrinking archives them, expanding
-  restores them, and the preview includes newly active preserved events unchanged.
+  restores them, and the preview includes newly active preserved events unchanged. The editor says
+  so in the archived section instead of claiming they can never apply, and the empty hint changes
+  to **No current adjustments** when only history remains and disappears once a row is added.
 - **Validation.** The service owns the four kinds, year windows, one saving override per plan/year,
   the current-year start rule and the F8.8 rollover exception, labels, signed amounts, zero and
   the 200-event limit. `FireError.row`/`column` drive inline row errors; the preview names the

@@ -342,6 +342,30 @@ def test_kind_labels_and_window_are_ready_for_the_editor() -> None:
     assert window.override_available is False
 
 
+def test_has_pending_adjustment_detects_only_unsaved_input() -> None:
+    saved = _event(2027, "cash", 100_000, "Saved")
+    rows = fire_adjustments.active_rows_from_detail(_detail(active=(saved,)), "en")
+    assert fire_adjustments.saved_active_count(rows) == 1
+    assert fire_adjustments.has_pending_adjustment(rows) is False
+
+    blank = fire_adjustments.active_rows_from_detail(_detail(), "en")
+    assert fire_adjustments.saved_active_count(blank) == 0
+    assert fire_adjustments.has_pending_adjustment(blank) is False
+
+    filled = fire_adjustments.active_rows_from_values(
+        {
+            "event_id_new": "",
+            "event_year_new": "2027",
+            "event_kind_new": "cash",
+            "event_amount_new": "",
+            "event_label_new": "",
+        },
+        "en",
+        "EUR",
+    )
+    assert fire_adjustments.has_pending_adjustment(filled) is True
+
+
 def test_checked_archived_ids_ignore_empty_and_reject_invalid_values() -> None:
     event_id = uuid4()
     assert fire_adjustments.checked_archived_ids(

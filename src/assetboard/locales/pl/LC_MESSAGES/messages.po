@@ -6341,6 +6341,15 @@ msgstr ""
 msgid "Select Remove and save changes to delete one."
 msgstr "Zaznacz Usuń i zapisz zmiany, aby ją usunąć."
 
+msgid ""
+"An adjustment archived only because it is after the plan's last year "
+"applies again when you save a horizon that covers it. The preview already"
+" includes it."
+msgstr ""
+"Korekta zarchiwizowana tylko dlatego, że przypada po ostatnim roku planu,"
+" zostanie ponownie zastosowana, gdy zapiszesz horyzont, który ją obejmie."
+" Podgląd już ją uwzględnia."
+
 #, python-format
 msgid "the archived adjustment from %(year)d"
 msgstr "zarchiwizowaną korektę z roku %(year)d"
@@ -6420,6 +6429,13 @@ msgstr ""
 "jedna korekta."
 
 msgid ""
+"No current adjustments. Use the new row below to model a one-off cash "
+"flow or a permanent change."
+msgstr ""
+"Brak bieżących korekt. Użyj nowego wiersza poniżej, aby dodać jednorazowy"
+" przepływ gotówki lub trwałą zmianę."
+
+msgid ""
 "No adjustments yet. Use the new row below to model a one-off cash flow or"
 " a permanent change."
 msgstr ""
@@ -6445,6 +6461,9 @@ msgstr[2] "%(num)d korekt"
 
 msgid "Adjustments applied to the projection"
 msgstr "Korekty zastosowane w prognozie"
+
+msgid "No current adjustments."
+msgstr "Brak bieżących korekt."
 
 msgid "No adjustments yet."
 msgstr "Brak korekt."

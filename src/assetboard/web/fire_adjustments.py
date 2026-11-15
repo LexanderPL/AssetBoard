@@ -165,6 +165,14 @@ def saved_active_count(rows: Iterable[AdjustmentRow]) -> int:
     return sum(1 for row in rows if row.id is not None)
 
 
+def has_pending_adjustment(rows: Iterable[AdjustmentRow]) -> bool:
+    """Whether an unsaved row already carries input, so an empty hint would be stale."""
+    return any(
+        row.id is None and (row.year is not None or bool(row.label) or bool(row.amount_input))
+        for row in rows
+    )
+
+
 def adjustment_values(values: Mapping[str, str]) -> list[dict[str, str]]:
     """The posted adjustment rows in form order, with ``new`` last."""
     indexes = sorted(
@@ -418,6 +426,7 @@ __all__ = [
     "archived_rows",
     "checked_archived_ids",
     "event_sort_key",
+    "has_pending_adjustment",
     "kind_labels",
     "next_adjustment_index",
     "parse_adjustments",
