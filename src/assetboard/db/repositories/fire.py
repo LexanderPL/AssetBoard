@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
 
-from assetboard.db.models.fire import (
-    FireContribution,
-    FireEvent,
-    FireExpenseExclusion,
-    FireScenario,
-)
+from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -21,141 +15,26 @@ class FireScenarioRepository(ScopedRepository[FireScenario]):
     def create(self, **values: object) -> FireScenario:
         return self.add(FireScenario(**values))
 
-    def active(self) -> list[FireScenario]:
-        statement = (
-            self._scoped_select()
-            .where(FireScenario.archived_at.is_(None))
-            .order_by(FireScenario.name_key, FireScenario.id)
-        )
-        return list(self._session.scalars(statement))
-
-    def archived(self) -> list[FireScenario]:
-        statement = (
-            self._scoped_select()
-            .where(FireScenario.archived_at.is_not(None))
-            .order_by(FireScenario.archived_at.desc(), FireScenario.name_key, FireScenario.id)
-        )
-        return list(self._session.scalars(statement))
-
-    def by_ids(self, scenario_ids: Collection[UUID]) -> list[FireScenario]:
-        """The requested scenarios of this workspace, in no particular order."""
-        if not scenario_ids:
-            return []
-        statement = self._scoped_select().where(FireScenario.id.in_(tuple(scenario_ids)))
-        return list(self._session.scalars(statement))
-
-    def active_by_name_key(self, name_key: str) -> FireScenario | None:
-        statement = self._scoped_select().where(
-            FireScenario.archived_at.is_(None),
-            FireScenario.name_key == name_key,
-        )
+    def live(self) -> FireScenario | None:
+        """The chosen plan of this workspace, if the migration is done."""
+        statement = self._scoped_select().where(FireScenario.is_live.is_(True))
         return self._session.scalars(statement).one_or_none()
 
-    def active_default(self) -> FireScenario | None:
-        statement = self._scoped_select().where(
-            FireScenario.archived_at.is_(None),
-            FireScenario.is_default.is_(True),
-        )
-        return self._session.scalars(statement).one_or_none()
-
-    def first_active(self, *, exclude_id: UUID | None = None) -> FireScenario | None:
-        statement = self._scoped_select().where(FireScenario.archived_at.is_(None))
-        if exclude_id is not None:
-            statement = statement.where(FireScenario.id != exclude_id)
-        statement = statement.order_by(FireScenario.created_at, FireScenario.id).limit(1)
-        return self._session.scalars(statement).first()
-
-    def active_name_keys(self) -> set[str]:
-        statement = select(FireScenario.name_key).where(
-            FireScenario.workspace_id == self._workspace_id,
-            FireScenario.archived_at.is_(None),
-        )
-        return set(self._session.scalars(statement))
-
-
-class FireContributionRepository(ScopedRepository[FireContribution]):
-    model = FireContribution
-
-    def create(self, **values: object) -> FireContribution:
-        return self.add(FireContribution(**values))
-
-    def for_scenario(self, scenario_id: UUID) -> list[FireContribution]:
-        statement = (
-            self._scoped_select()
-            .where(FireContribution.scenario_id == scenario_id)
-            .order_by(FireContribution.year)
-        )
+    def legacy(self) -> list[FireScenario]:
+        """Old scenarios of this workspace that still await the chooser."""
+        statement = self._scoped_select().where(FireScenario.is_live.is_(False))
         return list(self._session.scalars(statement))
 
-    def for_scenarios(self, scenario_ids: Collection[UUID]) -> list[FireContribution]:
-        """The contributions of several scenarios in one query."""
-        if not scenario_ids:
-            return []
+    def legacy_count(self) -> int:
         statement = (
-            self._scoped_select()
-            .where(FireContribution.scenario_id.in_(tuple(scenario_ids)))
-            .order_by(FireContribution.scenario_id, FireContribution.year)
-        )
-        return list(self._session.scalars(statement))
-
-    def counts_by_scenario(self) -> dict[UUID, int]:
-        statement = (
-            select(FireContribution.scenario_id, func.count())
-            .where(FireContribution.workspace_id == self._workspace_id)
-            .group_by(FireContribution.scenario_id)
-        )
-        return dict(self._session.execute(statement).all())
-
-
-class FireExpenseExclusionRepository(ScopedRepository[FireExpenseExclusion]):
-    """Excluded expense categories of one scenario; reconciled by category id."""
-
-    model = FireExpenseExclusion
-    unsupported = frozenset({"update"})
-
-    def create(
-        self,
-        *,
-        scenario_id: UUID,
-        category_id: UUID,
-        import_key: str | None = None,
-        created_at: datetime | None = None,
-    ) -> FireExpenseExclusion:
-        return self.add(
-            FireExpenseExclusion(
-                scenario_id=scenario_id,
-                category_id=category_id,
-                import_key=import_key,
-                created_at=created_at,
+            select(func.count())
+            .select_from(FireScenario)
+            .where(
+                FireScenario.workspace_id == self._workspace_id,
+                FireScenario.is_live.is_(False),
             )
         )
-
-    def for_scenario(self, scenario_id: UUID) -> list[FireExpenseExclusion]:
-        statement = (
-            self._scoped_select()
-            .where(FireExpenseExclusion.scenario_id == scenario_id)
-            .order_by(FireExpenseExclusion.category_id)
-        )
-        return list(self._session.scalars(statement))
-
-    def for_scenarios(self, scenario_ids: Collection[UUID]) -> list[FireExpenseExclusion]:
-        """The exclusions of several scenarios in one query."""
-        if not scenario_ids:
-            return []
-        statement = (
-            self._scoped_select()
-            .where(FireExpenseExclusion.scenario_id.in_(tuple(scenario_ids)))
-            .order_by(FireExpenseExclusion.scenario_id, FireExpenseExclusion.category_id)
-        )
-        return list(self._session.scalars(statement))
-
-    def counts_by_category(self) -> dict[UUID, int]:
-        statement = (
-            select(FireExpenseExclusion.category_id, func.count())
-            .where(FireExpenseExclusion.workspace_id == self._workspace_id)
-            .group_by(FireExpenseExclusion.category_id)
-        )
-        return dict(self._session.execute(statement).all())
+        return self._session.scalar(statement) or 0
 
 
 class FireEventRepository(ScopedRepository[FireEvent]):
@@ -164,24 +43,35 @@ class FireEventRepository(ScopedRepository[FireEvent]):
     def create(self, **values: object) -> FireEvent:
         return self.add(FireEvent(**values))
 
-    def for_scenario(self, scenario_id: UUID) -> list[FireEvent]:
+    def for_plan(self, plan_id: UUID) -> list[FireEvent]:
         statement = (
             self._scoped_select()
-            .where(FireEvent.scenario_id == scenario_id)
+            .where(FireEvent.scenario_id == plan_id)
             .order_by(FireEvent.year, FireEvent.id)
         )
         return list(self._session.scalars(statement))
 
-    def for_scenarios(self, scenario_ids: Collection[UUID]) -> list[FireEvent]:
-        """The events of several scenarios in one query."""
-        if not scenario_ids:
+    def for_plans(self, plan_ids: Collection[UUID]) -> list[FireEvent]:
+        """The events of several legacy scenarios in one query (archive/migration only)."""
+        if not plan_ids:
             return []
         statement = (
             self._scoped_select()
-            .where(FireEvent.scenario_id.in_(tuple(scenario_ids)))
+            .where(FireEvent.scenario_id.in_(tuple(plan_ids)))
             .order_by(FireEvent.scenario_id, FireEvent.year, FireEvent.id)
         )
         return list(self._session.scalars(statement))
+
+    def count_for_plan(self, plan_id: UUID) -> int:
+        statement = (
+            select(func.count())
+            .select_from(FireEvent)
+            .where(
+                FireEvent.workspace_id == self._workspace_id,
+                FireEvent.scenario_id == plan_id,
+            )
+        )
+        return self._session.scalar(statement) or 0
 
     def counts_by_scenario(self) -> dict[UUID, int]:
         statement = (
@@ -190,3 +80,11 @@ class FireEventRepository(ScopedRepository[FireEvent]):
             .group_by(FireEvent.scenario_id)
         )
         return dict(self._session.execute(statement).all())
+
+    def saving_override_years(self, plan_id: UUID) -> set[int]:
+        statement = select(FireEvent.year).where(
+            FireEvent.workspace_id == self._workspace_id,
+            FireEvent.scenario_id == plan_id,
+            FireEvent.kind == "saving_override",
+        )
+        return set(self._session.scalars(statement))

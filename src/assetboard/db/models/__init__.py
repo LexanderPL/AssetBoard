@@ -1,11 +1,6 @@
 """ORM model declarations imported for Alembic metadata registration."""
 
-from assetboard.db.models.fire import (
-    FireContribution,
-    FireEvent,
-    FireExpenseExclusion,
-    FireScenario,
-)
+from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
@@ -60,9 +55,7 @@ from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 
 __all__ = [
-    "FireContribution",
     "FireEvent",
-    "FireExpenseExclusion",
     "FireScenario",
     "NotificationChannel",
     "NotificationLog",

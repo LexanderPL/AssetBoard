@@ -28,7 +28,6 @@ MAX_YEAR = 2199
 MAX_NAME_LENGTH = 200
 MAX_NAME_KEY_LENGTH = 255
 MAX_LABEL_LENGTH = 200
-MAX_CONTRIBUTION_ROWS = 120
 MAX_EVENT_ROWS = 200
 MIN_HORIZON_AGE = 1
 MAX_HORIZON_AGE = 120
@@ -85,11 +84,12 @@ class PortfolioMode(StrEnum):
 
 
 class EventKind(StrEnum):
-    """A one-off cash flow or a permanent change to one annual series."""
+    """A one-off cash flow, a permanent change or a whole-year saving override."""
 
     CASH = "cash"
     EXPENSE_CHANGE = "expense_change"
     INCOME_CHANGE = "income_change"
+    SAVING_OVERRIDE = "saving_override"
 
 
 def age_at_start(start_year: int, birth_year: int) -> int:
@@ -97,8 +97,8 @@ def age_at_start(start_year: int, birth_year: int) -> int:
     return start_year - birth_year
 
 
-def contribution_years(start_year: int, birth_year: int, horizon_age: int) -> range:
-    """Allowed override years: the first full plan year through the horizon year."""
+def saving_override_years(start_year: int, birth_year: int, horizon_age: int) -> range:
+    """Allowed saving-override years: the first full plan year through the horizon year."""
     return range(start_year + 1, birth_year + horizon_age + 1)
 
 
@@ -267,14 +267,6 @@ class SensitivityError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class ContributionOverride:
-    """One plan year whose net line replaces ``income - expenses`` (signed nominal units)."""
-
-    year: int
-    amount: Money
-
-
-@dataclass(frozen=True, slots=True)
 class ProjectionEvent:
     """A one-off cash flow or a permanent change to one annual series.
 
@@ -305,7 +297,6 @@ class ProjectionInputs:
     start_income: Money
     start_expenses: Money
     start_portfolio: Money
-    contributions: tuple[ContributionOverride, ...] = ()
     events: tuple[ProjectionEvent, ...] = ()
 
 
@@ -474,8 +465,6 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
     stop_working_age = _integer(inputs.stop_working_age, "stop_working_age", "invalid_stop_age")
     if not 0 <= stop_working_age <= MAX_STOP_WORKING_AGE:
         raise FireProjectionError("stop_working_age", "invalid_stop_age")
-    if stop_working_age < age:
-        raise FireProjectionError("stop_working_age", "stop_before_age")
 
     inflation_bp = _rate(inputs.inflation_bp, "inflation_bp")
     real_return_bp = _rate(inputs.real_return_bp, "real_return_bp")
@@ -506,15 +495,6 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
     )
 
     overrides: dict[int, int] = {}
-    first_override_year = start_year + 1
-    for contribution in inputs.contributions:
-        year = _integer(contribution.year, "contributions", "rows_outside_window")
-        if not first_override_year <= year <= last_year:
-            raise FireProjectionError("contributions", "rows_outside_window")
-        if year in overrides:
-            raise FireProjectionError("contributions", "duplicate_contribution_year")
-        overrides[year] = _money_minor(contribution.amount, "contributions", currency, signed=True)
-
     cash_by_year: dict[int, int] = {}
     income_changes: dict[int, int] = {}
     expense_changes: dict[int, int] = {}
@@ -531,8 +511,14 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
             cash_by_year[year] = cash_by_year.get(year, 0) + amount
         elif kind is EventKind.INCOME_CHANGE:
             income_changes[year] = income_changes.get(year, 0) + amount
-        else:
+        elif kind is EventKind.EXPENSE_CHANGE:
             expense_changes[year] = expense_changes.get(year, 0) + amount
+        else:
+            if year <= start_year:
+                raise FireProjectionError("events", "saving_override_current_year")
+            if year in overrides:
+                raise FireProjectionError("events", "duplicate_saving_override")
+            overrides[year] = amount
 
     return _ProjectionPlan(
         currency=currency,
@@ -613,7 +599,7 @@ def project(inputs: ProjectionInputs) -> Projection:
         year = plan.start_year + offset
         row_age = year - plan.birth_year
         if offset == 0:
-            base_income = plan.start_income_minor
+            base_income = plan.start_income_minor if row_age < plan.stop_working_age else 0
             base_expenses = plan.start_expenses_minor
         else:
             base_income = (
