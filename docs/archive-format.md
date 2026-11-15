@@ -1,4 +1,4 @@
-# Workspace archive format (v2.0)
+# Workspace archive format (v2.1)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -43,7 +43,8 @@ assetboard-home-20261018-143000Z.zip
 ├── loan_scenarios.csv
 ├── installment_plans.csv
 ├── fire_plan.csv
-└── fire_events.csv
+├── fire_events.csv
+└── fire_loan_settings.csv
 ```
 
 All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
@@ -99,8 +100,10 @@ a 1.5 archive reads its old rows as fixed. 1.7 (additive): adds `loan_transfers.
 loan as `full_at_origination` with no interest-only phase. 1.8 (additive): adds the four legacy
 FIRE files, which format 2.0 upgrades; a 1.7 archive reads with no FIRE plan, and a 1.8 archive
 requires every new file (header only when empty). Format 2.0 (breaking): replaces those four
-files with `fire_plan.csv` and the new `fire_events.csv`. Schedules and projections are not
-archived and are recomputed from the restored terms. Golden archives of every released version
+files with `fire_plan.csv` and the new `fire_events.csv`. Format 2.1 (additive): adds
+`fire_loan_settings.csv` with the FIRE plan's ignored-loan choices; a 2.0 archive reads with
+every loan included, and a 2.1 archive requires the new file (header only when empty). Loan
+schedules and projections are not archived and are recomputed from the restored terms. Golden archives of every released version
 are in `tests/fixtures/`.
 
 ## `manifest.json`
@@ -108,7 +111,7 @@ are in `tests/fixtures/`.
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.8",
+  "format_version": "2.1",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -920,6 +923,25 @@ f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081,2027,saving_override,-1200.00,Sabbatical
 a4b5c6d7-e8f9-4a01-b2c3-4d5e6f708192,2030,cash,-5000.00,Home renovation
 ```
 
+## `fire_loan_settings.csv` (restore only, format 2.1)
+
+The FIRE plan's explicit ignored-loan choices. A loan is included when it has no row, so export
+writes only ignored loans; the file is header-only when every loan is included. The loan id is
+the archive lineage id. On restore, a row whose loan is missing from the archive is skipped with
+a warning; the rest of the plan and its other settings still restore.
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (the setting's lineage id) |
+| `loan_id` | yes | UUID of a loan in `loans.csv` |
+| `loan` | yes | the loan name, for readability; the id is authoritative |
+| `included` | yes | `false` for an ignored loan; `true` is accepted as a no-op |
+
+```csv
+id,loan_id,loan,included
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,false
+```
+
 ## Legacy FIRE files (format 1.8 only)
 
 A 1.8 archive carries `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv` and
@@ -946,7 +968,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 2.0)
+## Not in the archive (format 2.1)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
@@ -954,7 +976,9 @@ calendars, and tax rules are added by a later archive extension as new files (a 
 until then, a restore requires a workspace without them. Notification channels are never
 exported, because their URLs can contain secrets. Provider error logs are operational and not
 portable. FIRE projections, sensitivity grids and loan schedules are derived data: they are
-recomputed from the archived inputs and are never stored in the archive.
+recomputed from the archived inputs and are never stored in the archive. The plan's
+include/ignore choice for a loan is user intent, not derived data, so it is stored in
+`fire_loan_settings.csv`.
 
 The profile's `birth_year` and `life_expectancy` are user data, not workspace data, so they are
 not archived. `investment_cost_basis` and `risk_target_policy` are workspace settings and live

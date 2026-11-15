@@ -303,6 +303,7 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "installment_plans.csv",
             "fire_plan.csv",
             "fire_events.csv",
+            "fire_loan_settings.csv",
         ]
     with owner.db() as session:
         event = session.scalars(
@@ -339,6 +340,7 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "installment_plans",
             "fire_plan",
             "fire_events",
+            "fire_loan_settings",
             "fire_legacy_scenarios_skipped",
             "fire_plan_zeroed_fields",
         }
