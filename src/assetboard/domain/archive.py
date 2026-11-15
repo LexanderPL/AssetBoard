@@ -2400,6 +2400,8 @@ def _validate_current_fire(
         needs_review=row["needs_review"],
     )
     last_year = plan.birth_year + plan.horizon_age
+    if last_year > MAX_YEAR:
+        errors.append(ArchiveError("fire_plan.csv", "invalid FIRE scenario horizon"))
     event_ids: set[str] = set()
     override_years: set[int] = set()
     out: list[FireEventRow] = []

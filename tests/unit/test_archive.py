@@ -797,6 +797,7 @@ def _files() -> dict[str, bytes]:
         ("fire_plan.csv", 0, "inflation_bp", "5001"),
         ("fire_plan.csv", 0, "inflation_bp", "-2001"),
         ("fire_plan.csv", 0, "birth_year", "2200"),
+        ("fire_plan.csv", 0, "birth_year", "2190"),
         ("fire_plan.csv", 0, "horizon_age", "0"),
         ("fire_plan.csv", 0, "stop_working_age", "121"),
         ("fire_plan.csv", 0, "currency", "EURO"),
@@ -817,6 +818,22 @@ def test_reader_validates_fire_rows(name: str, row: int, column: str, value: str
     parsed, errors = parse_archive(_rewrite(files))
     assert parsed is None and errors, (name, column, value)
     assert any(error.file == name for error in errors), (name, column, value)
+
+
+def test_reader_rejects_two_fire_plans_and_duplicate_saving_overrides() -> None:
+    files = _files()
+    plan_lines = files["fire_plan.csv"].splitlines(keepends=True)
+    files["fire_plan.csv"] = plan_lines[0] + plan_lines[1] + plan_lines[1]
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "more than one FIRE plan" for error in errors)
+
+    files = _files()
+    _edit_csv(files, "fire_events.csv", 1, "year", "2027")
+    _edit_csv(files, "fire_events.csv", 1, "kind", "saving_override")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "duplicate FIRE saving override" for error in errors)
 
 
 @pytest.mark.parametrize(
