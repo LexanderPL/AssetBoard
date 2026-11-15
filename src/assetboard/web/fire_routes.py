@@ -1,9 +1,12 @@
-"""FIRE plan pages (F8.9): one plan, its chooser, setup wizard, view and reset.
+"""FIRE plan pages (F8.10): one plan, its chooser, setup wizard, read-only view and editor.
 
-Routes parse and format form values and map service errors to field messages; validation, roles,
-the one-time legacy choice, the setup wizard's step checks, reset and the current-year projection
-live in ``services.fire_scenarios`` and ``services.fire_projection``. Every state-changing route
-is covered by the router-level ``require_csrf`` dependency.
+``GET /fire`` is a read-only view for every role; ``GET /fire/edit`` is the editor-only page and
+``POST /fire/edit`` the only plan write besides the wizard/reset. The edit page recalculates the
+results through ``POST /fire/edit/preview`` and never writes. Routes parse and format form values
+and map service errors to field messages; validation, roles, the one-time legacy choice, the setup
+wizard's step checks, reset and the current-year projection live in ``services.fire_scenarios`` and
+``services.fire_projection``. Every state-changing route is covered by the router-level
+``require_csrf`` dependency.
 """
 
 from __future__ import annotations
@@ -103,6 +106,7 @@ ERRORS = {
     ),
     "confirmation_required": _("Confirm that the plan will be deleted."),
     "choice_not_confirmed": _("Confirm that the other old FIRE scenarios will be deleted."),
+    "missing_adjustments": _("The adjustment rows are missing. Reload the page and try again."),
 }
 
 RESULT_BLOCK_MESSAGES = {
@@ -155,6 +159,7 @@ NOTICES = {
     "review_updated": _(
         "The plan values changed. Check the updated review, then press Create plan."
     ),
+    "discarded": _("Unsaved changes discarded."),
 }
 
 RESET_WORD = "reset"
@@ -206,11 +211,7 @@ EVENT_KIND_LABELS = {
     EventKind.INCOME_CHANGE.value: _("Annual income change"),
     EventKind.SAVING_OVERRIDE.value: _("Saving override"),
 }
-STARTING_FIELD_LABELS = {
-    "income_manual": _("annual income"),
-    "expenses_manual": _("annual expenses"),
-    "portfolio_manual": _("starting portfolio"),
-}
+
 
 _EVENT_KEY = re.compile(r"^event_(id|year|kind|amount|label)_([0-9]+)$")
 _EVENT_FIELDS = ("id", "year", "kind", "amount", "label")
@@ -650,11 +651,7 @@ def _form_context(
         window_end = None
     currency = detail.plan.currency
     return {
-        "detail": detail,
         "values": values,
-        "title": _t(request, "FIRE plan"),
-        "action": request.url_for("fire_scenario_update", scenario_id=str(detail.plan.id)).path,
-        "cancel_url": request.url_for("fire_scenarios").path,
         "current_year": current_year,
         "currency": currency,
         "window_end": window_end,
@@ -668,7 +665,6 @@ def _form_context(
         "error": error,
         "error_code": error_code,
         "error_field": error_field,
-        "notice": None,
         "can_edit": has_role(ctx, Role.EDITOR),
         "format_money": format_money,
         "format_rate_short": format_rate_short,
@@ -681,7 +677,8 @@ def _results_context(
     results: fire_projection_service.FirePlanResults,
     *,
     basis: str,
-    inputs_open: bool,
+    editable_results: bool,
+    in_editor: bool = False,
     preview_error: str | None = None,
     preview_error_field: str | None = None,
 ) -> dict[str, object]:
@@ -692,7 +689,8 @@ def _results_context(
         "plan": results.detail.plan,
         "projection": projection,
         "basis": basis,
-        "inputs_open": inputs_open,
+        "editable_results": editable_results,
+        "in_editor": in_editor,
         "charts": (
             build_fire_charts(projection, basis, request.state.locale)
             if projection is not None
@@ -700,50 +698,64 @@ def _results_context(
         ),
         "preview_error": preview_error,
         "preview_error_field": preview_error_field,
-        "can_preview": has_role(ctx, Role.EDITOR),
         "can_edit": has_role(ctx, Role.EDITOR),
-        "field_labels": {
-            field: _t(request, label) for field, label in STARTING_FIELD_LABELS.items()
-        },
         "block_messages": {
             code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
         },
         "format_money": format_money,
         "format_rate_short": format_rate_short,
-        "format_day": lambda day: format_day(day, request.state.locale),
-        "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
-        "event_kind_labels": {
-            code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
-        },
-        "sensitivity_loaded": False,
-        "sensitivity_fragment_url": request.url_for(
-            "fire_scenario_sensitivity", scenario_id=str(results.detail.plan.id)
-        ).path,
-        "sensitivity_page_url": (
-            request.url_for("fire_scenarios").path + "?sensitivity=1#sensitivity"
-        ),
     }
 
 
-def _combined_context(
+def _suggestion_context(
+    request: Request,
+    suggestions: fire_linked_service.SetupSuggestions,
+    plan: fire_service.FirePlanView,
+) -> dict[str, object]:
+    """The edit page's suggestion cards: formatted copy values and the saved amounts."""
+    locale = request.state.locale
+    blocked_fields = {block.field for block in suggestions.blocks}
+    inputs: dict[str, str] = {}
+    if suggestions.income is not None and "income_manual" not in blocked_fields:
+        inputs["income_manual"] = format_amount_input(suggestions.income.annual_total, locale)
+    if suggestions.expenses is not None and "expenses_manual" not in blocked_fields:
+        inputs["expenses_manual"] = format_amount_input(suggestions.expenses.annual_total, locale)
+    if suggestions.portfolio is not None and "portfolio_manual" not in blocked_fields:
+        inputs["portfolio_manual"] = format_amount_input(suggestions.portfolio.total, locale)
+    return {
+        "suggestions": suggestions,
+        "suggested_inputs": inputs,
+        "saved_amounts": {
+            "income_manual": plan.income,
+            "expenses_manual": plan.expenses,
+            "portfolio_manual": plan.portfolio,
+        },
+        "suggestion_block_messages": block_messages(locale),
+        "suggestion_block_fallback": gettext(BLOCK_FALLBACK, locale),
+        "suggestion_warning_text": warning_text,
+        "format_day": format_day,
+    }
+
+
+def _edit_context(
     request: Request,
     ctx: Context,
-    results: fire_projection_service.FirePlanResults,
     *,
+    results: fire_projection_service.FirePlanResults,
+    suggestions: fire_linked_service.SetupSuggestions,
     basis: str,
-    inputs_open: bool,
-    notice: str | None = None,
+    values: dict[str, str] | None = None,
+    event_rows: list[dict[str, str]] | None = None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
-    values: dict[str, str] | None = None,
-    event_rows: list[dict[str, str]] | None = None,
+    notice: str | None = None,
+    dirty: bool = False,
 ) -> dict[str, object]:
-    detail = results.detail
     context = _form_context(
         request,
         ctx,
-        detail=detail,
+        detail=results.detail,
         values=values,
         event_rows=event_rows,
         error=error,
@@ -756,14 +768,56 @@ def _combined_context(
             ctx,
             results,
             basis=basis,
-            inputs_open=inputs_open,
+            editable_results=True,
+            in_editor=True,
         )
     )
+    context.update(_suggestion_context(request, suggestions, results.detail.plan))
     context["notice"] = notice
-    results_url = request.url_for("fire_scenarios").path
-    if basis == "real":
-        results_url = f"{results_url}?basis=real"
-    context["cancel_url"] = results_url
+    context["dirty"] = dirty
+    return context
+
+
+def _view_context(
+    request: Request,
+    ctx: Context,
+    results: fire_projection_service.FirePlanResults,
+    *,
+    basis: str,
+    sensitivity_loaded: bool,
+    notice: str | None = None,
+    error: str | None = None,
+    error_code: str | None = None,
+) -> dict[str, object]:
+    context = _results_context(
+        request,
+        ctx,
+        results,
+        basis=basis,
+        editable_results=False,
+        in_editor=False,
+    )
+    context.update(
+        {
+            "notice": notice,
+            "error": error,
+            "error_code": error_code,
+            "profile_url": request.url_for("account").path,
+            "event_kind_labels": {
+                code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
+            },
+            "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
+            "format_day": format_day,
+            "sensitivity_loaded": sensitivity_loaded,
+            "sensitivity_page_url": (
+                request.url_for("fire_scenarios").path + "?sensitivity=1#sensitivity"
+            ),
+            "sensitivity_fragment_url": request.url_for("fire_sensitivity").path,
+            "sensitivity_inputs_url": request.url_for("fire_edit").path + "#amounts",
+        }
+    )
+    if sensitivity_loaded:
+        context.update(_sensitivity_context(request, ctx, results))
     return context
 
 
@@ -795,12 +849,19 @@ def _redirect(
 
 
 def _sensitivity_context(
-    request: Request, results: fire_projection_service.FirePlanResults
+    request: Request,
+    ctx: Context,
+    results: fire_projection_service.FirePlanResults,
 ) -> dict[str, object]:
-    fragment_url = request.url_for(
-        "fire_scenario_sensitivity", scenario_id=str(results.detail.plan.id)
-    ).path
+    fragment_url = request.url_for("fire_sensitivity").path
     page_url = request.url_for("fire_scenarios").path + "?sensitivity=1#sensitivity"
+    plan = results.detail.plan
+    if plan.currency_mismatch:
+        inputs_url = request.url_for("fire_reset").path
+        inputs_label = _t(request, "Reset plan")
+    else:
+        inputs_url = request.url_for("fire_edit").path + "#amounts"
+        inputs_label = _t(request, "Edit the plan")
     context: dict[str, object] = {
         "sensitivity": None,
         "sensitivity_error": None,
@@ -811,7 +872,9 @@ def _sensitivity_context(
         },
         "sensitivity_fragment_url": fragment_url,
         "sensitivity_page_url": page_url,
-        "sensitivity_inputs_url": request.url_for("fire_scenarios").path + "?edit=1#inputs",
+        "sensitivity_inputs_url": inputs_url,
+        "sensitivity_inputs_label": inputs_label,
+        "can_edit": has_role(ctx, Role.EDITOR),
     }
     if results.projection is None:
         return context
@@ -991,23 +1054,21 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
     if entry.migration is not None:
         return _redirect(request, "fire_scenarios", notice="migrated")
     if entry.detail is not None:
+        if request.query_params.get("edit") == "1":
+            return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
         results = fire_projection_service.results_from_detail(entry.detail)
-        inputs_open = request.query_params.get("edit") == "1" or error is not None
         context = await run_in_threadpool(
-            _combined_context,
+            _view_context,
             request,
             ctx,
             results,
             basis=_basis(request.query_params.get("basis")),
-            inputs_open=inputs_open,
+            sensitivity_loaded=request.query_params.get("sensitivity") == "1",
             notice=notice,
             error=error,
             error_code=error_code,
         )
-        if request.query_params.get("sensitivity") == "1":
-            context.update(await run_in_threadpool(_sensitivity_context, request, results))
-            context["sensitivity_loaded"] = True
-        return render_template(request, "fire/results.html", context=context)
+        return render_template(request, "fire/view.html", context=context)
     if entry.legacy:
         context = {
             "legacy": entry.legacy,
@@ -1029,6 +1090,204 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
     )
     values = _wizard_values({}, defaults, request.state.locale)
     return await _render_wizard(request, ctx, 1, values, defaults, notice=notice)
+
+
+@router.get("/fire/edit", name="fire_edit")
+async def fire_edit_page(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    detail = await run_in_threadpool(
+        fire_service.get_fire_plan_if_any, request.app.state.session_factory, ctx
+    )
+    if detail is None or detail.plan.currency_mismatch:
+        return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+    return await _render_edit(
+        request,
+        ctx,
+        detail,
+        basis=_basis(request.query_params.get("basis")),
+        notice=_notice(
+            request,
+            "discarded"
+            if request.query_params.get("discarded") == "1"
+            else request.query_params.get("notice"),
+        ),
+    )
+
+
+async def _render_edit(
+    request: Request,
+    ctx: Context,
+    detail: fire_service.FirePlanDetail,
+    *,
+    basis: str,
+    values: dict[str, str] | None = None,
+    event_rows: list[dict[str, str]] | None = None,
+    error: str | None = None,
+    error_code: str | None = None,
+    error_field: str | None = None,
+    notice: str | None = None,
+    dirty: bool = False,
+    status_code: int = 200,
+) -> Response:
+    suggestions = await run_in_threadpool(
+        fire_linked_service.setup_suggestions,
+        request.app.state.session_factory,
+        ctx,
+        currency=detail.plan.currency,
+    )
+    results = fire_projection_service.results_from_detail(detail)
+    context = await run_in_threadpool(
+        _edit_context,
+        request,
+        ctx,
+        results=results,
+        suggestions=suggestions,
+        basis=basis,
+        values=values,
+        event_rows=event_rows,
+        error=error,
+        error_code=error_code,
+        error_field=error_field,
+        notice=notice,
+        dirty=dirty,
+    )
+    return render_template(request, "fire/edit.html", context=context, status_code=status_code)
+
+
+@router.post("/fire/edit/preview", name="fire_edit_preview")
+async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    values = await _form_data(request)
+    detail = await run_in_threadpool(
+        fire_service.get_fire_plan_if_any, request.app.state.session_factory, ctx
+    )
+    if detail is None:
+        raise NotFound
+    basis = _basis(values.get("basis"))
+    try:
+        plan = _plan_input(values, request.state.locale, detail.plan.currency)
+        results = await run_in_threadpool(
+            fire_projection_service.preview_plan_results,
+            ctx,
+            detail,
+            plan,
+            factory=request.app.state.session_factory,
+        )
+    except fire_service.FireError as exc:
+        saved = fire_projection_service.results_from_detail(detail)
+        context = await run_in_threadpool(
+            _results_context,
+            request,
+            ctx,
+            saved,
+            basis=basis,
+            editable_results=True,
+            in_editor=True,
+            preview_error=_error(request, exc.code),
+            preview_error_field=exc.field,
+        )
+        return render_template(request, "fire/_results.html", context=context)
+    context = await run_in_threadpool(
+        _results_context,
+        request,
+        ctx,
+        results,
+        basis=basis,
+        editable_results=True,
+        in_editor=True,
+    )
+    return render_template(request, "fire/_results.html", context=context)
+
+
+@router.post("/fire/edit", name="fire_edit_save")
+async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
+    """Validate and save the plan; preview, navigation and discard never write."""
+    require_role(ctx, Role.EDITOR)
+    values = await _form_data(request)
+    basis = _basis(values.get("basis"))
+    event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
+    detail = await run_in_threadpool(
+        fire_service.get_fire_plan_if_any, request.app.state.session_factory, ctx
+    )
+    if detail is None or detail.plan.currency_mismatch:
+        return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+    # A malformed partial save must not be read as "delete every adjustment". A real submit always
+    # carries the adjustment fields (including the blank row).
+    if not any(_EVENT_KEY.match(key) for key in values):
+        return await _render_edit(
+            request,
+            ctx,
+            detail,
+            basis=basis,
+            values=values,
+            event_rows=event_rows,
+            error=_error(request, "missing_adjustments"),
+            error_code="missing_adjustments",
+            error_field="events",
+            dirty=True,
+            status_code=400,
+        )
+    try:
+        plan = _plan_input(values, request.state.locale, detail.plan.currency)
+        await run_in_threadpool(
+            fire_service.update_fire_plan,
+            request.app.state.session_factory,
+            ctx,
+            plan,
+        )
+    except NotFound:
+        return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+    except fire_service.FireError as exc:
+        if exc.code == "plan_currency_mismatch":
+            return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+        return await _render_edit(
+            request,
+            ctx,
+            detail,
+            basis=basis,
+            values=values,
+            event_rows=event_rows,
+            error=_error(request, exc.code),
+            error_code=exc.code,
+            error_field=exc.field,
+            dirty=True,
+            status_code=400,
+        )
+    return _redirect(request, "fire_scenarios", notice="saved", basis=basis)
+
+
+@router.get("/fire/sensitivity", name="fire_sensitivity")
+async def fire_sensitivity(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.VIEWER)
+    results = await run_in_threadpool(
+        fire_projection_service.scenario_results,
+        request.app.state.session_factory,
+        ctx,
+    )
+    context = await run_in_threadpool(_sensitivity_context, request, ctx, results)
+    return render_template(request, "fire/_sensitivity.html", context=context)
+
+
+@router.get("/fire/results.csv", name="fire_results_csv")
+async def fire_results_csv(request: Request, ctx: CurrentContext) -> Response:
+    results = await run_in_threadpool(
+        fire_projection_service.scenario_results,
+        request.app.state.session_factory,
+        ctx,
+    )
+    if results.projection is None:
+        code = results.blocked.code if results.blocked is not None else "invalid_projection"
+        raise HTTPException(status_code=409, detail=_error(request, code))
+    content = await run_in_threadpool(render_fire_csv, results.projection)
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="fire-plan.csv"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/fire/setup", name="fire_wizard")
@@ -1271,19 +1530,20 @@ async def fire_scenario_choose(request: Request, ctx: CurrentContext) -> Respons
 
 @router.get("/fire/{scenario_id}", name="fire_scenario")
 async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
+    """Keep old bookmarks working; the live plan no longer has an id in its URLs."""
     detail = await run_in_threadpool(
         fire_service.get_fire_plan, request.app.state.session_factory, ctx
     )
     if str(detail.plan.id) != scenario_id:
         raise NotFound
+    if request.query_params.get("edit") == "1":
+        return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
     params = {
         key: value
-        for key in ("basis", "sensitivity", "edit", "notice", "error")
+        for key in ("basis", "sensitivity", "notice", "error")
         if (value := request.query_params.get(key))
     }
     anchor = "#sensitivity" if params.get("sensitivity") == "1" else ""
-    if params.get("edit") == "1":
-        anchor = "#inputs"
     url = request.url_for("fire_scenarios").path
     if params:
         url = f"{url}?{urlencode(params)}"
@@ -1295,14 +1555,12 @@ async def fire_scenario_sensitivity(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
     require_role(ctx, Role.VIEWER)
-    results = await run_in_threadpool(
-        fire_projection_service.scenario_results,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
+    detail = await run_in_threadpool(
+        fire_service.get_fire_plan, request.app.state.session_factory, ctx
     )
-    context = await run_in_threadpool(_sensitivity_context, request, results)
-    return render_template(request, "fire/_sensitivity.html", context=context)
+    if str(detail.plan.id) != scenario_id:
+        raise NotFound
+    return RedirectResponse(request.url_for("fire_sensitivity").path, status_code=303)
 
 
 @router.get("/fire/{scenario_id}/edit", name="fire_scenario_edit")
@@ -1315,130 +1573,17 @@ async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id:
     )
     if str(detail.plan.id) != scenario_id:
         raise NotFound
-    url = request.url_for("fire_scenarios").path
-    return RedirectResponse(f"{url}?edit=1#inputs", status_code=303)
-
-
-@router.post("/fire/{scenario_id}/preview", name="fire_scenario_preview")
-async def fire_scenario_preview(
-    request: Request, ctx: CurrentContext, scenario_id: str
-) -> Response:
-    require_role(ctx, Role.EDITOR)
-    values = await _form_data(request)
-    detail = await run_in_threadpool(
-        fire_service.get_fire_plan, request.app.state.session_factory, ctx
-    )
-    if str(detail.plan.id) != scenario_id:
-        raise NotFound
-    basis = _basis(values.get("basis"))
-    try:
-        plan = _plan_input(values, request.state.locale, detail.plan.currency)
-        results = await run_in_threadpool(
-            fire_projection_service.preview_plan_results,
-            ctx,
-            detail,
-            plan,
-            factory=request.app.state.session_factory,
-        )
-    except fire_service.FireError as exc:
-        saved = await run_in_threadpool(
-            fire_projection_service.scenario_results,
-            request.app.state.session_factory,
-            ctx,
-            detail.plan.id,
-        )
-        context = await run_in_threadpool(
-            _results_context,
-            request,
-            ctx,
-            saved,
-            basis=basis,
-            inputs_open=True,
-            preview_error=_error(request, exc.code),
-            preview_error_field=exc.field,
-        )
-        return render_template(request, "fire/_results.html", context=context)
-    context = await run_in_threadpool(
-        _results_context,
-        request,
-        ctx,
-        results,
-        basis=basis,
-        inputs_open=True,
-    )
-    return render_template(request, "fire/_results.html", context=context)
+    return _redirect(request, "fire_edit", basis=_basis(request.query_params.get("basis")))
 
 
 @router.get("/fire/{scenario_id}/results.csv", name="fire_scenario_csv")
 async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
-    results = await run_in_threadpool(
-        fire_projection_service.scenario_results,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
-    )
-    if results.projection is None:
-        code = results.blocked.code if results.blocked is not None else "invalid_projection"
-        raise HTTPException(status_code=409, detail=_error(request, code))
-    content = await run_in_threadpool(render_fire_csv, results.projection)
-    filename = f"fire-plan-{results.detail.plan.id}.csv"
-    return Response(
-        content,
-        media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "no-store",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
-
-
-@router.post("/fire/{scenario_id}", name="fire_scenario_update")
-async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
-    require_role(ctx, Role.EDITOR)
-    values = await _form_data(request)
-    event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     detail = await run_in_threadpool(
         fire_service.get_fire_plan, request.app.state.session_factory, ctx
     )
     if str(detail.plan.id) != scenario_id:
         raise NotFound
-    try:
-        plan = _plan_input(values, request.state.locale, detail.plan.currency)
-        saved_id = await run_in_threadpool(
-            fire_service.update_fire_plan,
-            request.app.state.session_factory,
-            ctx,
-            plan,
-        )
-    except fire_service.FireError as exc:
-        saved = await run_in_threadpool(
-            fire_projection_service.scenario_results,
-            request.app.state.session_factory,
-            ctx,
-            detail.plan.id,
-        )
-        context = await run_in_threadpool(
-            _combined_context,
-            request,
-            ctx,
-            saved,
-            basis=_basis(values.get("basis")),
-            inputs_open=True,
-            error=_error(request, exc.code),
-            error_code=exc.code,
-            error_field=exc.field,
-            values=values,
-            event_rows=event_rows,
-        )
-        return render_template(request, "fire/results.html", status_code=400, context=context)
-    return _redirect(
-        request,
-        "fire_scenario",
-        notice="saved",
-        basis=_basis(values.get("basis")),
-        scenario_id=str(saved_id),
-    )
+    return RedirectResponse(request.url_for("fire_results_csv").path, status_code=303)
 
 
 __all__ = ["router"]

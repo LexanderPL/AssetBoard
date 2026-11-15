@@ -82,15 +82,18 @@ def test_the_nav_link_and_the_wizard_entry(owner) -> None:
 
 
 def test_the_entry_renders_the_view_for_a_plan(owner) -> None:
-    plan_id = create_plan(owner)
+    create_plan(owner)
     page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-overview" in page.text
     assert "data-fire-results" in page.text
-    assert 'href="/fire?edit=1#inputs"' in page.text
-    assert f"/fire/{plan_id}/results.csv" in page.text
+    assert 'href="/fire/edit"' in page.text
+    assert "/fire/results.csv" in page.text
     assert "data-fire-reset" in page.text
     assert "data-fire-edit" in page.text
+    assert "data-fire-form" not in page.text
+    assert 'name="income_manual"' not in page.text
+    assert "data-fire-plan-values" in page.text
 
 
 def test_the_id_url_redirects_to_the_view(owner) -> None:
@@ -101,8 +104,33 @@ def test_the_id_url_redirects_to_the_view(owner) -> None:
     response = owner.client.get(f"/fire/{plan_id}?basis=real&sensitivity=1", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/fire?basis=real&sensitivity=1#sensitivity"
+    response = owner.client.get(f"/fire/{plan_id}?edit=1&basis=real", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire/edit?basis=real"
+    response = owner.client.get(f"/fire/{plan_id}/edit", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire/edit"
+    response = owner.client.get(f"/fire/{plan_id}/results.csv", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire/results.csv"
+    response = owner.client.get(f"/fire/{plan_id}/sensitivity", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire/sensitivity"
     assert owner.client.get(f"/fire/{uuid4()}").status_code == 404
     assert owner.client.get("/fire/not-a-uuid").status_code == 404
+
+
+def test_the_edit_query_redirects_to_the_editor(owner) -> None:
+    create_plan(owner)
+    response = owner.client.get("/fire?edit=1&basis=real", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire/edit?basis=real"
+
+
+def test_the_edit_query_is_ignored_without_a_plan(owner) -> None:
+    page = owner.client.get("/fire?edit=1")
+    assert page.status_code == 200
+    assert 'data-fire-wizard="1"' in page.text
 
 
 def test_a_viewer_reads_the_view_without_edit_or_reset(owner) -> None:
@@ -115,7 +143,10 @@ def test_a_viewer_reads_the_view_without_edit_or_reset(owner) -> None:
         assert "data-fire-edit" not in page.text
         assert "data-fire-reset" not in page.text
         assert "data-fire-form" not in page.text
+        assert "data-fire-plan-values" in page.text
         assert owner.client.get("/fire/reset").status_code == 403
+        assert owner.client.get("/fire/edit").status_code == 403
+        assert owner.client.get("/fire?edit=1", follow_redirects=True).status_code == 403
     finally:
         owner.set_admin_role(Role.OWNER.value)
 
@@ -228,16 +259,20 @@ def test_a_currency_mismatch_blocks_the_page_and_offers_reset(owner) -> None:
     assert "The projection is unavailable" in page.text
     assert "data-fire-blocked-reset" in page.text
     assert "data-fire-reset" in page.text
+    assert "data-fire-edit" not in page.text
+    edit = owner.client.get("/fire/edit", follow_redirects=False)
+    assert edit.status_code == 303
+    assert edit.headers["location"] == "/fire"
 
 
-def test_the_needs_review_banner_links_to_the_view_edit(owner) -> None:
+def test_the_needs_review_banner_links_to_the_editor(owner) -> None:
     plan_id = create_plan(owner)
     with owner.db() as session:
         session.get_one(FireScenario, plan_id).needs_review = True
         session.commit()
     page = owner.client.get("/fire")
     assert "data-fire-needs-review" in page.text
-    assert "/fire?edit=1#inputs" in page.text
+    assert "/fire/edit#amounts" in page.text
 
 
 def test_the_new_alias_redirects(owner) -> None:
