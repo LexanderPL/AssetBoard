@@ -64,9 +64,7 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
-    FireContributionRepository,
     FireEventRepository,
-    FireExpenseExclusionRepository,
     FireScenarioRepository,
     FxRateRepository,
     ImportBatchRepository,
@@ -261,6 +259,26 @@ REPORT_MESSAGES: dict[str, str] = {
     ),
     "fire_default_promoted": _(
         "The archive had no active default FIRE scenario; %(scenario)s was made the default."
+    ),
+    "fire_legacy_scenario_chosen": _(
+        "This is a FIRE archive from an older version; one scenario was converted to the "
+        "single-plan format."
+    ),
+    "fire_legacy_scenarios_skipped": _(
+        "The archive had more than one FIRE scenario; only the default or first one was kept."
+    ),
+    "fire_linked_fallback_used": _(
+        "A linked FIRE input used the value resolved when the archive was exported."
+    ),
+    "fire_missing_fallback_zero": _(
+        "A linked FIRE input had no resolved value in the archive; it was restored as 0."
+    ),
+    "fire_loan_payoff_removed": _(
+        "Saved loan-payoff events from the old archive were removed; the plan now reads live "
+        "loans instead."
+    ),
+    "fire_contributions_migrated": _(
+        "Old contribution overrides were converted to saving-override adjustments."
     ),
     "duplicate_fire_scenario": _("A FIRE scenario id appears more than once."),
     "duplicate_fire_scenario_name": _("Two active FIRE scenarios have the same name."),
@@ -560,6 +578,12 @@ _PARSER_CODES: dict[str, str] = {
     "FIRE contribution outside the plan window": "fire_contribution_window",
     "duplicate FIRE event id": "duplicate_fire_event",
     "FIRE event outside the plan window": "fire_event_window",
+    "legacy FIRE scenarios skipped": "fire_legacy_scenarios_skipped",
+    "legacy FIRE scenario chosen": "fire_legacy_scenario_chosen",
+    "FIRE linked input used its archived fallback": "fire_linked_fallback_used",
+    "FIRE linked input had no fallback and was restored as zero": "fire_missing_fallback_zero",
+    "FIRE loan payoff events were removed": "fire_loan_payoff_removed",
+    "FIRE contribution overrides became saving overrides": "fire_contributions_migrated",
     "duplicate FIRE exclusion id": "duplicate_fire_exclusion",
     "duplicate FIRE exclusion": "duplicate_fire_exclusion_row",
     "FIRE exclusion category mismatch": "fire_exclusion_category",
@@ -1479,9 +1503,7 @@ _LOAN_RESTORE_REPOSITORIES: dict[str, Any] = {
 }
 _FIRE_RESTORE_REPOSITORIES: dict[str, Any] = {
     "fire_scenarios": FireScenarioRepository,
-    "fire_contributions": FireContributionRepository,
     "fire_events": FireEventRepository,
-    "fire_expense_exclusions": FireExpenseExclusionRepository,
 }
 _M3_REFERENCE_ATTRIBUTES = (
     "category_id",
@@ -1704,13 +1726,8 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
-    # FIRE events reference loans with RESTRICT, so every FIRE row goes before the loan rows.
-    for key in (
-        "fire_events",
-        "fire_expense_exclusions",
-        "fire_contributions",
-        "fire_scenarios",
-    ):
+    # FIRE rows go before the loan rows because restored events sit under the plan.
+    for key in ("fire_events", "fire_scenarios"):
         repository = _FIRE_RESTORE_REPOSITORIES[key](session, ctx)
         for row in plan.fire_rows.get(key, ()):
             repository.delete(row)
