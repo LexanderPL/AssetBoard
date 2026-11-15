@@ -13,13 +13,17 @@ recommendations, and the projection assumes constant rates and no separate tax m
 **FIRE projection** opens the plan. If the workspace has no plan, the page starts the four-step
 **setup wizard**. A workspace has at most one plan; creating another is refused.
 
+The plan page is **read-only**. Editors and owners open a separate **Edit plan** page, change the
+values and adjustments there, and return to the read-only view after **Save changes**. Viewers can
+read the plan, its results and its adjustments but never see an edit control.
+
 The plan keeps a **currency snapshot** from the workspace base currency when it is created or
 migrated. If the workspace base currency changes later, the page shows a blocking notice and
 does not reinterpret the saved amounts. **Reset plan** deletes the plan and lets you create a new
 one in the current currency.
 
-A viewer sees the plan read-only. A viewer in a workspace with no plan sees an empty state and
-is told that an editor or owner can set it up.
+A viewer in a workspace with no plan sees an empty state and is told that an editor or owner can
+set it up.
 
 ## Setting up the plan
 
@@ -53,6 +57,54 @@ A blocked suggestion explains why it is unavailable (no data, another ledger cur
 price/FX rate or value) and leaves the field editable; the app never shows a fake zero. The
 starting rates are illustrative examples, not recommendations.
 
+## Viewing the plan
+
+The plan page shows the saved plan without any inputs or preview controls:
+
+- the key metrics and their definitions;
+- the net-worth and expenses-versus-gain charts;
+- the year-by-year schedule;
+- the saved **Plan values** (rates, ages and the three manual amounts);
+- the **Adjustments** applied to the plan, with before-the-current-year adjustments in a collapsed
+  **Archived adjustments** section;
+- the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
+- the **Download CSV** action when the projection is available.
+
+A converted plan shows a review banner until an editor or owner saves it in edit mode. The page
+never writes. The nominal/today's-money switch is a view preference in the link, not a saved
+plan value.
+
+## Editing the plan
+
+Editors and owners open **Edit plan**. The edit page is a separate page; it is not available to
+viewers. It contains every plan field and the adjustments editor.
+
+Results, charts and the year-by-year schedule recalculate on the server after every change; the
+page previews the unsaved plan and never saves a preview. **Save changes** validates the whole
+plan, writes it, clears the review banner and returns to the read-only view with a notice. An
+invalid value shows an inline error and leaves the saved plan untouched. **Discard changes**
+reloads the last saved values and keeps you in edit mode. Leaving with unsaved changes asks for
+confirmation, and an **Unsaved changes** indicator shows the state.
+
+Each amount has a suggestion card:
+
+- **Income** and **expenses** use the last 12 full calendar months, with the window, the months
+  with data, the data date, any warnings and the annualized amount. The expenses card also shows
+  the category breakdown and the loan payments linked to ledger expenses in the window.
+- **Portfolio** shows the current investable assets, the as-of date and the sources that make up
+  the value.
+
+**Use suggested value** copies the suggestion into the field. A suggestion never fills a field by
+itself, and the saved amount changes only when you press **Save changes**. The card shows the
+saved amount and says whether it matches or differs from the current suggestion. A blocked
+suggestion explains why and leaves the field for manual entry. Suggestions are read-only and
+never write.
+
+The adjustments row editor is available in edit mode; a saved adjustment before the current year
+stays archived history and is not applied. A later update adds the live loan schedules; until
+then, enter expenses that include your loan payments. If you edit the same plan in two tabs, the
+last save wins; reload the other tab before saving.
+
 ## Reset plan
 
 Editors and owners can **Reset plan** from the plan page. The reset page shows how many
@@ -72,8 +124,8 @@ Version 0.7 allowed several named scenarios. On the first use after the upgrade:
 
 The converted plan is marked for review. Its linked values were resolved once during the
 conversion and stored as manual amounts. A linked value that could not be resolved is stored as
-zero and the migration records which inputs were affected in the audit log. Open the plan
-inputs, check the values and save to clear the review banner.
+zero and the migration records which inputs were affected in the audit log. Open edit mode,
+check the values and save to clear the review banner.
 
 ## Plan fields
 
@@ -119,20 +171,19 @@ Negative amounts reduce, positive amounts increase. Cash, income-change and expe
 events may repeat in a year and are summed by kind. Adjustments from before the current year,
 and a saving override that has become the current year after a year rollover, are kept as
 **Archived adjustments**: they stay visible as history but are not applied to the projection.
-They can be removed from the plan.
+Adjustments are edited on the separate edit page.
 
 ## Results
 
-The results page shows:
+The plan page shows:
 
 - **FIRE age** and year, **years to FIRE**, the **FIRE number** and **progress** definitions;
 - the sustainability check: the depletion age and the lowest net worth after income stops;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth;
 - a net-worth chart and an expenses-versus-gain chart;
-- a collapsible **Plan inputs** panel, **Download CSV** and **Reset plan**.
+- **Download CSV** and, for editors and owners, **Edit plan** and **Reset plan**.
 
-Changing an input previews the new results without saving. Press **Save changes** to persist and
-clear the review banner, or **Discard changes** to return to the saved values. The
+The plan page is read-only. Editors and owners change the values on the separate edit page; the
 nominal/today's-money basis switch is a view preference and is not saved.
 
 The **Sensitivity** panel projects the saved plan across a range of real returns and expense
@@ -155,6 +206,7 @@ FIRE CSV import.
 
 ## Roles
 
-Every member can read the plan and its results. Editors and owners can set up the plan, edit it,
-convert old scenarios and reset the plan. All write pages are CSRF-protected, and a
-cross-workspace plan is reported as not found.
+Every member can read the plan, its results, its adjustments, the CSV and the sensitivity grid.
+Editors and owners can set up the plan, open the separate edit page, save or discard changes,
+convert old scenarios and reset the plan. Viewers never see edit controls. All write pages are
+CSRF-protected, and a cross-workspace plan is reported as not found.
