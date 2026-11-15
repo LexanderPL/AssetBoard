@@ -30,6 +30,7 @@ from assetboard.services.fire_scenarios import (
     FirePlanDetail,
     FirePlanInput,
     FirePlanView,
+    SavedEvent,
     get_fire_plan,
     validate_plan_input,
 )
@@ -180,7 +181,16 @@ def preview_plan_results(
     saved = detail.plan
     if saved.currency_mismatch:
         raise FireError("currency", "plan_currency_mismatch")
-    saved_events = {event.id: event.year for event in detail.events}
+    saved_events = {
+        event.id: SavedEvent(
+            year=event.year,
+            kind=event.kind,
+            amount_minor=event.amount.amount_minor,
+            label=event.label,
+            archived=event.archived,
+        )
+        for event in detail.events
+    }
     validated = validate_plan_input(
         plan_input,
         current_year=saved.current_year,

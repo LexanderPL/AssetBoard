@@ -121,14 +121,24 @@ def _legacy(
         return row.id
 
 
-def _add_event(team: WorkspaceDb, plan_id: UUID, year: int, amount_minor: int) -> UUID:
+def _add_event(
+    team: WorkspaceDb,
+    plan_id: UUID,
+    year: int,
+    amount_minor: int,
+    *,
+    kind: str = "cash",
+    label: str = "Event",
+    import_key: str | None = None,
+) -> UUID:
     with team.factory.begin() as session:
         row = FireEventRepository(session, team.ctx("owner", "owner")).create(
             scenario_id=plan_id,
             year=year,
-            kind="cash",
+            kind=kind,
             amount_minor=amount_minor,
-            label="Event",
+            label=label,
+            import_key=import_key,
         )
         return row.id
 
@@ -206,14 +216,495 @@ def test_update_clears_needs_review_and_reconciles_events(team: WorkspaceDb) -> 
                     amount_minor=150_000,
                     label="Updated",
                 ),
-            )
+            ),
+            removed_event_ids=(second,),
         ),
     )
     with team.factory() as session:
         rows = FireEventRepository(session, team.ctx("viewer", "viewer")).for_plan(plan_id)
         assert [(row.id, row.amount_minor) for row in rows] == [(first, 150_000)]
         assert session.get_one(FireScenario, plan_id).needs_review is False
-    assert second
+
+
+def test_a_saved_active_row_cannot_be_deleted_by_omission(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    first = _add_event(team, plan_id, 2027, 100_000)
+    second = _add_event(team, plan_id, 2028, 200_000)
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                events=(
+                    EventInput(
+                        id=first,
+                        year=2027,
+                        kind="cash",
+                        amount_minor=100_000,
+                        label="Event",
+                    ),
+                )
+            ),
+        )
+    assert error.value.code == "invalid_event"
+    with team.factory() as session:
+        rows = FireEventRepository(session, team.ctx("viewer", "viewer")).for_plan(plan_id)
+        assert {row.id for row in rows} == {first, second}
+        assert {row.amount_minor for row in rows} == {100_000, 200_000}
+
+
+def test_removed_ids_must_be_posted_or_saved_and_not_both(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    event_id = _add_event(team, plan_id, 2027, 100_000)
+    with pytest.raises(FireError) as duplicate:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                events=(
+                    EventInput(
+                        id=event_id,
+                        year=2027,
+                        kind="cash",
+                        amount_minor=100_000,
+                        label="Event",
+                    ),
+                ),
+                removed_event_ids=(event_id,),
+            ),
+        )
+    assert duplicate.value.code == "duplicate_event"
+    with pytest.raises(FireError) as unknown:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(removed_event_ids=(uuid4(),)),
+        )
+    assert unknown.value.code == "invalid_event"
+
+
+def test_archived_events_stay_when_the_plan_is_saved_without_them(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    old_cash = _add_event(team, plan_id, 2020, 100_000, label="Old bonus")
+    current_override = _add_event(
+        team,
+        plan_id,
+        2026,
+        200_000,
+        kind="saving_override",
+        label="This year",
+    )
+    fire_scenarios.update_fire_plan(team.factory, team.ctx("editor", "editor"), _input())
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert {row.id for row in detail.archived_events} == {old_cash, current_override}
+    assert detail.active_events == ()
+
+
+def test_archived_events_can_be_deleted_by_explicit_removal(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    old = _add_event(team, plan_id, 2020, 100_000, label="Old bonus")
+    active = _add_event(team, plan_id, 2027, 200_000, label="New bonus")
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            events=(
+                EventInput(
+                    id=active,
+                    year=2027,
+                    kind="cash",
+                    amount_minor=200_000,
+                    label="New bonus",
+                ),
+            ),
+            removed_event_ids=(old,),
+        ),
+    )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert [row.id for row in detail.active_events] == [active]
+    assert detail.archived_events == ()
+
+
+def test_archived_events_are_read_only_but_unchanged_posts_are_allowed(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team)
+    old = _add_event(team, plan_id, 2020, 100_000, label="Old bonus")
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                events=(
+                    EventInput(
+                        id=old,
+                        year=2020,
+                        kind="cash",
+                        amount_minor=150_000,
+                        label="Old bonus",
+                    ),
+                )
+            ),
+        )
+    assert error.value.code == "archived_event_read_only"
+    assert error.value.row is None
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            events=(
+                EventInput(
+                    id=old,
+                    year=2020,
+                    kind="cash",
+                    amount_minor=100_000,
+                    label="Old bonus",
+                ),
+            )
+        ),
+    )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert [row.id for row in detail.archived_events] == [old]
+
+
+def test_horizon_shrink_archives_and_expand_restores_the_same_event(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team)
+    event_id = _add_event(team, plan_id, 2070, 100_000, label="Later bonus")
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            horizon_age=80,
+            events=(
+                EventInput(
+                    id=event_id,
+                    year=2070,
+                    kind="cash",
+                    amount_minor=100_000,
+                    label="Later bonus",
+                ),
+            ),
+        ),
+    )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert [row.id for row in detail.archived_events] == [event_id]
+    assert detail.active_events == ()
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(horizon_age=90),
+    )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert [row.id for row in detail.active_events] == [event_id]
+    assert detail.archived_events == ()
+
+
+def test_a_changed_year_must_fit_the_submitted_window(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    event_id = _add_event(team, plan_id, 2027, 100_000, label="Bonus")
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                horizon_age=42,
+                events=(
+                    EventInput(
+                        id=event_id,
+                        year=2028,
+                        kind="cash",
+                        amount_minor=100_000,
+                        label="Bonus",
+                    ),
+                ),
+            ),
+        )
+    assert error.value.code == "rows_outside_window"
+
+
+def test_an_archived_override_blocks_a_new_override_when_the_horizon_expands(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team, horizon_age=80)
+    _add_event(
+        team,
+        plan_id,
+        2070,
+        100_000,
+        kind="saving_override",
+        label="Late override",
+    )
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                horizon_age=90,
+                events=(
+                    EventInput(
+                        year=2070,
+                        kind="saving_override",
+                        amount_minor=200_000,
+                        label="New override",
+                        index="7",
+                    ),
+                ),
+            ),
+        )
+    assert error.value.code == "duplicate_saving_override"
+    assert error.value.row == "7"
+    assert error.value.column == "year"
+
+
+def test_adjustment_row_errors_name_the_row_and_column(team: WorkspaceDb) -> None:
+    _create(team)
+    with pytest.raises(FireError) as duplicate:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                events=(
+                    EventInput(
+                        year=2027,
+                        kind="saving_override",
+                        amount_minor=1,
+                        label="A",
+                        index="4",
+                    ),
+                    EventInput(
+                        year=2027,
+                        kind="saving_override",
+                        amount_minor=2,
+                        label="B",
+                        index="5",
+                    ),
+                )
+            ),
+        )
+    assert duplicate.value.code == "duplicate_saving_override"
+    assert duplicate.value.row == "5"
+    assert duplicate.value.column == "year"
+    with pytest.raises(FireError) as bad_year:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(
+                events=(
+                    EventInput(
+                        year=2020,
+                        kind="cash",
+                        amount_minor=1,
+                        label="Past",
+                        index="new",
+                    ),
+                )
+            ),
+        )
+    assert bad_year.value.code == "rows_outside_window"
+    assert bad_year.value.row == "new"
+    assert bad_year.value.column == "year"
+
+
+def test_all_four_kinds_and_repeated_rows_are_accepted(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            events=(
+                EventInput(year=2027, kind="cash", amount_minor=100_000, label="Bonus"),
+                EventInput(year=2027, kind="cash", amount_minor=50_000, label="Gift"),
+                EventInput(year=2027, kind="income_change", amount_minor=20_000, label="Rent"),
+                EventInput(year=2028, kind="expense_change", amount_minor=-30_000, label="Loan"),
+                EventInput(
+                    year=2029,
+                    kind="saving_override",
+                    amount_minor=-40_000,
+                    label="Sabbatical",
+                ),
+                EventInput(year=2029, kind="cash", amount_minor=0, label="Zero is explicit"),
+            )
+        ),
+    )
+    with team.factory() as session:
+        rows = FireEventRepository(session, team.ctx("viewer", "viewer")).for_plan(plan_id)
+        assert {row.kind for row in rows} == {
+            "cash",
+            "income_change",
+            "expense_change",
+            "saving_override",
+        }
+        assert {row.amount_minor for row in rows if row.year == 2027} == {
+            100_000,
+            50_000,
+            20_000,
+        }
+        assert sum(1 for row in rows if row.kind == "cash") == 3
+
+
+def test_update_preserves_untouched_row_ids_timestamps_and_import_lineage(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team)
+    event_id = _add_event(
+        team,
+        plan_id,
+        2027,
+        100_000,
+        label="Imported",
+        import_key="fire-event-1",
+    )
+    with team.factory() as session:
+        row = session.get_one(FireEvent, event_id)
+        created_at, updated_at = row.created_at, row.updated_at
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            events=(
+                EventInput(
+                    id=event_id,
+                    year=2027,
+                    kind="cash",
+                    amount_minor=100_000,
+                    label="Imported",
+                ),
+            )
+        ),
+    )
+    with team.factory() as session:
+        row = session.get_one(FireEvent, event_id)
+        assert row.id == event_id
+        assert row.import_key == "fire-event-1"
+        assert row.created_at == created_at
+        assert row.updated_at == updated_at
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            events=(
+                EventInput(
+                    id=event_id,
+                    year=2027,
+                    kind="cash",
+                    amount_minor=150_000,
+                    label="Imported",
+                ),
+            )
+        ),
+    )
+    with team.factory() as session:
+        row = session.get_one(FireEvent, event_id)
+        assert row.id == event_id
+        assert row.import_key == "fire-event-1"
+        assert row.created_at == created_at
+        assert row.amount_minor == 150_000
+
+
+def test_an_archived_override_can_be_replaced_in_the_same_year(team: WorkspaceDb) -> None:
+    plan_id = _create(team, horizon_age=80)
+    old_override = _add_event(
+        team,
+        plan_id,
+        2070,
+        100_000,
+        kind="saving_override",
+        label="Late override",
+    )
+    fire_scenarios.update_fire_plan(
+        team.factory,
+        team.ctx("editor", "editor"),
+        _input(
+            horizon_age=90,
+            events=(
+                EventInput(year=2070, kind="saving_override", amount_minor=200_000, label="New"),
+            ),
+            removed_event_ids=(old_override,),
+        ),
+    )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("viewer", "viewer"))
+    assert [(row.year, row.amount.amount_minor) for row in detail.active_events] == [
+        (2070, 200_000)
+    ]
+    assert detail.archived_events == ()
+
+
+def test_cross_workspace_removed_id_is_refused_without_touching_the_other_row(
+    team: WorkspaceDb,
+) -> None:
+    _create(team)
+    other = team.add_workspace("Other")
+    team.add_member("other-owner", "owner", workspace_id=other)
+    other_ctx = team.ctx("other-owner", "owner", workspace_id=other)
+    with team.factory.begin() as session:
+        other_plan = FireScenarioRepository(session, other_ctx).create(
+            currency="EUR",
+            birth_year=1985,
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            stop_working_age=55,
+            horizon_age=90,
+            rule="returns_cover_expenses",
+            swr_bp=None,
+            income_minor=1,
+            expenses_minor=1,
+            portfolio_minor=1,
+            needs_review=False,
+            is_live=True,
+            legacy=None,
+        )
+        other_event = FireEventRepository(session, other_ctx).create(
+            scenario_id=other_plan.id,
+            year=2027,
+            kind="cash",
+            amount_minor=100_000,
+            label="Other bonus",
+        )
+        other_event_id = other_event.id
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(removed_event_ids=(other_event_id,)),
+        )
+    assert error.value.code == "invalid_event"
+    with team.factory() as session:
+        assert FireEventRepository(session, other_ctx).for_plan(other_plan.id)[0].id == (
+            other_event_id
+        )
+
+
+def test_the_event_limit_counts_archived_history(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    with team.factory.begin() as session:
+        repository = FireEventRepository(session, team.ctx("owner", "owner"))
+        for index in range(200):
+            repository.create(
+                scenario_id=plan_id,
+                year=2020,
+                kind="cash",
+                amount_minor=index + 1,
+                label="Old",
+            )
+    with pytest.raises(FireError) as error:
+        fire_scenarios.update_fire_plan(
+            team.factory,
+            team.ctx("editor", "editor"),
+            _input(events=(EventInput(year=2027, kind="cash", amount_minor=1, label="New"),)),
+        )
+    assert error.value.code == "too_many_events"
+
+
+def test_create_never_accepts_events_or_removals(team: WorkspaceDb) -> None:
+    with pytest.raises(FireError) as event:
+        _create(team, events=(EventInput(year=2027, kind="cash", amount_minor=1, label="A"),))
+    assert event.value.code == "events_not_allowed_on_create"
+    with pytest.raises(FireError) as removal:
+        _create(team, removed_event_ids=(uuid4(),))
+    assert removal.value.code == "events_not_allowed_on_create"
 
 
 def test_event_ids_from_another_plan_are_refused(team: WorkspaceDb) -> None:

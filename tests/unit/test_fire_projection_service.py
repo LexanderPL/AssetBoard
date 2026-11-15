@@ -204,6 +204,57 @@ def test_a_preview_ignores_archived_events_like_the_saved_projection(team: Works
     assert preview.projection == saved.projection
 
 
+def test_a_preview_includes_an_archived_event_that_the_new_horizon_covers(
+    team: WorkspaceDb,
+) -> None:
+    plan_id = _create(team, horizon_age=80)
+    with team.factory.begin() as session:
+        session.add(
+            FireEvent(
+                workspace_id=team.workspace_id,
+                scenario_id=plan_id,
+                year=2070,
+                kind="cash",
+                amount_minor=100_000,
+                label="Later bonus",
+            )
+        )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    assert [row.year for row in detail.archived_events] == [2070]
+    preview = fire_projection.preview_plan_results(
+        team.ctx("editor", "editor"), detail, _input(horizon_age=90)
+    )
+    assert preview.projection is not None
+    cash = {row.year: row.cash for row in preview.projection.rows}
+    assert cash[2070] == _money(100_000)
+    fire_scenarios.update_fire_plan(
+        team.factory, team.ctx("editor", "editor"), _input(horizon_age=90)
+    )
+    saved = fire_projection.results_from_detail(
+        fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    )
+    assert preview.projection == saved.projection
+
+
+def test_a_preview_refuses_a_partial_post(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    with team.factory.begin() as session:
+        session.add(
+            FireEvent(
+                workspace_id=team.workspace_id,
+                scenario_id=plan_id,
+                year=2027,
+                kind="cash",
+                amount_minor=100_000,
+                label="Bonus",
+            )
+        )
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    with pytest.raises(FireError) as error:
+        fire_projection.preview_plan_results(team.ctx("editor", "editor"), detail, _input())
+    assert error.value.code == "invalid_event"
+
+
 def test_a_preview_with_unchanged_inputs_equals_the_saved_projection(team: WorkspaceDb) -> None:
     _create(team)
     detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
@@ -227,6 +278,32 @@ def test_a_preview_writes_nothing(team: WorkspaceDb) -> None:
     with team.factory() as session:
         assert session.get_one(FireScenario, plan_id).updated_at == before
         assert session.scalar(select(func.count()).select_from(FireEvent)) == count_before
+
+
+def test_a_preview_can_remove_a_row_without_writing(team: WorkspaceDb) -> None:
+    plan_id = _create(team)
+    with team.factory.begin() as session:
+        event = FireEvent(
+            workspace_id=team.workspace_id,
+            scenario_id=plan_id,
+            year=2026,
+            kind="cash",
+            amount_minor=100_000,
+            label="Bonus",
+        )
+        session.add(event)
+        session.flush()
+        event_id = event.id
+    detail = fire_scenarios.get_fire_plan(team.factory, team.ctx("editor", "editor"))
+    preview = fire_projection.preview_plan_results(
+        team.ctx("editor", "editor"),
+        detail,
+        _input(removed_event_ids=(event_id,)),
+    )
+    assert preview.projection is not None
+    assert preview.projection.rows[0].cash == _money(0)
+    with team.factory() as session:
+        assert session.get_one(FireEvent, event_id).amount_minor == 100_000
 
 
 def test_an_unusual_rate_warns_in_a_preview_and_blocks_a_save(team: WorkspaceDb) -> None:

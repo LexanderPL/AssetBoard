@@ -61,12 +61,26 @@ LEGACY_NAME = "FIRE plan"
 
 
 class FireError(Exception):
-    """Invalid plan input; ``field`` names the form control and ``code`` the message."""
+    """Invalid plan input; ``field`` names the form control and ``code`` the message.
 
-    def __init__(self, field: str, code: str) -> None:
+    ``row`` and ``column`` identify an adjustment row and one of its controls for the
+    adjustments editor's inline errors. They are optional so plan-level errors keep the old
+    two-argument shape.
+    """
+
+    def __init__(
+        self,
+        field: str,
+        code: str,
+        *,
+        row: str | None = None,
+        column: str | None = None,
+    ) -> None:
         super().__init__(code)
         self.field = field
         self.code = code
+        self.row = row
+        self.column = column
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +91,23 @@ class EventInput:
     label: str
     # The saved row this editor row came from; ``None`` creates a new event.
     id: UUID | None = None
+    # The form row key, used only to attach an inline error; it is never persisted.
+    index: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SavedEvent:
+    """A saved adjustment as it stands before an update or preview.
+
+    ``archived`` is computed by the caller from the **saved** plan's window and the injected
+    clock, so the service never classifies an event against a horizon the user has not saved.
+    """
+
+    year: int
+    kind: str
+    amount_minor: int
+    label: str
+    archived: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +125,8 @@ class FirePlanInput:
     portfolio: Money | None = None
     extreme_rates_confirmed: bool = False
     events: tuple[EventInput, ...] = ()
+    # Saved rows the user explicitly removed; empty means no removal.
+    removed_event_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +259,7 @@ class ValidatedPlan:
     portfolio_minor: int
     events: tuple[EventInput, ...]
     needs_extreme_confirmation: bool = False
+    removed_event_ids: tuple[UUID, ...] = ()
 
 
 RateTuple = tuple[int, int, int, int | None]
@@ -341,15 +375,24 @@ def validate_plan_input(
     currency: str,
     default_horizon: int,
     previous_rates: RateTuple | None = None,
-    saved_events: dict[UUID, int] | None = None,
+    saved_events: dict[UUID, SavedEvent] | None = None,
     preview: bool = False,
     allow_events: bool = True,
 ) -> ValidatedPlan:
     """Check every field, amount, row and rate of a plan.
 
-    ``saved_events`` maps saved event ids to their saved year. It lets an old event that became
-    past (or a saving override that became the current year after rollover) stay on the form
-    without blocking an unrelated save; a new row still may not be created in the past.
+    ``saved_events`` maps saved event ids to their saved row and whether it is archived under the
+    saved plan's window. It supports three rules that keep an edit safe:
+
+    - every saved **active** event must be posted or explicitly removed, so a partial POST can
+      never delete a row by omission;
+    - an archived row posted as an active row is read-only, except the F8.8 rollover case where a
+      saving override has just become the current year;
+    - an unchanged row may keep a year outside the newly submitted window, so shrinking or
+      expanding the horizon archives or restores events by calculation.
+
+    An archived event that becomes active under the submitted window is added unchanged to the
+    validated events, so the preview and the save use the same projection input.
     """
     birth_year, horizon_age, stop_working_age = validate_ages(
         plan.birth_year,
@@ -374,55 +417,161 @@ def validate_plan_input(
     if rates.needs_extreme_confirmation and not plan.extreme_rates_confirmed and not preview:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")
 
-    if not allow_events and plan.events:
+    if not allow_events and (plan.events or plan.removed_event_ids):
         raise FireError("events", "events_not_allowed_on_create")
-    if len(plan.events) > MAX_EVENT_ROWS:
-        raise FireError("events", "too_many_events")
     last_year = birth_year + horizon_age
     events: list[EventInput] = []
-    seen_ids: set[UUID] = set()
+    posted_ids: set[UUID] = set()
+    posted_rows_by_id: dict[UUID, str | None] = {}
+    posted_override_rows: dict[int, str | None] = {}
     override_years: set[int] = set()
+    new_count = 0
+    saved = saved_events or {}
+
     for row in plan.events:
-        year = _integer(row.year, "events", "invalid_year")
-        if not MIN_YEAR <= year <= last_year:
-            raise FireError("events", "rows_outside_window")
+        row_key = row.index if isinstance(row.index, str) else None
+        year = row.year
+        if type(year) is not int:
+            raise FireError("events", "invalid_year", row=row_key, column="year")
         try:
             kind = EventKind(row.kind)
-        except ValueError:
-            raise FireError("events", "invalid_event_kind") from None
-        if type(row.amount_minor) is not int or abs(row.amount_minor) > MAX_AMOUNT_MINOR:
-            raise FireError("events", "invalid_amount")
+        except (TypeError, ValueError):
+            raise FireError("events", "invalid_event_kind", row=row_key, column="kind") from None
+        amount_minor = row.amount_minor
+        if type(amount_minor) is not int or abs(amount_minor) > MAX_AMOUNT_MINOR:
+            raise FireError("events", "invalid_amount", row=row_key, column="amount")
         try:
             label = clean_event_label(row.label)
         except ValueError:
-            raise FireError("events", "invalid_label") from None
+            raise FireError("events", "invalid_label", row=row_key, column="label") from None
+
+        current = None
         if row.id is not None:
-            if row.id in seen_ids:
-                raise FireError("events", "duplicate_event")
-            seen_ids.add(row.id)
-            saved_year = (saved_events or {}).get(row.id)
-            if saved_year is None:
-                raise FireError("events", "invalid_event")
-            if kind is EventKind.SAVING_OVERRIDE and year <= current_year and year != saved_year:
-                raise FireError("events", "saving_override_current_year")
+            if row.id in posted_ids:
+                raise FireError("events", "duplicate_event", row=row_key)
+            current = saved.get(row.id)
+            if current is None:
+                raise FireError("events", "invalid_event", row=row_key)
+            posted_ids.add(row.id)
+            posted_rows_by_id[row.id] = row_key
+            unchanged = (year, kind.value, amount_minor, label) == (
+                current.year,
+                current.kind,
+                current.amount_minor,
+                current.label,
+            )
+            if current.archived:
+                rollover = (
+                    kind is EventKind.SAVING_OVERRIDE
+                    and current.kind == EventKind.SAVING_OVERRIDE.value
+                    and current.year == current_year
+                    and year == current.year
+                )
+                if not unchanged and not rollover:
+                    raise FireError(
+                        "events", "archived_event_read_only", row=row_key, column="year"
+                    )
+                # An archived row may keep a year outside the submitted window; it stays
+                # archived, or becomes active again if the horizon now covers it.
+            elif year != current.year:
+                # A changed year must fit the submitted window. An unchanged year is allowed
+                # outside it so a horizon shrink can archive events by calculation.
+                if kind is EventKind.SAVING_OVERRIDE and year <= current_year:
+                    raise FireError(
+                        "events", "saving_override_current_year", row=row_key, column="year"
+                    )
+                if not current_year <= year <= last_year:
+                    raise FireError("events", "rows_outside_window", row=row_key, column="year")
         else:
-            if year < current_year:
-                raise FireError("events", "rows_outside_window")
+            new_count += 1
+            if not current_year <= year <= last_year:
+                raise FireError("events", "rows_outside_window", row=row_key, column="year")
             if kind is EventKind.SAVING_OVERRIDE and year <= current_year:
-                raise FireError("events", "saving_override_current_year")
+                raise FireError(
+                    "events", "saving_override_current_year", row=row_key, column="year"
+                )
+
         if kind is EventKind.SAVING_OVERRIDE:
             if year in override_years:
-                raise FireError("events", "duplicate_saving_override")
+                raise FireError("events", "duplicate_saving_override", row=row_key, column="year")
             override_years.add(year)
+            posted_override_rows[year] = row_key
         events.append(
             EventInput(
                 year=year,
                 kind=kind.value,
-                amount_minor=row.amount_minor,
+                amount_minor=amount_minor,
                 label=label,
                 id=row.id,
+                index=row_key,
             )
         )
+
+    removed_ids: list[UUID] = []
+    removed_set: set[UUID] = set()
+    for event_id in plan.removed_event_ids:
+        if event_id not in saved:
+            raise FireError("events", "invalid_event")
+        if event_id in removed_set:
+            raise FireError("events", "duplicate_event")
+        if event_id in posted_ids:
+            raise FireError("events", "duplicate_event", row=posted_rows_by_id.get(event_id))
+        removed_set.add(event_id)
+        removed_ids.append(event_id)
+
+    # Strict partial-POST protection: a missing active row is an error, never a deletion.
+    expected_active = {event_id for event_id, event in saved.items() if not event.archived}
+    if not expected_active <= posted_ids | removed_set:
+        raise FireError("events", "invalid_event")
+
+    # An archived event that the submitted window now covers is part of the projection even
+    # though the editor still renders it as archived. Add it unchanged; reconciliation leaves
+    # the saved row in place.
+    newly_active_ids: set[UUID] = set()
+    for event_id, event in saved.items():
+        if event_id in posted_ids or event_id in removed_set or not event.archived:
+            continue
+        if not event_is_active(event.year, event.kind, current_year, last_year):
+            continue
+        kind = EventKind(event.kind)
+        if kind is EventKind.SAVING_OVERRIDE:
+            if event.year in override_years:
+                raise FireError(
+                    "events",
+                    "duplicate_saving_override",
+                    row=posted_override_rows.get(event.year),
+                    column="year",
+                )
+            override_years.add(event.year)
+        newly_active_ids.add(event_id)
+        events.append(
+            EventInput(
+                year=event.year,
+                kind=event.kind,
+                amount_minor=event.amount_minor,
+                label=event.label,
+                id=event_id,
+            )
+        )
+
+    # A saved override that stays archived still occupies its year in the unique index; a new
+    # or moved override must not silently collide with it.
+    preserved_override_years = {
+        event.year
+        for event_id, event in saved.items()
+        if event_id not in posted_ids
+        and event_id not in removed_set
+        and event_id not in newly_active_ids
+        and event.kind == EventKind.SAVING_OVERRIDE.value
+    }
+    for year, row_key in posted_override_rows.items():
+        if year in preserved_override_years:
+            raise FireError("events", "duplicate_saving_override", row=row_key, column="year")
+
+    removed_saved_count = sum(1 for event_id in removed_ids if event_id in saved)
+    total_events = len(saved) + new_count - removed_saved_count
+    if total_events > MAX_EVENT_ROWS:
+        raise FireError("events", "too_many_events")
 
     return ValidatedPlan(
         birth_year=birth_year,
@@ -438,6 +587,7 @@ def validate_plan_input(
         portfolio_minor=portfolio_minor,
         events=tuple(events),
         needs_extreme_confirmation=rates.needs_extreme_confirmation,
+        removed_event_ids=tuple(removed_ids),
     )
 
 
@@ -751,10 +901,26 @@ def create_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
 
 
 def _reconcile_events(
-    session: Session, ctx: Context, plan_id: UUID, validated: ValidatedPlan
+    session: Session,
+    ctx: Context,
+    plan_id: UUID,
+    validated: ValidatedPlan,
+    *,
+    existing_rows: tuple[FireEvent, ...] | None = None,
 ) -> None:
+    """Apply explicit removals and posted rows; never delete a row by omission.
+
+    Saved rows that are not posted are the archived history the editor did not touch. They stay
+    exactly as they are, which also preserves their ids, timestamps and archive import lineage.
+    """
     events = FireEventRepository(session, ctx)
-    existing = {row.id: row for row in events.for_plan(plan_id)}
+    rows = existing_rows if existing_rows is not None else tuple(events.for_plan(plan_id))
+    existing = {row.id: row for row in rows}
+    for event_id in validated.removed_event_ids:
+        current = existing.pop(event_id, None)
+        if current is None:
+            raise FireError("events", "invalid_event")
+        events.delete(current)
     for row in validated.events:
         if row.id is None:
             events.create(
@@ -781,8 +947,6 @@ def _reconcile_events(
                 amount_minor=row.amount_minor,
                 label=row.label,
             )
-    for row in existing.values():
-        events.delete(row)
 
 
 def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePlanInput) -> UUID:
@@ -797,12 +961,23 @@ def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
         if row is None:
             raise NotFound
         _check_currency(session, ctx, row)
+        current_year = _current_year(ctx)
+        saved_rows = tuple(FireEventRepository(session, ctx).for_plan(row.id))
         saved_events = {
-            event.id: event.year for event in FireEventRepository(session, ctx).for_plan(row.id)
+            event.id: SavedEvent(
+                year=event.year,
+                kind=event.kind,
+                amount_minor=event.amount_minor,
+                label=event.label,
+                archived=not event_is_active(
+                    event.year, event.kind, current_year, row.birth_year + row.horizon_age
+                ),
+            )
+            for event in saved_rows
         }
         validated = validate_plan_input(
             plan,
-            current_year=_current_year(ctx),
+            current_year=current_year,
             currency=row.currency,
             default_horizon=row.horizon_age,
             previous_rates=(
@@ -828,7 +1003,7 @@ def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
             portfolio_minor=validated.portfolio_minor,
             needs_review=False,
         )
-        _reconcile_events(session, ctx, row.id, validated)
+        _reconcile_events(session, ctx, row.id, validated, existing_rows=saved_rows)
         _audit(session, ctx, "fire_plan.updated", row)
         return row.id
 
@@ -1020,6 +1195,7 @@ __all__ = [
     "LegacyScenarioView",
     "PlanEntry",
     "RateTuple",
+    "SavedEvent",
     "ValidatedPlan",
     "ValidatedRates",
     "create_fire_plan",
