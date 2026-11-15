@@ -863,7 +863,7 @@ msgstr ""
 msgid "Old scenario"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Old scenarios deleted"
 msgstr ""
 
@@ -2766,7 +2766,7 @@ msgstr ""
 msgid "The plan has an invalid withdrawal rate."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "A saving override is stored in the current year and is not applied."
 msgstr ""
 
