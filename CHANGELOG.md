@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.9](https://github.com/LexanderPL/AssetBoard/compare/v0.7.8...v0.7.9) (2026-11-16)
+
+
+### Features
+
+* **fire:** add the living-plan year review (F8.16) ([#358](https://github.com/LexanderPL/AssetBoard/issues/358)) ([8a00b6b](https://github.com/LexanderPL/AssetBoard/commit/8a00b6bc21e21038039de1fa2dbdf5f19134fcf3))
+* **fire:** rework the FIRE projection and editor layout (F8.17) ([#361](https://github.com/LexanderPL/AssetBoard/issues/361)) ([b0edf7c](https://github.com/LexanderPL/AssetBoard/commit/b0edf7cb35bcc65d34e237dabcbe7792efd494fc))
+* **ui:** polish portfolio scope, month hints and history pagination ([#363](https://github.com/LexanderPL/AssetBoard/issues/363)) ([7acb9ea](https://github.com/LexanderPL/AssetBoard/commit/7acb9ea17b83d2820eb1dba87563e84fd6c220e5))
+
 ## [0.7.8](https://github.com/LexanderPL/AssetBoard/compare/v0.7.7...v0.7.8) (2026-11-16)
 
 
