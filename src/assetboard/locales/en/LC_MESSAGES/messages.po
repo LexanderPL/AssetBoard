@@ -7061,11 +7061,17 @@ msgstr ""
 msgid "archived"
 msgstr ""
 
+msgid "First"
+msgstr ""
+
 msgid "Previous"
 msgstr ""
 
 #, python-format
 msgid "Page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Last"
 msgstr ""
 
 msgid ""
@@ -10124,12 +10130,6 @@ msgstr ""
 msgid "No entries in this category this month."
 msgstr ""
 
-msgid ""
-"Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
-"Tab moves to the next field, Enter saves, Esc clears the row or cancels "
-"an edit."
-msgstr ""
-
 msgid "Showing all entries."
 msgstr ""
 
@@ -10365,11 +10365,6 @@ msgid "Out: expenses and saved / invested"
 msgstr ""
 
 msgid "In: income and withdrawn from savings"
-msgstr ""
-
-msgid ""
-"Enter or leaving the field saves a planned value; 0 or an empty field "
-"removes it. Esc restores the saved value."
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."
@@ -14091,5 +14086,20 @@ msgstr ""
 #~ " net saving and is unique per "
 #~ "year. Negative amounts reduce, positive "
 #~ "amounts increase."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Day: a day of this month (7) "
+#~ "or a full date (2026-10-07 or "
+#~ "07.10.2026). Tab moves to the next "
+#~ "field, Enter saves, Esc clears the "
+#~ "row or cancels an edit."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Enter or leaving the field saves a"
+#~ " planned value; 0 or an empty "
+#~ "field removes it. Esc restores the "
+#~ "saved value."
 #~ msgstr ""
 
