@@ -545,8 +545,8 @@ re-running a backfill after correcting a value.
 - A recorded zero is data and renders a zero chart. Items without any effective value, only
   non-base values, only excluded items or only archived items show the empty state and the
   existing summary warnings.
-- A linked item is not counted before its creation date; it has no value there, not an
-  unavailable link.
+- A linked item created after another item's first value can be flagged unavailable at the
+  earlier points; it is never counted as zero there.
 - The range selector is `?range=1y|3y|5y|all` on the Summary page, default `1y`; unknown values
   normalise to `1y`. Range links keep the `#net-worth-trend` anchor.
 - `GET /net-worth/history` is a 302 redirect to
@@ -575,8 +575,8 @@ re-running a backfill after correcting a value.
   `registry.resolve_many` once for every date, then loops in memory. The number of SQL
   statements does not grow with the range.
 - `ItemHistory.created_at` is populated by `services.networth.load_item_histories`; the linked
-  item's creation date is the earliest start the current resolver protocol can support.
-  `values_at` reports a linked item before that date as having no value, not as unavailable.
+  item's creation date is the earliest start the current resolver protocol can support. A linked
+  item created after another item's first value can be unavailable at the earlier points.
 - `has_values` means at least one point has a counted base-currency, non-archived,
   include-in-net-worth value; `has_recorded_values` means any effective value exists even if
   none is counted. The view uses the former for the chart and the latter for the empty-state

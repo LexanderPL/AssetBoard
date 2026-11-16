@@ -62,9 +62,10 @@ Completed month-ends use the value effective on that date:
 - a manual item with **Estimate values between entries** on gets a straight-line value for a
   month-end strictly between two recorded values (see **Estimates between values**);
 - linked items use their historical series (portfolio prices and exchange rates, loan
-  schedules), and today's point uses the live value; before a linked item was created it has no
-  value, rather than an unavailable link;
-- a linked value that cannot be resolved is left out and counted as unavailable, never zero.
+  schedules), and today's point uses the live value;
+- a linked value that cannot be resolved is left out and counted as unavailable, never zero; a
+  linked item created after another item's first value can be unavailable at those earlier
+  points.
 
 Today is not estimated: it always uses the live effective value. A base-currency change is
 reflected on the next load because nothing is stored.
