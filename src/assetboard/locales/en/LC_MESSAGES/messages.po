@@ -6407,22 +6407,6 @@ msgstr ""
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr ""
 
-#, python-format
-msgid ""
-"Bar capped at 100%%, exact value %(value)s; starting portfolio %(start)s;"
-" net worth at FIRE %(target)s"
-msgstr ""
-
-#, python-format
-msgid ""
-"With these inputs, the portfolio never reaches the withdrawal-rate target"
-" before age %(age)d."
-msgstr ""
-
-#, python-format
-msgid "With these inputs, returns never cover expenses before age %(age)d."
-msgstr ""
-
 msgid "Preview of unsaved changes."
 msgstr ""
 
@@ -14047,4 +14031,19 @@ msgstr ""
 #~ msgid_plural "%(num)d archived"
 #~ msgstr[0] ""
 #~ msgstr[1] ""
+
+#~ msgid ""
+#~ "Bar capped at 100%%, exact value "
+#~ "%(value)s; starting portfolio %(start)s; net"
+#~ " worth at FIRE %(target)s"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With these inputs, the portfolio never"
+#~ " reaches the withdrawal-rate target "
+#~ "before age %(age)d."
+#~ msgstr ""
+
+#~ msgid "With these inputs, returns never cover expenses before age %(age)d."
+#~ msgstr ""
 

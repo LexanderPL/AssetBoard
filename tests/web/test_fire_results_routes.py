@@ -167,9 +167,7 @@ def test_a_never_fire_plan_shows_dashes_and_the_reason(owner) -> None:
     page = owner.client.get("/fire")
     assert 'data-fire-number-value=""' in page.text
     assert 'data-fire-progress="plan" data-progress-bp=""' in page.text
-    assert "data-fire-never" in page.text
     assert "data-fire-number-note" not in page.text
-    assert "With these inputs, returns never cover expenses" in page.text
     assert "data-fire-progress-note" in page.text
     assert "Not defined: this plan does not reach FIRE." in page.text
     assert 'aria-valuetext="Not defined"' in page.text
@@ -212,8 +210,6 @@ def test_plan_progress_shows_the_exact_percentage_and_caps_the_bar(owner) -> Non
     assert 'aria-valuenow="100"' in page.text
     assert 'width="100"' in page.text
     assert 'height="32"' in page.text
-    assert "data-fire-progress-exact" in page.text
-    assert "Bar capped at 100%, exact value 382.26%" in page.text
 
 
 def test_the_view_has_no_real_money_or_spreadsheet_wording(owner) -> None:

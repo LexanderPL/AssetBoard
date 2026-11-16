@@ -44,7 +44,6 @@
         <h2 id="plan-progress-heading" class="text-base font-semibold">{{ _("Plan progress") }} {{ hint(_("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.")) }}</h2>
         <p class="mt-1 text-3xl font-semibold tabular-nums" data-fire-progress-label>{% if progress_bp is none %}—{% else %}{{ format_rate_short(progress_bp, locale) }}{% endif %}</p>
       </div>
-      <p class="max-w-md text-sm text-muted">{{ _("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.") }}</p>
     </div>
     <div class="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <p class="flex items-baseline gap-2 text-sm text-muted"><span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>{{ _("Starting portfolio") }} <span class="text-lg font-semibold tabular-nums text-ink" data-fire-progress-starting>{{ format_money(projection.inputs.start_portfolio, locale) }}</span></p>
@@ -58,18 +57,6 @@
     </svg>
     {% if progress_bp is none %}
     <p class="mt-1 text-sm text-muted" data-fire-progress-note>{% if projection.fire_age is none %}{{ _("Not defined: this plan does not reach FIRE.") }}{% else %}{{ _("Not defined: net worth at FIRE is not positive.") }}{% endif %}</p>
-    {% else %}
-    <p class="sr-only" data-fire-progress-exact>{{ _("Bar capped at 100%%, exact value %(value)s; starting portfolio %(start)s; net worth at FIRE %(target)s", value=format_rate_short(progress_bp, locale), start=format_money(projection.inputs.start_portfolio, locale), target=format_money(projection.networth_at_fire, locale) if projection.networth_at_fire is not none else "—") }}</p>
     {% endif %}
   </section>
-
-  {% if projection.fire_age is none %}
-  <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-never>
-    {% if projection.inputs.rule.value == "swr" %}
-    {{ _("With these inputs, the portfolio never reaches the withdrawal-rate target before age %(age)d.", age=projection.inputs.horizon_age) }}
-    {% else %}
-    {{ _("With these inputs, returns never cover expenses before age %(age)d.", age=projection.inputs.horizon_age) }}
-    {% endif %}
-  </p>
-  {% endif %}
 </section>

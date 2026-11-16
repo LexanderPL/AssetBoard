@@ -6948,26 +6948,6 @@ msgstr "Nieokreślony: ten plan nie osiąga FIRE."
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr "Nieokreślony: wartość netto w roku FIRE nie jest dodatnia."
 
-#, python-format
-msgid ""
-"Bar capped at 100%%, exact value %(value)s; starting portfolio %(start)s;"
-" net worth at FIRE %(target)s"
-msgstr ""
-"Pasek ograniczony do 100%%, dokładna wartość %(value)s; portfel "
-"początkowy %(start)s; majątek netto w momencie FIRE %(target)s"
-
-#, python-format
-msgid ""
-"With these inputs, the portfolio never reaches the withdrawal-rate target"
-" before age %(age)d."
-msgstr ""
-"Przy tych danych portfel nigdy nie osiąga celu stopy wypłat przed wiekiem"
-" %(age)d."
-
-#, python-format
-msgid "With these inputs, returns never cover expenses before age %(age)d."
-msgstr "Przy tych danych zyski nigdy nie pokrywają wydatków przed wiekiem %(age)d."
-
 msgid "Preview of unsaved changes."
 msgstr "Podgląd niezapisanych zmian."
 
@@ -14910,4 +14890,28 @@ msgstr "Usuń obszar roboczy…"
 #~ msgstr[0] "%(num)d zarchiwizowana"
 #~ msgstr[1] "%(num)d zarchiwizowane"
 #~ msgstr[2] "%(num)d zarchiwizowanych"
+
+#~ msgid ""
+#~ "Bar capped at 100%%, exact value "
+#~ "%(value)s; starting portfolio %(start)s; net"
+#~ " worth at FIRE %(target)s"
+#~ msgstr ""
+#~ "Pasek ograniczony do 100%%, dokładna "
+#~ "wartość %(value)s; portfel początkowy "
+#~ "%(start)s; majątek netto w momencie FIRE"
+#~ " %(target)s"
+
+#~ msgid ""
+#~ "With these inputs, the portfolio never"
+#~ " reaches the withdrawal-rate target "
+#~ "before age %(age)d."
+#~ msgstr ""
+#~ "Przy tych danych portfel nigdy nie "
+#~ "osiąga celu stopy wypłat przed wiekiem"
+#~ " %(age)d."
+
+#~ msgid "With these inputs, returns never cover expenses before age %(age)d."
+#~ msgstr ""
+#~ "Przy tych danych zyski nigdy nie "
+#~ "pokrywają wydatków przed wiekiem %(age)d."
 
