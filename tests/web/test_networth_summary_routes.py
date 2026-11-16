@@ -299,6 +299,9 @@ def test_summary_shows_the_derived_trend_without_any_snapshots(owner: OwnerApp) 
     assert "data-networth-trend" in page
     assert 'data-chart="line"' in page and "echarts.min.js" in page
     assert "data-trend-row" in page
+    # The trend sits directly after the figure/bar panel and before the warnings and tables.
+    assert page.index("data-summary-figure") < page.index('id="net-worth-trend"')
+    assert page.index('id="net-worth-trend"') < page.index('data-summary-table="assets"')
     chart = _chart(page)
     assert chart["series"][0]["values"] == [12000] * 13
     assert chart["labels"][0] == "November 2025"
@@ -404,6 +407,9 @@ def test_monthly_values_table_is_collapsed(owner: OwnerApp) -> None:
     assert table is not None and "open" not in table.group(0)
     assert "<summary" in page and "Monthly values" in page
     assert "data-trend-row" in page
+    assert re.search(r'<table[^>]*class="sheet w-full text-sm"', page) is not None
+    assert '<caption class="sr-only">Monthly values</caption>' in page
+    assert 'scope="col"' in page and 'scope="row"' in page
 
 
 def test_no_snapshot_ui_or_history_tab_remains(owner: OwnerApp) -> None:

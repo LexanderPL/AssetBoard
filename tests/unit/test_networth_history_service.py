@@ -152,6 +152,22 @@ def test_all_starts_at_the_earliest_value_and_ignores_future_values(
     assert len(data.points) == 35
 
 
+def test_a_later_item_has_no_value_in_earlier_points(team: WorkspaceDb) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    _item(team, ctx, category, name="Older", value="100", as_of=date(2024, 1, 15))
+    _item(team, ctx, category, name="Newer", value="50", as_of=date(2026, 2, 1))
+
+    data = networth_history(team.factory, ctx, "all")
+    january = data.points[0]
+    february = next(point for point in data.points if point.as_of == date(2026, 2, 28))
+    assert january.as_of == date(2024, 1, 31)
+    assert january.assets == Money(10_000, "EUR")
+    assert [row.total_minor for row in january.breakdown.categories] == [10_000]
+    assert february.assets == Money(15_000, "EUR")
+
+
 def test_no_data_returns_no_points_and_no_chart(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     data = networth_history(team.factory, ctx, "1y")
@@ -263,6 +279,36 @@ def test_linked_values_use_resolver_history_and_live_today(
     today = data.points[-1]
     assert february.assets == Money(200, "EUR")
     assert today.assets == Money(300, "EUR") and today.live
+
+
+def test_linked_item_creation_is_the_earliest_supported_start(
+    team: WorkspaceDb, fake_links: FakeLinks
+) -> None:
+    _at(team, "2025-01-01T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    target = FakeTarget(
+        workspace_id=team.workspace_id,
+        link_id=uuid4(),
+        label="Holding",
+        values={
+            date(2025, 1, 31): 100,
+            date(2025, 2, 28): 200,
+            date(2026, 3, 15): 300,
+        },
+    )
+    fake_links.register(targets=[target])
+    _item(team, ctx, category, name="Holding", link_type=LINK_TYPE, link_id=target.link_id)
+    _at(team, "2026-03-15T12:00:00+00:00")
+
+    data = networth_history(team.factory, team.ctx("ed", "editor"), "all")
+    # The adapter cannot resolve a date before the item existed, so January 2025 is the start.
+    assert data.points[0].as_of == date(2025, 1, 31)
+    assert data.points[0].assets == Money(100, "EUR")
+    assert data.points[1].as_of == date(2025, 2, 28)
+    assert data.points[1].assets == Money(200, "EUR")
+    assert data.points[-1].as_of == date(2026, 3, 15)
+    assert data.points[-1].assets == Money(300, "EUR")
 
 
 def test_linked_resolution_is_one_batch_call_for_all_dates(

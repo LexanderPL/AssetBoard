@@ -2273,9 +2273,6 @@ def test_lone_exported_item_valuations_import_as_duplicates(
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
     rows = _rows()
-    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
-    # the exact total this test checks.
-    rows = replace(rows, networth_items=(rows.networth_items[0],))
     batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
     _apply(db, data_dir, batch_id, ctx=ctx)
@@ -2326,9 +2323,6 @@ def test_restore_apply_detects_a_workspace_that_became_non_empty(
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
     rows = _rows()
-    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
-    # the exact total this test checks.
-    rows = replace(rows, networth_items=(rows.networth_items[0],))
     batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     _plan(db, data_dir, batch_id, ctx=ctx)
     with db.factory.begin() as session:
@@ -2423,9 +2417,6 @@ def test_restore_rollback_refuses_a_row_added_after_it(db: WorkspaceDb, data_dir
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
     rows = _rows()
-    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
-    # the exact total this test checks.
-    rows = replace(rows, networth_items=(rows.networth_items[0],))
     batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     _plan(db, data_dir, batch_id, ctx=ctx)
     _apply(db, data_dir, batch_id, ctx=ctx)
