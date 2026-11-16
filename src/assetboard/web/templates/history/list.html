@@ -229,9 +229,11 @@
     {% endif %}
     {% if window and window.pages > 1 %}
     <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="{{ _('Pages') }}" data-pages>
+      {% if pages.first %}<a href="{{ pages.first }}" rel="first" class="{{ secondary_class }}" data-first>{{ _("First") }}</a>{% endif %}
       {% if pages.previous %}<a href="{{ pages.previous }}" rel="prev" class="{{ secondary_class }}" data-previous>{{ _("Previous") }}</a>{% endif %}
       <span class="text-muted" data-page-number>{{ _("Page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}</span>
       {% if pages.next %}<a href="{{ pages.next }}" rel="next" class="{{ secondary_class }}" data-next>{{ _("Next") }}</a>{% endif %}
+      {% if pages.last %}<a href="{{ pages.last }}" rel="last" class="{{ secondary_class }}" data-last>{{ _("Last") }}</a>{% endif %}
     </nav>
     {% endif %}
   </section>

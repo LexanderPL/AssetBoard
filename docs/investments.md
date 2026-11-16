@@ -386,12 +386,13 @@ workspace base currency. It is read-only.
 - **Class donut**: the totals box also shows a compact donut of the look-through value by asset
   class, in the classes' colours, including archived classes and an *Unallocated* slice for
   instruments without an allocation. Its total is the portfolio value.
-- **Chart**: a donut of instrument values, titled *Holdings by instrument*. Choose its scope above
-  it: one asset class (each instrument contributes only its part in that class) or the whole
-  portfolio. It opens on the class created as *Stocks* (*Akcje*) when you hold something there,
-  otherwise on the whole portfolio. Slices under 2% are grouped into *Other*. Slices use the
-  chart palette; the class colours appear in the asset-class table. Without JavaScript the
-  chart's table is shown.
+- **Chart**: a donut of instrument values, titled *Holdings by instrument*. Its scope selector
+  sits in the same section header: one asset class (each instrument contributes only its part in
+  that class) or the whole portfolio. It opens on the class created as *Stocks* (*Akcje*) when
+  you hold something there, otherwise on the whole portfolio. Slices under 2% are grouped into
+  *Other*. Slices use the chart palette; the class colours appear in the asset-class table.
+  Without JavaScript the chart's table is shown. The Holdings, By asset class and Risk balance
+  tables sit directly on the page without an outer card frame.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 

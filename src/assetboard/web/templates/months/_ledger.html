@@ -50,17 +50,15 @@
 {% if errors.get(name) %}<p id="{{ prefix }}-{{ name }}-error" class="mt-1 text-xs {{ error_class }}" data-field-error>{{ errors.get(name) }}</p>{% endif %}
 {%- endmacro %}
 
-{% macro described(prefix, name, errors, hint=None) -%}
-{% set ids = ([hint] if hint else []) + ([prefix ~ "-" ~ name ~ "-error"] if errors.get(name) else []) %}
-{% if hint %} data-describedby="{{ hint }}"{% endif %}{% if ids %} aria-describedby="{{ ids|join(' ') }}"{% endif %}{% if errors.get(name) %} aria-invalid="true"{% endif %}
+{% macro described(prefix, name, errors) -%}
+{% if errors.get(name) %} aria-describedby="{{ prefix }}-{{ name }}-error" aria-invalid="true"{% endif %}
 {%- endmacro %}
 
 {# The four inputs of an entry or edit row. ``kind`` is "entry" or "edit" (focus names). #}
 {% macro inputs(s, kind, prefix, form_id, values, errors, options) -%}
-{% set hint = "ledger-" ~ s.direction ~ "-hint" %}
 <td class="cell-edit align-top">
   <label for="{{ prefix }}-day" class="sr-only">{{ _("Day") }}</label>
-  <input id="{{ prefix }}-day" name="day" form="{{ form_id }}" type="text" inputmode="numeric" autocomplete="off" maxlength="10" value="{{ values.get('day', '') }}" placeholder="{{ _('Day') }}"{{ described(prefix, "day", errors, hint) }}{{ autofocus(s.state, kind ~ ":day") }} data-ledger-field class="{{ input_class }}">
+  <input id="{{ prefix }}-day" name="day" form="{{ form_id }}" type="text" inputmode="numeric" autocomplete="off" maxlength="10" value="{{ values.get('day', '') }}" placeholder="{{ _('Day') }}"{{ described(prefix, "day", errors) }}{{ autofocus(s.state, kind ~ ":day") }} data-ledger-field class="{{ input_class }}">
   {{ field_error(prefix, "day", errors) }}
 </td>
 <td class="cell-edit align-top">
@@ -254,9 +252,6 @@
       </tbody>
     </table>
   </div>
-  {% if ledger.can_write and s.categories %}
-  <p id="ledger-{{ s.direction }}-hint" class="mt-2 text-xs {{ muted_class }}">{{ _("Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). Tab moves to the next field, Enter saves, Esc clears the row or cancels an edit.") }}</p>
-  {% endif %}
 </section>
 {%- endmacro %}
 

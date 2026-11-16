@@ -150,7 +150,8 @@ form in a window; click outside it (or press Esc) to close it without changing a
 - **Categories**: tick one or more (archived categories are listed too); none ticked means all.
 
 **Order** sorts by date or by amount. The filters and the search are part of the page address, so
-you can bookmark a search. Each date links to the Transactions page of its month, where you edit
+you can bookmark a search. The page links include **First** and **Last** to jump to either end,
+and **Previous**/**Next** to move one page. Each date links to the Transactions page of its month, where you edit
 or delete the entry. Entries in
 closed months are marked "closed". Deleted entries are never listed.
 

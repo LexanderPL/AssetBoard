@@ -278,12 +278,21 @@ async def _list_page(
         options = await run_in_threadpool(category_options, factory, ctx)
     pairs = _state_pairs(raw, sort)
     window = result.window if result is not None else None
-    pages: dict[str, str | None] = {"previous": None, "next": None}
+    pages: dict[str, str | None] = {
+        "first": None,
+        "previous": None,
+        "next": None,
+        "last": None,
+    }
     if window is not None:
+        if window.number > 1:
+            pages["first"] = _list_url(request, _state_pairs(raw, sort, 1))
         if window.has_previous:
             pages["previous"] = _list_url(request, _state_pairs(raw, sort, window.number - 1))
         if window.has_next:
             pages["next"] = _list_url(request, _state_pairs(raw, sort, window.number + 1))
+        if window.number < window.pages:
+            pages["last"] = _list_url(request, _state_pairs(raw, sort, window.pages))
     current = _state_pairs(raw, sort, window.number if window else 1)
     context: dict[str, Any] = {
         "raw": raw,
