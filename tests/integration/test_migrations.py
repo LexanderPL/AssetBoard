@@ -674,6 +674,58 @@ def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypat
     assert not Path(calls[0][1].removeprefix("sqlite:///")).parent.exists()
 
 
+def test_0065_horizon_rule_constraint_accepts_the_new_value_and_downgrades(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'horizon_rule.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id = "11111111111141118111111111111111"
+    plan_id = "22222222222242228222222222222222"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces "
+                "(id, name, base_currency, locale, timezone, require_two_factor, "
+                "auto_copy_plan, taxes_enabled, upcoming_days, investment_cost_basis, "
+                "created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', 0, 0, 0, 30, "
+                "'average', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_scenarios "
+                "(id, workspace_id, currency, birth_year, stop_working_age, horizon_age, "
+                "inflation_bp, real_return_bp, income_growth_bp, rule, swr_bp, income_minor, "
+                "expenses_minor, portfolio_minor, needs_review, is_live, created_at, updated_at) "
+                "VALUES (?, ?, 'EUR', 1985, 55, 90, 250, 500, 300, 'lasts_to_horizon', NULL, "
+                "500000, 300000, 10000000, 0, 1, '2026-01-01 00:00:00', "
+                "'2026-01-01 00:00:00')",
+                (plan_id, workspace_id),
+            )
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(
+                "UPDATE fire_scenarios SET swr_bp = 400 WHERE id = ?", (plan_id,)
+            )
+        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT rule, swr_bp FROM fire_scenarios WHERE id = ?", (plan_id,)
+            ).one()
+        assert row == ("returns_cover_expenses", None)
+        upgrade_database(settings)
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT rule, swr_bp FROM fire_scenarios WHERE id = ?", (plan_id,)
+            ).one()
+        assert row == ("returns_cover_expenses", None)
+    finally:
+        engine.dispose()
+
+
 def test_identity_migration_is_reversible_and_head_detection_is_read_only(tmp_path: Path) -> None:
     database_path = tmp_path / "reversible.db"
     settings = Settings(

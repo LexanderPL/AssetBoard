@@ -78,13 +78,13 @@ class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="income_growth_valid",
         ),
         CheckConstraint(
-            "rule IN ('returns_cover_expenses', 'swr')",
+            "rule IN ('returns_cover_expenses', 'swr', 'lasts_to_horizon')",
             name="rule_valid",
         ),
         CheckConstraint(
             "(rule = 'swr' AND swr_bp IS NOT NULL AND "
             f"swr_bp BETWEEN {SWR_HARD_MIN_BP} AND {SWR_HARD_MAX_BP}) OR "
-            "(rule = 'returns_cover_expenses' AND swr_bp IS NULL)",
+            "(rule IN ('returns_cover_expenses', 'lasts_to_horizon') AND swr_bp IS NULL)",
             name="swr_valid",
         ),
         CheckConstraint(

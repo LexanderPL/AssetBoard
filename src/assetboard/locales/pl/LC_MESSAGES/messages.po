@@ -3198,6 +3198,9 @@ msgstr "Zwrot pokrywa wydatki"
 msgid "Withdrawal rate"
 msgstr "Stopa wypłat"
 
+msgid "Portfolio lasts to the horizon"
+msgstr "Portfel wystarcza do końca horyzontu"
+
 msgid "Reset plan"
 msgstr "Zresetuj plan"
 
@@ -6727,11 +6730,15 @@ msgstr "Reguła niezależności"
 msgid ""
 "Returns cover expenses compares the portfolio's return above inflation "
 "with the year's expenses, preserving real capital. Withdrawal rate uses "
-"the rate below."
+"the rate below. Portfolio lasts to the horizon assumes base income stops "
+"at the candidate FIRE age and checks that the portfolio is not depleted "
+"before the horizon."
 msgstr ""
 "Reguła „Zwrot pokrywa wydatki” porównuje zwrot z portfela powyżej "
 "inflacji z rocznymi wydatkami, zachowując realny kapitał. Reguła stopy "
-"wypłat używa stopy poniżej."
+"wypłat używa stopy poniżej. Reguła „Portfel wystarcza do końca horyzontu”"
+" zakłada, że dochód bazowy kończy się w wieku kandydata do FIRE, i "
+"sprawdza, że portfel nie zostanie wyczerpany przed końcem horyzontu."
 
 #, python-format
 msgid "Withdrawal rate (%%)"
@@ -6908,6 +6915,13 @@ msgid "FIRE number"
 msgstr "Kwota FIRE"
 
 msgid ""
+"Not used by Portfolio lasts to the horizon: that rule tests the portfolio"
+" through the horizon rather than a rate-based target."
+msgstr ""
+"Nie używane przez regułę „Portfel wystarcza do końca horyzontu”: sprawdza"
+" ona portfel w całym horyzoncie, a nie cel oparty na stopie."
+
+msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
 "independence rule uses: the withdrawal rate, or the return above "
 "inflation when returns must cover expenses. This is the portfolio the "
@@ -6916,6 +6930,9 @@ msgstr ""
 "Nominalne wydatki w roku FIRE podzielone przez stopę, której używa reguła"
 " niezależności: stopę wypłat albo zwrot powyżej inflacji, gdy zwrot ma "
 "pokrywać wydatki. To portfel potrzebny w tym roku."
+
+msgid "Not defined for this rule: it does not use a withdrawal rate."
+msgstr "Nieokreślona dla tej reguły: nie używa stopy wypłat."
 
 msgid "Not defined: the plan's return above inflation is not positive."
 msgstr "Nieokreślona: zwrot planu powyżej inflacji nie jest dodatni."
@@ -6949,6 +6966,13 @@ msgstr "Nie sprawdzono: w horyzoncie nie ma lat po zakończeniu dochodów."
 msgid "Plan progress"
 msgstr "Postęp planu"
 
+msgid ""
+"Not used by Portfolio lasts to the horizon: the rule has no net-worth "
+"target at FIRE."
+msgstr ""
+"Nie używane przez regułę „Portfel wystarcza do końca horyzontu”: reguła "
+"nie ma celu wartości netto w roku FIRE."
+
 #, python-format
 msgid ""
 "Starting portfolio divided by the projected nominal net worth at FIRE. "
@@ -6965,6 +6989,9 @@ msgstr "Nieokreślona"
 
 msgid "Not defined: this plan does not reach FIRE."
 msgstr "Nieokreślony: ten plan nie osiąga FIRE."
+
+msgid "Not defined for this rule: it does not use a net-worth target."
+msgstr "Nieokreślony dla tej reguły: nie używa celu wartości netto."
 
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr "Nieokreślony: wartość netto w roku FIRE nie jest dodatnia."

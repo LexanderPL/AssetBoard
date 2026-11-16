@@ -951,6 +951,13 @@ def test_a_portfolio_with_only_skipped_sources_explains_the_missing_value(owner)
     assert 'name="portfolio_manual" value=""' in text
 
 
+def test_the_wizard_offers_the_horizon_rule_without_changing_the_default(owner) -> None:
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    field = field_html(text, "rule")
+    assert '<option value="lasts_to_horizon">Portfolio lasts to the horizon</option>' in field
+    assert '<option value="returns_cover_expenses" selected>' in field
+
+
 def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(owner) -> None:
     text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
     field = field_html(text, "swr")

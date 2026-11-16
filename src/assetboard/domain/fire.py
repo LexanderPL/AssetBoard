@@ -66,6 +66,7 @@ class Rule(StrEnum):
 
     RETURNS_COVER_EXPENSES = "returns_cover_expenses"
     SWR = "swr"
+    LASTS_TO_HORIZON = "lasts_to_horizon"
 
 
 class IncomeMode(StrEnum):
@@ -362,9 +363,10 @@ class Projection:
     matches the currency of every row's ``Money`` values. ``fire_number`` is the portfolio
     needed at the FIRE row: that row's nominal expenses divided by the rule's rate (the
     withdrawal rate, or the return above inflation under returns-cover-expenses). It is
-    ``None`` when FIRE is never reached or the rate is not positive. ``plan_progress_bp`` is
-    the starting portfolio divided by the nominal net worth at FIRE; it is ``None`` when FIRE
-    is never reached or the net worth at FIRE is not positive.
+    ``None`` when FIRE is never reached, the rate is not positive, or the rule has no
+    rate-based target (``lasts_to_horizon``). ``plan_progress_bp`` is the starting portfolio
+    divided by the nominal net worth at FIRE; it is ``None`` when FIRE is never reached, the
+    net worth at FIRE is not positive, or the rule has no net-worth target.
     """
 
     inputs: ProjectionInputs
@@ -616,52 +618,10 @@ def _active_changes(changes: dict[int, int], rate_bp: int, years: int, year: int
     return total
 
 
-def project(inputs: ProjectionInputs) -> Projection:
-    """Project one FIRE plan year by year from ``start_year`` through ``horizon_age``.
-
-    ``t = 0`` reuses the net column as the starting portfolio and earns one gain before the
-    row's cash flow; later rows add ``net`` and ``cash`` to the opening net worth. The nominal
-    gain compounds inflation and the return above inflation exactly:
-    ``(1 + inflation) * (1 + real return) - 1``. Base income grows with income growth while the
-    row's age is below the stop age; base expenses grow with inflation; event changes are
-    separate components inflated from the start year and active from their event year. Saving
-    overrides replace the net line for their year but leave the shown income, expenses and cash
-    untouched. All series continue to the horizon after FIRE and after income stops.
-
-    A live loan is part of the expenses baseline. From an included loan's payoff year onward the
-    projection subtracts its recurring annual payment, so the expense line is net of payments
-    that have ended. A future one-off overpayment moves the payoff year but never enters the
-    annual payment. Ignored loans never produce a drop and keep their payment in the baseline for
-    the whole horizon. ``loan_payment`` reports the part of the net expense line still
-    attributable to loans; it is not an additional subtraction. A negative effective expense
-    line (an expense change, or an included loan drop, below zero) raises
-    :class:`FireProjectionError` with ``expenses_negative`` and the row's ``year``; a plan can
-    never declare FIRE on a negative expense line.
-
-    Under ``returns_cover_expenses`` the first row whose non-negative opening net worth earns a
-    return above inflation that covers the year's nominal expenses is the FIRE row:
-    ``opening * real_return_bp > expenses * 10_000``. That preserves real capital; the strict
-    comparison and the opening balance mean the crossing is marked in the first row where the
-    previous year's balance already earns enough. Under ``swr`` the first row with
-    ``opening net worth * swr >= expenses`` wins, and cash does not enter either predicate in its
-    own event year.
-
-    ``fire_number`` is the FIRE row's nominal expenses divided by the rule's rate (the
-    withdrawal rate, or the return above inflation when returns must cover expenses), rounded
-    once. It is ``None`` when FIRE is never reached or that rate is not positive.
-    ``plan_progress_bp`` is the starting portfolio divided by the nominal net worth at FIRE,
-    rounded once; it is ``None`` when FIRE is never reached or that net worth is not positive.
-
-    ``depletion_age`` and ``min_networth_after_stop`` look at rows from
-    ``max(1, stop_working_age - age_at_start)`` onward, inclusive. Invalid inputs raise
-    :class:`FireProjectionError` with a form-friendly ``field`` and ``code``.
-    """
-    plan = _validate(inputs)
-    currency = plan.currency
-    projection_inputs = (
-        inputs if inputs.currency == currency else replace(inputs, currency=currency)
-    )
-    age = age_at_start(plan.start_year, plan.birth_year)
+def _build_rows(
+    plan: _ProjectionPlan, currency: str, *, stop_working_age: int
+) -> list[ProjectionRow]:
+    """Build the nominal row series for one stop-working age; no FIRE row is marked."""
     last_year = plan.birth_year + plan.horizon_age
     # Exact nominal compounding in basis points: ((1 + inflation) * (1 + real return) - 1).
     # The numerator is over 100,000,000 so one opening * numerator / denominator rounds once.
@@ -670,20 +630,18 @@ def project(inputs: ProjectionInputs) -> Projection:
         + plan.real_return_bp * 10_000
         + plan.inflation_bp * plan.real_return_bp
     )
-
     rows: list[ProjectionRow] = []
-    fire_index: int | None = None
     previous_net_worth = 0
     for offset in range(last_year - plan.start_year + 1):
         year = plan.start_year + offset
         row_age = year - plan.birth_year
         if offset == 0:
-            base_income = plan.start_income_minor if row_age < plan.stop_working_age else 0
+            base_income = plan.start_income_minor if row_age < stop_working_age else 0
             base_expenses = plan.start_expenses_minor
         else:
             base_income = (
                 _inflate(plan.start_income_minor, plan.income_growth_bp, offset)
-                if row_age < plan.stop_working_age
+                if row_age < stop_working_age
                 else 0
             )
             base_expenses = _inflate(plan.start_expenses_minor, plan.inflation_bp, offset)
@@ -718,17 +676,6 @@ def project(inputs: ProjectionInputs) -> Projection:
         opening = plan.start_portfolio_minor if offset == 0 else previous_net_worth
         gain = round_ratio(opening * gain_numerator, 100_000_000)
         net_worth = net + gain + cash if offset == 0 else opening + net + gain + cash
-
-        is_fire = False
-        if fire_index is None and opening >= 0:
-            if plan.rule is Rule.SWR:
-                assert plan.swr_bp is not None
-                is_fire = opening * plan.swr_bp >= expenses * 10_000
-            else:
-                is_fire = opening * plan.real_return_bp > expenses * 10_000
-            if is_fire:
-                fire_index = offset
-
         rows.append(
             ProjectionRow(
                 year=year,
@@ -740,18 +687,127 @@ def project(inputs: ProjectionInputs) -> Projection:
                 gain=Money(gain, currency),
                 cash=Money(cash, currency),
                 net_worth=Money(net_worth, currency),
-                is_fire=is_fire,
-                income_stopped=offset > 0 and row_age >= plan.stop_working_age,
+                is_fire=False,
+                income_stopped=offset > 0 and row_age >= stop_working_age,
             )
         )
         previous_net_worth = net_worth
+    return rows
+
+
+def _rate_fire_index(plan: _ProjectionPlan, rows: list[ProjectionRow]) -> int | None:
+    """The first row where the rate-based rule fires; opening balances index the previous row."""
+    for offset, row in enumerate(rows):
+        opening = (
+            plan.start_portfolio_minor if offset == 0 else rows[offset - 1].net_worth.amount_minor
+        )
+        if opening < 0:
+            continue
+        if plan.rule is Rule.SWR:
+            assert plan.swr_bp is not None
+            if opening * plan.swr_bp >= row.expenses.amount_minor * 10_000:
+                return offset
+        elif opening * plan.real_return_bp > row.expenses.amount_minor * 10_000:
+            return offset
+    return None
+
+
+def _horizon_fire_index(plan: _ProjectionPlan, currency: str, *, age: int) -> int | None:
+    """The earliest age where stopping base income still lasts through the horizon.
+
+    Candidate ages stop at the earlier of the configured income-stop age and the year before the
+    horizon: the rule cannot declare FIRE after base income has already stopped or after the last
+    projected year. The check starts at the candidate's opening balance and requires every later
+    net worth to be non-negative; zero at the horizon counts as lasting.
+    """
+    last_candidate = max(age, min(plan.stop_working_age, plan.horizon_age - 1))
+    for stop_age in range(age, last_candidate + 1):
+        rows = _build_rows(plan, currency, stop_working_age=stop_age)
+        fire_offset = stop_age - age
+        opening = (
+            plan.start_portfolio_minor
+            if fire_offset == 0
+            else rows[fire_offset - 1].net_worth.amount_minor
+        )
+        if opening < 0:
+            continue
+        if all(row.net_worth.amount_minor >= 0 for row in rows[fire_offset:]):
+            return fire_offset
+    return None
+
+
+def project(inputs: ProjectionInputs) -> Projection:
+    """Project one FIRE plan year by year from ``start_year`` through ``horizon_age``.
+
+    ``t = 0`` reuses the net column as the starting portfolio and earns one gain before the
+    row's cash flow; later rows add ``net`` and ``cash`` to the opening net worth. The nominal
+    gain compounds inflation and the return above inflation exactly:
+    ``(1 + inflation) * (1 + real return) - 1``. Base income grows with income growth while the
+    row's age is below the stop age; base expenses grow with inflation; event changes are
+    separate components inflated from the start year and active from their event year. Saving
+    overrides replace the net line for their year but leave the shown income, expenses and cash
+    untouched. All series continue to the horizon after FIRE and after income stops.
+
+    A live loan is part of the expenses baseline. From an included loan's payoff year onward the
+    projection subtracts its recurring annual payment, so the expense line is net of payments
+    that have ended. A future one-off overpayment moves the payoff year but never enters the
+    annual payment. Ignored loans never produce a drop and keep their payment in the baseline for
+    the whole horizon. ``loan_payment`` reports the part of the net expense line still
+    attributable to loans; it is not an additional subtraction. A negative effective expense
+    line (an expense change, or an included loan drop, below zero) raises
+    :class:`FireProjectionError` with ``expenses_negative`` and the row's ``year``; a plan can
+    never declare FIRE on a negative expense line.
+
+    Under ``returns_cover_expenses`` the first row whose non-negative opening net worth earns a
+    return above inflation that covers the year's nominal expenses is the FIRE row:
+    ``opening * real_return_bp > expenses * 10_000``. That preserves real capital; the strict
+    comparison and the opening balance mean the crossing is marked in the first row where the
+    previous year's balance already earns enough. Under ``swr`` the first row with
+    ``opening net worth * swr >= expenses`` wins, and cash does not enter either predicate in its
+    own event year.
+
+    Under ``lasts_to_horizon`` the FIRE row is the earliest age from the current age through the
+    earlier of the configured income-stop age and the year before the horizon where a candidate
+    retirement survives. The candidate simulation stops **base income at that candidate age** and
+    keeps every other series and event as entered; the displayed rows still follow the configured
+    income-stop age. Every net worth from the candidate row through the horizon, and the opening
+    balance at the candidate age, must be non-negative; zero at the horizon counts as lasting.
+    The rule cannot declare FIRE after base income has already stopped or after the last projected
+    year.
+
+    ``fire_number`` is the FIRE row's nominal expenses divided by the rule's rate (the
+    withdrawal rate, or the return above inflation when returns must cover expenses), rounded
+    once. It is ``None`` when FIRE is never reached or that rate is not positive.
+    ``plan_progress_bp`` is the starting portfolio divided by the nominal net worth at FIRE,
+    rounded once; it is ``None`` when FIRE is never reached or that net worth is not positive.
+    ``lasts_to_horizon`` has no rate-based FIRE number and no net-worth target, so both are
+    ``None`` even when FIRE is reached.
+
+    ``depletion_age`` and ``min_networth_after_stop`` look at rows from
+    ``max(1, stop_working_age - age_at_start)`` onward, inclusive. Invalid inputs raise
+    :class:`FireProjectionError` with a form-friendly ``field`` and ``code``.
+    """
+    plan = _validate(inputs)
+    currency = plan.currency
+    projection_inputs = (
+        inputs if inputs.currency == currency else replace(inputs, currency=currency)
+    )
+    age = age_at_start(plan.start_year, plan.birth_year)
+    rows = _build_rows(plan, currency, stop_working_age=plan.stop_working_age)
+    fire_index = (
+        _horizon_fire_index(plan, currency, age=age)
+        if plan.rule is Rule.LASTS_TO_HORIZON
+        else _rate_fire_index(plan, rows)
+    )
+    if fire_index is not None:
+        rows[fire_index] = replace(rows[fire_index], is_fire=True)
 
     fire_row = rows[fire_index] if fire_index is not None else None
     fire_year = plan.start_year + fire_index if fire_index is not None else None
     fire_age = age + fire_index if fire_index is not None else None
 
     fire_number: Money | None = None
-    if fire_row is not None:
+    if fire_row is not None and plan.rule is not Rule.LASTS_TO_HORIZON:
         rate_bp = plan.swr_bp if plan.rule is Rule.SWR else plan.real_return_bp
         if rate_bp is not None and rate_bp > 0:
             fire_number = Money(
@@ -759,7 +815,11 @@ def project(inputs: ProjectionInputs) -> Projection:
             )
 
     plan_progress_bp: int | None = None
-    if fire_row is not None and fire_row.net_worth.amount_minor > 0:
+    if (
+        fire_row is not None
+        and plan.rule is not Rule.LASTS_TO_HORIZON
+        and fire_row.net_worth.amount_minor > 0
+    ):
         plan_progress_bp = round_ratio(
             plan.start_portfolio_minor * 10_000, fire_row.net_worth.amount_minor
         )

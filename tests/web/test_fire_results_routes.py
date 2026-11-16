@@ -67,6 +67,16 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert "data-fire-edit-page" not in page.text
 
 
+def test_horizon_rule_explains_its_undefined_fire_number_and_progress(owner) -> None:
+    _create(owner, rule="lasts_to_horizon")
+    text = owner.client.get("/fire").text
+    assert "data-fire-number-note" in text
+    assert "Not defined for this rule: it does not use a withdrawal rate." in text
+    assert "data-fire-progress-note" in text
+    assert "Not defined for this rule: it does not use a net-worth target." in text
+    assert "Portfolio lasts to the horizon" in text
+
+
 def test_the_view_section_order_is_metrics_details_table_charts_sensitivity(owner) -> None:
     _create(owner)
     text = owner.client.get("/fire").text

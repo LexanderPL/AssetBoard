@@ -249,9 +249,31 @@ def test_2_0_round_trip_keeps_plan_events_and_projection(db: WorkspaceDb, data_d
     content = export_workspace(db.factory, ctx).content
     parsed, errors = parse_archive(content)
     assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == "2.1"
+    assert parsed.manifest["format_version"] == "2.2"
     assert _data_files(original)["fire_plan.csv"] == _data_files(content)["fire_plan.csv"]
     assert _data_files(original)["fire_events.csv"] == _data_files(content)["fire_events.csv"]
+
+
+def test_a_horizon_rule_plan_round_trips_without_a_withdrawal_rate(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = replace(
+        _rows(),
+        fire_plan=replace(_plan_row(), rule="lasts_to_horizon", swr_bp=""),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_plan_created"] == 1
+    with db.factory() as session:
+        plan = FireScenarioRepository(session, ctx).live()
+        assert plan is not None
+        assert plan.rule == "lasts_to_horizon"
+        assert plan.swr_bp is None
+    content = export_workspace(db.factory, ctx).content
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    assert parsed.rows.fire_plan is not None
+    assert parsed.rows.fire_plan.rule == "lasts_to_horizon"
+    assert parsed.rows.fire_plan.swr_bp is None
 
 
 def test_a_restored_plan_keeps_its_currency_snapshot_and_blocks_on_a_mismatch(

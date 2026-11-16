@@ -79,10 +79,12 @@ def test_the_base_cell_equals_the_saved_projection_for_each_rule() -> None:
     reached = project(_inputs())
     never = project(_never_inputs())
     withdrawal = project(_inputs(rule=Rule.SWR, swr_bp=400))
+    horizon = project(_inputs(rule=Rule.LASTS_TO_HORIZON))
     for inputs, expected in (
         (_inputs(), reached),
         (_never_inputs(), never),
         (_inputs(rule=Rule.SWR, swr_bp=400), withdrawal),
+        (_inputs(rule=Rule.LASTS_TO_HORIZON), horizon),
     ):
         grid = sensitivity(inputs, DEFAULT_RETURN_DELTAS_BP, DEFAULT_EXPENSE_FACTORS_BP)
         assert grid.base_cell.fire_age == expected.fire_age

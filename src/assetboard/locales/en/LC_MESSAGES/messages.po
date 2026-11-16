@@ -3019,6 +3019,9 @@ msgstr ""
 msgid "Withdrawal rate"
 msgstr ""
 
+msgid "Portfolio lasts to the horizon"
+msgstr ""
+
 msgid "Reset plan"
 msgstr ""
 
@@ -6210,7 +6213,9 @@ msgstr ""
 msgid ""
 "Returns cover expenses compares the portfolio's return above inflation "
 "with the year's expenses, preserving real capital. Withdrawal rate uses "
-"the rate below."
+"the rate below. Portfolio lasts to the horizon assumes base income stops "
+"at the candidate FIRE age and checks that the portfolio is not depleted "
+"before the horizon."
 msgstr ""
 
 #, python-format
@@ -6364,10 +6369,18 @@ msgid "FIRE number"
 msgstr ""
 
 msgid ""
+"Not used by Portfolio lasts to the horizon: that rule tests the portfolio"
+" through the horizon rather than a rate-based target."
+msgstr ""
+
+msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
 "independence rule uses: the withdrawal rate, or the return above "
 "inflation when returns must cover expenses. This is the portfolio the "
 "plan needs in that year."
+msgstr ""
+
+msgid "Not defined for this rule: it does not use a withdrawal rate."
 msgstr ""
 
 msgid "Not defined: the plan's return above inflation is not positive."
@@ -6399,6 +6412,11 @@ msgstr ""
 msgid "Plan progress"
 msgstr ""
 
+msgid ""
+"Not used by Portfolio lasts to the horizon: the rule has no net-worth "
+"target at FIRE."
+msgstr ""
+
 #, python-format
 msgid ""
 "Starting portfolio divided by the projected nominal net worth at FIRE. "
@@ -6412,6 +6430,9 @@ msgid "Not defined"
 msgstr ""
 
 msgid "Not defined: this plan does not reach FIRE."
+msgstr ""
+
+msgid "Not defined for this rule: it does not use a net-worth target."
 msgstr ""
 
 msgid "Not defined: net worth at FIRE is not positive."
@@ -14185,5 +14206,13 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Not defined: the plan's gain rate is not positive."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns cover expenses compares the "
+#~ "portfolio's return above inflation with "
+#~ "the year's expenses, preserving real "
+#~ "capital. Withdrawal rate uses the rate"
+#~ " below."
 #~ msgstr ""
 
