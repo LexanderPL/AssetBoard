@@ -379,6 +379,7 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-progress-bar" in page.text
     assert "data-fire-overview" not in page.text
     assert "First projected year" not in page.text
+    assert ">Currency<" in page.text
     assert "data-fire-basis" not in page.text
     assert "Return above inflation" in page.text
     assert "Real return" not in page.text
@@ -581,6 +582,55 @@ def test_a_changed_unusual_rate_asks_for_confirmation_before_writing(owner) -> N
         row = session.get_one(FireScenario, plan_id)
         assert row.inflation_bp == 2100
         assert row.income_minor == 5_500_000
+
+
+def test_a_forged_or_missing_extreme_signature_cannot_bypass_the_panel(owner) -> None:
+    plan_id = create_plan(owner)
+    before = _snapshot(owner, plan_id)
+
+    # The old checkbox flag alone no longer writes anything.
+    flagged = owner.post(
+        "/fire/edit",
+        _form(inflation="20", extreme_rates_confirmed="1"),
+        token_from="/fire/edit",
+    )
+    assert flagged.status_code == 200
+    assert "data-fire-extreme-confirm" in flagged.text
+    assert "Confirm and save" in flagged.text
+    assert _snapshot(owner, plan_id) == before
+
+    # A digest that does not match the posted rates is ignored too.
+    forged = owner.post(
+        "/fire/edit",
+        _form(
+            inflation="20",
+            extreme_rates_confirmed="1",
+            extreme_rates_signature="forged",
+        ),
+        token_from="/fire/edit",
+    )
+    assert forged.status_code == 200
+    assert "data-fire-extreme-confirm" in forged.text
+    assert _input_value(forged.text, "inflation") == "20"
+    assert _snapshot(owner, plan_id) == before
+
+
+def test_an_unchanged_unusual_saved_rate_does_not_ask_again(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).inflation_bp = 2000
+
+    response = owner.post(
+        "/fire/edit",
+        _form(inflation="20", income_manual="51000"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire?notice=saved"
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert row.inflation_bp == 2000
+        assert row.income_minor == 5_100_000
 
 
 def test_preview_warns_about_unusual_rates_without_a_confirmation_field(owner) -> None:
