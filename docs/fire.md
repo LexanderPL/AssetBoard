@@ -73,30 +73,43 @@ starting rates are illustrative examples, not recommendations.
 
 The plan page shows the saved plan without any inputs or preview controls:
 
-- the key metrics and their definitions;
-- the net-worth and expenses-versus-gain charts;
-- the year-by-year schedule;
-- the saved **Plan values** (rates, ages and the three manual amounts);
-- the **Adjustments** applied to the plan, with before-the-current-year adjustments in a collapsed
-  **Archived adjustments** section;
-- the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
-- the **Loans** panel with each active loan's annual payment, payoff year, included/ignored
-  state and effect on the plan.
+- the key metrics, the plan-progress bar and their definitions;
+- one collapsed **Plan values, adjustments and loans** section between the progress bar and the
+  year-by-year results. It holds the saved **Plan values** (rates, ages and the three manual
+  amounts), the **Adjustments** applied to the plan (with before-the-current-year adjustments in
+  a collapsed **Archived adjustments** section) and the **Loans** panel with each active loan's
+  annual payment, payoff year, included/ignored state and effect on the plan. Open it with a
+  click, Enter or Space; no JavaScript is needed;
+- the year-by-year schedule and the net-worth and expenses-versus-gain charts;
+- the **Sensitivity** grid, which always uses the saved plan and never unsaved changes.
 
-A converted plan shows a review banner until an editor or owner saves it in edit mode. The page
-never writes. All amounts are nominal: each year's actual money, not adjusted for inflation.
+A converted plan shows a review banner until an editor or owner saves it in edit mode. A plan
+whose values were last reviewed in an earlier year shows the living-plan review banner; its
+editors' link opens the edit page with **Starting amounts** open. The page never writes. All
+amounts are nominal: each year's actual money, not adjusted for inflation.
 
 ## Editing the plan
 
 Editors and owners open **Edit plan**. The edit page is a separate page; it is not available to
 viewers. It contains every plan field and the adjustments editor.
 
+The page order is: key metrics and plan progress, the plan-inputs accordion, then the
+year-by-year table and charts, the disclaimer and the sensitivity grid. The accordion has five
+sections: **Plan**, **Assumptions**, **Starting amounts**, **Adjustments** and **Loans**. All are
+collapsed by default and only one can be open at a time. The server opens the section that owns a
+save error, **Adjustments** for an adjustment-row error, **Assumptions** when unusual rates need
+confirmation, and **Starting amounts** when the living-plan year review is due; an error section
+wins over the year review. `/fire/edit#amounts` opens that section directly.
+
 Results, charts and the year-by-year schedule recalculate on the server after every change; the
-page previews the unsaved plan and never saves a preview. **Save changes** validates the whole
-plan, writes it, clears the review banner and returns to the read-only view with a notice. An
-invalid value shows an inline error and leaves the saved plan untouched. **Discard changes**
-reloads the last saved values and keeps you in edit mode. Leaving with unsaved changes asks for
-confirmation, and an **Unsaved changes** indicator shows the state.
+page previews the unsaved plan and never saves a preview. The preview updates the metrics and the
+table/charts independently and never replaces the form, so focus and entered values stay in
+place. A preview error shows the message at the top of the results and opens the section that
+owns the invalid control without moving focus. **Save changes** validates the whole plan, writes
+it, clears the review banner and returns to the read-only view with a notice. An invalid value
+shows an inline error and leaves the saved plan untouched. **Discard changes** reloads the last
+saved values and keeps you in edit mode. Leaving with unsaved changes asks for confirmation, and
+an **Unsaved changes** indicator shows the state.
 
 Each amount has a suggestion card:
 
@@ -283,18 +296,22 @@ The plan page shows nominal values only:
 - the sustainability check: the nominal depletion age and the lowest nominal net worth after
   income stops;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth.
-  Every amount is the actual money of that year, not adjusted for inflation;
-- the **Adjustments** list, with archived history collapsed and read-only;
+  Every amount is the actual money of that year, not adjusted for inflation. It sits directly in
+  the page column and keeps the table's own border;
 - a nominal net-worth chart and a nominal expenses-versus-gain chart, each with accessible
   plotted data;
 - for editors and owners, **Edit plan** and **Reset plan**. The plan page has no download action.
 
-The plan page is read-only. Editors and owners change the values on the separate edit page.
+The **Plan values**, **Adjustments** and **Loans** sections live together in one collapsed
+disclosure between the progress bar and the year-by-year schedule. The plan page is read-only.
+Editors and owners change the values on the separate edit page.
 
 The **Sensitivity** panel projects the saved plan across a range of returns above inflation and
-expense levels. It shows only the resulting FIRE age, never amounts. It always uses the saved
-plan, never unsaved preview values. A blocked plan shows the reason instead of a grid, and never
-a fake zero.
+expense levels. It is always rendered on the view and edit pages; there is no load button. It
+shows only the resulting FIRE age, never amounts. It always uses the saved plan, never unsaved
+preview values or posted loan choices. A blocked plan shows the reason instead of a grid, and
+never a fake zero. The editor additionally shows **Refresh grid**, which re-fetches the grid from
+the saved plan; it is hidden without JavaScript because the grid is already rendered.
 
 ## Archive and restore
 
