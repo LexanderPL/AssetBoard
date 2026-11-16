@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -228,9 +228,20 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-edit]")).to_be_visible()
             expect(page.locator("[data-fire-form]")).to_have_count(0)
             expect(page.locator('input[name="income_manual"]')).to_have_count(0)
+            plan_inputs = page.locator("#plan-inputs")
+            expect(plan_inputs).to_have_attribute("data-fire-plan-inputs", "")
+            assert plan_inputs.evaluate("(element) => element.open") is False
+            expect(page.locator("[data-fire-plan-values]")).to_be_hidden()
+            expect(page.locator("[data-fire-adjustments-view]")).to_be_hidden()
+            expect(page.locator("[data-fire-loans]")).to_be_hidden()
+            plan_inputs.locator("summary").focus()
+            page.keyboard.press("Enter")
+            assert plan_inputs.evaluate("(element) => element.open") is True
             expect(page.locator("[data-fire-plan-values]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments-view]")).to_be_visible()
             expect(page.locator("[data-fire-loans]")).to_be_visible()
+            expect(page.locator("[data-fire-sensitivity-grid]")).to_be_visible()
+            expect(page.locator("[data-fire-sensitivity-refresh]")).to_have_count(0)
             expect(page.locator("[data-fire-progress='plan']")).to_be_visible()
             expect(page.locator("[data-fire-progress-bar]")).to_be_visible()
             expect(page.locator("[data-fire-progress-starting]")).to_contain_text("€")
@@ -254,6 +265,23 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
                 page.locator("[data-fire-edit]").click()
             assert page.url == f"{base}/fire/edit"
             expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "0")
+            for section_id in ("plan", "assumptions", "amounts", "adjustments", "loans"):
+                assert page.locator(f"#{section_id}").evaluate("(element) => element.open") is False
+            expect(page.locator('[data-fire-suggestion="income"]')).to_be_hidden()
+            # The sections are an exclusive native accordion; the fallback follows the same rule.
+            page.locator("#plan > summary").click()
+            assert page.locator("#plan").evaluate("(element) => element.open") is True
+            page.locator("#assumptions > summary").click()
+            assert page.locator("#assumptions").evaluate("(element) => element.open") is True
+            assert page.locator("#plan").evaluate("(element) => element.open") is False
+            # Keyboard disclosure: Space closes the current section, Enter opens it again.
+            page.locator("#assumptions > summary").focus()
+            page.keyboard.press("Space")
+            assert page.locator("#assumptions").evaluate("(element) => element.open") is False
+            page.keyboard.press("Enter")
+            assert page.locator("#assumptions").evaluate("(element) => element.open") is True
+            page.locator("#amounts > summary").click()
+            assert page.locator("#assumptions").evaluate("(element) => element.open") is False
             expect(page.locator('[data-fire-suggestion="income"]')).to_be_visible()
             expect(page.locator('[data-fire-suggestion="expenses"]')).to_be_visible()
             expect(
@@ -277,6 +305,8 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
 
             # The withdrawal rate stays in the layout; it is only disabled and dimmed for the
             # other rule. It never gets the hidden attribute or class.
+            page.locator("#assumptions > summary").click()
+            assert page.locator("#assumptions").evaluate("(element) => element.open") is True
             swr_wrapper = page.locator("[data-fire-swr-field]")
             swr_input = page.locator('input[name="swr"]')
             expect(swr_wrapper).to_be_visible()
@@ -303,6 +333,8 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.get_by_text("Real return")).to_have_count(0)
 
             # Every change recalculates server-side in place and never navigates or writes.
+            page.locator("#amounts > summary").click()
+            assert page.locator("#amounts").evaluate("(element) => element.open") is True
             expenses = page.locator('input[name="expenses_manual"]')
             before_fire_age = page.locator("[data-fire-fire-age]").get_attribute(
                 "data-fire-fire-age-value"
@@ -318,8 +350,23 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             )
             expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "1")
             expect(page.locator("[data-fire-dirty-status]")).to_be_visible()
+
+            # A preview error opens the section that owns the invalid field, even after the
+            # user collapsed it; the form is not swapped.
+            page.locator("#plan > summary").click()
+            page.get_by_label("Horizon age").fill("41")
+            expect(page.locator("[data-fire-preview-error]")).to_be_visible()
+            page.locator("#assumptions > summary").click()
+            assert page.locator("#plan").evaluate("(element) => element.open") is False
+            page.locator('input[name="inflation"]').fill("2.6")
+            expect(page.locator("[data-fire-preview-error]")).to_be_visible()
+            expect(page.locator("#plan")).to_have_attribute("open", "")
+            page.get_by_label("Horizon age").fill("90")
+            expect(page.locator("[data-fire-preview-error]")).to_have_count(0)
+
             page.reload(wait_until="networkidle")
             assert page.locator('input[name="expenses_manual"]').input_value() == "30000.00"
+            page.locator("#amounts > summary").click()
 
             # Use suggested value copies the server-formatted suggestion and previews.
             page.locator('[data-use-suggestion="expenses_manual"]').click()
@@ -337,10 +384,12 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             page.once("dialog", lambda dialog: dialog.accept())
             page.locator("[data-fire-view-plan]").click()
             page.wait_for_url(f"{base}/fire")
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-plan-values]")).to_contain_text("€30,000.00")
 
             # Discard reloads the saved values without a prompt and shows a notice.
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            page.locator("#amounts > summary").click()
             page.locator('input[name="expenses_manual"]').fill("70000")
             expect(page.locator("[data-fire-dirty-status]")).to_be_visible()
             page.locator("[data-fire-discard]").click()
@@ -351,44 +400,71 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             )
 
             # Save persists and returns to the read-only view.
+            page.locator("#amounts > summary").click()
             page.locator('input[name="expenses_manual"]').fill("80000")
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             assert page.url == f"{base}/fire?notice=saved"
             expect(page.locator("[data-action-notice]")).to_be_visible()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-plan-values]")).to_contain_text("€80,000.00")
 
-            # The editor still works when the saved projection is blocked; preview recovers.
-            from sqlalchemy import select
+            # F8.16: a plan whose values were last reviewed in an earlier year opens Starting
+            # amounts on the editor; the view banner link and #amounts do the same.
+            from sqlalchemy import select, update
 
             with app.state.session_factory() as session:
                 plan_id = session.scalars(
                     select(FireScenario.id).where(FireScenario.is_live.is_(True))
                 ).one()
+            with app.state.session_factory() as session, session.begin():
+                session.execute(
+                    update(FireScenario)
+                    .where(FireScenario.id == plan_id)
+                    .values(updated_at=datetime(start_year - 1, 1, 1, tzinfo=UTC))
+                )
+            page.goto(f"{base}/fire", wait_until="networkidle")
+            expect(page.locator("[data-fire-year-review]")).to_be_visible()
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-year-review] a").click()
+            assert page.url == f"{base}/fire/edit#amounts"
+            assert page.locator("#amounts").evaluate("(element) => element.open") is True
+            page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            expect(page.locator("[data-fire-year-review]")).to_be_visible()
+            assert page.locator("#amounts").evaluate("(element) => element.open") is True
+
+            # The editor still works when the saved projection is blocked; preview recovers.
             current_age = 41
             with app.state.session_factory() as session, session.begin():
                 session.get_one(FireScenario, plan_id).horizon_age = current_age
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
             expect(page.locator("[data-fire-blocked]")).to_be_visible()
             assert page.locator("script[src*='charts.js']").count() == 1
+            page.locator("#plan > summary").click()
             page.get_by_label("Horizon age").fill("90")
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
             ).to_have_attribute("data-chart-ready", "true")
+            # Restore the saved plan so the no-JavaScript grid and save checks use a valid plan.
+            with app.state.session_factory() as session, session.begin():
+                session.get_one(FireScenario, plan_id).horizon_age = 90
 
             page.set_viewport_size({"width": 390, "height": 844})
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
-            page.wait_for_timeout(200)
-            _no_page_overflow(page)
+            for section_id in ("plan", "assumptions", "amounts", "adjustments", "loans"):
+                page.locator(f"#{section_id} > summary").click()
+                page.wait_for_timeout(100)
+                _no_page_overflow(page)
             page.goto(f"{base}/fire", wait_until="networkidle")
+            page.locator("#plan-inputs > summary").click()
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             page.set_viewport_size({"width": 1440, "height": 900})
 
             # Without JavaScript the withdrawal-rate field is still visible and enabled, so a
-            # no-JS user can choose the rule and enter a rate.
+            # no-JS user can choose the rule and enter a rate. Closed sections still submit.
             storage = context.storage_state()
             no_js_context = browser.new_context(
                 viewport={"width": 1440, "height": 900},
@@ -397,8 +473,19 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             )
             no_js_page = no_js_context.new_page()
             no_js_page.goto(f"{base}/fire/edit", wait_until="load")
+            no_js_page.locator("#assumptions > summary").click()
             expect(no_js_page.locator("[data-fire-swr-field]")).to_be_visible()
             expect(no_js_page.locator('input[name="swr"]')).to_be_enabled()
+            expect(no_js_page.locator("[data-fire-sensitivity-grid]")).to_be_visible()
+            expect(no_js_page.locator("[data-fire-sensitivity-refresh]")).to_be_hidden()
+            no_js_page.locator("#amounts > summary").click()
+            expect(no_js_page.locator('input[name="income_manual"]')).to_be_visible()
+            no_js_page.locator('input[name="income_manual"]').fill("51000")
+            with no_js_page.expect_navigation(wait_until="load"):
+                no_js_page.locator("[data-fire-save]").click()
+            assert "/fire?notice=saved" in no_js_page.url
+            no_js_page.locator("#plan-inputs > summary").click()
+            expect(no_js_page.locator("[data-fire-plan-values]")).to_contain_text("€51,000.00")
             no_js_page.set_viewport_size({"width": 390, "height": 844})
             _no_page_overflow(no_js_page)
             no_js_context.close()

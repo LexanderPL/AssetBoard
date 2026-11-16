@@ -1,16 +1,20 @@
-"""F8.5 sensitivity panel: HTMX fragment, no-JS fallback, heat map and states."""
+"""F8.17 sensitivity: always rendered from the saved plan; refresh only in the editor."""
 
 from __future__ import annotations
 
 import re
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
 from assetboard.db.models.fire import FireScenario
 from assetboard.db.models.identity import User, Workspace
+from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
+from assetboard.web import fire_routes
 from tests.fire_helpers import create_plan
+from tests.fire_loan_helpers import create_loan
 
 
 def _form(**overrides: str) -> dict[str, str]:
@@ -82,31 +86,54 @@ def _base_age(html: str) -> str:
     return match.group(1).strip()
 
 
-def test_the_results_page_offers_an_on_demand_htmx_load_with_a_no_js_fallback(owner) -> None:
+def test_the_view_renders_the_grid_without_a_load_control(owner) -> None:
     _create(owner)
     page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-sensitivity" in page.text
-    assert "data-fire-sensitivity-load" in page.text
-    assert 'hx-get="/fire/sensitivity"' in page.text
-    assert 'hx-target="#fire-sensitivity"' in page.text
-    assert 'hx-swap="innerHTML"' in page.text
-    assert 'href="/fire?sensitivity=1#sensitivity"' in page.text
+    assert "data-fire-sensitivity-grid" in page.text
+    assert "data-fire-sensitivity-refresh" not in page.text
+    assert "data-fire-sensitivity-load" not in page.text
+    assert "Show sensitivity grid" not in page.text
+    assert 'hx-get="/fire/sensitivity"' not in page.text
     assert "Based on the saved plan; unsaved changes are not included." in page.text
-    assert "data-fire-sensitivity-grid" not in page.text
-    assert '<form id="fire-form"' not in page.text
-    assert page.text.index('id="fire-results"') < page.text.index("data-fire-sensitivity")
+    assert page.text.index('id="plan-inputs"') < page.text.index("data-fire-sensitivity")
+    assert _base_age(page.text) == _fire_age(page.text)
 
 
-def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owner) -> None:
+def test_the_edit_renders_the_grid_and_a_refresh_control(owner) -> None:
     _create(owner)
-    results = owner.client.get("/fire").text
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-grid" in page.text
+    assert "data-fire-sensitivity-refresh" in page.text
+    assert "data-fire-sensitivity-load" not in page.text
+    refresh = page.text.split("data-fire-sensitivity-refresh", 1)[0].rsplit("<button", 1)[1]
+    assert 'hx-get="/fire/sensitivity"' in refresh
+    assert 'hx-target="#fire-sensitivity"' in refresh
+    assert 'hx-swap="innerHTML"' in refresh
+    assert "hidden" in refresh
+    assert _base_age(page.text) == _fire_age(page.text)
+
+
+def test_the_refresh_fragment_is_the_grid_body(owner) -> None:
+    _create(owner)
     fragment = owner.client.get("/fire/sensitivity")
     assert fragment.status_code == 200
     assert "<html" not in fragment.text
     assert "data-fire-sensitivity-note" in fragment.text
-    assert "Based on the saved plan; unsaved changes are not included." in fragment.text
     assert "data-fire-sensitivity-grid" in fragment.text
+    assert "data-fire-sensitivity-legend" in fragment.text
+    assert "data-fire-sensitivity-refresh" not in fragment.text
+    assert "data-fire-sensitivity-load" not in fragment.text
+    assert "<section" not in fragment.text
+    assert "data-fire-sensitivity-content" not in fragment.text
+
+
+def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owner) -> None:
+    _create(owner)
+    fragment = owner.client.get("/fire/sensitivity")
+    assert fragment.status_code == 200
     assert len(re.findall(r"data-fire-sensitivity-return=", fragment.text)) == 5
     assert len(re.findall(r"data-fire-sensitivity-cell(?:\s|>)", fragment.text)) == 25
     expense_rows = re.findall(
@@ -129,100 +156,152 @@ def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owne
     assert "data-fire-sensitivity-base" in fragment.text
     assert ">Base<" in fragment.text
     assert "data-fire-sensitivity-tone=" in fragment.text
-    assert "data-fire-sensitivity-legend" in fragment.text
     assert 'aria-describedby="sensitivity-legend"' in fragment.text
     assert 'role="region"' in fragment.text and 'tabindex="0"' in fragment.text
     assert "overflow-x-auto" in fragment.text
     assert "sticky left-0" in fragment.text
     assert "<caption" in fragment.text
-    assert "data-fire-sensitivity-refresh" in fragment.text
-    assert 'hx-get="/fire/sensitivity"' in fragment.text
-    assert 'href="/fire?sensitivity=1#sensitivity"' in fragment.text
-    assert _base_age(fragment.text) == _fire_age(results)
-    assert "real return" not in fragment.text.lower()
-    assert "today's money" not in fragment.text.lower()
-    assert "data-fire-basis" not in fragment.text
     assert "€" not in fragment.text
+    assert "real return" not in fragment.text.lower()
     assert "return above inflation" in fragment.text
 
 
-def test_sensitivity_uses_the_saved_plan_and_not_an_unsaved_preview(owner) -> None:
+def test_the_grid_uses_the_saved_plan_not_posted_preview_values(owner) -> None:
     _create(owner)
-    page = owner.client.get("/fire?sensitivity=1").text
-    assert "data-fire-sensitivity-grid" in page
-    saved_base = _base_age(page)
+    saved = owner.client.get("/fire/sensitivity").text
+    saved_base = _base_age(saved)
+
     preview = owner.post(
         "/fire/edit/preview",
-        _form(expenses_manual="80000"),
+        _form(expenses_manual="80000", inflation="9"),
         token_from="/fire/edit",
     )
     assert preview.status_code == 200
     assert "data-fire-sensitivity" not in preview.text
-    after = owner.client.get("/fire/sensitivity")
-    assert _base_age(after.text) == saved_base
 
-
-def test_no_js_fallback_server_renders_the_loaded_grid(owner) -> None:
-    _create(owner)
-    page = owner.client.get("/fire?sensitivity=1")
-    assert page.status_code == 200
-    assert "data-fire-sensitivity-grid" in page.text
-    assert "data-fire-sensitivity-load" not in page.text
-    assert '<form id="fire-form"' not in page.text
-    assert page.text.index("data-fire-sensitivity-grid") > page.text.index('id="fire-results"')
-
-
-def test_a_saving_override_changes_the_base_cell(owner) -> None:
-    _create(owner, real_return="2", expenses_manual="50000", portfolio_manual="300000")
-    before = _base_age(owner.client.get("/fire/sensitivity").text)
-    response = owner.post(
+    error = owner.post(
         "/fire/edit",
-        _form(
-            event_year_1="2027",
-            event_kind_1="saving_override",
-            event_amount_1="-5000000",
-            event_label_1="Sabbatical",
-        ),
+        _form(expenses_manual="80000", inflation="9", birth_year="1901"),
         token_from="/fire/edit",
     )
-    assert response.status_code == 303
-    after = _base_age(owner.client.get("/fire/sensitivity").text)
-    assert after != before
+    assert error.status_code == 400
+    assert _base_age(error.text) == saved_base
+    assert _base_age(owner.client.get("/fire").text) == saved_base
+    assert _base_age(owner.client.get("/fire/sensitivity").text) == saved_base
 
 
-def test_a_blocked_scenario_shows_the_block_panel_without_a_grid(owner) -> None:
+def test_the_grid_uses_saved_loan_choices_after_a_save_error(owner) -> None:
+    _create(owner)
+    loan_id = create_loan(owner)
+    saved_base = _base_age(owner.client.get("/fire/sensitivity").text)
+    response = owner.post(
+        "/fire/edit",
+        _form(birth_year="1901", **{f"loan_include_{loan_id}": "0"}),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert _base_age(response.text) == saved_base
+
+
+def test_the_sensitivity_query_is_ignored(owner) -> None:
+    _create(owner)
+    plain = owner.client.get("/fire")
+    queried = owner.client.get("/fire?sensitivity=1")
+    assert plain.status_code == queried.status_code == 200
+    for page in (plain, queried):
+        assert "data-fire-sensitivity-grid" in page.text
+        assert "data-fire-sensitivity-refresh" not in page.text
+        assert "data-fire-sensitivity-load" not in page.text
+    assert _base_age(queried.text) == _base_age(plain.text)
+
+
+def test_viewers_see_the_grid_without_refresh_control(owner) -> None:
+    _create(owner)
+    owner.set_admin_role("viewer")
+    try:
+        page = owner.client.get("/fire")
+        assert page.status_code == 200
+        assert "data-fire-sensitivity-grid" in page.text
+        assert "data-fire-sensitivity-refresh" not in page.text
+        assert "data-fire-sensitivity-load" not in page.text
+        fragment = owner.client.get("/fire/sensitivity")
+        assert fragment.status_code == 200
+        assert "data-fire-sensitivity-grid" in fragment.text
+    finally:
+        owner.set_admin_role("owner")
+
+
+def test_a_blocked_view_and_fragment_show_the_block_panel_without_a_grid(owner) -> None:
     plan_id = _create(owner)
     with owner.db() as session:
         row = session.scalars(select(FireScenario).where(FireScenario.id == plan_id)).one()
         row.currency = "USD"
         session.commit()
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-blocked" in page.text
+    assert 'data-fire-sensitivity-block="plan_currency_mismatch"' in page.text
+    assert "data-fire-sensitivity-grid" not in page.text
+    assert "Reset plan" in page.text
     fragment = owner.client.get("/fire/sensitivity")
     assert fragment.status_code == 200
     assert "data-fire-sensitivity-blocked" in fragment.text
     assert 'data-fire-sensitivity-block="plan_currency_mismatch"' in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
-    assert "Reset plan" in fragment.text
 
 
-def test_an_extreme_base_return_shows_the_axis_error(owner) -> None:
+def test_an_extreme_base_return_shows_the_axis_error_in_the_grid(owner) -> None:
     _create(owner, real_return="49", extreme_rates_confirmed="1")
+    page = owner.client.get("/fire")
+    assert "data-fire-sensitivity-error" in page.text
+    assert 'data-fire-sensitivity-error-code="return_out_of_range"' in page.text
+    assert "data-fire-sensitivity-grid" not in page.text
     fragment = owner.client.get("/fire/sensitivity")
-    assert fragment.status_code == 200
     assert "data-fire-sensitivity-error" in fragment.text
     assert 'data-fire-sensitivity-error-code="return_out_of_range"' in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
 
 
-def test_viewers_can_load_the_grid(owner) -> None:
+def test_full_pages_compute_the_grid_once_and_never_reload_the_plan(owner, monkeypatch) -> None:
     _create(owner)
-    owner.set_admin_role("viewer")
-    try:
-        fragment = owner.client.get("/fire/sensitivity")
-        assert fragment.status_code == 200
-        assert "data-fire-sensitivity-grid" in fragment.text
-        assert "data-fire-sensitivity-error" not in fragment.text
-    finally:
-        owner.set_admin_role("owner")
+    calls = 0
+    original = fire_routes.sensitivity
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("a full FIRE page must not call scenario_results")
+
+    monkeypatch.setattr(fire_routes, "sensitivity", counted)
+    monkeypatch.setattr(fire_projection_service, "scenario_results", boom)
+    assert owner.client.get("/fire").status_code == 200
+    assert calls == 1
+    calls = 0
+    assert owner.client.get("/fire/edit").status_code == 200
+    assert calls == 1
+
+
+def test_the_preview_never_computes_the_sensitivity_grid(owner, monkeypatch) -> None:
+    _create(owner)
+    token = owner.token("/fire/edit")
+    calls = 0
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("preview must not compute the sensitivity grid")
+
+    monkeypatch.setattr(fire_routes, "sensitivity", boom)
+    response = owner.client.post(
+        "/fire/edit/preview",
+        data={"csrf_token": token} | _form(),
+    )
+    assert response.status_code == 200
+    assert calls == 0
+    assert "data-fire-sensitivity" not in response.text
 
 
 def test_the_blocked_sensitivity_link_to_the_editor_is_translated(owner) -> None:
@@ -241,17 +320,9 @@ def test_the_blocked_sensitivity_link_to_the_editor_is_translated(owner) -> None
         owner.client.headers.pop("Accept-Language", None)
 
 
-def test_the_edit_page_has_no_sensitivity_panel(owner) -> None:
-    _create(owner)
-    page = owner.client.get("/fire/edit")
-    assert page.status_code == 200
-    assert "data-fire-sensitivity" not in page.text
-    assert "/fire/sensitivity" not in page.text
-
-
 def test_the_old_sensitivity_url_redirects(owner) -> None:
     plan_id = _create(owner)
     response = owner.client.get(f"/fire/{plan_id}/sensitivity", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire/sensitivity"
+    assert response.headers["location"] == "/fire#sensitivity"
     assert owner.client.get(f"/fire/{uuid4()}/sensitivity").status_code == 404

@@ -102,7 +102,7 @@ def test_the_id_url_redirects_to_the_view(owner) -> None:
     assert response.headers["location"] == "/fire"
     response = owner.client.get(f"/fire/{plan_id}?basis=real&sensitivity=1", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire?sensitivity=1#sensitivity"
+    assert response.headers["location"] == "/fire"
     response = owner.client.get(f"/fire/{plan_id}?edit=1&basis=real", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/fire/edit"
@@ -113,7 +113,7 @@ def test_the_id_url_redirects_to_the_view(owner) -> None:
     assert response.status_code == 404
     response = owner.client.get(f"/fire/{plan_id}/sensitivity", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/fire/sensitivity"
+    assert response.headers["location"] == "/fire#sensitivity"
     assert owner.client.get(f"/fire/{uuid4()}").status_code == 404
     assert owner.client.get("/fire/not-a-uuid").status_code == 404
 

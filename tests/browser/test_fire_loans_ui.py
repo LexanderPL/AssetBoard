@@ -204,6 +204,7 @@ def test_live_loans_in_view_and_editor(tmp_path: Path) -> None:
 
             loan_id = _create_loan(app, admin, workspace)
             page.goto(f"{base}/fire", wait_until="networkidle")
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator(f'[data-fire-loan="{loan_id}"]')).to_be_visible()
             expect(page.locator("[data-fire-loan-annual]")).to_contain_text("€")
             expect(page.locator("[data-fire-loan-effect]")).to_contain_text("Removed")
@@ -211,6 +212,7 @@ def test_live_loans_in_view_and_editor(tmp_path: Path) -> None:
             _no_page_overflow(page)
 
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            page.locator("#loans > summary").click()
             loan = page.locator(f'[data-fire-loan="{loan_id}"]')
             loan.locator('input[value="0"]').check()
             page.wait_for_timeout(800)
@@ -218,6 +220,7 @@ def test_live_loans_in_view_and_editor(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-loans-expense-warning]")).to_have_count(0)
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator(f'[data-fire-loan="{loan_id}"]')).to_have_attribute(
                 "data-fire-loan-state", "ignored"
             )
@@ -226,8 +229,10 @@ def test_live_loans_in_view_and_editor(tmp_path: Path) -> None:
 
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/fire", wait_until="networkidle")
+            page.locator("#plan-inputs > summary").click()
             _no_page_overflow(page)
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            page.locator("#loans > summary").click()
             _no_page_overflow(page)
             assert page.evaluate("window.__cspViolations") == []
             context.close()

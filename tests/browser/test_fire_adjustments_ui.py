@@ -109,6 +109,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-create]").click()
 
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-adjustments-view]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments-empty]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
@@ -118,6 +119,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
 
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
+            page.locator("#adjustments > summary").click()
             expect(page.locator("[data-fire-adjustments]")).to_be_visible()
             expect(page.locator("[data-fire-adjustments] textarea")).to_have_count(0)
             expect(page.locator("[data-fire-archived-adjustments]")).to_have_count(0)
@@ -171,6 +173,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             assert page.url == f"{base}/fire?notice=saved"
+            page.locator("#plan-inputs > summary").click()
             for label in ("Bonus", "Rent", "Loan repaid", "Sabbatical"):
                 expect(page.locator("[data-fire-adjustments-view]")).to_contain_text(label)
 
@@ -185,6 +188,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             page.set_viewport_size({"width": 1440, "height": 900})
 
             # Edit one row in place.
+            page.locator("#adjustments > summary").click()
             rows = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])")
             first = rows.filter(has=page.locator('input[name^="event_label_"][value="Bonus"]'))
             first.locator('input[name^="event_amount_"]').fill("1500")
@@ -192,6 +196,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-preview-note]")).to_be_visible()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("Bonus updated")
             expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("€1,500.00")
 
@@ -199,6 +204,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             # checkbox is focusable; Space toggles it and the label becomes Undo.
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
+            page.locator("#adjustments > summary").click()
             rows = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])")
             removed = rows.filter(has=page.locator('input[name^="event_label_"][value="Rent"]'))
             checkbox = removed.locator("[data-adjustment-remove]")
@@ -217,6 +223,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(removed.locator("[data-adjustment-remove-text]")).to_have_text("Undo")
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-adjustments-view]")).not_to_contain_text("Rent")
 
             # Archived history is read-only and removed only by its visible Remove control.
@@ -227,6 +234,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
                 ).one()
             _add_archived(app, plan_id, workspace_id)
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            page.locator("#adjustments > summary").click()
             page.locator("[data-fire-archived-adjustments] summary").click()
             archived = page.locator("[data-fire-archived-adjustment]").filter(has_text="Old bonus")
             expect(archived).to_be_visible()
@@ -238,6 +246,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
                 removals.nth(index).click()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
                 "No current adjustments"
             )
@@ -245,6 +254,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
 
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
+            page.locator("#adjustments > summary").click()
             expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
                 "No current adjustments"
             )
@@ -255,6 +265,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(archived.locator("[data-adjustment-removed-note]")).to_be_visible()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-archived-adjustments]")).to_have_count(0)
             expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
                 "No adjustments yet"
@@ -264,6 +275,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             # and Save changes applies the removal.
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
+            page.locator("#adjustments > summary").click()
             page.locator("[data-add-adjustment]").click()
             no_js_row = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])").last
             no_js_row.locator('input[name^="event_year_"]').fill("2032")
@@ -272,6 +284,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             no_js_row.locator('input[name^="event_label_"]').fill("No JS")
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
+            page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("No JS")
 
             storage = context.storage_state()
@@ -282,12 +295,14 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             )
             no_js_page = no_js_context.new_page()
             no_js_page.goto(f"{base}/fire/edit", wait_until="load")
+            no_js_page.locator("#adjustments > summary").click()
             no_js_row = no_js_page.locator("[data-adjustment-row]").filter(
                 has=no_js_page.locator('input[name^="event_label_"][value="No JS"]')
             )
             no_js_row.locator("[data-adjustment-remove-text]").click()
             with no_js_page.expect_navigation(wait_until="load"):
                 no_js_page.locator("[data-fire-save]").click()
+            no_js_page.locator("#plan-inputs > summary").click()
             expect(no_js_page.locator("[data-fire-adjustments-view]")).not_to_contain_text("No JS")
             no_js_context.close()
 
@@ -296,6 +311,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
+            page.locator("#adjustments > summary").click()
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             overflow = page.evaluate(
@@ -306,6 +322,7 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             )
             assert overflow is not None and overflow["scroll"] > overflow["client"], overflow
             page.goto(f"{base}/fire", wait_until="networkidle")
+            page.locator("#plan-inputs > summary").click()
             page.wait_for_timeout(200)
             _no_page_overflow(page)
             page.set_viewport_size({"width": 1440, "height": 900})

@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
 from sqlalchemy import func, select, update
 
 from assetboard.db.models.fire import FireEvent, FireScenario
@@ -113,6 +114,15 @@ def _extreme_signature(text: str) -> str:
     marker = 'name="extreme_rates_signature" value="'
     start = text.index(marker) + len(marker)
     return text[start : text.index('"', start)]
+
+
+_ACCORDION_DETAIL = re.compile(r'<details[^>]*data-fire-accordion-section="([^"]+)"[^>]*>')
+
+
+def _open_sections(text: str) -> list[str]:
+    return [
+        match.group(1) for match in _ACCORDION_DETAIL.finditer(text) if " open" in match.group(0)
+    ]
 
 
 def _category(owner, name: str, *, kind: str) -> UUID:
@@ -366,7 +376,7 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert 'action="/fire/edit"' in page.text
     assert 'hx-post="/fire/edit/preview"' in page.text
     assert 'hx-trigger="change from:#fire-form delay:300ms' in page.text
-    assert 'hx-include="#fire-form"' in page.text and 'hx-target="#fire-results"' in page.text
+    assert 'hx-include="#fire-form"' in page.text and 'hx-target="#fire-metrics"' in page.text
     assert 'hx-swap="innerHTML"' in page.text and 'hx-sync="this:replace"' in page.text
     assert 'data-fire-dirty="0"' in page.text
     assert "data-fire-save" in page.text
@@ -384,7 +394,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "Return above inflation" in page.text
     assert "Real return" not in page.text
     assert "data-fire-suggestion" in page.text
-    assert "data-fire-sensitivity" not in page.text
+    assert "data-fire-sensitivity" in page.text
+    assert "data-fire-sensitivity-grid" in page.text
+    assert "data-fire-sensitivity-refresh" in page.text
+    assert "data-fire-sensitivity-load" not in page.text
     assert "data-fire-csv" not in page.text
     assert "data-fire-reset" not in page.text
     assert 'name="adjustments_present" value="1"' in page.text
@@ -399,6 +412,190 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert f'action="/fire/{plan_id}"' not in page.text
     assert f'hx-post="/fire/{plan_id}' not in page.text
     assert "js/fire.js" in page.text
+
+    # F8.17 composition and the five-section exclusive accordion.
+    for section_id in ("plan", "assumptions", "amounts", "adjustments", "loans"):
+        assert f'<details id="{section_id}" name="fire-inputs"' in page.text
+        assert f'data-fire-accordion-section="{section_id}"' in page.text
+    assert page.text.count('name="fire-inputs"') == 5
+    assert page.text.count("data-fire-accordion-section=") == 5
+    assert _open_sections(page.text) == []
+    assert page.text.index('id="fire-metrics"') < page.text.index('id="plan"')
+    assert page.text.index('id="loans"') < page.text.index("data-fire-table-section")
+    assert page.text.index("data-fire-table-section") < page.text.index("data-fire-sensitivity")
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "section"),
+    (
+        ("birth_year", "1901", "plan"),
+        ("horizon_age", "41", "plan"),
+        ("stop_working_age", "121", "plan"),
+        ("inflation", "not-a-rate", "assumptions"),
+        ("real_return", "not-a-rate", "assumptions"),
+        ("income_growth", "not-a-rate", "assumptions"),
+        ("rule", "not-a-rule", "assumptions"),
+        ("swr", "not-a-rate", "assumptions"),
+        ("income_manual", "-1", "amounts"),
+        ("expenses_manual", "-1", "amounts"),
+        ("portfolio_manual", "-1", "amounts"),
+        (
+            "event_amount_1",
+            "not-money",
+            "adjustments",
+        ),
+    ),
+)
+def test_a_save_error_opens_the_section_that_owns_the_field(
+    owner, field: str, value: str, section: str
+) -> None:
+    create_plan(owner)
+    payload = _form(**{field: value})
+    if field == "swr":
+        payload["rule"] = "swr"
+    if field == "event_amount_1":
+        payload.update({"event_year_1": "2028", "event_label_1": "Bad amount"})
+    response = owner.post("/fire/edit", payload, token_from="/fire/edit")
+    assert response.status_code == 400
+    assert _open_sections(response.text) == [section]
+
+
+def test_a_forged_loan_toggle_opens_loans(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(**{"loan_include_00000000-0000-0000-0000-000000000000": "0"}),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert _open_sections(response.text) == ["loans"]
+
+
+def test_a_missing_adjustments_marker_opens_adjustments(owner) -> None:
+    create_plan(owner)
+    payload = {
+        key: value
+        for key, value in _form().items()
+        if not key.startswith("event_") and key != "adjustments_present"
+    }
+    response = owner.post("/fire/edit", payload, token_from="/fire/edit")
+    assert response.status_code == 400
+    assert _open_sections(response.text) == ["adjustments"]
+
+
+def test_an_unusual_rate_confirmation_opens_assumptions(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit",
+        _form(inflation="20"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert "data-fire-extreme-confirm" in response.text
+    assert _open_sections(response.text) == ["assumptions"]
+
+
+def test_the_living_plan_review_opens_starting_amounts(owner) -> None:
+    freeze_clock(owner, "2026-01-01T00:00:00+00:00")
+    create_plan(owner)
+    freeze_clock(owner, "2027-01-01T00:00:00+00:00")
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    assert "data-fire-year-review" in page.text
+    assert _open_sections(page.text) == ["amounts"]
+
+
+def test_an_error_section_wins_over_the_living_plan_review(owner) -> None:
+    freeze_clock(owner, "2026-01-01T00:00:00+00:00")
+    create_plan(owner)
+    freeze_clock(owner, "2027-01-01T00:00:00+00:00")
+    response = owner.post(
+        "/fire/edit",
+        _form(horizon_age="41"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert "data-fire-year-review" in response.text
+    assert _open_sections(response.text) == ["plan"]
+
+
+def test_the_preview_response_updates_metrics_and_the_detail_with_oob(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(expenses_manual="40000"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert 'id="fire-results-detail" hx-swap-oob="innerHTML"' in response.text
+    assert "data-fire-metrics" in response.text
+    assert "data-fire-table" in response.text
+    assert "data-fire-chart" in response.text
+    assert "<form" not in response.text
+    assert "<input" not in response.text
+    assert "<select" not in response.text
+    assert "<textarea" not in response.text
+    assert 'id="fire-metrics"' not in response.text
+    assert "data-fire-sensitivity" not in response.text
+
+
+def test_a_blocked_preview_clears_the_detail_fragment(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).currency = "USD"
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert 'id="fire-results-detail" hx-swap-oob="innerHTML"' in response.text
+    assert "data-fire-blocked" in response.text
+    assert "data-fire-table" not in response.text
+    assert "data-fire-charts" not in response.text
+    assert "data-fire-metrics" not in response.text
+
+
+def test_a_preview_error_keeps_the_saved_table_and_names_the_field(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit/preview",
+        _form(income_manual="-1"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert 'id="fire-results-detail" hx-swap-oob="innerHTML"' in response.text
+    assert "data-fire-table" in response.text
+    assert 'data-fire-preview-error-field="income_manual"' in response.text
+    assert "data-fire-metrics" in response.text
+
+
+def test_the_adjustments_editor_year_and_amount_inputs_fill_their_cells(owner) -> None:
+    create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    section = page.split("data-fire-adjustments", 1)[1].split("data-fire-actions", 1)[0]
+    assert 'class="cell-input form-control w-full tabular-nums" data-adjustment-year' in section
+    assert 'class="cell-input form-control w-full tabular-nums" data-adjustment-amount' in section
+    assert "w-20 tabular-nums" not in section
+    assert "w-32 tabular-nums" not in section
+    assert 'class="cell-tight w-24 font-medium"' in section
+    assert 'class="cell-tight w-36 font-medium"' in section
+
+
+def test_the_preview_does_not_compute_the_sensitivity_grid(owner, monkeypatch) -> None:
+    create_plan(owner)
+    token = owner.token("/fire/edit")
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("preview must not compute the sensitivity grid")
+
+    monkeypatch.setattr("assetboard.web.fire_routes.sensitivity", boom)
+    response = owner.client.post(
+        "/fire/edit/preview",
+        data={"csrf_token": token} | _form(),
+    )
+    assert response.status_code == 200
+    assert "data-fire-sensitivity" not in response.text
 
 
 def test_saving_clears_the_living_plan_review_even_without_changes(owner) -> None:
@@ -1179,8 +1376,10 @@ def test_preview_returns_changed_results_and_writes_nothing(owner) -> None:
     assert "data-fire-metrics" in response.text
     assert "data-fire-table" in response.text
     assert "data-fire-chart" in response.text
+    assert 'id="fire-results-detail" hx-swap-oob="innerHTML"' in response.text
     assert "<html" not in response.text
     assert 'id="fire-results"' not in response.text
+    assert 'id="fire-metrics"' not in response.text
     assert "data-fire-suggestion" not in response.text
     assert "data-suggested-minor" not in response.text
     assert _snapshot(owner, plan_id) == before
@@ -1260,6 +1459,8 @@ def test_an_invalid_preview_keeps_the_saved_projection_and_names_the_field(owner
     assert "data-fire-preview-error" in response.text
     assert 'data-fire-preview-error-field="income_manual"' in response.text
     assert "data-fire-metrics" in response.text
+    assert 'id="fire-results-detail" hx-swap-oob="innerHTML"' in response.text
+    assert "data-fire-table" in response.text
     with owner.db() as session:
         assert session.get_one(FireScenario, plan_id).income_minor == 5_000_000
 
@@ -1612,6 +1813,8 @@ def test_the_edit_page_renders_in_polish(owner) -> None:
         assert "Niezapisane zmiany" in page.text
         assert "Użyj proponowanej wartości" in page.text
         assert "Korekty" in page.text
+        assert "Założenia" in page.text
+        assert "Kwoty początkowe" in page.text
         assert "Dodaj korektę" in page.text
         assert "Korekta oszczędności" in page.text
         assert "Edytor korekt" in page.text
