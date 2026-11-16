@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import event, select
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.networth import NetWorthCategory, NetWorthItem
+from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
 from tests.conftest import OwnerApp
 
 
@@ -360,6 +360,27 @@ def test_trend_tooltip_has_the_category_breakdown_and_estimated_note(owner: Owne
     assert not any("estimated" in line for line in chart["tooltips"][-1])
     assert "includes 1 estimated value" in page
     assert "data-estimated" in page
+
+
+def test_page_reflects_an_edited_value(owner: OwnerApp) -> None:
+    owner.app.state.clock = FixedClock("2026-11-16T12:00:00+00:00")
+    item_id = _create_item(owner, name="Car", value="100", as_of="2026-09-15")
+    with owner.db() as session:
+        valuation_id = session.scalars(
+            select(ItemValuation.id).where(ItemValuation.item_id == item_id)
+        ).one()
+    before = owner.client.get("/net-worth/summary").text
+    assert _chart(before)["series"][0]["values"] == [10000] * 3
+
+    response = owner.post(
+        f"/net-worth/items/{item_id}/valuations/{valuation_id}",
+        {"value": "250", "as_of": "2026-09-15", "note": "corrected"},
+        token_from="/net-worth",
+    )
+    assert response.status_code == 303
+    after = owner.client.get("/net-worth/summary").text
+    assert _chart(after)["series"][0]["values"] == [25000] * 3
+    assert "€250.00" in after
 
 
 def test_today_is_not_estimated_and_is_marked(owner: OwnerApp) -> None:
