@@ -1418,7 +1418,12 @@ async def fire_sensitivity(request: Request, ctx: CurrentContext) -> Response:
         request.app.state.session_factory,
         ctx,
     )
-    context = await run_in_threadpool(_sensitivity_context, request, ctx, results)
+    # The editor's Refresh grid swaps this fragment in place; its blocked-state link must stay
+    # on the edit page instead of reloading it and dropping unsaved changes.
+    in_editor = request.query_params.get("in_editor") == "1"
+    context = await run_in_threadpool(
+        _sensitivity_context, request, ctx, results, in_editor=in_editor
+    )
     return render_template(request, "fire/_sensitivity.html", context=context)
 
 

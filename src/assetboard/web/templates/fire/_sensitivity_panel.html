@@ -10,7 +10,7 @@
     {% if sensitivity_refresh %}
     <div class="mt-4 flex flex-wrap items-center gap-3">
       <button type="button" class="btn-sm hidden"
-              hx-get="{{ sensitivity_fragment_url }}"
+              hx-get="{{ sensitivity_fragment_url }}?in_editor=1"
               hx-target="#fire-sensitivity"
               hx-swap="innerHTML"
               data-fire-sensitivity-refresh>{{ _("Refresh grid") }}</button>

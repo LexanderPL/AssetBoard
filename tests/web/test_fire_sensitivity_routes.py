@@ -109,7 +109,7 @@ def test_the_edit_renders_the_grid_and_a_refresh_control(owner) -> None:
     assert "data-fire-sensitivity-refresh" in page.text
     assert "data-fire-sensitivity-load" not in page.text
     refresh = page.text.split("data-fire-sensitivity-refresh", 1)[0].rsplit("<button", 1)[1]
-    assert 'hx-get="/fire/sensitivity"' in refresh
+    assert 'hx-get="/fire/sensitivity?in_editor=1"' in refresh
     assert 'hx-target="#fire-sensitivity"' in refresh
     assert 'hx-swap="innerHTML"' in refresh
     assert "hidden" in refresh
@@ -248,6 +248,27 @@ def test_a_blocked_view_and_fragment_show_the_block_panel_without_a_grid(owner) 
     assert "data-fire-sensitivity-blocked" in fragment.text
     assert 'data-fire-sensitivity-block="plan_currency_mismatch"' in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
+
+
+def test_the_editor_refresh_fragment_keeps_its_blocked_link_on_the_editor(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).horizon_age = 41
+    page = owner.client.get("/fire/edit")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-refresh" in page.text
+    assert 'href="#amounts"' in page.text
+
+    # The refresh button asks for the editor variant, so the swapped blocked link stays in
+    # place instead of reloading the editor (and dropping unsaved changes).
+    editor_fragment = owner.client.get("/fire/sensitivity?in_editor=1")
+    assert editor_fragment.status_code == 200
+    assert 'href="#amounts"' in editor_fragment.text
+
+    # A plain fragment request (the view or a viewer) still points at the edit page.
+    page_fragment = owner.client.get("/fire/sensitivity")
+    assert page_fragment.status_code == 200
+    assert 'href="/fire/edit#amounts"' in page_fragment.text
 
 
 def test_an_extreme_base_return_shows_the_axis_error_in_the_grid(owner) -> None:

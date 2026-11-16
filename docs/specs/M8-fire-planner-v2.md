@@ -1130,9 +1130,11 @@ archive, dependencies, projection math and loan math unchanged.
   `hx-sync="this:replace"`), so the form is never swapped.
 - **Sensitivity.** `_view_context` and `_edit_context` always call `_sensitivity_context`.
   `_render_edit` keeps `saved_results` for the grid while a posted loan toggle may recompute
-  `results` only for the form summary. `sensitivity_page_url` and the load branch are gone;
+  `results` for the editor's metrics and table. `sensitivity_page_url` and the load branch are gone;
   `sensitivity_refresh` is true only in the editor. `fire.js` reveals the hidden **Refresh grid**
-  button. The fragment route renders `_sensitivity.html` only. `fire_scenario_sensitivity`
+  button. The fragment route renders `_sensitivity.html` only. The refresh button requests
+  `?in_editor=1`, so a swapped blocked-state link stays at `#amounts` instead of reloading the
+  editor; a plain fragment request still links to `/fire/edit#amounts`. `fire_scenario_sensitivity`
   redirects to `/fire#sensitivity`; `fire_scenario_page` forwards only `notice`/`error`; the
   `sensitivity` query parameter is ignored.
 - **Styling.** `_table.html` dropped `panel` and its padding; the table keeps `sheet`,
