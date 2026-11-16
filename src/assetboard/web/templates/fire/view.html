@@ -3,7 +3,6 @@
 {% block title %}{{ _("FIRE plan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("FIRE plan") }}{% endblock %}
 {% block header_actions %}
-{% if results.projection %}<a href="{{ scoped_url(request, 'fire_results_csv') }}" class="btn" data-fire-csv>{{ _("Download CSV") }}</a>{% endif %}
 {% if can_edit %}<a href="{{ scoped_url(request, 'fire_reset') }}" class="btn" data-fire-reset>{{ _("Reset plan") }}</a>{% endif %}
 {% if can_edit and not plan.currency_mismatch %}<a href="{{ scoped_url(request, 'fire_edit') }}" class="btn-primary" data-fire-edit>{{ _("Edit plan") }}</a>{% endif %}
 {% endblock %}
@@ -18,23 +17,18 @@
 <p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{% if can_edit %}{{ _("This plan was converted from the old format. Review its values and save to confirm them.") }} <a href="{{ scoped_url(request, 'fire_edit') }}#amounts" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% else %}{{ _("This plan was converted from the old format. An editor or owner must review its values and save to confirm them.") }}{% endif %}</p>
 {% endif %}
 
-<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="plan-overview-heading" data-fire-overview="{{ s.id }}">
-  <div class="flex flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
-      <h2 id="plan-overview-heading" class="text-xl font-semibold">{{ _("FIRE plan") }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("First year %(year)d · age %(age)d · currency %(currency)s", year=s.current_year, age=s.age_at_start, currency=s.currency) }}</p>
-    </div>
-    <p class="text-sm text-muted">{{ ngettext("%(num)d adjustment", "%(num)d adjustments", s.event_count, num=s.event_count) }}{% if s.archived_event_count %} · {{ ngettext("%(num)d archived", "%(num)d archived", s.archived_event_count, num=s.archived_event_count) }}{% endif %}</p>
-  </div>
+{% if s.horizon_reached or s.income_stopped or s.stop_after_horizon %}
+<div class="mb-4 space-y-2" data-fire-warnings>
   {% if s.horizon_reached %}
-  <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-horizon-warning>{{ _("The horizon age is not after your current age. Raise it in edit mode to project the plan.") }}</p>
+  <p role="status" class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-horizon-warning>{{ _("The horizon age is not after your current age. Raise it in edit mode to project the plan.") }}</p>
   {% elif s.income_stopped %}
-  <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income is zero. The plan still spends from the portfolio.") }}</p>
+  <p role="status" class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income is zero. The plan still spends from the portfolio.") }}</p>
   {% endif %}
   {% if s.stop_after_horizon %}
-  <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon. The plan is saved, but the projection has no working years beyond age %(horizon)d.", horizon=s.horizon_age) }}</p>
+  <p role="status" class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon. The plan is saved, but the projection has no working years beyond age %(horizon)d.", horizon=s.horizon_age) }}</p>
   {% endif %}
-</section>
+</div>
+{% endif %}
 
 <div id="fire-results" data-fire-results>
   {% include "fire/_results.html" %}

@@ -1,24 +1,10 @@
 {% from "fire/_macros.html" import hint with context %}
 {% set projection = results.projection %}
-
-{% macro progress_card(kind, label, definition, bp, note="") %}
-<div class="border border-line bg-surface p-4" data-fire-progress="{{ kind }}" data-progress-bp="{{ bp if bp is not none else '' }}">
-  <dt class="text-xs font-medium text-muted">{{ label }} {{ hint(definition) }}</dt>
-  <dd class="mt-1 flex items-baseline justify-between gap-2">
-    <span class="text-lg font-semibold tabular-nums" data-fire-progress-label>{% if bp is none %}—{% else %}{{ format_rate_short(bp, locale) }}{% endif %}</span>
-    {% if bp is not none %}{% set capped = 100 if bp > 10000 else (0 if bp < 0 else bp // 100) %}
-    <span class="sr-only">{{ _("Bar capped at 100%%, exact value %(value)s", value=format_rate_short(bp, locale)) }}</span>
-    <span class="inline-flex w-24 shrink-0" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ capped }}" aria-valuetext="{{ format_rate_short(bp, locale) }}" aria-label="{{ label }}">
-      <svg class="h-2.5 w-full overflow-hidden rounded-full bg-subtle" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <rect x="0" y="0" width="{{ capped }}" height="10" class="fill-primary"></rect>
-      </svg>
-    </span>
-    {% endif %}
-  </dd>
-  <p class="mt-2 text-xs text-muted">{{ definition }}</p>
-  {% if note %}<p class="mt-1 text-xs text-muted" data-fire-progress-note>{{ note }}</p>{% endif %}
-</div>
-{% endmacro %}
+{% set progress_bp = projection.plan_progress_bp %}
+{% if progress_bp is not none %}
+  {% set capped_bp = [[progress_bp, 0]|max, 10000]|min %}
+  {% set bar_width = capped_bp // 100 %}
+{% endif %}
 
 <section class="mb-6" aria-labelledby="metrics-heading" data-fire-metrics>
   <h2 id="metrics-heading" class="sr-only">{{ _("Key metrics") }}</h2>
@@ -52,9 +38,30 @@
     </div>
   </dl>
 
-  <dl class="mt-4 grid gap-4 sm:grid-cols-2">
-    {{ progress_card("plan", _("Plan progress"), _("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target."), projection.plan_progress_bp, _("Not defined: net worth at FIRE is not positive.") if projection.fire_age is not none and projection.plan_progress_bp is none else "") }}
-  </dl>
+  <section class="panel mt-4 p-4 sm:p-6" aria-labelledby="plan-progress-heading" data-fire-progress="plan" data-progress-bp="{{ progress_bp if progress_bp is not none else '' }}">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 id="plan-progress-heading" class="text-base font-semibold">{{ _("Plan progress") }} {{ hint(_("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.")) }}</h2>
+        <p class="mt-1 text-3xl font-semibold tabular-nums" data-fire-progress-label>{% if progress_bp is none %}—{% else %}{{ format_rate_short(progress_bp, locale) }}{% endif %}</p>
+      </div>
+      <p class="max-w-md text-sm text-muted">{{ _("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.") }}</p>
+    </div>
+    <div class="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <p class="flex items-baseline gap-2 text-sm text-muted"><span class="inline-block h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>{{ _("Starting portfolio") }} <span class="text-lg font-semibold tabular-nums text-ink" data-fire-progress-starting>{{ format_money(projection.inputs.start_portfolio, locale) }}</span></p>
+      <p class="flex items-baseline gap-2 text-sm text-muted"><span class="inline-block h-2.5 w-2.5 rounded-full border border-line-strong bg-subtle" aria-hidden="true"></span>{{ _("Net worth at FIRE") }} <span class="font-semibold tabular-nums text-ink" data-fire-progress-target>{% if projection.networth_at_fire is not none %}{{ format_money(projection.networth_at_fire, locale) }}{% else %}—{% endif %}</span></p>
+    </div>
+    <svg class="mt-2 h-8 w-full overflow-visible{% if progress_bp is none %} opacity-60{% endif %}" viewBox="0 0 100 32" preserveAspectRatio="none" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ bar_width if progress_bp is not none else 0 }}" aria-valuetext="{{ format_rate_short(progress_bp, locale) if progress_bp is not none else _('Not defined') }}" aria-label="{{ _('Plan progress') }}" data-fire-progress-bar>
+      <rect x="0" y="0" width="100" height="32" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
+      {% if progress_bp is not none and bar_width > 0 %}
+      <rect x="0" y="0" width="{{ bar_width }}" height="32" class="fill-success stroke-surface" stroke-width="2" vector-effect="non-scaling-stroke" data-fire-progress-fill></rect>
+      {% endif %}
+    </svg>
+    {% if progress_bp is none %}
+    <p class="mt-1 text-sm text-muted" data-fire-progress-note>{% if projection.fire_age is none %}{{ _("Not defined: this plan does not reach FIRE.") }}{% else %}{{ _("Not defined: net worth at FIRE is not positive.") }}{% endif %}</p>
+    {% else %}
+    <p class="sr-only" data-fire-progress-exact>{{ _("Bar capped at 100%%, exact value %(value)s; starting portfolio %(start)s; net worth at FIRE %(target)s", value=format_rate_short(progress_bp, locale), start=format_money(projection.inputs.start_portfolio, locale), target=format_money(projection.networth_at_fire, locale) if projection.networth_at_fire is not none else "—") }}</p>
+    {% endif %}
+  </section>
 
   {% if projection.fire_age is none %}
   <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-never>

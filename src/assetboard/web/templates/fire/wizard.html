@@ -125,15 +125,9 @@
         {{ field_label("swr", _("Withdrawal rate (%%)"), _("Share of the portfolio withdrawn in the first year of retirement. 4%% is an example, not a rule.")) }}
         <input id="swr" name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr", "swr-hint") }}>
         {{ field_error(error_field, "swr", error) }}
+        <span class="text-xs font-normal text-muted" data-fire-swr-note>{{ _("Used only when the independence rule is Withdrawal rate.") }}</span>
       </div>
     </div>
-    {% set show_extreme = (review and review.needs_extreme_confirmation) or error_field == "extreme_rates_confirmed" %}
-    {% if show_extreme %}
-    <div class="border-t border-line pt-4">
-      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="extreme_rates_confirmed" value="1"{% if values.get('extreme_rates_confirmed') == '1' %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{{ field_attrs(error_field, "extreme_rates_confirmed") }}> <span>{{ _("I confirm these unusual rates are intentional") }}<span class="block text-xs text-muted">{{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</span></span></label>
-      {{ field_error(error_field, "extreme_rates_confirmed", error) }}
-    </div>
-    {% endif %}
 
     {% if review %}
     <div class="border-t border-line pt-4" data-fire-review>
@@ -150,8 +144,22 @@
       </dl>
       {% if review.income_stopped %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income will be zero.") }}</p>{% endif %}
       {% if review.stop_after_horizon %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon; the projection has no working years beyond age %(horizon)d.", horizon=review.last_year - review.birth_year) }}</p>{% endif %}
+      {% if review.needs_extreme_confirmation %}
+      <p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-extreme-warning>{{ _("A changed rate is outside the usual range. Confirm it to create the plan.") }} {{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</p>
+      {% endif %}
       <p class="mt-3 text-sm text-muted">{{ _("Adjustments can be added after the plan is created.") }}</p>
     </div>
+    {% endif %}
+
+    {% if extreme_confirmation %}
+    <section class="border border-warning-line bg-warning-soft px-4 py-3" role="alert" aria-labelledby="extreme-confirmation-heading" data-fire-extreme-confirm>
+      <h3 id="extreme-confirmation-heading" class="text-base font-semibold">{{ _("Confirm the unusual rates") }}</h3>
+      <p class="mt-2 text-sm text-warning-strong">{{ _("A rate is outside the usual range. Confirm it to create the plan.") }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Nothing is saved until you press Confirm and create plan. The confirmation applies to the values shown in the review.") }}</p>
+      <input type="hidden" name="extreme_rates_confirmed" value="1">
+      <button type="submit" name="go" value="create" class="btn-primary mt-3" data-fire-confirm-extreme>{{ _("Confirm and create plan") }}</button>
+    </section>
     {% endif %}
 
     {% include "fire/_wizard_loans.html" %}
@@ -165,7 +173,7 @@
       {% endif %}
       {% if step < last_step %}
       <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Next") }}</button>
-      {% else %}
+      {% elif not extreme_confirmation %}
       <button type="submit" name="go" value="review" class="btn" data-wizard-review>{{ _("Review changes") }}</button>
       <button type="submit" name="go" value="create" class="btn-primary" data-fire-create>{{ _("Create plan") }}</button>
       {% endif %}
