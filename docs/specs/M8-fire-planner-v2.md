@@ -1313,6 +1313,50 @@ dependencies, loan math and the UI layout unchanged.
   modules. `docs/fire.md`, this section, §5.2/§5.3, the overview range and ADR-0025's amended
   note were updated. No model, migration, archive, dependency, loan-math or UI-layout change.
 
+### F8.20 — FIRE wizard and risk table polish
+
+**Acceptance**
+
+- Wizard step 1 puts **Birth year** on its own full-width row. **Horizon age** and **Income
+  stops at age** share the next row and their inputs align.
+- Edit mode shows the illustrative 4% in the inactive **Withdrawal rate** field when the plan
+  stores no rate (for example under **Returns cover expenses**). The field stays visible and is
+  JavaScript-disabled for the other rule. Saving still stores no rate, and the server still
+  ignores a posted rate for that rule.
+- The Portfolio **Holdings**, **By asset class** and **Risk balance** tables use
+  `sheet bg-surface`, matching the Transactions history table.
+- No schema, migration, archive, dependency or projection/loan-math change. The `pl` catalog is
+  complete with no fuzzy entries.
+- Tests cover the wizard row structure, the edit-mode 4% display and no-store save, the three
+  portfolio table classes, and the aligned wizard layout in a browser.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.20 from docs/specs/M8-fire-planner-v2.md: put Birth year on its own full-width
+wizard row with the two ages paired below, show the illustrative 4% in the inactive edit-mode
+withdrawal-rate field when no rate is stored, and give the Portfolio Holdings, By asset class and
+Risk balance tables the Transactions surface background. Keep models, migrations, archive,
+dependencies, projection math and loan math unchanged.
+```
+
+### As built (M8.F8.20)
+
+- `wizard.html` step 1 uses a single-column outer grid for **Birth year** and a nested
+  two-column `sm:grid-cols-2` row for **Horizon age** and **Income stops at age**, so the
+  profile-source copy under birth year no longer offsets the age fields.
+- `_detail_values` falls back to `ILLUSTRATIVE_SWR_BP` (400 bp) when the saved plan has no
+  withdrawal rate, so edit mode shows `4` in the inactive field; saving under **Returns cover
+  expenses** still leaves `swr_bp` unset and the posted rate ignored.
+- `_portfolio_body.html` adds `bg-surface` to the Holdings, By asset class and Risk balance
+  tables; no markup, hooks or row styling changed otherwise.
+- Web tests cover the wizard row structure, the 4% edit display and the no-store save, and the
+  three table classes. The browser wizard module checks the birth-year row is full width and the
+  two ages share a row; the browser edit module checks the displayed 4%. `docs/fire.md`,
+  `docs/investments.md` and the overview range were updated. No model, migration, archive,
+  dependency or projection/loan-math change.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -1352,6 +1396,7 @@ dependencies, loan math and the UI layout unchanged.
 10. F8.17 — FIRE projection and editor layout.
 11. F8.18 — FIRE display and input polish.
 12. F8.19 — FIRE real-return coverage and model corrections.
+13. F8.20 — FIRE wizard and risk table polish.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and
