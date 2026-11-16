@@ -214,7 +214,8 @@ def test_live_loans_in_view_and_editor(tmp_path: Path) -> None:
             loan = page.locator(f'[data-fire-loan="{loan_id}"]')
             loan.locator('input[value="0"]').check()
             page.wait_for_timeout(800)
-            expect(page.locator("[data-fire-loans-preview]")).to_contain_text("Ignored loans")
+            expect(page.locator("[data-fire-loans-preview]")).to_have_count(0)
+            expect(page.locator("[data-fire-loans-expense-warning]")).to_have_count(0)
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             expect(page.locator(f'[data-fire-loan="{loan_id}"]')).to_have_attribute(

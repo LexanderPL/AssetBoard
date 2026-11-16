@@ -36,8 +36,10 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-view" in page.text
-    assert "data-fire-overview" in page.text
     assert "data-fire-results" in page.text
+    assert "data-fire-overview" not in page.text
+    assert "First year " not in page.text
+    assert "data-fire-warnings" not in page.text
     assert "data-fire-metrics" in page.text
     assert "data-fire-table" in page.text
     assert "data-fire-plan-values" in page.text
@@ -46,7 +48,9 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert "data-fire-sensitivity" in page.text
     assert "data-fire-edit" in page.text
     assert "data-fire-reset" in page.text
-    assert "data-fire-csv" in page.text
+    # The obsolete plan overview panel and the removed CSV action are gone.
+    assert "data-fire-csv" not in page.text
+    assert "Download CSV" not in page.text
     # No editor at all: no form, no inputs, no preview hooks, no suggestion cards.
     assert "data-fire-form" not in page.text
     assert "data-fire-preview" not in page.text
@@ -55,6 +59,51 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert 'name="birth_year"' not in page.text
     assert "data-fire-suggestion" not in page.text
     assert "data-fire-edit-page" not in page.text
+
+
+def test_plan_warnings_are_a_compact_stack_without_the_old_overview(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).horizon_age = 41
+    view = owner.client.get("/fire").text
+    assert "data-fire-overview" not in view
+    assert "data-fire-warnings" in view
+    assert "data-fire-horizon-warning" in view
+    assert "data-fire-income-warning" not in view
+    assert view.index("data-fire-warnings") < view.index("data-fire-results")
+
+    edit = owner.client.get("/fire/edit").text
+    assert "data-fire-overview" not in edit
+    assert "data-fire-warnings" in edit
+    assert "data-fire-horizon-warning" in edit
+    assert "data-fire-income-warning" not in edit
+    assert edit.index("data-fire-warnings") < edit.index("data-fire-form")
+
+    # Income already stopped at the current age: the compact stack names that, not the horizon.
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).horizon_age = 90
+        session.get_one(FireScenario, plan_id).stop_working_age = 41
+    view = owner.client.get("/fire").text
+    assert "data-fire-warnings" in view
+    assert "data-fire-income-warning" in view
+    assert "data-fire-horizon-warning" not in view
+    assert "data-fire-stop-warning" not in view
+    edit = owner.client.get("/fire/edit").text
+    assert "data-fire-income-warning" in edit
+    assert "data-fire-horizon-warning" not in edit
+
+    # Income stops after the horizon: only the stop-after-horizon warning is shown.
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).horizon_age = 60
+        session.get_one(FireScenario, plan_id).stop_working_age = 65
+    view = owner.client.get("/fire").text
+    assert "data-fire-warnings" in view
+    assert "data-fire-stop-warning" in view
+    assert "data-fire-income-warning" not in view
+    assert "data-fire-horizon-warning" not in view
+    edit = owner.client.get("/fire/edit").text
+    assert "data-fire-stop-warning" in edit
+    assert "data-fire-income-warning" not in edit
 
 
 def test_the_view_uses_nominal_values_only(owner) -> None:
@@ -125,8 +174,25 @@ def test_the_metrics_show_fire_number_with_year_and_plan_progress(owner) -> None
     assert 'data-fire-number-value="' in page.text
     assert re.search(r'data-fire-number-year="\d{4}"', page.text)
     assert 'data-fire-progress="plan"' in page.text
+    assert "data-fire-progress-bar" in page.text
+    assert "data-fire-progress-starting" in page.text
+    assert "data-fire-progress-target" in page.text
+    assert "Starting portfolio" in page.text
+    assert "Net worth at FIRE" in page.text
+    assert "h-8 w-full" in page.text
+    assert "fill-success" in page.text
     assert 'data-fire-progress="today"' not in page.text
     assert 'data-fire-progress="sheet"' not in page.text
+    # The default plan is at 93.02%: a below-100 value must not be described as capped, and the
+    # visible percentage plus both legend amounts are the projection's values.
+    assert 'data-fire-progress="plan" data-progress-bp="9302"' in page.text
+    assert "data-fire-progress-label>93.02%<" in page.text
+    assert 'aria-valuenow="93"' in page.text
+    assert 'aria-valuetext="93.02%"' in page.text
+    assert 'width="93"' in page.text
+    assert "data-fire-progress-starting>€1,000,000.00<" in page.text
+    assert "data-fire-progress-target>€1,075,000.00<" in page.text
+    assert "Bar capped at 100%" not in page.text
     assert "FIRE number" in page.text
     assert "Plan progress" in page.text
     assert "projected nominal net worth at FIRE" in page.text
@@ -141,9 +207,28 @@ def test_a_never_fire_plan_shows_dashes_and_the_reason(owner) -> None:
     page = owner.client.get("/fire")
     assert 'data-fire-number-value=""' in page.text
     assert 'data-fire-progress="plan" data-progress-bp=""' in page.text
-    assert "data-fire-never" in page.text
     assert "data-fire-number-note" not in page.text
-    assert "With these inputs, returns never cover expenses" in page.text
+    assert "data-fire-progress-note" in page.text
+    assert "Not defined: this plan does not reach FIRE." in page.text
+    assert 'aria-valuetext="Not defined"' in page.text
+    assert 'aria-valuenow="0"' in page.text
+    assert "data-fire-progress-fill" not in page.text
+
+
+def test_plan_progress_without_a_positive_target_is_muted_and_explained(owner) -> None:
+    # FIRE is reached with a positive rate but net worth at FIRE is zero: the percentage is not
+    # defined. The bar is muted, has no fill and the note names the non-positive target.
+    _create(owner, rule="swr", expenses_manual="0", portfolio_manual="0")
+    page = owner.client.get("/fire")
+    assert 'data-fire-progress="plan" data-progress-bp=""' in page.text
+    assert "data-fire-progress-label>—<" in page.text
+    assert 'aria-valuenow="0"' in page.text
+    assert 'aria-valuetext="Not defined"' in page.text
+    assert "data-fire-progress-fill" not in page.text
+    assert "opacity-60" in page.text
+    assert "data-fire-progress-note" in page.text
+    assert "Not defined: net worth at FIRE is not positive." in page.text
+    assert "Not defined: this plan does not reach FIRE." not in page.text
 
 
 def test_plan_progress_shows_the_exact_percentage_and_caps_the_bar(owner) -> None:
@@ -177,9 +262,14 @@ def test_plan_progress_shows_the_exact_percentage_and_caps_the_bar(owner) -> Non
     page = owner.client.get("/fire")
     # Starting portfolio / net worth at FIRE = 10,000,000 / 2,616,031.25 = 382.26%.
     assert 'data-fire-progress="plan" data-progress-bp="38226"' in page.text
+    assert "data-fire-progress-label>382.26%<" in page.text
     assert 'aria-valuetext="382.26%"' in page.text
     assert 'aria-valuenow="100"' in page.text
     assert 'width="100"' in page.text
+    assert 'height="32"' in page.text
+    assert "data-fire-progress-starting>€10,000,000.00<" in page.text
+    assert "data-fire-progress-target>€2,616,031.25<" in page.text
+    assert "Bar capped at 100%" not in page.text
 
 
 def test_the_view_has_no_real_money_or_spreadsheet_wording(owner) -> None:
@@ -244,7 +334,7 @@ def test_a_viewer_sees_no_edit_or_reset_and_no_form(owner) -> None:
         owner.set_admin_role("owner")
 
 
-def test_a_blocked_projection_hides_results_and_the_csv_link(owner) -> None:
+def test_a_blocked_projection_hides_results_and_the_removed_csv_is_gone(owner) -> None:
     plan_id = _create(owner)
     with owner.db() as session:
         session.get_one(FireScenario, plan_id).currency = "USD"
@@ -255,8 +345,7 @@ def test_a_blocked_projection_hides_results_and_the_csv_link(owner) -> None:
     assert "data-fire-metrics" not in page.text
     assert "data-fire-csv" not in page.text
     assert "data-fire-blocked-reset" in page.text
-    response = owner.client.get("/fire/results.csv")
-    assert response.status_code == 409
+    assert owner.client.get("/fire/results.csv").status_code == 404
 
 
 def test_archived_adjustments_are_shown_read_only(owner) -> None:
@@ -341,25 +430,23 @@ def test_the_view_loads_no_editor_javascript(owner) -> None:
     assert "vendor/echarts.min.js" in page.text
 
 
-def test_the_csv_is_id_free_and_writes_nothing(owner) -> None:
+def test_the_removed_csv_is_not_found_and_writes_nothing(owner) -> None:
     plan_id = _create(owner)
     before = _snapshot(owner, plan_id)
     response = owner.client.get("/fire/results.csv")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/csv")
-    assert response.headers["content-disposition"] == 'attachment; filename="fire-plan.csv"'
-    header = response.text.splitlines()[0]
-    assert header == (
-        "year,age,income,expenses,loan_payment,net,gain,cash,net_worth,"
-        "is_fire,income_stopped,currency"
-    )
-    assert "real" not in header
+    assert response.status_code == 404
+    assert _snapshot(owner, plan_id) == before
+    # The old id-based URL is not a redirect any more either, and a viewer gets the same 404.
+    legacy = owner.client.get(f"/fire/{plan_id}/results.csv")
+    assert legacy.status_code == 404
     assert _snapshot(owner, plan_id) == before
     owner.set_admin_role("viewer")
     try:
-        assert owner.client.get("/fire/results.csv").status_code == 200
+        assert owner.client.get("/fire/results.csv").status_code == 404
+        assert owner.client.get(f"/fire/{plan_id}/results.csv").status_code == 404
     finally:
         owner.set_admin_role("owner")
+    assert _snapshot(owner, plan_id) == before
 
 
 def test_a_currency_mismatch_hides_the_review_banner_and_editor_link(owner) -> None:
@@ -451,8 +538,13 @@ def test_the_view_shows_live_loans_and_their_effect(owner) -> None:
     assert "data-fire-loan-payoff" in page.text
     assert "data-fire-loan-effect" in page.text
     assert 'name="loan_include_' not in page.text
-    assert "Loan payments" in page.text
-    assert "data-fire-loan-payment" in page.text
+    # F8.15 removed the loan-payments table column and the totals line; the loan badge and panel
+    # remain.
+    assert "data-fire-loan-payment" not in page.text
+    assert "Loan payments are the part" not in page.text
+    assert "Loan payments</th>" not in page.text
+    assert "data-fire-loans-preview" not in page.text
+    assert "Loan choices:" not in page.text
     with owner.db() as session, session.begin():
         session.add(
             FireLoanSetting(
@@ -586,7 +678,6 @@ def test_the_loan_panel_is_translated(owner) -> None:
     assert "Kredyty" in page.text
     assert "Uwzględnione w planie" in page.text
     assert "Rata roczna" in page.text or "Roczna rata" in page.text
-    assert "Raty kredytów" in page.text
     assert "Zarchiwizowany w Kredytach; nie jest częścią planu." in page.text
 
 

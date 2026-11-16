@@ -56,11 +56,13 @@ first; **Create plan** never saves values that differ from the review you last s
    an amount.
 4. **Assumptions and review:** inflation, return above inflation, income growth and the
    independence rule. **Withdrawal rate** is used only when the independence rule is
-   **Withdrawal rate**. With **Returns cover expenses** the field is hidden and disabled.
-   Without JavaScript it stays visible, and the server ignores the rate for that rule.
-   The review shows the entered values, the projected window, the warnings and a read-only list
-   of active loans with their annual payment, payoff year and included state. **Create plan**
-   writes the plan once. Adjustments and loan include/ignore choices are changed after creation
+   **Withdrawal rate**. With **Returns cover expenses** the field stays visible but inactive and
+   disabled; without JavaScript it stays enabled, and the server ignores the rate for that rule.
+   The field note says so. The review shows the entered values, the projected window, the
+   warnings and a read-only list of active loans with their annual payment, payoff year and
+   included state. A changed rate outside the usual range shows a warning. **Create plan** then
+   opens a confirmation panel; nothing is saved until **Confirm and create plan**. There is no
+   confirmation checkbox. Adjustments and loan include/ignore choices are changed after creation
    in edit mode.
 
 A blocked suggestion explains why it is unavailable (no data, another ledger currency, a missing
@@ -79,8 +81,7 @@ The plan page shows the saved plan without any inputs or preview controls:
   **Archived adjustments** section;
 - the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
 - the **Loans** panel with each active loan's annual payment, payoff year, included/ignored
-  state and effect on the plan;
-- the **Download CSV** action when the projection is available.
+  state and effect on the plan.
 
 A converted plan shows a review banner until an editor or owner saves it in edit mode. The page
 never writes. All amounts are nominal: each year's actual money, not adjusted for inflation.
@@ -142,9 +143,9 @@ term or overpayment plan changes the next FIRE calculation.
   change it. In edit mode the results summary at the top of the page is the live preview of the
   posted choices, including the expense warning; the detailed loan cards below keep showing the
   saved choice and its effect until you save.
-- Multiple loans are summed, each with its own payoff year. The year-by-year table has a **Loan
-  payments** column showing the part of that year's expenses still attributable to loans, and a
-  badge on the payoff year. The charts mark included loan payoffs.
+- Multiple loans are summed, each with its own payoff year. A badge on the payoff year marks the
+  year a loan ends; the **Loans** panel shows the annual payment and its effect. The year-by-year
+  table no longer repeats a separate loan-payments column. The charts mark included loan payoffs.
 - Loans in another currency, archived loans, paid-off and not-drawn loans, broken schedules and
   installment plans are listed with a reason and are not included. They are never silently
   treated as zero. A saved ignore survives archiving the loan, so restoring it restores the
@@ -185,7 +186,7 @@ check the values and save to clear the review banner.
 
 ## Plan fields
 
-- **First projected year** is always the current year and is shown read-only.
+- The projection always starts in the current calendar year. There is no first-year input field.
 - **Birth year** turns plan years into ages. New plans prefill it from your profile; the plan
   keeps its saved value, so later profile changes do not alter an existing plan.
 - **Horizon age** is the last age in the projection. It defaults from your profile's life
@@ -210,15 +211,20 @@ makes sense. The hard bounds are −20% to 50% for inflation, return above infla
 growth, and 0.5% to 20% for the withdrawal rate.
 
 The ordinary ranges are 0–10% inflation, −2–8% return above inflation, 0–10% income growth and
-2–6% withdrawal rate. A rate outside its ordinary range needs the **unusual rates**
-confirmation. When editing, only a rate you actually changed asks for it again.
+2–6% withdrawal rate. A rate outside its ordinary range asks for confirmation when you save or
+create the plan. Edit mode shows a confirmation panel with **Confirm and save**; the wizard shows
+a confirmation panel with **Confirm and create plan**. Nothing is written until you confirm. The
+confirmation applies to the rates shown: if you change one of them first, the page asks again.
+Only a rate you actually changed asks for confirmation again, so editing another field of a plan
+with an unusual rate does not nag on every save. There is no confirmation checkbox.
 
 The starting values (2.5% inflation, 5% return above inflation, 3% income growth and 4%
 withdrawal rate) are illustrative examples, not recommendations.
 
 **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**. With
-**Returns cover expenses** the field is hidden and disabled. Without JavaScript it stays
-visible, and the server ignores the rate for that rule.
+**Returns cover expenses** the field stays in the layout but is inactive and disabled; without
+JavaScript it stays enabled, and the server ignores the rate for that rule. A note beside the
+field says when it is used.
 
 ## Adjustments
 
@@ -232,22 +238,26 @@ The plan's **Adjustments** list holds four kinds of event, stored as calendar ye
 - **Saving override** replaces that year's net saving. A year can have only one override, and a
   new override starts in the next year because the current row uses the starting portfolio.
 
-In edit mode, adjustments are added one row at a time and edited in place. There is no bulk-paste
-box. Rows of the same kind and year are added together. A zero amount is allowed; negative amounts
-reduce, positive amounts increase. All adjustment changes, together with the plan fields, are
-saved by **Save changes** in one transaction; **Discard changes** leaves the saved adjustments
-untouched.
+In edit mode, adjustments are a compact table and are added one row at a time and edited in
+place. There is no bulk-paste box. Rows of the same kind and year are added together. A zero
+amount is allowed; negative amounts reduce, positive amounts increase. All adjustment changes,
+together with the plan fields, are saved by **Save changes** in one transaction; **Discard
+changes** leaves the saved adjustments untouched.
 
-To remove an adjustment, tick its **Remove** checkbox and save. A saved row is never deleted just
-because it is missing from a request; the app reloads the rows and asks you to try again.
+To remove an adjustment, choose **Remove** at the end of its row and save. A saved row is marked,
+the control changes to **Undo**, and nothing is deleted until **Save changes**; choosing
+**Undo** keeps the row. A row you added but have not saved is removed immediately and has no
+effect on the saved plan. The checkbox behind the control is visually hidden, so removal works
+without JavaScript too. A saved row is never deleted just because it is missing from a request;
+the app reloads the rows and asks you to try again.
 
 Adjustments from before the current year, after the plan's last year, and a saving override that
 has become the current year after a year rollover are kept as **Archived adjustments**. They stay
 visible in a collapsed section with the reason, are read-only, and are not applied to the
-projection. Editors and owners can delete an archived adjustment by ticking **Remove** and saving;
-viewers cannot. Archived history is never edited in place or moved to another year. An adjustment
-archived only because it is after the plan's last year applies again when you raise the horizon;
-the preview includes it before you save.
+projection. Editors and owners can delete an archived adjustment by choosing **Remove** and
+saving; viewers cannot. Archived history is never edited in place or moved to another year. An
+adjustment archived only because it is after the plan's last year applies again when you raise the
+horizon; the preview includes it before you save.
 
 ## Results
 
@@ -257,18 +267,21 @@ The plan page shows nominal values only:
   nominal expenses in the FIRE year divided by the rate the independence rule uses: the
   withdrawal rate, or the nominal gain rate when returns must cover expenses. It is shown with
   the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
-- **Plan progress**: the starting portfolio divided by the projected nominal net worth at FIRE.
-  100% means the plan has reached its FIRE net-worth target. It is a dash when FIRE is never
-  reached or net worth at FIRE is not positive;
+- **Plan progress** is a full-width bar directly below the four key metric cards. The percentage
+  is shown large, and the legend shows the **Starting portfolio** and **Net worth at FIRE** with
+  their formatted amounts. The bar fills in success colour and is capped visually at 100%; the
+  accessible value keeps the exact percentage. When FIRE is not reached or net worth at FIRE is
+  not positive, the bar is muted and the page explains why. It is the starting portfolio divided
+  by the projected nominal net worth at FIRE, so 100% means the plan has reached its FIRE
+  net-worth target;
 - the sustainability check: the nominal depletion age and the lowest nominal net worth after
   income stops;
-- a year-by-year schedule with income, expenses, loan payments, net saving, investment gain,
-  cash and net worth. Every amount is the actual money of that year, not adjusted for inflation;
+- a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth.
+  Every amount is the actual money of that year, not adjusted for inflation;
 - the **Adjustments** list, with archived history collapsed and read-only;
 - a nominal net-worth chart and a nominal expenses-versus-gain chart, each with accessible
   plotted data;
-- **Download CSV** and, for editors and owners, **Edit plan** and **Reset plan**. The CSV has
-  one nominal row per plan year.
+- for editors and owners, **Edit plan** and **Reset plan**. The plan page has no download action.
 
 The plan page is read-only. Editors and owners change the values on the separate edit page.
 
@@ -294,7 +307,7 @@ FIRE CSV import.
 
 ## Roles
 
-Every member can read the plan, its results, its adjustments, the CSV and the sensitivity grid.
-Editors and owners can set up the plan, open the separate edit page, save or discard changes,
-convert old scenarios and reset the plan. Viewers never see edit controls. All write pages are
-CSRF-protected, and a cross-workspace plan is reported as not found.
+Every member can read the plan, its results, its adjustments and the sensitivity grid. Editors
+and owners can set up the plan, open the separate edit page, save or discard changes, convert old
+scenarios and reset the plan. Viewers never see edit controls. All write pages are CSRF-protected,
+and a cross-workspace plan is reported as not found.

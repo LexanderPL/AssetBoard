@@ -109,6 +109,12 @@ def _input_value(text: str, name: str) -> str:
     return match.group(1)
 
 
+def _extreme_signature(text: str) -> str:
+    marker = 'name="extreme_rates_signature" value="'
+    start = text.index(marker) + len(marker)
+    return text[start : text.index('"', start)]
+
+
 def _category(owner, name: str, *, kind: str) -> UUID:
     with owner.app.state.session_factory.begin() as session:
         row = CategoryRepository(session, _context(owner)).create(
@@ -370,6 +376,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-metrics" in page.text
     assert "data-fire-table" in page.text
     assert 'data-fire-progress="plan"' in page.text
+    assert "data-fire-progress-bar" in page.text
+    assert "data-fire-overview" not in page.text
+    assert "First projected year" not in page.text
+    assert ">Currency<" in page.text
     assert "data-fire-basis" not in page.text
     assert "Return above inflation" in page.text
     assert "Real return" not in page.text
@@ -382,6 +392,7 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-add-adjustment" in page.text
     assert "data-add-event" not in page.text
     assert "data-event-table" not in page.text
+    assert 'name="extreme_rates_confirmed"' not in page.text
     assert _input_value(page.text, "income_manual") == "50000.00"
     assert _input_value(page.text, "expenses_manual") == "30000.00"
     assert _input_value(page.text, "portfolio_manual") == "1000000.00"
@@ -516,6 +527,124 @@ def test_preview_does_not_clear_needs_review(owner) -> None:
     assert owner.post("/fire/edit/preview", _form(), token_from="/fire/edit").status_code == 200
     with owner.db() as session:
         assert session.get_one(FireScenario, plan_id).needs_review is True
+
+
+def test_a_changed_unusual_rate_asks_for_confirmation_before_writing(owner) -> None:
+    plan_id = create_plan(owner)
+    before = _snapshot(owner, plan_id)
+    page = owner.client.get("/fire/edit").text
+    assert "data-fire-extreme-confirm" not in page
+    assert 'name="extreme_rates_confirmed"' not in page
+
+    response = owner.post(
+        "/fire/edit",
+        _form(inflation="20", income_manual="55000"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert "data-fire-extreme-confirm" in response.text
+    assert "Confirm and save" in response.text
+    assert "Unusual means inflation outside" in response.text
+    assert _input_value(response.text, "inflation") == "20"
+    assert _snapshot(owner, plan_id) == before
+    signature = _extreme_signature(response.text)
+
+    # A rate changed after the panel invalidates its digest and asks again, using the posted
+    # values; nothing is written before the user confirms the new rate.
+    changed = owner.post(
+        "/fire/edit",
+        _form(
+            inflation="21",
+            income_manual="55000",
+            extreme_rates_confirmed="1",
+            extreme_rates_signature=signature,
+        ),
+        token_from="/fire/edit",
+    )
+    assert changed.status_code == 200
+    assert "data-fire-extreme-confirm" in changed.text
+    assert _input_value(changed.text, "inflation") == "21"
+    assert _snapshot(owner, plan_id) == before
+
+    confirmed = owner.post(
+        "/fire/edit",
+        _form(
+            inflation="21",
+            income_manual="55000",
+            extreme_rates_confirmed="1",
+            extreme_rates_signature=_extreme_signature(changed.text),
+        ),
+        token_from="/fire/edit",
+    )
+    assert confirmed.status_code == 303
+    assert confirmed.headers["location"] == "/fire?notice=saved"
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert row.inflation_bp == 2100
+        assert row.income_minor == 5_500_000
+
+
+def test_a_forged_or_missing_extreme_signature_cannot_bypass_the_panel(owner) -> None:
+    plan_id = create_plan(owner)
+    before = _snapshot(owner, plan_id)
+
+    # The old checkbox flag alone no longer writes anything.
+    flagged = owner.post(
+        "/fire/edit",
+        _form(inflation="20", extreme_rates_confirmed="1"),
+        token_from="/fire/edit",
+    )
+    assert flagged.status_code == 200
+    assert "data-fire-extreme-confirm" in flagged.text
+    assert "Confirm and save" in flagged.text
+    assert _snapshot(owner, plan_id) == before
+
+    # A digest that does not match the posted rates is ignored too.
+    forged = owner.post(
+        "/fire/edit",
+        _form(
+            inflation="20",
+            extreme_rates_confirmed="1",
+            extreme_rates_signature="forged",
+        ),
+        token_from="/fire/edit",
+    )
+    assert forged.status_code == 200
+    assert "data-fire-extreme-confirm" in forged.text
+    assert _input_value(forged.text, "inflation") == "20"
+    assert _snapshot(owner, plan_id) == before
+
+
+def test_an_unchanged_unusual_saved_rate_does_not_ask_again(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        session.get_one(FireScenario, plan_id).inflation_bp = 2000
+
+    response = owner.post(
+        "/fire/edit",
+        _form(inflation="20", income_manual="51000"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/fire?notice=saved"
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert row.inflation_bp == 2000
+        assert row.income_minor == 5_100_000
+
+
+def test_preview_warns_about_unusual_rates_without_a_confirmation_field(owner) -> None:
+    create_plan(owner)
+    unusual = owner.post("/fire/edit/preview", _form(inflation="20"), token_from="/fire/edit")
+    assert unusual.status_code == 200
+    assert "data-fire-extreme-warning" in unusual.text
+    assert "Confirm it to save the plan" in unusual.text
+    assert 'name="extreme_rates_confirmed"' not in unusual.text
+    assert 'type="checkbox"' not in unusual.text
+
+    normal = owner.post("/fire/edit/preview", _form(), token_from="/fire/edit")
+    assert normal.status_code == 200
+    assert "data-fire-extreme-warning" not in normal.text
 
 
 def test_save_preserves_events(owner) -> None:
@@ -899,6 +1028,43 @@ def test_an_archived_adjustment_applies_when_the_submitted_horizon_covers_it(
         assert session.get_one(FireEvent, later_id).year == 2070
 
 
+def test_the_adjustments_editor_is_a_slim_table_with_a_visible_remove_control(owner) -> None:
+    create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    section = page.split("data-fire-adjustments", 1)[1].split("data-fire-actions", 1)[0]
+    assert '<table class="sheet w-full min-w-[42rem]' in section
+    assert "overflow-x-auto" in section
+    assert "data-adjustment-rows" in section
+    assert "<tbody" in section
+    assert "<ol" not in section
+    for heading in ("Year", "Type", "Description", "Amount (EUR)", "Action"):
+        assert f">{heading}<" in section
+    rendered = section.split("<template", 1)[0]
+    assert "data-adjustment-remove-text" not in rendered  # only the blank row exists
+    assert "data-new-adjustment-row" in rendered
+    response = owner.post(
+        "/fire/edit",
+        _form(
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="1000",
+            event_label_1="Bonus",
+        ),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    page = owner.client.get("/fire/edit").text
+    section = page.split("data-fire-adjustments", 1)[1].split("data-fire-actions", 1)[0]
+    rendered = section.split("<template", 1)[0]
+    assert "data-adjustment-remove-text" in rendered
+    assert ">Remove<" in rendered
+    assert 'name="event_remove_1" value="1"' in rendered
+    assert 'class="peer sr-only"' in rendered
+    assert 'type="checkbox"' in rendered
+    # The checkbox is visually hidden and the label is the button-like control.
+    assert 'class="h-4 w-4 rounded border-line accent-primary"' not in rendered
+
+
 def test_the_adjustments_editor_has_no_bulk_paste_or_contribution_controls(owner) -> None:
     create_plan(owner)
     page = owner.client.get("/fire/edit").text
@@ -1180,6 +1346,8 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert " disabled" not in field
     assert " hidden" not in field
     assert "data-fire-swr-field" in field
+    assert "data-fire-swr-note" in field
+    assert "Used only when the independence rule is Withdrawal rate." in field
     assert "js/fire.js" in text
     assert not re.search(r"<script(?![^>]*\bsrc=)", text)
     assert "onclick=" not in text
@@ -1420,6 +1588,9 @@ def test_the_edit_page_renders_in_polish(owner) -> None:
         assert "Korekty" in page.text
         assert "Dodaj korektę" in page.text
         assert "Korekta oszczędności" in page.text
+        assert "Edytor korekt" in page.text
+        assert "Działanie" in page.text
+        assert "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." in page.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
 
@@ -1477,8 +1648,8 @@ def test_the_editor_shows_loan_toggles_and_preview_never_writes(owner) -> None:
         token_from="/fire/edit",
     )
     assert preview.status_code == 200
-    assert "data-fire-loans-preview" in preview.text
-    assert "Loan choices in this preview:" in preview.text
+    assert "data-fire-loans-preview" not in preview.text
+    assert "Loan choices in this preview" not in preview.text
     assert "data-fire-loans-ignored-total" in page.text
     assert _loan_settings(owner, plan_id) == []
 

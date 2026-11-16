@@ -28,9 +28,48 @@
   function setRemovedState(checkbox) {
     const row = checkbox.closest("[data-adjustment-row], [data-fire-archived-adjustment]");
     if (!(row instanceof HTMLElement)) return;
+    if (
+      row.hasAttribute("data-adjustment-row") &&
+      !row.hasAttribute("data-new-adjustment-row") &&
+      row.dataset.adjustmentId === ""
+    ) {
+      const next = row.nextElementSibling;
+      if (next instanceof HTMLElement && next.hasAttribute("data-adjustment-error-row")) {
+        next.remove();
+      }
+      row.remove();
+      const table = document.querySelector("[data-adjustment-rows]");
+      if (table instanceof HTMLElement) {
+        const current = table.querySelectorAll(
+          "[data-adjustment-row]:not([data-new-adjustment-row])"
+        ).length;
+        const empty = document.querySelector("[data-fire-adjustments-empty]");
+        if (empty instanceof HTMLElement) empty.hidden = current > 0;
+      }
+      const section = document.querySelector("[data-fire-adjustments]");
+      announce(
+        section instanceof HTMLElement ? section.dataset.adjustmentRemovedMessage || "" : ""
+      );
+      return;
+    }
+    const checked = checkbox.checked;
     const note = row.querySelector("[data-adjustment-removed-note]");
-    if (note instanceof HTMLElement) note.hidden = !checkbox.checked;
-    row.setAttribute("data-removed", checkbox.checked ? "1" : "0");
+    if (note instanceof HTMLElement) {
+      note.hidden = !checked;
+      note.classList.toggle("hidden", !checked);
+    }
+    const text = row.querySelector("[data-adjustment-remove-text]");
+    if (text instanceof HTMLElement) {
+      text.textContent = checked
+        ? checkbox.dataset.undoLabel || ""
+        : checkbox.dataset.removeLabel || "";
+    }
+    checkbox.setAttribute(
+      "aria-label",
+      checked ? checkbox.dataset.undoAria || "" : checkbox.dataset.removeAria || ""
+    );
+    row.classList.toggle("opacity-60", checked);
+    row.setAttribute("data-removed", checked ? "1" : "0");
   }
 
   function addAdjustment(button) {
@@ -40,22 +79,15 @@
     const blank = rows.querySelector("[data-new-adjustment-row]");
     const index = Number(rows.dataset.nextIndex || "1");
     rows.dataset.nextIndex = String(index + 1);
-    const holder = document.createElement("ol");
+    // A tbody holder gives the HTML parser the table-row context a <tr> template needs.
+    const holder = document.createElement("tbody");
     holder.innerHTML = template.innerHTML.replaceAll("__index__", String(index));
-    const row = holder.firstElementChild;
+    const row = holder.querySelector("[data-adjustment-row]");
     if (!(row instanceof HTMLElement)) return;
-    if (blank instanceof HTMLElement) rows.insertBefore(row, blank);
-    else rows.appendChild(row);
-    const legend = row.querySelector("[data-adjustment-legend]");
-    if (legend instanceof HTMLElement) {
-      const count = rows.querySelectorAll(
-        "[data-adjustment-row]:not([data-new-adjustment-row])"
-      ).length;
-      legend.textContent = button.dataset.adjustmentLegend.replace(
-        "__NUM__",
-        String(count)
-      );
-    }
+    const fragment = document.createDocumentFragment();
+    for (const child of Array.from(holder.children)) fragment.appendChild(child);
+    if (blank instanceof HTMLElement) rows.insertBefore(fragment, blank);
+    else rows.appendChild(fragment);
     const first = row.querySelector("[data-adjustment-year]");
     if (first instanceof HTMLElement) first.focus();
     const empty = document.querySelector("[data-fire-adjustments-empty]");
@@ -147,9 +179,10 @@
     document.addEventListener(eventName, syncPreviewError);
   }
 
-  // F8.14: the withdrawal rate applies only to the withdrawal-rate rule. The server renders the
-  // field visible so a no-JavaScript user can still use it; this script hides and disables it for
-  // the other rule. The server ignores a valid posted rate for a non-SWR rule.
+  // F8.15: the withdrawal rate applies only to the withdrawal-rate rule. The server renders the
+  // field visible and enabled so a no-JavaScript user can still use it; this script disables it
+  // and dims the field for the other rule. The server ignores a valid posted rate for a non-SWR
+  // rule.
   function syncSwrFields() {
     document.querySelectorAll("[data-fire-swr-field]").forEach((wrapper) => {
       if (!(wrapper instanceof HTMLElement)) return;
@@ -158,11 +191,9 @@
       const input = wrapper.querySelector('input[name="swr"]');
       if (!(rule instanceof HTMLSelectElement) || !(input instanceof HTMLInputElement)) return;
       const active = rule.value === "swr";
-      wrapper.hidden = !active;
-      // Tailwind's `.grid` would override the user-agent `[hidden]` rule, so toggle the utility
-      // class as well; the attribute keeps the semantic state for tests and assistive technology.
-      wrapper.classList.toggle("hidden", !active);
       input.disabled = !active;
+      wrapper.classList.toggle("opacity-60", !active);
+      wrapper.dataset.fireSwrInactive = active ? "0" : "1";
     });
   }
 

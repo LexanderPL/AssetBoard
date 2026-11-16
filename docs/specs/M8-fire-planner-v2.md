@@ -203,8 +203,8 @@ the payoff year onward; it is not added on top. An ignored loan has no drop.
 - **Plan progress:** starting portfolio divided by net worth at FIRE, shown as a percentage
   with the definition; `—` when FIRE is never reached. **Today's-money progress** is removed.
 - **Sustainability:** depletion age and lowest net worth after income stops; nominal.
-- **No real/today's-money fields or columns.** CSV, charts, sensitivity and comparison-free
-  pages export/show nominal values only.
+- **No real/today's-money fields or columns.** Charts, sensitivity and the result pages show
+  nominal values only.
 
 ---
 
@@ -586,7 +586,7 @@ breakdown. No client-side projection.
   the saved-plan sensitivity panel. It has no form, no inputs and no preview hooks, and does not
   load `fire.js`. Editors see **Edit plan** (not on a currency mismatch); viewers see no edit or
   reset control. CSV and sensitivity stay viewer-accessible; CSV is hidden when the projection is
-  blocked.
+  blocked. F8.15 later removed the CSV action and its routes.
 - **Editor.** `GET /fire/edit` is editor-only and always separate. It shows the overview/results
   first, then one form with every plan field, the three amount suggestion cards and the existing
   adjustments table. `POST /fire/edit/preview` returns the results fragment for the HTMX live
@@ -816,6 +816,8 @@ the UI and user docs.
 - **Compatibility.** No model, migration, archive-format, dependency or loan-math change.
   F8.10 view/edit, F8.11 adjustments, F8.12 live loans, roles, CSRF, query budgets and tenant
   isolation are unchanged. Existing archives remain 2.1-compatible.
+- **Superseded by F8.15.** The results CSV delivered by F8.3 and made nominal here was removed in
+  F8.15; the projection, results and archive did not change.
 - **Tests and docs.** Unit tests cover the new row/metric shape, golden FIRE number/progress,
   undefined states, zero expenses, loan-driven metric changes, nominal charts and CSV, and
   property invariants. Web tests cover the removed controls/query/links, metric copy, Polish
@@ -898,6 +900,126 @@ unchanged.
   390/1440 widths and CSP. `docs/fire.md`, §1, §3 and §10 were updated. No model, migration,
   archive, dependency, loan-math or projection-math change. All tests ran single-core.
 
+### F8.15 — FIRE results and editor cleanup
+
+**Acceptance**
+
+- The obsolete **FIRE plan** overview panel is gone from the view and edit pages. Its horizon,
+  income-stopped and stop-after-horizon warnings move into a compact warning stack above the
+  results or the form, and appear only when the condition is present.
+- The year-by-year table has no **Loan payments** column and no column hint. The loan payoff
+  badge, the **Loans** panel and the projection's loan-payment data stay.
+- The **Download CSV** action is removed. `/fire/results.csv`, the legacy
+  `/fire/{scenario_id}/results.csv` redirect, `web/fire_csv.py` and their tests are deleted. The
+  archive CSV files are unaffected.
+- The adjustments editor is a compact table with Year, Type, Description, Amount and an action
+  column inside a horizontal scroll container, so a 390px page scrolls the table inside its panel.
+  A visible **Remove** control wraps a visually hidden checkbox with the existing
+  `event_remove_<index>` name: removal works without JavaScript, while JavaScript dims a saved
+  row, changes the label to **Undo** and removes an unsaved new row from the DOM. **Save changes**
+  applies saved-row removals; the server parser and `adjustments_present` marker are unchanged.
+- **Plan progress** is a full-width panel directly below the four key metric cards, styled like the
+  loan repayment bar: a large percentage, a **Starting portfolio** / **Net worth at FIRE** legend
+  with formatted amounts, a 32px bar with a success fill and subtle track, a visual cap at 100%
+  and the exact percentage in accessible text. A no-FIRE or non-positive-target state shows a
+  muted bar and an explanation. `role="progressbar"` and the ARIA value attributes stay.
+- The **Loan choices** included/ignored totals line above the results is gone. The
+  understated-expenses warning and the full **Loans** section stay.
+- Unusual rates are confirmed when the plan is saved or created, not with a checkbox. Normal forms
+  contain no confirmation checkbox. Preview shows the unusual-rate warning only when
+  `needs_extreme_confirmation` is true. **Save changes** with a changed unusual rate re-renders the
+  editor with a **Confirm and save** panel and writes nothing before that click. **Create plan**
+  with unusual rates re-renders step 4 with a **Confirm and create plan** panel. The confirmation
+  is tied to the rates shown; changing them asks again, and the wizard review signature still
+  refuses changed values.
+- The withdrawal-rate field stays in both forms. Server markup is visible and enabled for the
+  no-JavaScript fallback; JavaScript disables and dims it unless the rule uses it, without
+  `hidden` or the `hidden` class. A visible note says it is used only with the withdrawal-rate
+  rule. The server hardening from F8.14 is unchanged.
+- The read-only **First projected year** field is removed from Plan inputs; the Currency field
+  stays. The projection still starts in the current year, and the wizard review and table keep
+  their first-year information.
+- No model, migration, archive, dependency, projection-math or loan-math change.
+- Tests cover the removed panels/column/action/field, CSV-route removal, the table editor and
+  removal flow, the progress bar states, loan totals removal, save-time confirmation (including a
+  changed rate after the panel), always-visible withdrawal-rate states, no-JavaScript fallback,
+  390/1440 widths, keyboard/ARIA access, i18n and CSP.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.15 from docs/specs/M8-fire-planner-v2.md: remove the obsolete FIRE overview, CSV
+export, loan-payments table column and first-year field; rebuild adjustments as a slim table
+with visible Remove controls; make Plan progress a large loan-style bar; move unusual-rate
+confirmation to save/create time; and keep the withdrawal-rate field visible but inactive.
+Keep models, migrations, archive, dependencies and projection/loan math unchanged.
+```
+
+### As built (M8.F8.15)
+
+- **Overview and warnings.** `view.html` and `edit.html` no longer render `data-fire-overview`,
+  the heading, the first-year/age/currency line or the adjustment counts. The horizon,
+  income-stopped and stop-after-horizon messages render in `data-fire-warnings` above the results
+  (view) or form (edit), only when present; the `needs_review` banner is unchanged.
+- **Table and loans.** The year-by-year table dropped the **Loan payments** header, cell and
+  footnote. `ProjectionRow.loan_payment`, the payoff badge, the **Loans** panel and chart markers
+  are unchanged. The **Loan choices** totals line (`data-fire-loans-preview`) was removed; the
+  understated-expenses warning still depends on the live loan section.
+- **CSV removed.** The header action, `fire_results_csv`, the legacy `fire_scenario_csv` redirect,
+  `src/assetboard/web/fire_csv.py` and `tests/unit/test_fire_csv.py` were deleted, along with the
+  route tests and documentation links. `/fire/results.csv` and `/fire/{id}/results.csv` now return
+  404. No module imports `fire_csv`. F8.15 supersedes the CSV export delivered by F8.3 and made
+  nominal by F8.13; the workspace archive's `fire_plan.csv`/`fire_events.csv` are unrelated and
+  unchanged.
+- **Adjustments.** `_adjustments_edit.html` is a `sheet` table in an `overflow-x-auto` region with
+  Year, Type, Description, Amount and Action columns. The trailing blank `new` row stays last;
+  **Add an adjustment** clones the `<tr>` template through a `tbody` holder before it. Saved rows
+  and JavaScript-added rows use a visible **Remove** label around a `peer sr-only` checkbox with
+  the existing `event_remove_<index>` name. `fire.js` dims a saved row, changes the label and ARIA
+  name to **Undo**, and removes an unsaved row (and its inline error row) from the DOM. Archived
+  adjustments use the same visible control. The server parser, `adjustments_present`,
+  apply-on-save semantics, inline row errors and archived state are unchanged. The empty-state
+  hint tracks JavaScript-added and removed rows, removing an unsaved row announces that it was
+  removed, and focus still moves to the new row's year field.
+- **Plan progress.** `_metrics.html` renders `data-fire-progress="plan"` directly below the four
+  metric cards. It shows the large percentage, `Starting portfolio` and `Net worth at FIRE`
+  amounts from `projection.inputs.start_portfolio` and `projection.networth_at_fire`, and a
+  32px `viewBox="0 0 100 32"` SVG. The fill is capped at 100% in its width while
+  `aria-valuetext` keeps the exact percentage; `aria-valuenow` is the capped integer. No-FIRE and
+  non-positive-target states render a muted track, `aria-valuetext="Not defined"`, a zero value
+  and an explanation. The duplicate never-FIRE banner and the old “Bar capped at 100%, exact
+  value …” sentence are gone; the undefined note carries the reason and the accessible value
+  keeps the exact percentage for defined values. No arithmetic moved into JavaScript.
+- **Unusual rates.** The checkbox and its error field are gone from `_form_body.html` and the
+  wizard. Preview keeps `data-fire-extreme-warning` only when `needs_extreme_confirmation` is
+  true. The edit save route strips a confirmation unless the posted rate digest matches the one
+  the panel rendered, then re-renders `data-fire-extreme-confirm` with **Confirm and save** and
+  writes only after that button posts the digest plus `extreme_rates_confirmed=1`. The wizard
+  renders the same panel on step 4 with **Confirm and create plan**; the panel posts
+  `extreme_rates_confirmed=1` with `go=create`, while the review signature still forces a fresh
+  review (and a fresh confirmation) when values changed. The review's own unusual-rate warning
+  is not repeated beside the confirmation panel. Copy now says “Confirm it to save the plan” /
+  “Confirm it to create the plan” and keeps the unusual-range explanation.
+- **Withdrawal rate.** Both forms keep the field with its `data-fire-swr-field` wrapper and add
+  `data-fire-swr-note`. Server markup is visible and enabled. `fire.js` sets `input.disabled`,
+  toggles `opacity-60` and `data-fire-swr-inactive`, and never sets `hidden` or the `hidden`
+  class. The server still reads `swr` only for the withdrawal-rate rule.
+- **First year.** The read-only **First projected year** input was removed from `_form_body.html`;
+  **Currency** remains. The wizard review, the table and the projection's current-year start are
+  unchanged.
+- **Tests and docs.** Web tests cover the removed overview/CSV/loan preview/column/first-year
+  field, all three compact warnings and their absence, the slim table and hidden checkbox, the
+  save-time confirmation (including a changed rate after the panel and a forged or missing
+  digest), preview warning scope, the defined/capped/undefined progress states with both legend
+  amounts, the no-nag case for an unchanged unusual saved rate, SWR notes and Polish copy.
+  Chromium covers add/remove/undo/remove-unsaved and the trailing blank row, keyboard Space on
+  the hidden checkbox, saved-row apply-on-save, no-JavaScript removal, the 390px in-panel table
+  scroll, the always-visible disabled/enabled SWR field, the no-JavaScript edit fallback, CSP and
+  1440 widths. `docs/fire.md`, this section, the overview range and the F8.13 superseded note
+  were updated. No model, migration, archive, dependency, projection-math or loan-math change.
+  All tests ran single-core.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -932,6 +1054,7 @@ unchanged.
 5. F8.12 — live loans.
 6. F8.13 — nominal-only results and wording.
 7. F8.14 — FIRE setup and input polish.
+8. F8.15 — FIRE results and editor cleanup.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

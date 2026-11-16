@@ -2990,15 +2990,8 @@ msgstr ""
 msgid "Create the plan first, then add adjustments."
 msgstr "Najpierw utwórz plan, a potem dodaj korekty."
 
-msgid "A rate is outside the usual range. Tick the confirmation box to save it."
-msgstr ""
-"Jedna ze stóp wykracza poza zwykły zakres. Zaznacz pole potwierdzenia, "
-"aby zapisać."
-
-msgid "Tick the confirmation box only when you mean the unusual rates."
-msgstr ""
-"Zaznacz pole potwierdzenia tylko wtedy, gdy naprawdę chcesz użyć "
-"nietypowych stóp."
+msgid "A rate is outside the usual range. Confirm it to save the plan."
+msgstr "Jedna ze stóp wykracza poza zwykły zakres. Potwierdź ją, aby zapisać plan."
 
 msgid "The saved plan cannot be projected."
 msgstr "Nie można wykonać prognozy zapisanego planu."
@@ -6492,19 +6485,19 @@ msgstr ""
 " zostanie ponownie zastosowana, gdy zapiszesz horyzont, który ją obejmie."
 " Podgląd już ją uwzględnia."
 
+msgid "Undo"
+msgstr "Cofnij"
+
 #, python-format
-msgid "the archived adjustment from %(year)d"
-msgstr "zarchiwizowaną korektę z roku %(year)d"
+msgid "Remove the archived adjustment from %(year)d"
+msgstr "Usuń zarchiwizowaną korektę z roku %(year)d"
+
+#, python-format
+msgid "Undo removal of the archived adjustment from %(year)d"
+msgstr "Cofnij usunięcie zarchiwizowanej korekty z roku %(year)d"
 
 msgid "Will be deleted when you save."
 msgstr "Zostanie usunięta po zapisaniu."
-
-msgid "New adjustment"
-msgstr "Nowa korekta"
-
-#, python-format
-msgid "Adjustment %(num)d"
-msgstr "Korekta %(num)d"
 
 msgid "Description"
 msgstr "Opis"
@@ -6513,11 +6506,17 @@ msgstr "Opis"
 msgid "Amount (%(currency)s)"
 msgstr "Kwota (%(currency)s)"
 
-msgid "this adjustment"
-msgstr "tę korektę"
+msgid "Remove this adjustment"
+msgstr "Usuń tę korektę"
+
+msgid "Undo removal of this adjustment"
+msgstr "Cofnij usunięcie tej korekty"
 
 msgid "Will be removed when you save."
 msgstr "Zostanie usunięta po zapisaniu."
+
+msgid "Adjustment removed."
+msgstr "Usunięto korektę."
 
 msgid "Adjustments"
 msgstr "Korekty"
@@ -6584,9 +6583,11 @@ msgstr ""
 "Nie ma jeszcze korekt. Użyj nowego wiersza poniżej, aby dodać jednorazowy"
 " przepływ gotówki lub trwałą zmianę."
 
-#, python-format
-msgid "Adjustment %(num)s"
-msgstr "Korekta %(num)s"
+msgid "Adjustments editor"
+msgstr "Edytor korekt"
+
+msgid "Action"
+msgstr "Działanie"
 
 msgid "Adjustment added."
 msgstr "Dodano korektę."
@@ -6657,12 +6658,6 @@ msgstr "Dane wykresu wydatków i zysku"
 msgid "Plan"
 msgstr "Plan"
 
-msgid "First projected year"
-msgstr "Pierwszy prognozowany rok"
-
-msgid "The projection always starts in the current calendar year."
-msgstr "Prognoza zawsze zaczyna się w bieżącym roku kalendarzowym."
-
 msgid "Snapshotted from the workspace base currency when the plan is created."
 msgstr "Kopia waluty bazowej obszaru roboczego z chwili utworzenia planu."
 
@@ -6726,16 +6721,8 @@ msgstr ""
 "Część portfela wypłacana w pierwszym roku emerytury. 4%% to przykład, a "
 "nie reguła."
 
-msgid "I confirm these unusual rates are intentional"
-msgstr "Potwierdzam, że te nietypowe stopy są zamierzone"
-
-#, python-format
-msgid ""
-"Unusual means inflation outside 0–10%%, return above inflation outside "
-"−2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
-msgstr ""
-"Nietypowe oznacza inflację poza 0–10%%, zwrot powyżej inflacji poza "
-"−2–8%%, wzrost dochodów poza 0–10%% lub stopę wypłat poza 2–6%%."
+msgid "Used only when the independence rule is Withdrawal rate."
+msgstr "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat."
 
 msgid "Starting amounts"
 msgstr "Kwoty początkowe"
@@ -6866,10 +6853,6 @@ msgstr ""
 "Aktywne kredyty są uwzględniane w planie po jego utworzeniu. Możesz "
 "zignorować kredyt w trybie edycji."
 
-#, python-format
-msgid "Bar capped at 100%%, exact value %(value)s"
-msgstr "Pasek ograniczony do 100%%, dokładna wartość %(value)s"
-
 msgid "Key metrics"
 msgstr "Najważniejsze wskaźniki"
 
@@ -6953,30 +6936,33 @@ msgstr ""
 "Portfel początkowy podzielony przez prognozowaną nominalną wartość netto "
 "w roku FIRE. 100%% oznacza, że plan osiągnął docelową wartość netto FIRE."
 
+msgid "Net worth at FIRE"
+msgstr "Majątek netto w momencie FIRE"
+
+msgid "Not defined"
+msgstr "Nieokreślona"
+
+msgid "Not defined: this plan does not reach FIRE."
+msgstr "Nieokreślony: ten plan nie osiąga FIRE."
+
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr "Nieokreślony: wartość netto w roku FIRE nie jest dodatnia."
-
-#, python-format
-msgid ""
-"With these inputs, the portfolio never reaches the withdrawal-rate target"
-" before age %(age)d."
-msgstr ""
-"Przy tych danych portfel nigdy nie osiąga celu stopy wypłat przed wiekiem"
-" %(age)d."
-
-#, python-format
-msgid "With these inputs, returns never cover expenses before age %(age)d."
-msgstr "Przy tych danych zyski nigdy nie pokrywają wydatków przed wiekiem %(age)d."
 
 msgid "Preview of unsaved changes."
 msgstr "Podgląd niezapisanych zmian."
 
-msgid ""
-"A changed rate is outside the usual range. Tick the confirmation box "
-"before saving."
+msgid "A changed rate is outside the usual range. Confirm it to save the plan."
 msgstr ""
-"Zmieniona stopa wykracza poza zwykły zakres. Przed zapisaniem zaznacz "
-"pole potwierdzenia."
+"Zmieniona stopa wykracza poza zwykły zakres. Potwierdź ją, aby zapisać "
+"plan."
+
+#, python-format
+msgid ""
+"Unusual means inflation outside 0–10%%, return above inflation outside "
+"−2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
+msgstr ""
+"Nietypowe oznacza inflację poza 0–10%%, zwrot powyżej inflacji poza "
+"−2–8%%, wzrost dochodów poza 0–10%% lub stopę wypłat poza 2–6%%."
 
 msgid "The projection is unavailable"
 msgstr "Prognoza jest niedostępna"
@@ -6986,20 +6972,6 @@ msgstr "Nie można prognozować planu."
 
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr "Zmień poniżej wartości planu; prognoza aktualizuje się podczas edycji."
-
-msgid "Loan choices in this preview:"
-msgstr "Wybory kredytów w tym podglądzie:"
-
-msgid "Loan choices:"
-msgstr "Wybory kredytów:"
-
-#, python-format
-msgid "Included loans: %(amount)s a year"
-msgstr "Uwzględnione kredyty: %(amount)s rocznie"
-
-#, python-format
-msgid "Ignored loans: %(amount)s a year"
-msgstr "Ignorowane kredyty: %(amount)s rocznie"
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
@@ -7179,9 +7151,6 @@ msgstr "Prognoza rok po roku"
 msgid "Year-by-year projection in nominal money"
 msgstr "Prognoza rok po roku w pieniądzach nominalnych"
 
-msgid "Loan payments"
-msgstr "Raty kredytów"
-
 msgid "Net saving"
 msgstr "Oszczędności netto"
 
@@ -7208,15 +7177,6 @@ msgid ""
 msgstr ""
 "Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
 " wyczerpany wiersz jest oznaczony na czerwono."
-
-msgid ""
-"Loan payments are the part of that year's expenses still attributable to "
-"loans. Included loans stop counting at their payoff year; ignored loans "
-"continue through the horizon."
-msgstr ""
-"Raty kredytów to część wydatków danego roku nadal związana z kredytami. "
-"Uwzględnione kredyty przestają być liczone w roku spłaty; ignorowane są "
-"liczone przez cały horyzont."
 
 msgid "Choose your FIRE plan"
 msgstr "Wybierz plan FIRE"
@@ -7286,20 +7246,6 @@ msgstr ""
 "Ten plan został przekształcony ze starego formatu. Sprawdź poniższe "
 "wartości i zapisz, aby je potwierdzić."
 
-msgid "FIRE plan"
-msgstr "Plan FIRE"
-
-#, python-format
-msgid "First year %(year)d · age %(age)d · currency %(currency)s"
-msgstr "Pierwszy rok %(year)d · wiek %(age)d · waluta %(currency)s"
-
-#, python-format
-msgid "%(num)d archived"
-msgid_plural "%(num)d archived"
-msgstr[0] "%(num)d zarchiwizowana"
-msgstr[1] "%(num)d zarchiwizowane"
-msgstr[2] "%(num)d zarchiwizowanych"
-
 msgid ""
 "The horizon age is not after your current age. Raise it below to project "
 "the plan."
@@ -7322,6 +7268,19 @@ msgstr ""
 "Dochód kończy się po horyzoncie planu. Plan jest zapisany, ale prognoza "
 "nie ma lat pracy po wieku %(horizon)d."
 
+msgid "Confirm the unusual rates"
+msgstr "Potwierdź nietypowe stopy"
+
+msgid ""
+"Nothing is saved until you press Confirm and save. The confirmation "
+"applies to the rates currently shown."
+msgstr ""
+"Nic nie zostanie zapisane, dopóki nie naciśniesz „Potwierdź i zapisz”. "
+"Potwierdzenie dotyczy aktualnie wyświetlanych stóp."
+
+msgid "Confirm and save"
+msgstr "Potwierdź i zapisz"
+
 msgid "Plan inputs"
 msgstr "Dane planu"
 
@@ -7340,6 +7299,9 @@ msgstr "Odrzuć zmiany"
 
 msgid "Unsaved changes"
 msgstr "Niezapisane zmiany"
+
+msgid "FIRE plan"
+msgstr "Plan FIRE"
 
 msgid "Setup cancelled"
 msgstr "Anulowano konfigurację"
@@ -7402,9 +7364,6 @@ msgstr "Zawiera plan i jego korekty."
 #, python-format
 msgid "To confirm, type %(word)s:"
 msgstr "Aby potwierdzić, wpisz %(word)s:"
-
-msgid "Download CSV"
-msgstr "Pobierz CSV"
 
 msgid "Edit plan"
 msgstr "Edytuj plan"
@@ -7508,6 +7467,9 @@ msgstr ""
 "Z Twojego profilu. Ten plan zapisuje własny rok urodzenia; późniejsza "
 "zmiana profilu nie zmieni tego planu."
 
+msgid "The projection always starts in the current calendar year."
+msgstr "Prognoza zawsze zaczyna się w bieżącym roku kalendarzowym."
+
 #, python-format
 msgid "You are %(age)d in %(year)d."
 msgstr "W %(year)d: wiek %(age)d."
@@ -7594,8 +7556,28 @@ msgstr ""
 "Dochód kończy się po horyzoncie planu; prognoza nie ma lat pracy po wieku"
 " %(horizon)d."
 
+msgid "A changed rate is outside the usual range. Confirm it to create the plan."
+msgstr ""
+"Zmieniona stopa wykracza poza zwykły zakres. Potwierdź ją, aby utworzyć "
+"plan."
+
 msgid "Adjustments can be added after the plan is created."
 msgstr "Korekty można dodać po utworzeniu planu."
+
+msgid "A rate is outside the usual range. Confirm it to create the plan."
+msgstr ""
+"Jedna ze stóp wykracza poza zwykły zakres. Potwierdź ją, aby utworzyć "
+"plan."
+
+msgid ""
+"Nothing is saved until you press Confirm and create plan. The "
+"confirmation applies to the values shown in the review."
+msgstr ""
+"Nic nie zostanie zapisane, dopóki nie naciśniesz „Potwierdź i utwórz "
+"plan”. Potwierdzenie dotyczy wartości pokazanych w podsumowaniu."
+
+msgid "Confirm and create plan"
+msgstr "Potwierdź i utwórz plan"
 
 msgid ""
 "Projections are illustrative and not financial advice. The starting rates"
@@ -7692,6 +7674,9 @@ msgstr ""
 "przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
 "ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
 "chroniony opis może być za długi do ponownego importu."
+
+msgid "Download CSV"
+msgstr "Pobierz CSV"
 
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"
@@ -8615,9 +8600,6 @@ msgstr "Wagi muszą sumować się dokładnie do 100%%."
 
 msgid "Save instrument"
 msgstr "Zapisz instrument"
-
-msgid "Undo"
-msgstr "Cofnij"
 
 msgid "Back to instruments"
 msgstr "Wróć do instrumentów"
@@ -12699,9 +12681,6 @@ msgstr[0] "%(num)d wiersz"
 msgstr[1] "%(num)d wiersze"
 msgstr[2] "%(num)d wierszy"
 
-msgid "Action"
-msgstr "Działanie"
-
 msgid "Map to an existing category"
 msgstr "Przypisz do istniejącej kategorii"
 
@@ -14853,4 +14832,86 @@ msgstr "Usuń obszar roboczy…"
 #~ "samodzielnie. Kliknij Użyj proponowanej "
 #~ "wartości, aby ją skopiować, a potem "
 #~ "zmień ją, jeśli chcesz."
+
+#~ msgid "Tick the confirmation box only when you mean the unusual rates."
+#~ msgstr ""
+#~ "Zaznacz pole potwierdzenia tylko wtedy, "
+#~ "gdy naprawdę chcesz użyć nietypowych "
+#~ "stóp."
+
+#~ msgid "New adjustment"
+#~ msgstr "Nowa korekta"
+
+#~ msgid "Adjustment %(num)d"
+#~ msgstr "Korekta %(num)d"
+
+#~ msgid "Adjustment %(num)s"
+#~ msgstr "Korekta %(num)s"
+
+#~ msgid "First projected year"
+#~ msgstr "Pierwszy prognozowany rok"
+
+#~ msgid "Bar capped at 100%%, exact value %(value)s"
+#~ msgstr "Pasek ograniczony do 100%%, dokładna wartość %(value)s"
+
+#~ msgid "Loan choices in this preview:"
+#~ msgstr "Wybory kredytów w tym podglądzie:"
+
+#~ msgid "Loan choices:"
+#~ msgstr "Wybory kredytów:"
+
+#~ msgid "Included loans: %(amount)s a year"
+#~ msgstr "Uwzględnione kredyty: %(amount)s rocznie"
+
+#~ msgid "Ignored loans: %(amount)s a year"
+#~ msgstr "Ignorowane kredyty: %(amount)s rocznie"
+
+#~ msgid "Loan payments"
+#~ msgstr "Raty kredytów"
+
+#~ msgid ""
+#~ "Loan payments are the part of that"
+#~ " year's expenses still attributable to "
+#~ "loans. Included loans stop counting at"
+#~ " their payoff year; ignored loans "
+#~ "continue through the horizon."
+#~ msgstr ""
+#~ "Raty kredytów to część wydatków danego"
+#~ " roku nadal związana z kredytami. "
+#~ "Uwzględnione kredyty przestają być liczone "
+#~ "w roku spłaty; ignorowane są liczone "
+#~ "przez cały horyzont."
+
+#~ msgid "First year %(year)d · age %(age)d · currency %(currency)s"
+#~ msgstr "Pierwszy rok %(year)d · wiek %(age)d · waluta %(currency)s"
+
+#~ msgid "%(num)d archived"
+#~ msgid_plural "%(num)d archived"
+#~ msgstr[0] "%(num)d zarchiwizowana"
+#~ msgstr[1] "%(num)d zarchiwizowane"
+#~ msgstr[2] "%(num)d zarchiwizowanych"
+
+#~ msgid ""
+#~ "Bar capped at 100%%, exact value "
+#~ "%(value)s; starting portfolio %(start)s; net"
+#~ " worth at FIRE %(target)s"
+#~ msgstr ""
+#~ "Pasek ograniczony do 100%%, dokładna "
+#~ "wartość %(value)s; portfel początkowy "
+#~ "%(start)s; majątek netto w momencie FIRE"
+#~ " %(target)s"
+
+#~ msgid ""
+#~ "With these inputs, the portfolio never"
+#~ " reaches the withdrawal-rate target "
+#~ "before age %(age)d."
+#~ msgstr ""
+#~ "Przy tych danych portfel nigdy nie "
+#~ "osiąga celu stopy wypłat przed wiekiem"
+#~ " %(age)d."
+
+#~ msgid "With these inputs, returns never cover expenses before age %(age)d."
+#~ msgstr ""
+#~ "Przy tych danych zyski nigdy nie "
+#~ "pokrywają wydatków przed wiekiem %(age)d."
 

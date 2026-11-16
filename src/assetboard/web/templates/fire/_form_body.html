@@ -5,7 +5,6 @@
   <section id="plan" class="panel p-6 sm:p-7" aria-labelledby="plan-heading">
     <h2 id="plan-heading" class="text-base font-semibold">{{ _("Plan") }}</h2>
     <div class="mt-4 grid gap-4 sm:grid-cols-2">
-      <label class="grid gap-1 text-sm font-medium">{{ _("First projected year") }}<input value="{{ current_year }}" readonly class="{{ input_class }} font-normal text-muted"><span class="text-xs font-normal text-muted">{{ _("The projection always starts in the current calendar year.") }}</span></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Currency") }}<input value="{{ values.get('currency', currency) }}" readonly class="{{ input_class }} font-normal text-muted"><span class="text-xs font-normal text-muted">{{ _("Snapshotted from the workspace base currency when the plan is created.") }}</span></label>
       <div class="grid gap-1" data-fire-field="birth_year">
         {{ field_label("birth_year", _("Birth year")) }}
@@ -53,11 +52,8 @@
         {{ field_label("swr", _("Withdrawal rate (%%)"), _("Share of the portfolio withdrawn in the first year of retirement. 4%% is an example, not a rule.")) }}
         <input id="swr" name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr", "swr-hint") }}>
         {{ field_error(error_field, "swr", error) }}
+        <span class="text-xs font-normal text-muted" data-fire-swr-note>{{ _("Used only when the independence rule is Withdrawal rate.") }}</span>
       </div>
-    </div>
-    <div class="mt-5 border-t border-line pt-4">
-      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="extreme_rates_confirmed" value="1"{% if values.get('extreme_rates_confirmed') == '1' %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{{ field_attrs(error_field, "extreme_rates_confirmed") }}> <span>{{ _("I confirm these unusual rates are intentional") }}<span class="block text-xs text-muted">{{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</span></span></label>
-      {{ field_error(error_field, "extreme_rates_confirmed", error) }}
     </div>
   </section>
 

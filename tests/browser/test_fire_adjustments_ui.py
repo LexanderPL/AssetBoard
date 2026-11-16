@@ -131,6 +131,12 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             assert page.evaluate("document.activeElement && document.activeElement.name") == (
                 "event_year_1"
             )
+            assert page.evaluate(
+                """() => {
+                  const rows = [...document.querySelectorAll("[data-adjustment-row]")];
+                  return rows.at(-1).hasAttribute("data-new-adjustment-row");
+                }"""
+            )
             rows = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])")
             row = rows.nth(0)
             row.locator('input[name^="event_year_"]').fill("2028")
@@ -153,6 +159,14 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
                 new_row.locator('input[name^="event_amount_"]').fill(amount)
                 new_row.locator('input[name^="event_label_"]').fill(label)
             expect(rows).to_have_count(4)
+
+            # An unsaved row is removed from the DOM immediately, without a marker.
+            page.locator("[data-add-adjustment]").click()
+            expect(rows).to_have_count(5)
+            rows.last.locator("[data-adjustment-remove-text]").click()
+            expect(rows).to_have_count(4)
+            expect(page.locator("[data-adjustment-status]")).to_have_text("Adjustment removed.")
+            assert page.locator('input[name^="event_remove_"]').count() == 4
 
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
@@ -181,19 +195,31 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("Bonus updated")
             expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("€1,500.00")
 
-            # Remove one saved row with the checkbox, not DOM deletion.
+            # Remove one saved row with its visible Remove button, not DOM deletion. The hidden
+            # checkbox is focusable; Space toggles it and the label becomes Undo.
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-edit]").click()
             rows = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])")
             removed = rows.filter(has=page.locator('input[name^="event_label_"][value="Rent"]'))
-            removed.locator("[data-adjustment-remove]").check()
+            checkbox = removed.locator("[data-adjustment-remove]")
+            checkbox.focus()
+            page.keyboard.press("Space")
+            expect(removed.locator("[data-adjustment-remove-text]")).to_have_text("Undo")
+            expect(checkbox).to_have_attribute("aria-label", "Undo removal of this adjustment")
             expect(removed.locator("[data-adjustment-removed-note]")).to_be_visible()
+            expect(removed).to_have_attribute("data-removed", "1")
             expect(page.locator("[data-fire-dirty-status]")).to_be_visible()
+            page.keyboard.press("Space")
+            expect(removed.locator("[data-adjustment-remove-text]")).to_have_text("Remove")
+            expect(checkbox).to_have_attribute("aria-label", "Remove this adjustment")
+            expect(removed.locator("[data-adjustment-removed-note]")).to_be_hidden()
+            removed.locator("[data-adjustment-remove-text]").click()
+            expect(removed.locator("[data-adjustment-remove-text]")).to_have_text("Undo")
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             expect(page.locator("[data-fire-adjustments-view]")).not_to_contain_text("Rent")
 
-            # Archived history is read-only and removed only by its checkbox.
+            # Archived history is read-only and removed only by its visible Remove control.
             plan_id = _plan_id(app)
             with app.state.session_factory() as session:
                 workspace_id = session.scalars(
@@ -206,10 +232,10 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             expect(archived).to_be_visible()
 
             # Remove every active row; the saved archived history stays and the editor says so.
-            removals = page.locator("[data-adjustment-row] [data-adjustment-remove]")
+            removals = page.locator("[data-adjustment-row] [data-adjustment-remove-text]")
             expect(removals).to_have_count(3)
             for index in range(removals.count()):
-                removals.nth(index).check()
+                removals.nth(index).click()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             expect(page.locator("[data-fire-adjustments-empty]")).to_contain_text(
@@ -224,7 +250,8 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             )
             page.locator("[data-fire-archived-adjustments] summary").click()
             archived = page.locator("[data-fire-archived-adjustment]").filter(has_text="Old bonus")
-            archived.locator("[data-adjustment-archived-remove]").check()
+            archived.locator("[data-adjustment-remove-text]").click()
+            expect(archived.locator("[data-adjustment-remove-text]")).to_have_text("Undo")
             expect(archived.locator("[data-adjustment-removed-note]")).to_be_visible()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
@@ -233,6 +260,37 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
                 "No adjustments yet"
             )
 
+            # Without JavaScript the visible Remove control still toggles its wrapped checkbox,
+            # and Save changes applies the removal.
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-edit]").click()
+            page.locator("[data-add-adjustment]").click()
+            no_js_row = page.locator("[data-adjustment-row]:not([data-new-adjustment-row])").last
+            no_js_row.locator('input[name^="event_year_"]').fill("2032")
+            no_js_row.locator('select[name^="event_kind_"]').select_option("cash")
+            no_js_row.locator('input[name^="event_amount_"]').fill("250")
+            no_js_row.locator('input[name^="event_label_"]').fill("No JS")
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-save]").click()
+            expect(page.locator("[data-fire-adjustments-view]")).to_contain_text("No JS")
+
+            storage = context.storage_state()
+            no_js_context = browser.new_context(
+                viewport={"width": 1440, "height": 900},
+                java_script_enabled=False,
+                storage_state=storage,
+            )
+            no_js_page = no_js_context.new_page()
+            no_js_page.goto(f"{base}/fire/edit", wait_until="load")
+            no_js_row = no_js_page.locator("[data-adjustment-row]").filter(
+                has=no_js_page.locator('input[name^="event_label_"][value="No JS"]')
+            )
+            no_js_row.locator("[data-adjustment-remove-text]").click()
+            with no_js_page.expect_navigation(wait_until="load"):
+                no_js_page.locator("[data-fire-save]").click()
+            expect(no_js_page.locator("[data-fire-adjustments-view]")).not_to_contain_text("No JS")
+            no_js_context.close()
+
             # Mobile layout stays inside the viewport in both modes.
             page.set_viewport_size({"width": 390, "height": 844})
             page.wait_for_timeout(200)
@@ -240,6 +298,13 @@ def test_unified_adjustments_in_a_browser(tmp_path: Path) -> None:
             page.goto(f"{base}/fire/edit", wait_until="networkidle")
             page.wait_for_timeout(200)
             _no_page_overflow(page)
+            overflow = page.evaluate(
+                """() => {
+                  const holder = document.querySelector("[data-fire-adjustments] .overflow-x-auto");
+                  return holder ? {scroll: holder.scrollWidth, client: holder.clientWidth} : null;
+                }"""
+            )
+            assert overflow is not None and overflow["scroll"] > overflow["client"], overflow
             page.goto(f"{base}/fire", wait_until="networkidle")
             page.wait_for_timeout(200)
             _no_page_overflow(page)

@@ -2839,10 +2839,7 @@ msgstr ""
 msgid "Create the plan first, then add adjustments."
 msgstr ""
 
-msgid "A rate is outside the usual range. Tick the confirmation box to save it."
-msgstr ""
-
-msgid "Tick the confirmation box only when you mean the unusual rates."
+msgid "A rate is outside the usual range. Confirm it to save the plan."
 msgstr ""
 
 msgid "The saved plan cannot be projected."
@@ -6005,19 +6002,18 @@ msgid ""
 " includes it."
 msgstr ""
 
+msgid "Undo"
+msgstr ""
+
 #, python-format
-msgid "the archived adjustment from %(year)d"
+msgid "Remove the archived adjustment from %(year)d"
+msgstr ""
+
+#, python-format
+msgid "Undo removal of the archived adjustment from %(year)d"
 msgstr ""
 
 msgid "Will be deleted when you save."
-msgstr ""
-
-#, fuzzy
-msgid "New adjustment"
-msgstr ""
-
-#, python-format
-msgid "Adjustment %(num)d"
 msgstr ""
 
 msgid "Description"
@@ -6027,10 +6023,17 @@ msgstr ""
 msgid "Amount (%(currency)s)"
 msgstr ""
 
-msgid "this adjustment"
+#, fuzzy
+msgid "Remove this adjustment"
+msgstr ""
+
+msgid "Undo removal of this adjustment"
 msgstr ""
 
 msgid "Will be removed when you save."
+msgstr ""
+
+msgid "Adjustment removed."
 msgstr ""
 
 msgid "Adjustments"
@@ -6082,8 +6085,10 @@ msgid ""
 " a permanent change."
 msgstr ""
 
-#, python-format
-msgid "Adjustment %(num)s"
+msgid "Adjustments editor"
+msgstr ""
+
+msgid "Action"
 msgstr ""
 
 msgid "Adjustment added."
@@ -6150,12 +6155,6 @@ msgstr ""
 msgid "Plan"
 msgstr ""
 
-msgid "First projected year"
-msgstr ""
-
-msgid "The projection always starts in the current calendar year."
-msgstr ""
-
 msgid "Snapshotted from the workspace base currency when the plan is created."
 msgstr ""
 
@@ -6211,13 +6210,7 @@ msgid ""
 "an example, not a rule."
 msgstr ""
 
-msgid "I confirm these unusual rates are intentional"
-msgstr ""
-
-#, python-format
-msgid ""
-"Unusual means inflation outside 0–10%%, return above inflation outside "
-"−2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
+msgid "Used only when the independence rule is Withdrawal rate."
 msgstr ""
 
 msgid "Starting amounts"
@@ -6333,10 +6326,6 @@ msgid ""
 "in edit mode."
 msgstr ""
 
-#, python-format
-msgid "Bar capped at 100%%, exact value %(value)s"
-msgstr ""
-
 msgid "Key metrics"
 msgstr ""
 
@@ -6406,25 +6395,28 @@ msgid ""
 "100%% means the plan has reached its FIRE net-worth target."
 msgstr ""
 
+msgid "Net worth at FIRE"
+msgstr ""
+
+msgid "Not defined"
+msgstr ""
+
+msgid "Not defined: this plan does not reach FIRE."
+msgstr ""
+
 msgid "Not defined: net worth at FIRE is not positive."
-msgstr ""
-
-#, python-format
-msgid ""
-"With these inputs, the portfolio never reaches the withdrawal-rate target"
-" before age %(age)d."
-msgstr ""
-
-#, python-format
-msgid "With these inputs, returns never cover expenses before age %(age)d."
 msgstr ""
 
 msgid "Preview of unsaved changes."
 msgstr ""
 
+msgid "A changed rate is outside the usual range. Confirm it to save the plan."
+msgstr ""
+
+#, python-format
 msgid ""
-"A changed rate is outside the usual range. Tick the confirmation box "
-"before saving."
+"Unusual means inflation outside 0–10%%, return above inflation outside "
+"−2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
 msgstr ""
 
 msgid "The projection is unavailable"
@@ -6434,20 +6426,6 @@ msgid "The plan cannot be projected."
 msgstr ""
 
 msgid "Change the plan values below; the projection updates as you edit."
-msgstr ""
-
-msgid "Loan choices in this preview:"
-msgstr ""
-
-msgid "Loan choices:"
-msgstr ""
-
-#, python-format
-msgid "Included loans: %(amount)s a year"
-msgstr ""
-
-#, python-format
-msgid "Ignored loans: %(amount)s a year"
 msgstr ""
 
 msgid ""
@@ -6600,9 +6578,6 @@ msgstr ""
 msgid "Year-by-year projection in nominal money"
 msgstr ""
 
-msgid "Loan payments"
-msgstr ""
-
 msgid "Net saving"
 msgstr ""
 
@@ -6624,12 +6599,6 @@ msgstr ""
 msgid ""
 "FIRE rows are highlighted. Rows after income stops are muted; a depleted "
 "row is marked in red."
-msgstr ""
-
-msgid ""
-"Loan payments are the part of that year's expenses still attributable to "
-"loans. Included loans stop counting at their payoff year; ignored loans "
-"continue through the horizon."
 msgstr ""
 
 msgid "Choose your FIRE plan"
@@ -6687,19 +6656,6 @@ msgid ""
 "save to confirm them."
 msgstr ""
 
-msgid "FIRE plan"
-msgstr ""
-
-#, python-format
-msgid "First year %(year)d · age %(age)d · currency %(currency)s"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d archived"
-msgid_plural "%(num)d archived"
-msgstr[0] ""
-msgstr[1] ""
-
 msgid ""
 "The horizon age is not after your current age. Raise it below to project "
 "the plan."
@@ -6714,6 +6670,17 @@ msgstr ""
 msgid ""
 "Income stops after the plan's horizon. The plan is saved, but the "
 "projection has no working years beyond age %(horizon)d."
+msgstr ""
+
+msgid "Confirm the unusual rates"
+msgstr ""
+
+msgid ""
+"Nothing is saved until you press Confirm and save. The confirmation "
+"applies to the rates currently shown."
+msgstr ""
+
+msgid "Confirm and save"
 msgstr ""
 
 msgid "Plan inputs"
@@ -6731,6 +6698,9 @@ msgid "Discard changes"
 msgstr ""
 
 msgid "Unsaved changes"
+msgstr ""
+
+msgid "FIRE plan"
 msgstr ""
 
 msgid "Setup cancelled"
@@ -6783,9 +6753,6 @@ msgstr ""
 
 #, python-format
 msgid "To confirm, type %(word)s:"
-msgstr ""
-
-msgid "Download CSV"
 msgstr ""
 
 msgid "Edit plan"
@@ -6872,6 +6839,9 @@ msgid ""
 "profile later does not change this plan."
 msgstr ""
 
+msgid "The projection always starts in the current calendar year."
+msgstr ""
+
 #, python-format
 msgid "You are %(age)d in %(year)d."
 msgstr ""
@@ -6945,7 +6915,21 @@ msgid ""
 "years beyond age %(horizon)d."
 msgstr ""
 
+msgid "A changed rate is outside the usual range. Confirm it to create the plan."
+msgstr ""
+
 msgid "Adjustments can be added after the plan is created."
+msgstr ""
+
+msgid "A rate is outside the usual range. Confirm it to create the plan."
+msgstr ""
+
+msgid ""
+"Nothing is saved until you press Confirm and create plan. The "
+"confirmation applies to the values shown in the review."
+msgstr ""
+
+msgid "Confirm and create plan"
 msgstr ""
 
 msgid ""
@@ -7027,6 +7011,9 @@ msgid ""
 "a comma or semicolon inside it, so that a spreadsheet does not run them "
 "as formulas. Such values then differ from the stored ones, and a "
 "protected description may be too long to import again."
+msgstr ""
+
+msgid "Download CSV"
 msgstr ""
 
 msgid "Smallest amount"
@@ -7871,9 +7858,6 @@ msgid "Weights must total exactly 100%%."
 msgstr ""
 
 msgid "Save instrument"
-msgstr ""
-
-msgid "Undo"
 msgstr ""
 
 msgid "Back to instruments"
@@ -11590,9 +11574,6 @@ msgid_plural "%(num)d rows"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Action"
-msgstr ""
-
 msgid "Map to an existing category"
 msgstr ""
 
@@ -13979,5 +13960,90 @@ msgstr ""
 #~ "does not model taxes separately. Nothing"
 #~ " is saved until you press Create "
 #~ "plan."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A rate is outside the usual range."
+#~ " Tick the confirmation box to save"
+#~ " it."
+#~ msgstr ""
+
+#~ msgid "Tick the confirmation box only when you mean the unusual rates."
+#~ msgstr ""
+
+#~ msgid "the archived adjustment from %(year)d"
+#~ msgstr ""
+
+#~ msgid "New adjustment"
+#~ msgstr ""
+
+#~ msgid "Adjustment %(num)d"
+#~ msgstr ""
+
+#~ msgid "this adjustment"
+#~ msgstr ""
+
+#~ msgid "Adjustment %(num)s"
+#~ msgstr ""
+
+#~ msgid "First projected year"
+#~ msgstr ""
+
+#~ msgid "I confirm these unusual rates are intentional"
+#~ msgstr ""
+
+#~ msgid "Bar capped at 100%%, exact value %(value)s"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A changed rate is outside the "
+#~ "usual range. Tick the confirmation box"
+#~ " before saving."
+#~ msgstr ""
+
+#~ msgid "Loan choices in this preview:"
+#~ msgstr ""
+
+#~ msgid "Loan choices:"
+#~ msgstr ""
+
+#~ msgid "Included loans: %(amount)s a year"
+#~ msgstr ""
+
+#~ msgid "Ignored loans: %(amount)s a year"
+#~ msgstr ""
+
+#~ msgid "Loan payments"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Loan payments are the part of that"
+#~ " year's expenses still attributable to "
+#~ "loans. Included loans stop counting at"
+#~ " their payoff year; ignored loans "
+#~ "continue through the horizon."
+#~ msgstr ""
+
+#~ msgid "First year %(year)d · age %(age)d · currency %(currency)s"
+#~ msgstr ""
+
+#~ msgid "%(num)d archived"
+#~ msgid_plural "%(num)d archived"
+#~ msgstr[0] ""
+#~ msgstr[1] ""
+
+#~ msgid ""
+#~ "Bar capped at 100%%, exact value "
+#~ "%(value)s; starting portfolio %(start)s; net"
+#~ " worth at FIRE %(target)s"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With these inputs, the portfolio never"
+#~ " reaches the withdrawal-rate target "
+#~ "before age %(age)d."
+#~ msgstr ""
+
+#~ msgid "With these inputs, returns never cover expenses before age %(age)d."
 #~ msgstr ""
 
