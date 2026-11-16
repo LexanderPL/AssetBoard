@@ -26,7 +26,7 @@ Select **Download archive**. The ZIP contains the current workspace's settings (
 Taxes switch, the Upcoming window, the investment cost basis and the saved risk targets), all
 categories (including archived categories), transactions (including deleted entries), planned
 values, stored month states (closed months and plan-start markers), all net-worth categories,
-items, value histories and snapshots, and the whole investment history: asset classes,
+items, value histories and legacy snapshots, and the whole investment history: asset classes,
 instruments, allocations, buy/sell transactions (undated lots included), bond terms, stored
 manual and provider prices, stored FX rates, and provider settings without their API keys,
 and the loan configuration: reference rates and their values, loans (including installment
@@ -65,7 +65,7 @@ carry them yet. The suggested net-worth categories follow the same rule as the l
 untouched, unused and seeded automatically, they are removed before the archive's net-worth
 categories are written. The suggested asset classes follow the same rule: untouched, unused and
 seeded automatically, they are removed before the archive's classes are written. Edited
-categories, items, values, snapshots or asset classes make the workspace non-empty. FIRE
+categories, items, values, legacy snapshots or asset classes make the workspace non-empty. FIRE
 scenarios and their rows do too: a restore replaces the workspace's data rather than merging
 it.
 
@@ -78,7 +78,7 @@ Restore writes, all at once:
 3. planned values, including those of archived and transfer categories;
 4. transactions, including deleted entries, in their original order within each day;
 5. month states exactly as stored: closed months and plan-start markers;
-6. net-worth categories, items and value histories, then snapshots. Values keep their
+6. net-worth categories, items and value histories, then legacy snapshots. Values keep their
    `created_at`, so several values on one day restore in the same order and the current value
    does not change. The estimate switch is carried; a 1.2 archive restores assets with it on
    and liabilities off;
@@ -322,7 +322,7 @@ shows what will be removed.
   it is archived, like a category that is still referenced.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
-  corrected archive. It also removes the net-worth categories, items, valuations and snapshots
+  corrected archive. It also removes the net-worth categories, items, valuations and legacy snapshots
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
   rates, provider settings and risk targets it wrote; valuations created by the batch are removed
   only through this explicit batch rollback. It also removes the FIRE plan and its events it
@@ -330,11 +330,12 @@ shows what will be removed.
   It is refused, with the reason, once anything changed
   after the restore: a new or edited entry, category, planned value, net-worth or investment
   row, a closed or reopened month, a changed setting, or a new recurring item, income source,
-  work log or tax rule. A monthly automatic net-worth snapshot taken after the restore also
-  counts as a new row and blocks rollback. A rolled-back restore does not bring back the
-  suggested categories or asset classes; use **Add suggested categories** on the
-  [Categories](categories.md) or [Net worth](net-worth.md) page, or **Add suggested asset
-  classes** on the [Investments](investments.md) page, if you want them.
+  work log or tax rule. The derived net-worth history reads the restored item valuations, not the
+  legacy snapshot rows, so a restore and the current Summary chart agree immediately. A legacy
+  snapshot imported after the restore also counts as a new row and blocks rollback. A rolled-back
+  restore does not bring back the suggested categories or asset classes; use **Add suggested
+  categories** on the [Categories](categories.md) or [Net worth](net-worth.md) page, or **Add
+  suggested asset classes** on the [Investments](investments.md) page, if you want them.
 
 The audit log records every apply and rollback with counts, never with amounts, descriptions or
 file names.

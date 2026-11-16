@@ -4,7 +4,7 @@ Status: draft v1. This file is the shared "constitution". Milestone specs (`M0`â
 
 ## 1. Vision and principles
 
-A self-hosted web app that replaces a personal finance spreadsheet (monthly income/expense sheets with planned-vs-actual summaries, net worth, investment portfolio, mortgage calculator, FIRE projection) and adds what spreadsheets cannot do: recurring items with reminders, variable income, optional tax modelling, multi-user + SSO, history/snapshots, backups.
+A self-hosted web app that replaces a personal finance spreadsheet (monthly income/expense sheets with planned-vs-actual summaries, net worth, investment portfolio, mortgage calculator, FIRE projection) and adds what spreadsheets cannot do: recurring items with reminders, variable income, optional tax modelling, multi-user + SSO, derived history, backups.
 
 1. **Spreadsheet-fast data entry.** Adding a transaction is a keyboard-driven inline row, not a modal form.
 2. **Optional complexity.** Taxes, recurring items, loans, FIRE, multi-currency, work logs: all can be ignored; the app works with just categories and transactions.
@@ -73,7 +73,7 @@ Used by tax rules, loan cost components and similar. `mode: percent | fixed`; `p
 A net-worth item is either `manual` (user enters value; every change is appended to a valuation history) or `linked` (value computed from another module: asset class in portfolio, a single holding, a loan's remaining principal). Links are by `(link_type, link_id)`; resolution lives in the owning module's service.
 
 ### 3.8 History and snapshots
-Anything the user will want a trend of is stored historically: manual valuations (correctable, never deleted), price points, FX rates, net-worth snapshots (monthly job + manual "take snapshot"), loan balance checkpoints.
+Anything the user will want a trend of is stored historically: manual valuations (correctable, never deleted), price points, FX rates, loan balance checkpoints. Net-worth history is **derived on read** from those rows, linked resolvers and estimates; monthly net-worth snapshots are legacy archive data and are no longer written or displayed.
 
 ### 3.9 Audit and deletion
 - Soft delete (`deleted_at`) for user-entered financial rows; UI offers undo for ~10 s and a trash view later.
@@ -112,7 +112,7 @@ Key fields for the shared entities:
 | M2 | Ledger core: categories, transactions, month view, planned vs actual | M1 | v0.2 |
 | M3 | Recurring items, variable income, taxes, reminders | M2 | v0.3 |
 | M4 | Ledger export and import: a documented archive for full workspace backup and restore, and CSV import of your own history (dogfooding point: you can leave the spreadsheet for monthly tracking) | M2 | v0.4 |
-| M5 | Net worth: assets, debts, snapshots | M1 | v0.5 |
+| M5 | Net worth: assets, debts, derived history | M1 | v0.5 |
 | M6 | Investments | M5 | v0.6 |
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner; v2 rework in [M8-fire-planner-v2.md](M8-fire-planner-v2.md) | M2, M6, M7 | v0.8 |

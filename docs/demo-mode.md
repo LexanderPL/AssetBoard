@@ -110,7 +110,8 @@ assetboard demo-seed --workspace <workspace-id> [--date YYYY-MM-DD]
   and overdue occurrences;
 - an hourly income source with a filled work calendar for `M-3`…`M0` and an attached tax rule;
 - net worth items (current account, savings, emergency fund, car, apartment, mortgage, credit
-  card) with monthly valuations (one deliberate gap) and twelve monthly snapshots;
+  card) with monthly valuations (one deliberate gap), so the derived history chart has a year of
+  points; no stored snapshots are created;
 - a portfolio: a global ETF, an 80/20 fund, a USD stock (sells, quarterly dividends, linked
   income, a 2-for-1 split and a base-settled buy), gold, crypto, a bond-model instrument with
   terms and a currency cash holding, plus 24 months of weekly manual prices and FX rates;
