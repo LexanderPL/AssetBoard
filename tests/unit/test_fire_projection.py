@@ -46,14 +46,11 @@ def _half_up(value: Fraction) -> int:
 def _oracle(inputs: ProjectionInputs) -> Projection:
     current_age = inputs.start_year - inputs.birth_year
     last_year = inputs.birth_year + inputs.horizon_age
-    # Exact nominal compounding: (1 + inflation)(1 + real return) - 1.
-    gain_numerator = (
-        inputs.inflation_bp * 10_000
-        + inputs.real_return_bp * 10_000
-        + inputs.inflation_bp * inputs.real_return_bp
-    )
+    # Exact nominal compounding straight from the definition:
+    # (1 + inflation) * (1 + return above inflation) - 1.
     inflation = Fraction(10_000 + inputs.inflation_bp, 10_000)
     growth = Fraction(10_000 + inputs.income_growth_bp, 10_000)
+    gain_rate = inflation * Fraction(10_000 + inputs.real_return_bp, 10_000) - 1
 
     overrides: dict[int, int] = {}
     cash: defaultdict[int, int] = defaultdict(int)
@@ -112,7 +109,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
             net = overrides.get(year, income - expenses)
             opening = previous_net_worth
         cash_amount = cash[year]
-        gain = _half_up(Fraction(opening * gain_numerator, 100_000_000))
+        gain = _half_up(Fraction(opening) * gain_rate)
         net_worth = net + gain + cash_amount if offset == 0 else opening + net + gain + cash_amount
 
         is_fire = False
@@ -146,12 +143,16 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
     rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else inputs.real_return_bp
     fire_number: Money | None = None
     if fire_row is not None and rate_bp is not None and rate_bp > 0:
-        fire_number = _eur(_half_up(Fraction(fire_row.expenses.amount_minor * 10_000, rate_bp)))
+        fire_number = _eur(
+            _half_up(Fraction(fire_row.expenses.amount_minor) / Fraction(rate_bp, 10_000))
+        )
 
     plan_progress: int | None = None
     if fire_row is not None and fire_row.net_worth.amount_minor > 0:
         plan_progress = _half_up(
-            Fraction(inputs.start_portfolio.amount_minor * 10_000, fire_row.net_worth.amount_minor)
+            Fraction(inputs.start_portfolio.amount_minor)
+            / Fraction(fire_row.net_worth.amount_minor)
+            * 10_000
         )
 
     retirement_start = max(1, inputs.stop_working_age - current_age)
@@ -286,7 +287,7 @@ def test_golden_sets_match_the_independent_oracle(inputs: ProjectionInputs) -> N
     _assert_matches_oracle(inputs)
 
 
-def test_parity_t0_and_key_metrics_are_hand_checkable() -> None:
+def test_t0_and_key_metrics_are_hand_checkable() -> None:
     result = project(_RETURNS_FIRE)
     first = result.rows[0]
     assert (first.year, first.age) == (2026, 41)
@@ -550,7 +551,7 @@ def test_a_zero_portfolio_with_negative_expenses_cannot_declare_fire() -> None:
     assert error.value.year == 2026
 
 
-def test_returns_rule_uses_strict_less_than_and_the_previous_net_worth() -> None:
+def test_returns_rule_uses_strictly_greater_and_the_previous_net_worth() -> None:
     inputs = _edge(
         horizon_age=43,
         real_return_bp=1_000,
@@ -559,9 +560,11 @@ def test_returns_rule_uses_strict_less_than_and_the_previous_net_worth() -> None
         start_portfolio=_eur(1_000_000),
     )
     result = project(inputs)
-    # At t=0 expenses (100,000) equal the gain on the starting portfolio exactly: not FIRE.
+    # At t=0 the opening portfolio's real return equals expenses exactly: 1,000,000 * 10% is
+    # not strictly greater than 100,000, so the strict comparison does not fire.
     assert not result.rows[0].is_fire
-    # At t=1 the gain is 10% of 1,100,000, which is strictly above expenses.
+    # At t=1 the opening balance is 1,100,000, so its real return (110,000) is strictly above
+    # expenses.
     assert result.rows[1].is_fire
     assert result.fire_index == 1
 

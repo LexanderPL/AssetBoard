@@ -1,4 +1,4 @@
-"""Property tests for the pure FIRE projection engine (F8.2)."""
+"""Property tests for the pure FIRE projection engine (F8.2, corrected by F8.19)."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from assetboard.domain.fire import (
     SWR_HARD_MAX_BP,
     SWR_HARD_MIN_BP,
     EventKind,
+    FireProjectionError,
     ProjectionEvent,
     ProjectionInputs,
     ProjectionLoan,
@@ -124,6 +125,35 @@ def _projection_inputs(
     )
 
 
+@st.composite
+def _with_negative_expense_change(draw: st.DrawFn) -> ProjectionInputs:
+    """A valid plan plus one signed expense change, so the effective line may cross zero."""
+    inputs = draw(_projection_inputs(with_overrides=False, with_events=False))
+    last_year = inputs.birth_year + inputs.horizon_age
+    year = draw(st.integers(min_value=inputs.start_year, max_value=last_year))
+    amount = draw(st.integers(min_value=-1_000_000_000, max_value=0))
+    return replace(
+        inputs,
+        events=(ProjectionEvent(year, EventKind.EXPENSE_CHANGE, Money(amount, "EUR")),),
+    )
+
+
+@settings(max_examples=50, deadline=None)
+@given(inputs=_with_negative_expense_change())
+def test_a_negative_expense_line_is_an_error_and_never_a_negative_row(
+    inputs: ProjectionInputs,
+) -> None:
+    try:
+        result = project(inputs)
+    except FireProjectionError as error:
+        assert error.code == "expenses_negative"
+        assert error.year is not None
+        assert inputs.start_year <= error.year <= inputs.birth_year + inputs.horizon_age
+        return
+    assert all(row.expenses.amount_minor >= 0 for row in result.rows)
+    assert not any(row.is_fire and row.expenses.amount_minor < 0 for row in result.rows)
+
+
 @settings(max_examples=50, deadline=None)
 @given(inputs=_projection_inputs(zero_rates=True, with_events=False))
 def test_zero_return_and_inflation_equals_start_plus_cumulative_savings(
@@ -142,26 +172,26 @@ def test_zero_return_and_inflation_equals_start_plus_cumulative_savings(
 
 @settings(max_examples=50, deadline=None)
 @given(inputs=_projection_inputs(with_overrides=False, with_events=False))
-def test_without_events_or_overrides_the_parity_recurrence_holds(
+def test_without_events_or_overrides_the_compounding_recurrence_holds(
     inputs: ProjectionInputs,
 ) -> None:
     result = project(inputs)
     first = result.rows[0]
-    gain_numerator = (
-        inputs.inflation_bp * 10_000
-        + inputs.real_return_bp * 10_000
-        + inputs.inflation_bp * inputs.real_return_bp
+    gain_rate = (
+        Fraction(10_000 + inputs.inflation_bp, 10_000)
+        * Fraction(10_000 + inputs.real_return_bp, 10_000)
+        - 1
     )
     assert first.net.amount_minor == inputs.start_portfolio.amount_minor
     assert first.gain.amount_minor == _half_up(
-        Fraction(inputs.start_portfolio.amount_minor * gain_numerator, 100_000_000)
+        Fraction(inputs.start_portfolio.amount_minor) * gain_rate
     )
     assert first.net_worth == inputs.start_portfolio + first.gain
     previous = first
     for row in result.rows[1:]:
         assert row.net == row.income - row.expenses
         assert row.gain.amount_minor == _half_up(
-            Fraction(previous.net_worth.amount_minor * gain_numerator, 100_000_000)
+            Fraction(previous.net_worth.amount_minor) * gain_rate
         )
         assert row.net_worth == previous.net_worth + row.net + row.gain
         previous = row

@@ -263,9 +263,10 @@ class FireProjectionError(ValueError):
 
 
 class SensitivityError(ValueError):
-    """Invalid sensitivity axes; ``field`` and ``code`` name the problem for the caller.
+    """Invalid sensitivity axes, or a scaled cell that cannot be projected.
 
-    ``year`` names the projected row that failed in a scaled cell, when there is one.
+    ``field`` and ``code`` name the problem for the caller. ``year`` names the projected row that
+    failed in a scaled cell, when there is one.
     """
 
     def __init__(self, field: str, code: str, *, year: int | None = None) -> None:
@@ -823,9 +824,10 @@ def sensitivity(
     non-empty, at most nine values each and 81 cells, with every effective return inside the
     projection's hard rate bounds and every scaled expense component inside the projection
     amount limit. Invalid axes raise :class:`SensitivityError`; an invalid plan raises the
-    projection's own :class:`FireProjectionError`, and a scaled cell whose effective expenses
-    would be negative raises :class:`SensitivityError` with ``expenses_negative`` and the row's
-    ``year``. The function only reads its arguments: it has no I/O, clock, database or mutation.
+    projection's own :class:`FireProjectionError` before any scaled cell is projected, and a
+    scaled cell whose effective expenses would be negative raises :class:`SensitivityError` with
+    ``expenses_negative`` and the row's ``year``. The function only reads its arguments: it has
+    no I/O, clock, database or mutation.
     A cell that never reaches FIRE keeps ``None`` for its age and year.
 
     A higher return cannot delay FIRE while the net-worth path stays non-negative (a negative
@@ -888,6 +890,11 @@ def sensitivity(
         if not RATE_HARD_MIN_BP <= base_return + delta <= RATE_HARD_MAX_BP:
             raise SensitivityError("return_deltas_bp", "return_out_of_range")
 
+    # Validate and project the saved plan before any scaled cell. An invalid plan keeps its own
+    # projection error instead of being reported as a scaled grid failure; the base cell reuses
+    # this exact projection.
+    base_projection = project(inputs)
+
     rows: list[SensitivityRow] = []
     base_cell: SensitivityCell | None = None
     ages: list[int] = []
@@ -896,22 +903,25 @@ def sensitivity(
         for delta in deltas:
             effective_return = base_return + delta
             is_base = delta == 0 and factor == 10_000
-            try:
-                projection = project(
-                    replace(
-                        inputs,
-                        real_return_bp=effective_return,
-                        start_expenses=Money(scaled_expenses[factor], currency),
-                        events=scaled_events[factor],
-                        loans=scaled_loans[factor],
+            if is_base:
+                projection = base_projection
+            else:
+                try:
+                    projection = project(
+                        replace(
+                            inputs,
+                            real_return_bp=effective_return,
+                            start_expenses=Money(scaled_expenses[factor], currency),
+                            events=scaled_events[factor],
+                            loans=scaled_loans[factor],
+                        )
                     )
-                )
-            except FireProjectionError as exc:
-                if exc.code == "expenses_negative":
-                    raise SensitivityError(
-                        "expense_factors_bp", "expenses_negative", year=exc.year
-                    ) from None
-                raise
+                except FireProjectionError as exc:
+                    if exc.code == "expenses_negative":
+                        raise SensitivityError(
+                            "expense_factors_bp", "expenses_negative", year=exc.year
+                        ) from None
+                    raise
             cell = SensitivityCell(
                 return_delta_bp=delta,
                 expense_factor_bp=factor,

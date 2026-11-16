@@ -350,6 +350,7 @@ def test_the_metrics_show_fire_number_with_year_and_plan_progress(owner) -> None
     assert "data-fire-progress-target>€1,076,250.00<" in page.text
     assert "Bar capped at 100%" not in page.text
     assert "FIRE number" in page.text
+    assert "return above inflation when returns must cover expenses" in page.text
     assert "Plan progress" in page.text
     assert "projected nominal net worth at FIRE" in page.text
     assert "All amounts are nominal" in page.text
@@ -462,8 +463,32 @@ def test_the_metrics_and_progress_are_translated(owner) -> None:
     assert "Kwota FIRE" in page.text
     assert "Postęp planu" in page.text
     assert "Wartości planu, korekty i kredyty" in page.text
+    assert "Pierwszy wiersz to punkt startowy" in page.text
     assert "Sheet progress" not in page.text
     assert "Postęp arkusza" not in page.text
+
+
+def test_a_negative_expense_block_and_its_year_are_translated(owner) -> None:
+    from assetboard.db.models.identity import User, Workspace
+
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.add(
+            FireEvent(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                year=2027,
+                kind="expense_change",
+                amount_minor=-4_000_000,
+                label="Too large a reduction",
+            )
+        )
+        session.get_one(Workspace, owner.home_id).locale = "pl"
+        session.get_one(User, owner.admin_id).locale = "pl"
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "Wydatki w planie są ujemne w co najmniej jednym roku." in page.text
+    assert "Rok 2027" in page.text
 
 
 def test_the_view_writes_nothing(owner) -> None:

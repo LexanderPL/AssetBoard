@@ -304,6 +304,32 @@ def test_expense_factors_are_bounded_and_scaled_expenses_must_fit() -> None:
     assert (large.value.field, large.value.code) == ("expense_factors_bp", "expense_too_large")
 
 
+def test_scaled_expense_events_and_loans_respect_the_amount_limit() -> None:
+    event = fire.ProjectionEvent(
+        year=2027,
+        kind=fire.EventKind.EXPENSE_CHANGE,
+        amount=Money(MAX_AMOUNT_MINOR, "EUR"),
+    )
+    with pytest.raises(SensitivityError) as event_error:
+        sensitivity(_inputs(events=(event,)), (0,), (10_000, 15_000))
+    assert (event_error.value.field, event_error.value.code) == (
+        "expense_factors_bp",
+        "expense_too_large",
+    )
+
+    loan_payment = MAX_AMOUNT_MINOR * 3 // 4 + 1
+    loaned = replace(
+        _inputs(start_expenses=Money(1, "EUR")),
+        loans=(ProjectionLoan(Money(loan_payment, "EUR"), 2030, True),),
+    )
+    with pytest.raises(SensitivityError) as loan_error:
+        sensitivity(loaned, (0,), (10_000, 15_000))
+    assert (loan_error.value.field, loan_error.value.code) == (
+        "expense_factors_bp",
+        "expense_too_large",
+    )
+
+
 def test_the_base_cell_equals_the_direct_projection_with_expense_events() -> None:
     inputs = _inputs(
         events=(
@@ -366,3 +392,22 @@ def test_an_invalid_plan_keeps_the_projection_error() -> None:
             DEFAULT_RETURN_DELTAS_BP,
             DEFAULT_EXPENSE_FACTORS_BP,
         )
+
+
+def test_a_negative_base_plan_keeps_the_projection_error() -> None:
+    # The saved plan is invalid, not a scaled cell: report the projection's own error even though
+    # the first factor in the axis would also be negative.
+    inputs = _inputs(
+        start_expenses=Money(0, "EUR"),
+        start_portfolio=Money(0, "EUR"),
+        events=(
+            fire.ProjectionEvent(
+                year=2026,
+                kind=fire.EventKind.EXPENSE_CHANGE,
+                amount=Money(-1, "EUR"),
+            ),
+        ),
+    )
+    with pytest.raises(fire.FireProjectionError) as error:
+        sensitivity(inputs, DEFAULT_RETURN_DELTAS_BP, DEFAULT_EXPENSE_FACTORS_BP)
+    assert (error.value.code, error.value.year) == ("expenses_negative", 2026)
