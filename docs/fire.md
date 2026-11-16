@@ -274,8 +274,7 @@ definition of independence; the year-by-year table always shows the plan you ent
 the configured **Income stops at age**.
 
 - **Returns cover expenses** (the default): the portfolio's return above inflation covers that
-  year's expenses. This preserves the portfolio's real capital and is the most conservative of
-  the three.
+  year's expenses. This preserves the portfolio's real capital.
 - **Withdrawal rate**: the portfolio multiplied by the withdrawal rate covers the year's
   expenses. The rate is stored with the plan and is used only by this rule.
 - **Portfolio lasts to the horizon**: the earliest age at which stopping base income *at that
