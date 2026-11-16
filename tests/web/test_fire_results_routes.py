@@ -94,6 +94,10 @@ def test_the_view_puts_plan_values_adjustments_and_loans_in_one_collapsed_detail
         "data-fire-loans",
     ):
         assert marker_name in block
+    # The outer details is the only framed panel: the sections inside it are flat.
+    assert block.count('class="panel') == 1
+    for tag in ("<form", "<input", "<select", "<textarea", "<button"):
+        assert tag not in block
     assert text.count('id="plan-inputs"') == 1
     assert text.index('data-fire-progress="plan"') < start
     assert start < text.index("data-fire-table-section")

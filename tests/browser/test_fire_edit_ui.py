@@ -267,6 +267,16 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "0")
             for section_id in ("plan", "assumptions", "amounts", "adjustments", "loans"):
                 assert page.locator(f"#{section_id}").evaluate("(element) => element.open") is False
+            # The editor reveals Refresh grid; the grid itself is server-rendered and the
+            # control re-fetches the saved plan's fragment rather than unsaved form values.
+            refresh = page.locator("[data-fire-sensitivity-refresh]")
+            expect(refresh).to_be_visible()
+            with page.expect_response(
+                lambda response: "/fire/sensitivity" in response.url
+            ) as refresh_response:
+                refresh.click()
+            assert refresh_response.value.ok
+            expect(page.locator("[data-fire-sensitivity-grid]")).to_be_visible()
             expect(page.locator('[data-fire-suggestion="income"]')).to_be_hidden()
             # The sections are an exclusive native accordion; the fallback follows the same rule.
             page.locator("#plan > summary").click()
