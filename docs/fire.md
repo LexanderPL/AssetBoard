@@ -191,7 +191,8 @@ check the values and save to clear the review banner.
   **review** banner until you save it again. The banner names the year the values were last
   reviewed and the current first year. Review income, expenses and portfolio, then press
   **Save changes**; the next year starts with the same saved amounts until you change them.
-  The projection does not silently update the amounts.
+  The projection does not silently update the amounts. Editors and owners get a link to the plan
+  inputs from the banner; viewers see the same notice without the link.
 - **Birth year** turns plan years into ages. New plans prefill it from your profile; the plan
   keeps its saved value, so later profile changes do not alter an existing plan.
 - **Horizon age** is the last age in the projection. It defaults from your profile's life
