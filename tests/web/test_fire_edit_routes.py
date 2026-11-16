@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,7 +30,7 @@ from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.prices import save_manual_price
-from tests.fire_helpers import create_plan, field_html, suggestion_html
+from tests.fire_helpers import create_plan, field_html, freeze_clock, suggestion_html
 
 
 def _context(owner, role: Role = Role.OWNER) -> Context:
@@ -399,6 +399,32 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert f'action="/fire/{plan_id}"' not in page.text
     assert f'hx-post="/fire/{plan_id}' not in page.text
     assert "js/fire.js" in page.text
+
+
+def test_saving_clears_the_living_plan_review_even_without_changes(owner) -> None:
+    freeze_clock(owner, "2026-01-01T00:00:00+00:00")
+    plan_id = create_plan(owner)
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        amounts = (row.income_minor, row.expenses_minor, row.portfolio_minor)
+
+    freeze_clock(owner, "2027-01-01T00:00:00+00:00")
+    edit = owner.client.get("/fire/edit")
+    assert edit.status_code == 200
+    assert "data-fire-year-review" in edit.text
+    assert "This plan starts in 2027" in edit.text
+    assert "values last reviewed for 2026" in edit.text
+    assert 'data-fire-review-section="amounts"' in edit.text
+
+    # The form carries the same values the wizard saved: only the save year moves.
+    response = owner.post("/fire/edit", _form(), token_from="/fire/edit")
+    assert response.status_code == 303
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert row.updated_at == datetime(2027, 1, 1, tzinfo=UTC)
+        assert (row.income_minor, row.expenses_minor, row.portfolio_minor) == amounts
+    assert "data-fire-year-review" not in owner.client.get("/fire").text
+    assert "data-fire-year-review" not in owner.client.get("/fire/edit").text
 
 
 def test_the_editor_does_not_write_on_get(owner) -> None:

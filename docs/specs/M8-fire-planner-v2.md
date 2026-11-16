@@ -1020,6 +1020,44 @@ Keep models, migrations, archive, dependencies and projection/loan math unchange
   were updated. No model, migration, archive, dependency, projection-math or loan-math change.
   All tests ran single-core.
 
+### F8.16 — Living-plan year review
+
+**Acceptance**
+
+- The plan keeps the current-year projection anchor; it does not store a start year.
+- The plan's last-saved year (`updated_at` in the workspace timezone) is shown as the year the
+  starting values were last reviewed.
+- When that year is before the current calendar year, the view and edit pages show a review
+  banner naming both years. A viewer sees the banner without an edit link; an editor/owner sees
+  a link to the plan inputs.
+- Saving the plan in the new year clears the banner. Amounts are not updated automatically.
+- No schema, migration, archive, dependency or projection-math change.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.16 from docs/specs/M8-fire-planner-v2.md: use the plan's last-saved workspace-local
+year for a living-plan review banner; keep the current-year anchor; do not auto-change values.
+```
+
+### As built (M8.F8.16)
+
+- `FirePlanView.values_year` is computed from `updated_at` in the workspace timezone; no column
+  or migration was added.
+- `view.html` and `edit.html` render `data-fire-year-review` only when `values_year` is before
+  `current_year`. The copy names both years; the view links editors/owners to the plan inputs,
+  while viewers see the explanation without the link. The edit banner marks
+  `data-fire-review-section="amounts"` so the F8.17 accordion can open the Starting amounts
+  section.
+- Saving the plan updates `updated_at` explicitly, so even an unchanged form counts as a save and
+  clears the banner in the new year. The stored amounts are still reused until the user changes
+  them.
+- Tests freeze the clock in 2026, create a plan, advance it to 2027, assert the banner on view
+  and edit, save the unchanged values and assert it is gone; a current-year plan has no banner.
+  Workspace-timezone year conversion (the same instant is 2026 in UTC and 2027 at UTC+14) and
+  the viewer/editor links are covered. No schema, migration, archive or dependency change.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -1055,6 +1093,7 @@ Keep models, migrations, archive, dependencies and projection/loan math unchange
 6. F8.13 — nominal-only results and wording.
 7. F8.14 — FIRE setup and input polish.
 8. F8.15 — FIRE results and editor cleanup.
+9. F8.16 — living-plan year review.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and
