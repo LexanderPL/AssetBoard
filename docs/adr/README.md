@@ -33,6 +33,7 @@ The decisions below are accepted unless noted otherwise.
 | [0024](0024-price-providers.md) | Price and FX providers | Accepted |
 | [0025](0025-fire-projection-rounding.md) | FIRE projection numeric representation and rounding | Accepted; gain model and returns-cover rule superseded by ADR-0026 |
 | [0026](0026-fire-real-return-coverage.md) | FIRE real-return coverage and exact nominal compounding | Accepted |
+| [0027](0027-fire-horizon-rule.md) | Optional horizon-based FIRE independence rule | Accepted |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.
