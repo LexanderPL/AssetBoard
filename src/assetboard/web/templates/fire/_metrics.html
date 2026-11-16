@@ -19,9 +19,9 @@
       <dd class="mt-1 text-lg font-semibold tabular-nums" data-fire-years-value>{% if projection.years_to_fire is not none %}{{ projection.years_to_fire }}{% else %}—{% endif %}</dd>
     </div>
     <div class="border border-line bg-surface p-4" data-fire-number data-fire-number-value="{{ projection.fire_number.amount_minor if projection.fire_number is not none else '' }}" data-fire-number-year="{{ projection.fire_year if projection.fire_year is not none else '' }}">
-      <dt class="text-xs font-medium text-muted">{{ _("FIRE number") }} {{ hint(_("The nominal expenses in the FIRE year divided by the rate the independence rule uses: the withdrawal rate, or the nominal gain rate when returns must cover expenses. This is the portfolio the plan needs in that year.")) }}</dt>
+      <dt class="text-xs font-medium text-muted">{{ _("FIRE number") }} {{ hint(_("The nominal expenses in the FIRE year divided by the rate the independence rule uses: the withdrawal rate, or the return above inflation when returns must cover expenses. This is the portfolio the plan needs in that year.")) }}</dt>
       <dd class="mt-1 text-lg font-semibold tabular-nums">{% if projection.fire_number is not none %}{{ format_money(projection.fire_number, locale) }} <span class="text-sm font-normal text-muted">({{ projection.fire_year }})</span>{% else %}—{% endif %}</dd>
-      {% if projection.fire_age is not none and projection.fire_number is none %}<p class="mt-1 text-xs text-muted" data-fire-number-note>{{ _("Not defined: the plan's gain rate is not positive.") }}</p>{% endif %}
+      {% if projection.fire_age is not none and projection.fire_number is none %}<p class="mt-1 text-xs text-muted" data-fire-number-note>{{ _("Not defined: the plan's return above inflation is not positive.") }}</p>{% endif %}
     </div>
     {% set sustainability_class = "border border-line bg-danger-soft" if projection.depletion_age is not none else "border border-line bg-surface" %}
     <div class="{{ sustainability_class }} p-4" data-fire-sustainability>

@@ -15,8 +15,9 @@
   <h2 class="text-base font-semibold">{{ _("The projection is unavailable") }}</h2>
   <ul class="mt-3 space-y-2 text-sm text-ink">
     {% for block in results.blocks %}
-    <li data-fire-block="{{ block.code }}" data-fire-block-field="{{ block.field or '' }}">
+    <li data-fire-block="{{ block.code }}" data-fire-block-field="{{ block.field or '' }}" data-fire-block-year="{{ block.year if block.year is not none else '' }}">
       <span class="font-medium">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}</span>
+      {% if block.year is not none %}<span class="text-muted"> ({{ _("Year %(year)d", year=block.year) }})</span>{% endif %}
       {% if block.detail %}<span class="text-muted"> ({{ block.detail }})</span>{% endif %}
     </li>
     {% endfor %}

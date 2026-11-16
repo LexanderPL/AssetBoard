@@ -67,7 +67,8 @@ class FireError(Exception):
     """Invalid plan input; ``field`` names the form control and ``code`` the message.
 
     ``row`` and ``column`` identify an adjustment row and one of its controls for the
-    adjustments editor's inline errors. They are optional so plan-level errors keep the old
+    adjustments editor's inline errors. ``year`` names a projection row for a row-level plan
+    error such as a negative expense line. They are optional so plan-level errors keep the old
     two-argument shape.
     """
 
@@ -78,12 +79,14 @@ class FireError(Exception):
         *,
         row: str | None = None,
         column: str | None = None,
+        year: int | None = None,
     ) -> None:
         super().__init__(code)
         self.field = field
         self.code = code
         self.row = row
         self.column = column
+        self.year = year
 
 
 @dataclass(frozen=True, slots=True)

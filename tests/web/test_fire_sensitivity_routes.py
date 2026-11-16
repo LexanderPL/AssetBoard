@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from assetboard.db.models.fire import FireScenario
 from assetboard.db.models.identity import User, Workspace
+from assetboard.domain.fire import SensitivityError
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.web import fire_routes
@@ -281,6 +282,26 @@ def test_an_extreme_base_return_shows_the_axis_error_in_the_grid(owner) -> None:
     assert "data-fire-sensitivity-error" in fragment.text
     assert 'data-fire-sensitivity-error-code="return_out_of_range"' in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
+
+
+def test_a_scaled_negative_expense_cell_shows_the_grid_error_and_year(owner, monkeypatch) -> None:
+    _create(owner)
+
+    def negative_cell(*_args: object, **_kwargs: object) -> Any:
+        raise SensitivityError("expense_factors_bp", "expenses_negative", year=2027)
+
+    monkeypatch.setattr(fire_routes, "sensitivity", negative_cell)
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-error" in page.text
+    assert 'data-fire-sensitivity-error-code="expenses_negative"' in page.text
+    assert "negative in 2027" in page.text
+    assert "data-fire-sensitivity-grid" not in page.text
+
+    fragment = owner.client.get("/fire/sensitivity")
+    assert fragment.status_code == 200
+    assert "data-fire-sensitivity-error" in fragment.text
+    assert "negative in 2027" in fragment.text
 
 
 def test_full_pages_compute_the_grid_once_and_never_reload_the_plan(owner, monkeypatch) -> None:

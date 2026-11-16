@@ -587,6 +587,43 @@ def test_a_preview_error_keeps_the_saved_table_and_names_the_field(owner) -> Non
     assert "data-fire-metrics" in response.text
 
 
+def _negative_expense_form() -> dict[str, str]:
+    return _form(
+        event_year_1="2027",
+        event_kind_1="expense_change",
+        event_amount_1="-40000",
+        event_label_1="Too large a reduction",
+    )
+
+
+def test_a_negative_expense_line_is_a_preview_error_with_the_year(owner) -> None:
+    create_plan(owner)
+    response = owner.post(
+        "/fire/edit/preview",
+        _negative_expense_form(),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 200
+    assert "data-fire-preview-error" in response.text
+    assert 'data-fire-preview-error-field="events"' in response.text
+    assert "negative in 2027" in response.text
+    assert "data-fire-table" in response.text  # the saved projection stays visible
+
+
+def test_a_negative_expense_line_is_a_save_error_and_writes_nothing(owner) -> None:
+    plan_id = create_plan(owner)
+    before = _snapshot(owner, plan_id)
+    response = owner.post(
+        "/fire/edit",
+        _negative_expense_form(),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 400
+    assert "negative in 2027" in response.text
+    assert _open_sections(response.text) == ["adjustments"]
+    assert _snapshot(owner, plan_id) == before
+
+
 def test_the_adjustments_editor_year_and_amount_inputs_fill_their_cells(owner) -> None:
     create_plan(owner)
     page = owner.client.get("/fire/edit").text
@@ -1928,9 +1965,11 @@ def test_preview_loan_warning_uses_the_posted_expenses_and_writes_nothing(owner)
     assert page.status_code == 200
     assert "data-fire-loans-expense-warning" not in page.text
     assert _loan_settings(owner, plan_id) == []
+    # 26,000 is below the loan's annual payment but the inflated expense line still covers the
+    # payment when it is removed at payoff, so the preview stays valid and shows the warning.
     low = owner.post(
         "/fire/edit/preview",
-        _form(expenses_manual="1000"),
+        _form(expenses_manual="26000"),
         token_from="/fire/edit",
     )
     assert low.status_code == 200

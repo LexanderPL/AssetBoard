@@ -14,7 +14,7 @@
   <p class="font-medium">{{ _("The sensitivity grid is unavailable while the projection is blocked.") }}</p>
   <ul class="mt-2 space-y-1">
     {% for block in sensitivity_blocks %}
-    <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
+    <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}" data-fire-sensitivity-block-year="{{ block.year if block.year is not none else '' }}">{{ block_messages.get(block.code, _("The plan cannot be projected.")) }}{% if block.year is not none %} <span class="text-muted">({{ _("Year %(year)d", year=block.year) }})</span>{% endif %}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
     {% endfor %}
   </ul>
   {% if can_edit %}<a href="{{ sensitivity_inputs_url }}" class="btn-sm mt-3">{{ sensitivity_inputs_label }}</a>{% endif %}

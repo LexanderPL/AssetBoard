@@ -146,6 +146,9 @@ def test_the_year_by_year_section_has_no_panel_frame(owner) -> None:
     assert "p-6" not in opening and "p-7" not in opening
     assert "Year by year" in text
     assert "data-fire-table" in text
+    assert "data-fire-first-year-hint" in text
+    assert "the first row is the starting point" in text.lower()
+    assert "data-fire-zero-note" not in text
 
 
 def test_a_current_year_plan_has_no_living_plan_review(owner) -> None:
@@ -336,15 +339,15 @@ def test_the_metrics_show_fire_number_with_year_and_plan_progress(owner) -> None
     assert "fill-success" in page.text
     assert 'data-fire-progress="today"' not in page.text
     assert 'data-fire-progress="sheet"' not in page.text
-    # The default plan is at 93.02%: a below-100 value must not be described as capped, and the
+    # The default plan is at 92.92%: a below-100 value must not be described as capped, and the
     # visible percentage plus both legend amounts are the projection's values.
-    assert 'data-fire-progress="plan" data-progress-bp="9302"' in page.text
-    assert "data-fire-progress-label>93.02%<" in page.text
-    assert 'aria-valuenow="93"' in page.text
-    assert 'aria-valuetext="93.02%"' in page.text
-    assert 'width="93"' in page.text
+    assert 'data-fire-progress="plan" data-progress-bp="9292"' in page.text
+    assert "data-fire-progress-label>92.92%<" in page.text
+    assert 'aria-valuenow="92"' in page.text
+    assert 'aria-valuetext="92.92%"' in page.text
+    assert 'width="92"' in page.text
     assert "data-fire-progress-starting>€1,000,000.00<" in page.text
-    assert "data-fire-progress-target>€1,075,000.00<" in page.text
+    assert "data-fire-progress-target>€1,076,250.00<" in page.text
     assert "Bar capped at 100%" not in page.text
     assert "FIRE number" in page.text
     assert "Plan progress" in page.text
@@ -413,15 +416,15 @@ def test_plan_progress_shows_the_exact_percentage_and_caps_the_bar(owner) -> Non
             ]
         )
     page = owner.client.get("/fire")
-    # Starting portfolio / net worth at FIRE = 10,000,000 / 2,616,031.25 = 382.26%.
-    assert 'data-fire-progress="plan" data-progress-bp="38226"' in page.text
-    assert "data-fire-progress-label>382.26%<" in page.text
-    assert 'aria-valuetext="382.26%"' in page.text
+    # Starting portfolio / net worth at FIRE = 10,000,000 / 2,648,136.35 = 377.62%.
+    assert 'data-fire-progress="plan" data-progress-bp="37762"' in page.text
+    assert "data-fire-progress-label>377.62%<" in page.text
+    assert 'aria-valuetext="377.62%"' in page.text
     assert 'aria-valuenow="100"' in page.text
     assert 'width="100"' in page.text
     assert 'height="32"' in page.text
     assert "data-fire-progress-starting>€10,000,000.00<" in page.text
-    assert "data-fire-progress-target>€2,616,031.25<" in page.text
+    assert "data-fire-progress-target>€2,648,136.35<" in page.text
     assert "Bar capped at 100%" not in page.text
 
 
@@ -486,6 +489,46 @@ def test_a_viewer_sees_no_edit_or_reset_and_no_form(owner) -> None:
         assert "data-adjustment-remove" not in page.text
     finally:
         owner.set_admin_role("owner")
+
+
+def test_a_negative_expense_change_blocks_the_projection_with_its_year(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.add(
+            FireEvent(
+                workspace_id=owner.home_id,
+                scenario_id=plan_id,
+                year=2027,
+                kind="expense_change",
+                amount_minor=-4_000_000,
+                label="Too large a reduction",
+            )
+        )
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert 'data-fire-blocked="expenses_negative"' in page.text
+    assert 'data-fire-block-year="2027"' in page.text
+    assert "expenses are negative in at least one year." in page.text
+    assert "(Year 2027)" in page.text
+    assert 'data-fire-sensitivity-block="expenses_negative"' in page.text
+    assert 'data-fire-sensitivity-block-year="2027"' in page.text
+    assert "data-fire-metrics" not in page.text
+    assert "data-fire-table" not in page.text
+
+
+def test_an_included_loan_larger_than_expenses_blocks_with_its_payoff_year(owner) -> None:
+    from tests.fire_loan_helpers import create_loan
+
+    _create(owner, expenses_manual="1000")
+    create_loan(owner)
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert 'data-fire-blocked="expenses_negative"' in page.text
+    assert 'data-fire-block-field="loans"' in page.text
+    match = re.search(r'data-fire-block-year="(\d{4})"', page.text)
+    assert match is not None
+    assert f"(Year {match.group(1)})" in page.text
+    assert "data-fire-metrics" not in page.text
 
 
 def test_a_blocked_projection_hides_results_and_the_removed_csv_is_gone(owner) -> None:

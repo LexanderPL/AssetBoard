@@ -119,6 +119,10 @@ ERRORS = {
     ),
     "duplicate_loan": _("The same loan appears twice. Reload the page and try again."),
     "invalid_loan_setting": _("Choose Included or Ignored for each loan."),
+    "expenses_negative": _(
+        "The plan's expenses are negative in %(year)s. Expenses cannot be below zero; check "
+        "the annual expense changes and the included loan payments."
+    ),
 }
 
 RESULT_BLOCK_MESSAGES = {
@@ -139,6 +143,10 @@ RESULT_BLOCK_MESSAGES = {
         "A saving override is stored in the current year and is not applied."
     ),
     "duplicate_saving_override": _("A year has more than one saving override."),
+    "expenses_negative": _(
+        "The plan's expenses are negative in at least one year. Expenses cannot be below zero; "
+        "check the annual expense changes and the included loan payments."
+    ),
 }
 
 FALLBACK_ERROR = _("The plan could not be saved. Reload the page and try again.")
@@ -159,6 +167,10 @@ SENSITIVITY_ERRORS = {
     "expense_too_large": _(
         "The expense range would exceed the supported amount. Reduce the starting expenses and "
         "try again."
+    ),
+    "expenses_negative": _(
+        "The sensitivity grid cannot be calculated because the scaled expenses would be "
+        "negative in %(year)s. Check the annual expense changes and the included loan payments."
     ),
 }
 SENSITIVITY_FALLBACK = _("The sensitivity grid could not be calculated.")
@@ -267,10 +279,17 @@ def _t(request: Request, message: str) -> str:
     return gettext(message, request.state.locale)
 
 
-def _error(request: Request, code: str | None) -> str | None:
+def _with_year(message: str, year: int | None) -> str:
+    """Fill a translated ``%(year)s`` placeholder when the error names a projection row."""
+    if year is not None and "%(year)s" in message:
+        return message % {"year": year}
+    return message
+
+
+def _error(request: Request, code: str | None, *, year: int | None = None) -> str | None:
     if not code:
         return None
-    return _t(request, ERRORS.get(code, FALLBACK_ERROR))
+    return _with_year(_t(request, ERRORS.get(code, FALLBACK_ERROR)), year)
 
 
 def _notice(request: Request, code: str | None) -> str | None:
@@ -943,8 +962,9 @@ def _sensitivity_context(
             DEFAULT_EXPENSE_FACTORS_BP,
         )
     except SensitivityError as exc:
-        context["sensitivity_error"] = _t(
-            request, SENSITIVITY_ERRORS.get(exc.code, SENSITIVITY_FALLBACK)
+        context["sensitivity_error"] = _with_year(
+            _t(request, SENSITIVITY_ERRORS.get(exc.code, SENSITIVITY_FALLBACK)),
+            exc.year,
         )
         context["sensitivity_error_code"] = exc.code
     else:
@@ -1326,7 +1346,7 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
             ctx,
             saved,
             in_editor=True,
-            preview_error=_error(request, exc.code),
+            preview_error=_error(request, exc.code, year=exc.year),
             preview_error_field=_preview_error_field(exc),
         )
         return render_template(request, "fire/_preview.html", context=context)
@@ -1374,6 +1394,16 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             values = dict(values)
             values["extreme_rates_confirmed"] = ""
         plan = _plan_input(values, request.state.locale, detail.plan.currency)
+        # A plan must be projectable before it is saved: a negative effective expense line is
+        # an input error, not a saved plan that only blocks on the next view. Preview validates
+        # and projects without writing; the update below re-validates under its own lock.
+        await run_in_threadpool(
+            fire_projection_service.preview_plan_results,
+            ctx,
+            detail,
+            plan,
+            factory=request.app.state.session_factory,
+        )
         await run_in_threadpool(
             fire_service.update_fire_plan,
             request.app.state.session_factory,
@@ -1400,7 +1430,7 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             ctx,
             detail,
             values=values,
-            error=_error(request, exc.code),
+            error=_error(request, exc.code, year=exc.year),
             error_code=exc.code,
             error_field=exc.field,
             adjustment_error=exc,
@@ -1506,7 +1536,7 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
             error_step,
             values,
             defaults,
-            error=_error(request, exc.code),
+            error=_error(request, exc.code, year=exc.year),
             error_field=exc.field,
             status_code=400,
         )
@@ -1526,7 +1556,7 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
                 error_step,
                 values,
                 defaults,
-                error=_error(request, exc.code),
+                error=_error(request, exc.code, year=exc.year),
                 error_field=exc.field,
                 status_code=400,
             )
@@ -1591,7 +1621,7 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
             error_step,
             values,
             defaults,
-            error=_error(request, exc.code),
+            error=_error(request, exc.code, year=exc.year),
             error_field=exc.field,
             status_code=400,
         )
@@ -1648,7 +1678,9 @@ async def fire_reset_confirm(request: Request, ctx: CurrentContext) -> Response:
         return render_template(
             request,
             "fire/reset.html",
-            context=_reset_context(request, ctx, detail, error=_error(request, exc.code)),
+            context=_reset_context(
+                request, ctx, detail, error=_error(request, exc.code, year=exc.year)
+            ),
             status_code=400,
         )
     return _redirect(request, "fire_scenarios", notice="reset")
