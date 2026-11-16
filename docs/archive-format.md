@@ -372,6 +372,10 @@ e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8091,c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,Car,20
 
 ## `networth_snapshots.csv` (restore only)
 
+These rows are legacy: older versions stored monthly net-worth snapshots. They are still exported
+and restored byte-compatibly, but the current history chart derives every point from item values
+and never displays a stored snapshot.
+
 | Column | Required | Values |
 |---|---|---|
 | `id` | yes | UUID (lineage id) |

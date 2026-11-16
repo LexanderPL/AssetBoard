@@ -1,4 +1,4 @@
-// The category donuts (F2.7) and net-worth line chart (F5.3). Every [data-chart] element holds
+// The category donuts (F2.7) and net-worth line chart (F5.9). Every [data-chart] element holds
 // its data in a <script type="application/json"> block (amounts in minor units with labels
 // formatted by the server). With ECharts available the chart is drawn in [data-chart-canvas];
 // otherwise the table stays visible. Donut legends are HTML under the chart ([data-chart-legend],
@@ -267,7 +267,7 @@
         name: series.name,
         type: "line",
         data: series.values,
-        // A single snapshot has no line; keep its point visible until the series is long.
+        // A single point has no line; keep its point visible until the series is long.
         showSymbol: data.labels.length <= 24,
         symbolSize: 4,
         lineStyle: { width: 2, color: token(series.color) },

@@ -158,19 +158,33 @@ def test_unlink_through_the_ui_keeps_the_value(owner: OwnerApp, fake_links: Fake
 def test_unavailable_link_is_visible_in_the_list_summary_and_history(
     owner: OwnerApp, fake_links: FakeLinks
 ) -> None:
-    owner.app.state.clock = FixedClock("2026-11-02T12:00:00+00:00")
-    target = _target(owner, values={})
+    owner.app.state.clock = FixedClock("2026-10-01T12:00:00+00:00")
+    target = _target(owner, values={date(2026, 10, 31): 100})
     fake_links.register(targets=[target])
     _post_linked(owner, target)
+    response = owner.post(
+        "/net-worth/items",
+        {
+            "side": "asset",
+            "category_id": str(_category_id(owner)),
+            "name": "Cash",
+            "value": "1",
+            "currency": "EUR",
+            "include_in_net_worth": "1",
+            "as_of": "2025-01-01",
+        },
+        token_from="/net-worth",
+    )
+    assert response.status_code == 303
+    owner.app.state.clock = FixedClock("2026-11-02T12:00:00+00:00")
     page = owner.client.get("/net-worth").text
     assert "data-unavailable" in page
     assert "Value unavailable" in page
     summary = owner.client.get("/net-worth/summary").text
     assert 'data-summary-note="unavailable"' in summary
     assert "linked item is unavailable" in summary
-    owner.post("/net-worth/history/snapshot", token_from="/net-worth/history")
-    history = owner.client.get("/net-worth/history").text
-    assert "linked item was unavailable and was not counted" in history
+    assert "linked item was unavailable and was not counted" in summary
+    assert "data-trend-row" in summary and "data-trend-today" in summary
 
 
 def test_unknown_link_type_on_read_is_unavailable_and_unlinkable(

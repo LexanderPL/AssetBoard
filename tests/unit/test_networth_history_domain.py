@@ -1,4 +1,4 @@
-"""Net-worth history domain (F5.3): month ends, ranges, source priority and dated values.
+"""Net-worth history domain (F5.9): month ends, ranges, clipping, values and breakdowns.
 
 The independent oracle for the date examples is the hand-written calendar below: month lengths
 were checked against the Gregorian calendar (2024 is a leap year), not produced by the function
@@ -8,7 +8,7 @@ under test.
 from __future__ import annotations
 
 import calendar
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from fractions import Fraction
 from uuid import UUID, uuid4
@@ -21,22 +21,22 @@ from assetboard.domain.money import Money
 from assetboard.domain.networth import Side, Unavailable, ValuationPoint
 from assetboard.domain.networth_history import (
     DEFAULT_HISTORY_RANGE,
+    HISTORY_RANGES,
     BreakdownCategory,
     ItemHistory,
-    backfill_month_ends,
+    ItemValue,
+    breakdown_for,
+    history_dates,
     history_start,
+    linked_for_date,
     month_end,
     month_ends,
     normalize_history_range,
-    parse_breakdown,
-    preferred_source,
     previous_month_end,
-    snapshot_breakdown,
-    source_rank,
+    summarize_values,
     value_on,
     values_at,
 )
-from assetboard.domain.networth_summary import SummaryItem, summarize_net_worth
 
 
 def _point(as_of: date, value_minor: int = 100) -> ValuationPoint:
@@ -54,6 +54,7 @@ def _item(
     link_type: str | None = None,
     link_id: UUID | None = None,
     estimate_between: bool = False,
+    created_at: datetime | None = None,
 ) -> ItemHistory:
     return ItemHistory(
         id=uuid4(),
@@ -67,6 +68,32 @@ def _item(
         link_type=link_type,
         link_id=link_id,
         estimate_between=estimate_between,
+        created_at=created_at,
+    )
+
+
+def _value(
+    *,
+    value_minor: int | None = 100,
+    currency: str = "EUR",
+    side: Side = Side.ASSET,
+    include: bool = True,
+    archived: bool = False,
+    unavailable: bool = False,
+    estimated: bool = False,
+) -> ItemValue:
+    return ItemValue(
+        id=uuid4(),
+        side=side,
+        category_id=uuid4(),
+        currency=currency,
+        include_in_net_worth=include,
+        archived_at=None,
+        archived=archived,
+        value_minor=value_minor,
+        value_as_of=date(2026, 1, 31) if value_minor is not None else None,
+        unavailable=unavailable,
+        estimated=estimated,
     )
 
 
@@ -95,16 +122,6 @@ def test_month_ends_are_inclusive_and_oldest_first() -> None:
     )
 
 
-def test_backfill_starts_at_the_earliest_valuations_month_end() -> None:
-    assert backfill_month_ends(date(2025, 12, 15), date(2026, 3, 1)) == (
-        date(2025, 12, 31),
-        date(2026, 1, 31),
-        date(2026, 2, 28),
-    )
-    assert backfill_month_ends(None, date(2026, 3, 1)) == ()
-    assert backfill_month_ends(date(2026, 3, 2), date(2026, 3, 1)) == ()
-
-
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
@@ -125,12 +142,170 @@ def test_history_start_handles_29_february() -> None:
     assert history_start(date(2028, 2, 29), "3y") == date(2025, 2, 28)
 
 
-def test_source_priority_is_manual_then_auto_then_backfill() -> None:
-    assert preferred_source(["backfill"]) == "backfill"
-    assert preferred_source(["backfill", "auto"]) == "auto"
-    assert preferred_source(["auto", "manual", "backfill"]) == "manual"
-    assert preferred_source([]) is None
-    assert [source_rank(source) for source in ("manual", "auto", "backfill")] == [0, 1, 2]
+def test_history_dates_fixed_ranges_include_every_completed_month_end_and_today() -> None:
+    today = date(2026, 11, 16)
+    earliest = date(2020, 1, 1)  # before every window: no clipping
+    expected = {
+        "1y": (date(2025, 11, 30), 13),
+        "3y": (date(2023, 11, 30), 37),
+        "5y": (date(2021, 11, 30), 61),
+    }
+    for code, (first, count) in expected.items():
+        dates = history_dates(today, code, earliest=earliest)
+        assert len(dates) == count
+        assert (dates[0], dates[-1]) == (first, today)
+        assert all(day == month_end(day) for day in dates[:-1])
+
+
+def test_history_dates_fixed_ranges_clip_to_the_earliest_recorded_value() -> None:
+    dates = history_dates(date(2026, 11, 16), "1y", earliest=date(2026, 9, 15))
+    assert dates == (date(2026, 9, 30), date(2026, 10, 31), date(2026, 11, 16))
+
+
+def test_history_dates_all_starts_at_the_earliest_recorded_value() -> None:
+    dates = history_dates(date(2026, 11, 16), "all", earliest=date(2024, 1, 15))
+    assert dates[0] == date(2024, 1, 31)
+    assert dates[-1] == date(2026, 11, 16)
+    # January 2024 through October 2026 is 34 completed month-ends.
+    assert len(dates) == 35
+
+
+def test_history_dates_no_data_returns_no_points() -> None:
+    assert history_dates(date(2026, 11, 16), "1y", earliest=None) == ()
+    assert history_dates(date(2026, 11, 16), "all", earliest=None) == ()
+
+
+@pytest.mark.parametrize(
+    ("today", "expected_last_month_end"),
+    [
+        (date(2026, 11, 30), date(2026, 10, 31)),
+        (date(2026, 12, 31), date(2026, 11, 30)),
+        (date(2026, 1, 1), date(2025, 12, 31)),
+    ],
+)
+def test_history_dates_never_duplicates_a_month_end_today(
+    today: date, expected_last_month_end: date
+) -> None:
+    dates = history_dates(today, "1y", earliest=today - timedelta(days=400))
+    assert dates[-2:] == (expected_last_month_end, today)
+    assert len(set(dates)) == len(dates)
+
+
+def test_history_dates_clips_inside_the_current_month_to_today_only() -> None:
+    assert history_dates(date(2026, 11, 16), "1y", earliest=date(2026, 11, 10)) == (
+        date(2026, 11, 16),
+    )
+
+
+def test_history_dates_normalises_unknown_ranges_and_handles_leap_day_starts() -> None:
+    expected = history_dates(date(2024, 2, 29), "1y", earliest=date(2020, 1, 1))
+    assert history_dates(date(2024, 2, 29), "unknown", earliest=date(2020, 1, 1)) == expected
+    assert expected[0] == date(2023, 2, 28)
+    assert expected[-1] == date(2024, 2, 29)
+
+
+@given(
+    today=st.dates(min_value=date(2000, 1, 1), max_value=date(2099, 12, 31)),
+    age=st.integers(min_value=0, max_value=2000),
+    code=st.sampled_from(HISTORY_RANGES),
+)
+def test_property_dates_are_ordered_month_ends_with_today_last(
+    today: date, age: int, code: str
+) -> None:
+    earliest = max(date(1900, 1, 1), today - timedelta(days=age))
+    dates = history_dates(today, code, earliest=earliest)
+    assert dates[-1] == today
+    assert dates == tuple(sorted(set(dates)))
+    assert all(day <= today for day in dates)
+    assert all(day == month_end(day) for day in dates[:-1])
+    start = history_start(today, code)
+    lower = earliest if start is None else max(start, earliest)
+    assert dates[0] >= lower
+
+
+def test_linked_for_date_returns_only_linked_items() -> None:
+    first = _item(valuation_mode="linked", link_type="portfolio_asset_class", link_id=uuid4())
+    second = _item(valuation_mode="linked", link_type="portfolio_asset_class", link_id=uuid4())
+    manual = _item()
+    resolved = {
+        (first.id, date(2026, 1, 31)): Money(500, "EUR"),
+        (second.id, date(2026, 1, 31)): Unavailable(),
+    }
+    linked = linked_for_date(resolved, (first, second, manual), date(2026, 1, 31))
+    assert linked == {first.id: Money(500, "EUR"), second.id: Unavailable()}
+    missing = linked_for_date({}, (first,), date(2026, 2, 28))
+    assert missing == {first.id: Unavailable()}
+
+
+def test_summarize_values_counts_only_included_base_estimates() -> None:
+    values = (
+        _value(value_minor=10_000, estimated=True),
+        _value(value_minor=5_000, include=False, estimated=True),
+        _value(value_minor=None),
+        _value(value_minor=7_000, archived=True, estimated=True),
+        _value(value_minor=2_000, currency="USD", estimated=True),
+        _value(value_minor=None, unavailable=True),
+    )
+    summary, estimated = summarize_values(values, currency="EUR")
+    assert summary.assets == Money(10_000, "EUR")
+    assert summary.liabilities == Money(0, "EUR")
+    assert summary.net == Money(10_000, "EUR")
+    assert estimated == 1
+    assert summary.non_base_item_ids == (values[4].id,)
+    assert summary.no_value_item_ids == (values[2].id,)
+    assert summary.excluded_item_ids == (values[1].id,)
+    assert summary.unavailable_item_ids == (values[5].id,)
+
+
+def test_breakdown_for_matches_the_category_and_not_counted_shape() -> None:
+    category_id = uuid4()
+    other_id = uuid4()
+    values = (
+        _value(value_minor=1_200, estimated=True),
+        _value(value_minor=200, side=Side.LIABILITY),
+        _value(value_minor=100, currency="USD"),
+        _value(value_minor=None),
+        _value(value_minor=None, unavailable=True),
+    )
+    # Give the first two values their own categories so the breakdown has two rows.
+    values = (
+        ItemValue(
+            id=values[0].id,
+            side=Side.ASSET,
+            category_id=category_id,
+            currency="EUR",
+            include_in_net_worth=True,
+            archived_at=None,
+            archived=False,
+            value_minor=1_200,
+            value_as_of=date(2026, 1, 31),
+            estimated=True,
+        ),
+        ItemValue(
+            id=values[1].id,
+            side=Side.LIABILITY,
+            category_id=other_id,
+            currency="EUR",
+            include_in_net_worth=True,
+            archived_at=None,
+            archived=False,
+            value_minor=200,
+            value_as_of=date(2026, 1, 31),
+        ),
+        *values[2:],
+    )
+    summary, estimated = summarize_values(values, currency="EUR")
+    breakdown = breakdown_for(summary, estimated=estimated)
+    assert breakdown.categories == (
+        BreakdownCategory(category_id, Side.ASSET, 1_200),
+        BreakdownCategory(other_id, Side.LIABILITY, 200),
+    )
+    assert (breakdown.non_base, breakdown.no_value, breakdown.unavailable, breakdown.estimated) == (
+        1,
+        1,
+        1,
+        1,
+    )
 
 
 def test_values_at_ignores_a_valuation_after_the_date() -> None:
@@ -191,36 +366,6 @@ def test_a_restored_item_counts_at_every_date() -> None:
     item = _item(archived_at=None, valuations=(_point(date(2026, 1, 1), 100),))
     assert all(not value.archived for value in values_at([item], date(2026, 1, 31), timezone="UTC"))
     assert all(not value.archived for value in values_at([item], date(2026, 6, 30), timezone="UTC"))
-
-
-def test_breakdown_round_trip_is_versioned_and_ignores_unknown_keys() -> None:
-    category_id = uuid4()
-    other_id = uuid4()
-    summary = summarize_net_worth(
-        [
-            SummaryItem(category_id, Side.ASSET, category_id, Money(1200, "EUR")),
-            SummaryItem(other_id, Side.LIABILITY, other_id, Money(200, "EUR")),
-            SummaryItem(uuid4(), Side.ASSET, uuid4(), Money(100, "USD")),
-            SummaryItem(uuid4(), Side.ASSET, uuid4(), None),
-        ],
-        currency="EUR",
-    )
-    raw = snapshot_breakdown(summary)
-    assert raw["v"] == 1
-    assert raw["not_counted"] == {"non_base": 1, "no_value": 1, "unavailable": 0}
-    assert raw["estimated"] == 0
-    assert parse_breakdown(raw).estimated == 0
-    assert parse_breakdown({**raw, "estimated": 3}).estimated == 3
-    assert parse_breakdown({"v": 1, "categories": []}).estimated == 0
-    parsed = parse_breakdown(raw)
-    assert parsed.categories == (
-        BreakdownCategory(category_id, Side.ASSET, 1200),
-        BreakdownCategory(other_id, Side.LIABILITY, 200),
-    )
-    future = {"v": 99, **raw, "unavailable": 1, "categories": raw["categories"]}
-    assert parse_breakdown(future).categories == parsed.categories
-    assert parse_breakdown(None).categories == ()
-    assert parse_breakdown({"categories": [{"category_id": "nope"}]}).categories == ()
 
 
 @given(st.dates(min_value=date(1900, 1, 1), max_value=date(2199, 12, 31)))

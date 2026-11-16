@@ -1,4 +1,4 @@
-"""View models for net-worth history (F5.3): chart data, table rows and source badges."""
+"""View models for the derived net-worth trend (F5.9): chart data, table rows and ranges."""
 
 from __future__ import annotations
 
@@ -8,15 +8,11 @@ from uuid import UUID
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.domain.networth_history import HISTORY_RANGES, month_end
+from assetboard.domain.networth_history import HISTORY_RANGES, SnapshotBreakdown, month_end
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day, format_month
 from assetboard.i18n.numbers import format_money
-from assetboard.services.networth_snapshots import (
-    HistoryCategory,
-    HistorySnapshot,
-    NetWorthHistoryData,
-)
+from assetboard.services.networth_history import HistoryCategory, HistoryPoint, NetWorthHistoryData
 
 
 def _(message: str) -> str:
@@ -29,11 +25,6 @@ RANGE_LABELS = {
     "3y": _("3 years"),
     "5y": _("5 years"),
     "all": _("All time"),
-}
-SOURCE_LABELS = {
-    "manual": _("Manual"),
-    "auto": _("Automatic"),
-    "backfill": _("From history"),
 }
 SERIES_COLORS = {
     "net": "primary-ink",
@@ -58,42 +49,33 @@ class BreakdownRow:
 
 
 @dataclass(frozen=True, slots=True)
-class HistoryRow:
+class TrendRow:
     as_of: date
     as_of_text: str
-    source: str
-    source_label: str
+    live: bool
     net: str
     assets: str
     liabilities: str
-    currency: str
-    charted: bool
     breakdown: tuple[BreakdownRow, ...]
     not_counted: tuple[str, ...]
     estimated_note: str | None
 
 
 @dataclass(frozen=True, slots=True)
-class HistoryView:
+class NetWorthTrendView:
     base_currency: str
     range_code: str
     range_options: tuple[RangeOption, ...]
-    rows: tuple[HistoryRow, ...]
+    rows: tuple[TrendRow, ...]
     chart: dict[str, object] | None
-    other_currency_count: int
-    can_edit: bool
-    notice: str | None
-    error: str | None
-
-    @property
-    def has_chart(self) -> bool:
-        return self.chart is not None
+    has_chart: bool
+    has_recorded_values: bool
 
 
-def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
+def _not_counted(breakdown: SnapshotBreakdown, locale: str) -> tuple[str, ...]:
     lines: list[str] = []
-    if point.breakdown.non_base:
-        count = point.breakdown.non_base
+    if breakdown.non_base:
+        count = breakdown.non_base
         lines.append(
             ngettext(
                 "%(num)d item in another currency was not counted.",
@@ -103,8 +85,8 @@ def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
             )
             % {"num": count}
         )
-    if point.breakdown.no_value:
-        count = point.breakdown.no_value
+    if breakdown.no_value:
+        count = breakdown.no_value
         lines.append(
             ngettext(
                 "%(num)d item had no value yet and was not counted.",
@@ -114,8 +96,8 @@ def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
             )
             % {"num": count}
         )
-    if point.breakdown.unavailable:
-        count = point.breakdown.unavailable
+    if breakdown.unavailable:
+        count = breakdown.unavailable
         lines.append(
             ngettext(
                 "%(num)d linked item was unavailable and was not counted.",
@@ -128,24 +110,26 @@ def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
     return tuple(lines)
 
 
-def _estimated_note(point: HistorySnapshot, locale: str) -> str | None:
-    if point.breakdown.estimated <= 0:
+def _estimated_note(breakdown: SnapshotBreakdown, locale: str) -> str | None:
+    if breakdown.estimated <= 0:
         return None
     return ngettext(
         "includes %(num)d estimated value",
         "includes %(num)d estimated values",
-        point.breakdown.estimated,
+        breakdown.estimated,
         locale,
-    ) % {"num": point.breakdown.estimated}
+    ) % {"num": breakdown.estimated}
 
 
 def _breakdown(
-    point: HistorySnapshot,
+    breakdown: SnapshotBreakdown,
     categories: dict[UUID, HistoryCategory],
+    *,
+    currency: str,
     locale: str,
 ) -> tuple[BreakdownRow, ...]:
     rows: list[BreakdownRow] = []
-    for total in point.breakdown.categories:
+    for total in breakdown.categories:
         category: HistoryCategory | None = categories.get(total.category_id)
         name = category.name if category is not None else gettext("Deleted category", locale)
         side = category.side.value if category is not None else total.side.value
@@ -154,7 +138,7 @@ def _breakdown(
             BreakdownRow(
                 name=name,
                 side=gettext(side_label, locale),
-                amount=format_money(Money(total.total_minor, point.currency), locale),
+                amount=format_money(Money(total.total_minor, currency), locale),
                 color=category.color if category is not None else None,
             )
         )
@@ -197,7 +181,7 @@ def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int,
 
 
 def _chart(
-    points: tuple[HistorySnapshot, ...],
+    points: tuple[HistoryPoint, ...],
     categories: dict[UUID, HistoryCategory],
     *,
     base_currency: str,
@@ -213,10 +197,15 @@ def _chart(
     for point in points:
         lines = [
             f"{row.side} · {row.name}: {row.amount}"
-            for row in _breakdown(point, categories, locale)
+            for row in _breakdown(
+                point.breakdown,
+                categories,
+                currency=base_currency,
+                locale=locale,
+            )
         ]
-        lines.extend(_not_counted(point, locale))
-        estimated_note = _estimated_note(point, locale)
+        lines.extend(_not_counted(point.breakdown, locale))
+        estimated_note = _estimated_note(point.breakdown, locale)
         if estimated_note is not None:
             lines.append(estimated_note)
         tooltips.append(lines)
@@ -253,32 +242,27 @@ def _chart(
     }
 
 
-def build_history_view(
-    data: NetWorthHistoryData,
-    locale: str,
-    *,
-    can_edit: bool,
-    notice: str | None = None,
-    error: str | None = None,
-) -> HistoryView:
+def build_trend_view(data: NetWorthHistoryData, locale: str) -> NetWorthTrendView:
     rows = tuple(
-        HistoryRow(
+        TrendRow(
             as_of=point.as_of,
             as_of_text=_point_label(point.as_of, locale),
-            source=point.source,
-            source_label=gettext(SOURCE_LABELS.get(point.source, point.source), locale),
+            live=point.live,
             net=format_money(point.net, locale),
             assets=format_money(point.assets, locale),
             liabilities=format_money(point.liabilities, locale),
-            currency=point.currency,
-            charted=point.charted,
-            breakdown=_breakdown(point, data.categories, locale),
-            not_counted=_not_counted(point, locale),
-            estimated_note=_estimated_note(point, locale),
+            breakdown=_breakdown(
+                point.breakdown,
+                data.categories,
+                currency=data.base_currency,
+                locale=locale,
+            ),
+            not_counted=_not_counted(point.breakdown, locale),
+            estimated_note=_estimated_note(point.breakdown, locale),
         )
-        for point in data.snapshots
+        for point in data.points
     )
-    return HistoryView(
+    return NetWorthTrendView(
         base_currency=data.base_currency,
         range_code=data.range_code,
         range_options=tuple(
@@ -290,14 +274,16 @@ def build_history_view(
             for code in HISTORY_RANGES
         ),
         rows=rows,
-        chart=_chart(
-            data.charted,
-            data.categories,
-            base_currency=data.base_currency,
-            locale=locale,
+        chart=(
+            _chart(
+                data.points,
+                data.categories,
+                base_currency=data.base_currency,
+                locale=locale,
+            )
+            if data.has_chart
+            else None
         ),
-        other_currency_count=data.other_currency_count,
-        can_edit=can_edit,
-        notice=notice,
-        error=error,
+        has_chart=data.has_chart,
+        has_recorded_values=data.has_recorded_values,
     )

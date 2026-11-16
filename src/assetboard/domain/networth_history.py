@@ -1,36 +1,34 @@
-"""Net-worth history (F5.3): month ends, date-dependent values, snapshots and ranges.
+"""Net-worth history (F5.9): completed month-ends, derived values, breakdowns and ranges.
 
 Pure: no I/O, database or clock access. Services pass "today" and the workspace time zone in
-from the injected ``Clock``. Values are selected from the same ``ItemHistory`` that
-``services.networth.current_values`` uses, so the summary, the automatic snapshot and the
-backfill cannot drift apart.
+from the injected ``Clock``. Every derived point and the Summary's live point go through
+``values_at`` with the same rules, so the figure and the trend cannot drift apart.
 
 An item counts up to its archive date: at month-end ``D`` it is excluded only when its
 ``archived_at`` falls on or before ``D`` in the workspace's time zone. A restored item has no
-``archived_at`` and counts at every date. ``include_in_net_worth`` has no history in F5.3, so the
-current setting applies to every date.
+``archived_at`` and counts at every date. ``include_in_net_worth`` has no history, so the current
+setting applies to every date.
+
+The stored-snapshot era is over: F5.9 derives each point on read and never reads
+``NetWorthSnapshot``. The ``SnapshotBreakdown`` type keeps its historical name because it
+describes the same per-category shape that the Summary warning and account for.
 """
 
 from __future__ import annotations
 
 import calendar
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from assetboard.domain.money import Money
 from assetboard.domain.networth import Side, Unavailable, ValuationPoint, current_valuation
-from assetboard.domain.networth_summary import NetWorthSummary
+from assetboard.domain.networth_summary import NetWorthSummary, SummaryItem, summarize_net_worth
 
 HISTORY_RANGES = ("1y", "3y", "5y", "all")
 DEFAULT_HISTORY_RANGE = "1y"
-SNAPSHOT_SOURCES = ("auto", "manual", "backfill")
-# Lower wins when several sources exist for the same date.
-SOURCE_PRIORITY = {"manual": 0, "auto": 1, "backfill": 2}
-BREAKDOWN_VERSION = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +46,7 @@ class ItemHistory:
     link_type: str | None = None
     link_id: UUID | None = None
     estimate_between: bool = False
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +75,7 @@ class BreakdownCategory:
 
 @dataclass(frozen=True, slots=True)
 class SnapshotBreakdown:
-    """The versioned JSON stored on a snapshot; unknown keys are ignored."""
+    """The category totals and not-counted counts of one derived history point."""
 
     categories: tuple[BreakdownCategory, ...]
     non_base: int
@@ -111,21 +110,6 @@ def month_ends(start: date, end: date) -> tuple[date, ...]:
     return tuple(months)
 
 
-def backfill_month_ends(earliest_valuation: date | None, today: date) -> tuple[date, ...]:
-    """Month-ends from the earliest valuation's month through the previous month.
-
-    No valuations, or a first valuation in the current month, means there is nothing to
-    backfill yet.
-    """
-    if earliest_valuation is None:
-        return ()
-    first = month_end(earliest_valuation)
-    last = previous_month_end(today)
-    if first > last:
-        return ()
-    return month_ends(first, last)
-
-
 def _years_before(day: date, years: int) -> date:
     try:
         return day.replace(year=day.year - years)
@@ -139,18 +123,46 @@ def normalize_history_range(value: str) -> str:
 
 
 def history_start(today: date, range_code: str) -> date | None:
-    """The first date included by ``range_code``; ``None`` means every stored snapshot."""
+    """The first date included by ``range_code``; ``None`` means all recorded history."""
     years = {"1y": 1, "3y": 3, "5y": 5}.get(normalize_history_range(range_code))
     return None if years is None else _years_before(today, years)
 
 
-def source_rank(source: str) -> int:
-    return SOURCE_PRIORITY[source]
+def history_dates(
+    today: date,
+    range_code: str,
+    *,
+    earliest: date | None,
+) -> tuple[date, ...]:
+    """Every completed month-end in the clipped range, then today as the live point.
+
+    ``earliest`` is the first date with recorded data (a manual valuation or a linked item's
+    creation). A fixed range starts at ``max(range_start, earliest)`` so the chart never opens
+    with leading zero months; ``all`` starts at ``earliest``. With no data there are no points.
+    Today is always last and never duplicates a month-end: the completed months stop at the
+    previous month-end.
+    """
+    if earliest is None:
+        return ()
+    start = history_start(today, range_code)
+    clipped = earliest if start is None else max(start, earliest)
+    end = previous_month_end(today)
+    if clipped > end:
+        return (today,)
+    return (*month_ends(clipped, end), today)
 
 
-def preferred_source(sources: Iterable[str]) -> str | None:
-    """The source shown when several snapshots share a date: manual > auto > backfill."""
-    return min(sources, key=source_rank, default=None)
+def linked_for_date(
+    resolved: Mapping[tuple[UUID, date], Money | Unavailable],
+    histories: Sequence[ItemHistory],
+    as_of: date,
+) -> dict[UUID, Money | Unavailable]:
+    """Every linked item's resolution for ``as_of``; a missing key is unavailable, never zero."""
+    return {
+        item.id: resolved.get((item.id, as_of), Unavailable())
+        for item in histories
+        if item.valuation_mode == "linked"
+    }
 
 
 def archived_on(archived_at: datetime | None, timezone: str) -> date | None:
@@ -212,7 +224,8 @@ def values_at(
     date onwards; that date itself is already excluded (the owner's decision).
 
     ``backfill`` enables the F5.6 straight-line estimate for manual items whose
-    ``estimate_between`` switch is on. Every other caller keeps the F5.3 rule.
+    ``estimate_between`` switch is on. F5.9 passes it for completed month-ends only; today's
+    live point is never estimated, and every other caller keeps the F5.3 rule.
     """
     values: list[ItemValue] = []
     for item in items:
@@ -268,65 +281,53 @@ def values_at(
     return tuple(values)
 
 
-def snapshot_breakdown(summary: NetWorthSummary, *, estimated: int = 0) -> dict[str, object]:
-    """The versioned object stored in a snapshot's ``breakdown`` column."""
-    categories = [
-        {
-            "category_id": str(category.category_id),
-            "side": category.side.value,
-            "total_minor": category.total.amount_minor,
-        }
+def summarize_values(values: Sequence[ItemValue], *, currency: str) -> tuple[NetWorthSummary, int]:
+    """The summary totals and the number of counted estimates for one history point."""
+    summary = summarize_net_worth(
+        (
+            SummaryItem(
+                id=value.id,
+                side=value.side,
+                category_id=value.category_id,
+                value=(
+                    Money(value.value_minor, value.currency)
+                    if value.value_minor is not None
+                    else None
+                ),
+                include_in_net_worth=value.include_in_net_worth,
+                archived=value.archived,
+                unavailable=value.unavailable,
+            )
+            for value in values
+        ),
+        currency=currency,
+    )
+    estimated = sum(
+        1
+        for value in values
+        if value.estimated
+        and not value.archived
+        and value.include_in_net_worth
+        and value.value_minor is not None
+        and value.currency == currency
+    )
+    return summary, estimated
+
+
+def breakdown_for(summary: NetWorthSummary, *, estimated: int = 0) -> SnapshotBreakdown:
+    """The category totals and not-counted counts of one derived history point."""
+    categories = tuple(
+        BreakdownCategory(
+            category_id=category.category_id,
+            side=category.side,
+            total_minor=category.total.amount_minor,
+        )
         for category in (*summary.asset_categories, *summary.liability_categories)
-    ]
-    return {
-        "v": BREAKDOWN_VERSION,
-        "categories": categories,
-        "not_counted": {
-            "non_base": len(summary.non_base_item_ids),
-            "no_value": len(summary.no_value_item_ids),
-            "unavailable": len(summary.unavailable_item_ids),
-        },
-        "estimated": estimated,
-    }
-
-
-def _mapping(value: object) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        return {}
-    return cast(Mapping[str, object], value)
-
-
-def _optional_count(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        return 0
-    return value
-
-
-def parse_breakdown(raw: object) -> SnapshotBreakdown:
-    """Read a stored breakdown, ignoring unknown keys and malformed entries."""
-    root = _mapping(raw)
-    categories: list[BreakdownCategory] = []
-    rows = root.get("categories")
-    if isinstance(rows, list):
-        for entry in cast(list[object], rows):
-            row = _mapping(entry)
-            category_id = row.get("category_id")
-            side = row.get("side")
-            total = row.get("total_minor")
-            if not isinstance(category_id, str) or side not in {s.value for s in Side}:
-                continue
-            if isinstance(total, bool) or not isinstance(total, int) or total < 0:
-                continue
-            try:
-                parsed_id = UUID(category_id)
-            except ValueError:
-                continue
-            categories.append(BreakdownCategory(parsed_id, Side(str(side)), total))
-    counts = _mapping(root.get("not_counted"))
+    )
     return SnapshotBreakdown(
-        tuple(categories),
-        _optional_count(counts.get("non_base")),
-        _optional_count(counts.get("no_value")),
-        _optional_count(counts.get("unavailable")),
-        _optional_count(root.get("estimated")),
+        categories=categories,
+        non_base=len(summary.non_base_item_ids),
+        no_value=len(summary.no_value_item_ids),
+        unavailable=len(summary.unavailable_item_ids),
+        estimated=estimated,
     )

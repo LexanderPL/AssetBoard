@@ -115,7 +115,7 @@ family ahead of the security review.
   zone, configurable on the same settings page) replaces the demo workspace's data with a fresh
   build in one transaction, keeping the workspace id so open demo sessions keep working. A
   failed reset leaves the previous data and is reported to administrators like a failed backup
-  (F9.4). Other scheduled jobs (auto-post, notifications, snapshots) skip the demo workspace;
+  (F9.4). Other scheduled jobs (auto-post, notifications) skip the demo workspace;
   it has no notification channels or price providers, so it makes no external calls.
 - **No email, no PII.** All data is synthetic (no real names, places or accounts). The demo
   needs no email address and sends no mail. If `Context` needs a user, it is a system account

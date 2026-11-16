@@ -6,6 +6,5 @@
   <a href="{{ scoped_url(request, 'networth_summary') }}" data-summary-tab{% if active == "summary" %} aria-current="page"{% endif %}>{{ _("Summary") }}</a>
   <a href="{{ scoped_url(request, 'networth') }}?side=asset" data-side-tab="asset"{% if active == "asset" %} aria-current="page"{% endif %}>{{ _("Assets") }}</a>
   <a href="{{ scoped_url(request, 'networth') }}?side=liability" data-side-tab="liability"{% if active == "liability" %} aria-current="page"{% endif %}>{{ _("Liabilities") }}</a>
-  <a href="{{ scoped_url(request, 'networth_history') }}" data-history-tab{% if active == "history" %} aria-current="page"{% endif %}>{{ _("History") }}</a>
 </nav>
 {%- endmacro %}

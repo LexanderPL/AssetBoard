@@ -16,8 +16,8 @@ each feature.
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
 **Data model:** none. Reports read existing rows (transactions, categories, and in Phase B
-net-worth snapshots and portfolio data) and store nothing; there is nothing to add to the M4
-archive.
+the derived net-worth history and portfolio data) and store nothing; there is nothing to add to
+the M4 archive.
 
 **Shared rules for every report**
 - **Page:** `/reports` ("Reports", pl "Raporty") in the sidebar after History. Every member,
@@ -65,7 +65,7 @@ archive.
 | Phase | Features | Depends on |
 |---|---|---|
 | A (ledger only) | F10.1, F10.2, F10.3 | M2 (F2.4; F2.7 for the chart conventions) |
-| B | F10.4 | M5 (F5.3 snapshots) |
+| B | F10.4 | M5 (F5.9 derived history) |
 | B | F10.5 | M6 (F6.7 `portfolio_series`) |
 
 ---
@@ -161,19 +161,20 @@ multi-select and the savings option, and the category x period table. Property t
 ## F10.4 Net worth over time (Phase B, depends on M5)
 
 **Acceptance**
-- Shown only when the workspace has net-worth snapshots (F5.3); before M5 exists the section is
+- Shown only when the workspace has net-worth values (F5.9); before M5 exists the section is
   absent, not disabled.
-- Line chart per period: assets, liabilities and net worth, from `NetWorthSnapshot` (the last
-  snapshot in each month or year; `backfill` snapshots are marked in the table, and a real
-  snapshot wins over a backfill of the same date, as F5.3 says).
-- Snapshots in another currency than the filter are left out and counted in a note.
-- Periods without a snapshot are gaps, never interpolated.
+- Line chart per period: assets, liabilities and net worth, from F5.9's derived history service.
+  The report reuses that service rather than reading `NetWorthSnapshot`; stored snapshots are
+  legacy archive data.
+- Base currency only, as the derived service already is. Non-base items stay excluded with the
+  same warning as the Summary.
+- Periods without a derived point are gaps, never interpolated.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports from F5.3's snapshots (last per period,
-backfill marked, gaps not interpolated), hidden when there are no snapshots.
+Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports from F5.9's derived history
+service (last point per period, gaps not interpolated), hidden when there are no values. Do not read stored snapshots.
 ```
 
 ---

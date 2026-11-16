@@ -12,7 +12,6 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
-from assetboard.db.models.networth import NetWorthSnapshot
 from assetboard.db.repositories import ItemValuationRepository
 from assetboard.domain.money import Money
 from assetboard.domain.networth import Side
@@ -29,11 +28,7 @@ from assetboard.services.networth import (
     unlink_item,
     update_item,
 )
-from assetboard.services.networth_snapshots import (
-    backfill_snapshots,
-    take_auto_snapshot,
-    take_manual_snapshot,
-)
+from assetboard.services.networth_history import networth_history
 from assetboard.services.networth_summary import networth_summary
 from tests.fake_links import FakeLinks, FakeTarget
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -287,10 +282,10 @@ def test_duplicate_active_links_and_restore_are_refused(
     assert get_item(team.factory, ctx, first.id).valuation_mode == "linked"
 
 
-def test_unavailable_linked_item_is_flagged_and_snapshot_records_it(
+def test_unavailable_linked_item_is_flagged_in_the_summary_and_history(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:
-    _at(team, "2026-03-15T12:00:00+00:00")
+    _at(team, "2026-01-01T12:00:00+00:00")
     target = _target(team, values={})
     fake_links.register(targets=[target])
     ctx = team.ctx("ed", "editor")
@@ -299,13 +294,13 @@ def test_unavailable_linked_item_is_flagged_and_snapshot_records_it(
     assert item.unavailable and item.current is None
     summary = networth_summary(team.factory, ctx)
     assert [warning.id for warning in summary.unavailable_items] == [item.id]
-    take_manual_snapshot(team.factory, ctx)
-    with team.factory() as session:
-        snapshot = session.scalars(
-            select(NetWorthSnapshot).where(NetWorthSnapshot.workspace_id == team.workspace_id)
-        ).one()
-    assert snapshot.breakdown["not_counted"]["unavailable"] == 1
-    assert _events(team, "networth_snapshot.taken")
+
+    _at(team, "2026-03-15T12:00:00+00:00")
+    history = networth_history(team.factory, ctx, "1y")
+    assert history.points
+    assert all(point.breakdown.unavailable == 1 for point in history.points)
+    assert history.has_chart is False
+    assert _events(team, "networth_snapshot.taken") == []
 
 
 def test_one_item_write_resolves_only_that_item(team: WorkspaceDb, fake_links: FakeLinks) -> None:
@@ -402,7 +397,7 @@ def test_wrong_currency_resolution_counts_as_unavailable(
 def test_unknown_type_on_read_is_unavailable_and_can_be_unlinked(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:
-    _at(team, "2026-03-15T12:00:00+00:00")
+    _at(team, "2026-01-01T12:00:00+00:00")
     target = _target(team, values={date(2026, 3, 15): 100})
     fake_links.register(targets=[target])
     ctx = team.ctx("ed", "editor")
@@ -412,20 +407,17 @@ def test_unknown_type_on_read_is_unavailable_and_can_be_unlinked(
     read = get_item(team.factory, ctx, item.id)
     assert read.unavailable and read.current is None
     assert read.link_name is None and read.link_label is None and read.link_url is None
-    take_manual_snapshot(team.factory, ctx)
-    with team.factory() as session:
-        snapshot = session.scalars(
-            select(NetWorthSnapshot).where(NetWorthSnapshot.workspace_id == team.workspace_id)
-        ).one()
-    assert snapshot.breakdown["not_counted"]["unavailable"] == 1
+    _at(team, "2026-03-15T12:00:00+00:00")
+    history = networth_history(team.factory, ctx, "1y")
+    assert all(point.breakdown.unavailable == 1 for point in history.points)
     result = unlink_item(team.factory, ctx, item.id)
     assert not result.value_recorded and result.item.valuation_mode == "manual"
 
 
-def test_backfill_resolves_linked_values_once_for_all_month_ends(
+def test_history_resolves_linked_values_once_for_all_month_ends(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:
-    _at(team, "2026-03-15T12:00:00+00:00")
+    _at(team, "2026-01-01T12:00:00+00:00")
     target = _target(
         team,
         values={
@@ -439,60 +431,50 @@ def test_backfill_resolves_linked_values_once_for_all_month_ends(
     _manual_item(team, ctx, category, value="0", as_of=date(2026, 1, 1))
     _linked_item(team, ctx, category, target)
     spec.calls.clear()
-    result = backfill_snapshots(team.factory, ctx)
-    assert (result.from_date, result.to_date) == (
-        date(2026, 1, 31),
-        date(2026, 2, 28),
-    )
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+
+    history = networth_history(team.factory, ctx, "1y")
     assert len(spec.calls) == 1
     workspace_id, link_ids, dates = spec.calls[0]
     assert workspace_id == team.workspace_id
     assert link_ids == {target.link_id}
-    assert dates == (date(2026, 1, 31), date(2026, 2, 28))
-    with team.factory() as session:
-        rows = list(
-            session.scalars(
-                select(NetWorthSnapshot)
-                .where(NetWorthSnapshot.workspace_id == team.workspace_id)
-                .order_by(NetWorthSnapshot.as_of)
-            )
-        )
-    assert [row.assets_minor for row in rows] == [100, 200]
-    assert rows[0].breakdown["not_counted"]["unavailable"] == 0
+    assert date(2026, 1, 31) in dates and date(2026, 2, 28) in dates
+    assert dates[-1] == date(2026, 3, 15)
+    january = next(point for point in history.points if point.as_of == date(2026, 1, 31))
+    february = next(point for point in history.points if point.as_of == date(2026, 2, 28))
+    assert (january.assets.amount_minor, february.assets.amount_minor) == (100, 200)
+    assert all(point.breakdown.unavailable == 0 for point in history.points[:-1])
 
 
-def test_manual_snapshot_uses_the_linked_value_today(
-    team: WorkspaceDb, fake_links: FakeLinks
-) -> None:
-    _at(team, "2026-03-15T12:00:00+00:00")
+def test_history_uses_the_live_linked_value_today(team: WorkspaceDb, fake_links: FakeLinks) -> None:
+    _at(team, "2026-01-01T12:00:00+00:00")
     target = _target(team, values={date(2026, 3, 15): 900})
     fake_links.register(targets=[target])
     ctx = team.ctx("ed", "editor")
     category = _category(team, ctx)
     _linked_item(team, ctx, category, target)
-    take_manual_snapshot(team.factory, ctx)
-    with team.factory() as session:
-        row = session.scalars(
-            select(NetWorthSnapshot).where(NetWorthSnapshot.workspace_id == team.workspace_id)
-        ).one()
-    assert (row.as_of, row.assets_minor) == (date(2026, 3, 15), 900)
+    _at(team, "2026-03-15T12:00:00+00:00")
+    history = networth_history(team.factory, team.ctx("ed", "editor"), "1y")
+    assert history.points[-1].as_of == date(2026, 3, 15)
+    assert history.points[-1].assets == Money(900, "EUR")
+    assert history.points[-1].live
 
 
-def test_auto_snapshot_uses_the_linked_value_at_the_month_end(
+def test_history_uses_the_historical_linked_value_at_the_month_end(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:
-    _at(team, "2026-03-15T12:00:00+00:00")
+    _at(team, "2026-01-01T12:00:00+00:00")
     target = _target(team, values={date(2026, 2, 28): 700})
     fake_links.register(targets=[target])
     ctx = team.ctx("ed", "editor")
     category = _category(team, ctx)
     _linked_item(team, ctx, category, target)
-    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is True
-    with team.factory() as session:
-        row = session.scalars(
-            select(NetWorthSnapshot).where(NetWorthSnapshot.workspace_id == team.workspace_id)
-        ).one()
-    assert (row.as_of, row.assets_minor) == (date(2026, 2, 28), 700)
+    _at(team, "2026-03-15T12:00:00+00:00")
+    history = networth_history(team.factory, team.ctx("ed", "editor"), "1y")
+    february = next(point for point in history.points if point.as_of == date(2026, 2, 28))
+    assert february.assets == Money(700, "EUR")
+    assert history.points[-1].assets == Money(0, "EUR")
 
 
 def test_only_editors_can_link_or_unlink(team: WorkspaceDb, fake_links: FakeLinks) -> None:

@@ -4551,12 +4551,6 @@ msgstr "5 lat"
 msgid "All time"
 msgstr "Cały okres"
 
-msgid "Manual"
-msgstr "Ręczna"
-
-msgid "From history"
-msgstr "Z historii"
-
 #, python-format
 msgid "%(num)d item in another currency was not counted."
 msgid_plural "%(num)d items in another currency were not counted."
@@ -4593,21 +4587,6 @@ msgstr "Aktywa"
 
 msgid "Liabilities"
 msgstr "Zobowiązania"
-
-msgid "Snapshot saved."
-msgstr "Migawka zapisana."
-
-msgid "Snapshot replaced."
-msgstr "Migawka zastąpiona."
-
-msgid "History rebuilt from stored values."
-msgstr "Historia odtworzona z zapisanych wartości."
-
-msgid "There are no stored values to backfill yet."
-msgstr "Nie ma jeszcze zapisanych wartości do uzupełnienia historii."
-
-msgid "A snapshot cannot be dated in the future."
-msgstr "Migawka nie może mieć przyszłej daty."
 
 msgid "Enter notes of at most 200 characters."
 msgstr "Podaj notatki o długości do 200 znaków."
@@ -8971,6 +8950,9 @@ msgstr "Zapisz cele ryzyka"
 msgid "Chart scope"
 msgstr "Zakres wykresu"
 
+msgid "Manual"
+msgstr "Ręczna"
+
 msgid "Transaction"
 msgstr "Transakcja"
 
@@ -11521,11 +11503,12 @@ msgid "Estimate values between entries"
 msgstr "Szacuj wartości między wpisami"
 
 msgid ""
-"Backfill draws a straight line between recorded values. Re-run Backfill "
-"from history after changing this."
+"Estimates draw a straight line between recorded values on the net-worth "
+"chart for past month-ends; today's value is never estimated."
 msgstr ""
-"Uzupełnianie historii rysuje prostą między zapisanymi wartościami. Po "
-"zmianie tego ustawienia ponownie uruchom Uzupełnij z historii."
+"Szacunki rysują prostą linię między zapisanymi wartościami na wykresie "
+"wartości netto dla minionych końców miesięcy; dzisiejsza wartość nigdy "
+"nie jest szacowana."
 
 msgid "Enter values as positive amounts. For a liability, enter the amount owed."
 msgstr ""
@@ -11571,42 +11554,6 @@ msgstr ""
 "Zarchiwizowane pozycje zachowują historię wartości, ale nie wliczają się "
 "do majątku netto."
 
-msgid ""
-"Automatic snapshots are stored on the 1st of each month at 04:00 in the "
-"workspace time zone. Manual snapshots are never recalculated; Backfill "
-"rebuilds automatic rows for past months."
-msgstr ""
-"Migawki automatyczne są zapisywane 1. dnia każdego miesiąca o 04:00 w "
-"strefie czasowej obszaru roboczego. Migawki ręczne nigdy nie są "
-"przeliczane; Uzupełnianie historii odtwarza automatyczne wiersze z "
-"poprzednich miesięcy."
-
-msgid "Take snapshot now"
-msgstr "Zrób migawkę teraz"
-
-msgid "Backfill from history"
-msgstr "Uzupełnij historię"
-
-#, python-format
-msgid "%(num)d snapshot is in another currency and is not charted."
-msgid_plural "%(num)d snapshots are in another currency and are not charted."
-msgstr[0] "%(num)d migawka jest w innej walucie i nie jest pokazywana na wykresie."
-msgstr[1] "%(num)d migawki są w innej walucie i nie są pokazywane na wykresie."
-msgstr[2] "%(num)d migawek jest w innej walucie i nie jest pokazywanych na wykresie."
-
-msgid "Net worth history"
-msgstr "Historia majątku netto"
-
-msgid "Breakdown"
-msgstr "Szczegóły"
-
-msgid ""
-"No snapshots yet. The first automatic snapshot needs at least one net-"
-"worth item."
-msgstr ""
-"Nie ma jeszcze migawek. Pierwsza migawka automatyczna wymaga co najmniej "
-"jednej pozycji majątku netto."
-
 #, python-format
 msgid "Not in totals (%(currency)s)"
 msgstr "Poza sumami (%(currency)s)"
@@ -11627,12 +11574,8 @@ msgstr "niedostępnym źródłem"
 msgid "Value unavailable"
 msgstr "Wartość niedostępna"
 
-msgid ""
-"Stored snapshots are not recalculated. Re-run Backfill from history after"
-" correcting a past value."
-msgstr ""
-"Zapisane migawki nie są przeliczane. Po poprawieniu wcześniejszej "
-"wartości uruchom ponownie Uzupełnianie z historii."
+msgid "The net-worth chart uses the corrected value the next time it loads."
+msgstr "Wykres wartości netto użyje poprawionej wartości przy następnym wczytaniu."
 
 msgid "This value comes from the linked source and is read-only."
 msgstr "Ta wartość pochodzi z powiązanego źródła i jest tylko do odczytu."
@@ -11709,6 +11652,30 @@ msgstr "Brak liczonych kategorii"
 
 msgid "Show items"
 msgstr "Pokaż pozycje"
+
+msgid ""
+"Calculated from your saved values each time the page loads. Past month-"
+"ends use your value history, linked items and prices; today is live."
+msgstr ""
+"Obliczane za każdym wczytaniem strony z Twoich zapisanych wartości. "
+"Minione końce miesięcy korzystają z historii wartości, powiązanych "
+"pozycji i cen; dzisiejsza wartość jest bieżąca."
+
+msgid "Monthly values"
+msgstr "Wartości miesięczne"
+
+msgid "Breakdown"
+msgstr "Szczegóły"
+
+msgid ""
+"No values are counted for this range. The warnings below explain any "
+"items that were not counted."
+msgstr ""
+"Dla tego zakresu nie są liczone żadne wartości. Ostrzeżenia poniżej "
+"wyjaśniają pozycje, które nie zostały uwzględnione."
+
+msgid "No values yet. Add an item and its first value to see the trend."
+msgstr "Brak wartości. Dodaj pozycję i jej pierwszą wartość, aby zobaczyć trend."
 
 msgid "New channel"
 msgstr "Nowy kanał"
@@ -12837,9 +12804,6 @@ msgstr "Pozycje majątku do usunięcia"
 
 msgid "Item valuations to remove"
 msgstr "Wyceny pozycji do usunięcia"
-
-msgid "Net-worth snapshots to remove"
-msgstr "Migawki majątku netto do usunięcia"
 
 msgid "Settings to restore:"
 msgstr "Ustawienia do przywrócenia:"
@@ -14914,4 +14878,84 @@ msgstr "Usuń obszar roboczy…"
 #~ msgstr ""
 #~ "Przy tych danych zyski nigdy nie "
 #~ "pokrywają wydatków przed wiekiem %(age)d."
+
+#~ msgid "From history"
+#~ msgstr "Z historii"
+
+#~ msgid "Snapshot saved."
+#~ msgstr "Migawka zapisana."
+
+#~ msgid "Snapshot replaced."
+#~ msgstr "Migawka zastąpiona."
+
+#~ msgid "History rebuilt from stored values."
+#~ msgstr "Historia odtworzona z zapisanych wartości."
+
+#~ msgid "There are no stored values to backfill yet."
+#~ msgstr "Nie ma jeszcze zapisanych wartości do uzupełnienia historii."
+
+#~ msgid "A snapshot cannot be dated in the future."
+#~ msgstr "Migawka nie może mieć przyszłej daty."
+
+#~ msgid ""
+#~ "Backfill draws a straight line between"
+#~ " recorded values. Re-run Backfill "
+#~ "from history after changing this."
+#~ msgstr ""
+#~ "Uzupełnianie historii rysuje prostą między "
+#~ "zapisanymi wartościami. Po zmianie tego "
+#~ "ustawienia ponownie uruchom Uzupełnij z "
+#~ "historii."
+
+#~ msgid ""
+#~ "Automatic snapshots are stored on the"
+#~ " 1st of each month at 04:00 in"
+#~ " the workspace time zone. Manual "
+#~ "snapshots are never recalculated; Backfill "
+#~ "rebuilds automatic rows for past months."
+#~ msgstr ""
+#~ "Migawki automatyczne są zapisywane 1. "
+#~ "dnia każdego miesiąca o 04:00 w "
+#~ "strefie czasowej obszaru roboczego. Migawki"
+#~ " ręczne nigdy nie są przeliczane; "
+#~ "Uzupełnianie historii odtwarza automatyczne "
+#~ "wiersze z poprzednich miesięcy."
+
+#~ msgid "Take snapshot now"
+#~ msgstr "Zrób migawkę teraz"
+
+#~ msgid "Backfill from history"
+#~ msgstr "Uzupełnij historię"
+
+#~ msgid "%(num)d snapshot is in another currency and is not charted."
+#~ msgid_plural "%(num)d snapshots are in another currency and are not charted."
+#~ msgstr[0] "%(num)d migawka jest w innej walucie i nie jest pokazywana na wykresie."
+#~ msgstr[1] "%(num)d migawki są w innej walucie i nie są pokazywane na wykresie."
+#~ msgstr[2] ""
+#~ "%(num)d migawek jest w innej walucie "
+#~ "i nie jest pokazywanych na wykresie."
+
+#~ msgid "Net worth history"
+#~ msgstr "Historia majątku netto"
+
+#~ msgid ""
+#~ "No snapshots yet. The first automatic"
+#~ " snapshot needs at least one net-"
+#~ "worth item."
+#~ msgstr ""
+#~ "Nie ma jeszcze migawek. Pierwsza migawka"
+#~ " automatyczna wymaga co najmniej jednej "
+#~ "pozycji majątku netto."
+
+#~ msgid ""
+#~ "Stored snapshots are not recalculated. "
+#~ "Re-run Backfill from history after "
+#~ "correcting a past value."
+#~ msgstr ""
+#~ "Zapisane migawki nie są przeliczane. Po"
+#~ " poprawieniu wcześniejszej wartości uruchom "
+#~ "ponownie Uzupełnianie z historii."
+
+#~ msgid "Net-worth snapshots to remove"
+#~ msgstr "Migawki majątku netto do usunięcia"
 

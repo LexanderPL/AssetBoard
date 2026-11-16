@@ -115,6 +115,7 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         "FireScenario",
         "FireEvent",
         "FireLoanSetting",
+        "NetWorthSnapshot",
     }
     assert all(reason.strip() for reason in DEMO_EXCLUDED_MODELS.values())
     assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"
@@ -123,6 +124,9 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
     )
     assert (
         DEMO_EXCLUDED_MODELS["FireScenario"] == "the FIRE plan is a user what-if, not sample data"
+    )
+    assert DEMO_EXCLUDED_MODELS["NetWorthSnapshot"] == (
+        "snapshots are legacy data; net-worth history is derived from valuations"
     )
 
 
@@ -135,7 +139,6 @@ def test_plan_amounts_use_the_base_currency_and_expected_shapes() -> None:
     )
     assert len(plan.months) == 4
     assert len(plan.planned_values) == 21 * 4
-    assert len(plan.snapshot_dates) == 12
     assert {row.type for row in plan.investment_transactions} >= {
         "buy",
         "sell",
@@ -153,7 +156,6 @@ def test_nothing_is_dated_after_t_except_planned_future_rows() -> None:
     assert all(row.day <= reference for row in plan.price_points)
     assert all(row.day <= reference for row in plan.fx_points)
     assert all(point.as_of <= reference for item in plan.networth_items for point in item.values)
-    assert all(day <= reference for day in plan.snapshot_dates)
     future_items = [row for row in plan.recurring if row.start_date > reference]
     assert {row.key for row in future_items} == {"insurance", "one-time"}
 

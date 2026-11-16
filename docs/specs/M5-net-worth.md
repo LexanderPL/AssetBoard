@@ -2,7 +2,7 @@
 
 **Goal:** list what you own and what you owe, grouped into categories, compare the two, and track net worth over time.
 
-**Exit criteria:** assets and liabilities (manual values with history), category groupings, a summary with net worth, and monthly snapshots producing a trend chart. Linked valuations are *designed for* here and *filled in* by M6 (portfolio) and M7 (loans).
+**Exit criteria:** assets and liabilities (manual values with history), category groupings, a summary with net worth, and a trend chart derived from saved values on every load. Stored monthly snapshots are legacy archive data only. Linked valuations are *designed for* here and *filled in* by M6 (portfolio) and M7 (loans).
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -10,7 +10,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - `NetWorthCategory(id, workspace_id, side[asset|liability], name, color, sort_order, archived_at)`
 - `NetWorthItem(id, workspace_id, side, category_id, name, currency, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, estimate_between bool (F5.6), acquired_on?, archived_at)` — `currency` is the item's source of truth.
 - `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — correctable in place (F5.8) but never deleted; "current manual value" = latest `as_of ≤ today`. Every valuation uses its item's currency.
-- `NetWorthSnapshot(id, workspace_id, as_of date, assets_minor, liabilities_minor, net_minor, currency, breakdown JSON[{category_id, side, total_minor}], source[auto|manual|backfill])`; unique `(workspace_id, as_of, source)`.
+- `NetWorthSnapshot(id, workspace_id, as_of date, assets_minor, liabilities_minor, net_minor, currency, breakdown JSON[{category_id, side, total_minor}], source[auto|manual|backfill])`; unique `(workspace_id, as_of, source)`. **Legacy since F5.9**: kept for archive compatibility, never written or displayed.
 - `link_type` values reserved now: `portfolio_asset_class`, `portfolio_holding`, `loan_balance`. Until the owning module exists, the UI does not offer linked mode.
 
 ---
@@ -68,7 +68,7 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - Items under an **archived category** still count while the item itself is not archived (F5.1 rule).
 - Summary page: big net-worth figure, one combined assets-vs-liabilities bar, and a category
   table for each side (assets, then liabilities) with totals and shares of that side's own total.
-  The page loads no chart script.
+  F5.2 shipped without a chart script; F5.9 adds the derived trend chart above the warnings.
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).
 
@@ -76,7 +76,8 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - `GET /net-worth/summary` is its own page; the sidebar points to it and both pages share the
   Summary / Assets / Liabilities tabs. F5.1 URLs stay unchanged.
 - The shared read path is `services.networth.current_values(session, ctx, *, as_of, ...)`; the
-  list uses history, the summary uses current values only, and F5.3 can pass a month-end date.
+  list uses history and the summary uses current values only. F5.9 derives the history points
+  from the same item and valuation rows through `domain.networth_history.values_at`.
   A valuation after `as_of` is ignored.
 - `summarize_net_worth` is pure and works on item IDs, sides and `Money`; names and colours are
   added in the web layer.
@@ -94,7 +95,7 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
   hatched red and a vertical marker line marks the assets end. Equal sides give a full red bar and
   zero net worth; no liabilities gives a full green bar; assets of zero with liabilities gives a
   fully hatched red bar; both zero gives an empty track and the **No assets or liabilities yet.**
-  caption. The page loads no chart script.
+  caption. F5.2 shipped without a chart; F5.9 adds the derived trend above the warnings.
 - Excluded items are a neutral note; non-base and no-value items use warning tones. No FX, no
   base-currency lock, no writes/audit, no migration.
 
@@ -107,7 +108,11 @@ Property tests: net = assets - liabilities; category totals sum to side totals; 
 
 ---
 
-## F5.3 Snapshots and net-worth history
+## F5.3 Snapshots and net-worth history (superseded by F5.9)
+
+**Superseded by F5.9 (2026-11-16).** The monthly job, manual snapshot and Backfill actions are
+removed, and stored snapshots are legacy archive data. The acceptance and implementation notes
+below record F5.3 as it originally shipped; F5.9 defines the current behaviour.
 
 **Story:** I see how net worth changed over time.
 
@@ -189,8 +194,8 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   the form picker. The production registry is empty until M6/M7 register their resolvers.
 - The picker is shown only for the item side with a registered resolver and offers “Manual
   value” by default. Linking happens at creation. An existing manual item with valuation
-  history must be archived and replaced by a linked item; archive-date snapshots keep its
-  history continuous.
+  history must be archived and replaced by a linked item; the archive date keeps its history
+  continuous up to that point.
 - A linked item has no manual valuations and shows its value read-only with a “Linked to …”
   chip, optional click-through and target currency. Unknown targets, removed resolver modules
   and resolved values in another currency are `Unavailable`, never zero.
@@ -202,9 +207,9 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   `(workspace_id, link_type, link_id)` for active linked items, on SQLite and PostgreSQL.
   Duplicate creation returns `already_linked`; restoring an archived linked item is refused
   while another active item links to the same target.
-- Auto, manual and backfill snapshots resolve linked values at their `as_of`; a backfill makes
-  one `resolve_many` call per link type. The breakdown keeps `v: 1` and adds
-  `not_counted.unavailable`; unavailable linked items do not make an auto snapshot eligible.
+- Derived history points (F5.9) resolve linked values at their `as_of` with one batched
+  `resolve_many` call per link type. The breakdown adds `not_counted.unavailable`; an
+  unavailable linked item is never counted as zero.
 - Follow-up: list pages still call `describe` once per linked item. A batched `describe_many`
   on the protocol would let M6 avoid one lookup per holding; not required for F5.4.
 - The automatic portfolio linking (F6.8) is a workspace setting, not an item flag. Turning it
@@ -272,10 +277,10 @@ emptiness checks and the extended round-trip test.
 
 ---
 
-## F5.6 Estimated values between entries (backfill)
+## F5.6 Estimated values between entries
 
-Owner decision, 2026-11-03: backfill estimates the months between two recorded values with a
-straight line, switchable per item.
+Owner decision, 2026-11-03: the history estimates the months between two recorded values with a
+straight line, switchable per item. F5.9 applies it to the derived month-end points.
 
 **Story:** my car was worth 100 000 four years ago and is worth 60 000 now. I recorded only those
 two values, but the history should show it losing value month by month, not a flat line with
@@ -283,7 +288,7 @@ one drop.
 
 **Rule**
 - An item has a switch, **Estimate values between entries** (`estimate_between`).
-- With the switch on, a backfilled month-end `D` that falls strictly between two of the item's
+- With the switch on, a completed month-end `D` that falls strictly between two of the item's
   recorded values gets a straight-line estimate:
   `v0 + (v1 − v0) × (D − d0) / (d1 − d0)`.
   - `d0` is the latest recorded date before `D` and `v0` its value.
@@ -304,14 +309,13 @@ one drop.
 - With the switch off, an item keeps the F5.3 rule (latest value on or before `D`).
 
 **Where it applies**
-- **Backfilled snapshots** (`source=backfill`). They replace automatic rows in the backfill range
-  (owner decision, 2026-11-04); manual snapshots stay exactly as recorded.
+- **Derived history month-ends (F5.9).** Each completed month-end on the Summary trend uses the
+  switch. Stored snapshots are legacy archive data and are never changed.
 - The item's current value, Assets/Liabilities lists, summary (F5.2), valuation history table and
   sparkline stay unchanged.
 - Linked items (F5.4) ignore the switch, because their resolver supplies real values.
 - The archive rule (F5.3) and the include setting still apply as before.
-- Changing the switch does not rewrite anything by itself. The item form says that a re-run of
-  **Backfill from history** applies it to past months.
+- Changing the switch does not rewrite anything; the trend uses it on the next page load.
 
 **Defaults**
 - New asset items: **on**, including items created by bulk add.
@@ -321,10 +325,9 @@ one drop.
 - The switch is editable on every manual item at any time. It is hidden on linked items.
 
 **Marking estimates**
-- The snapshot breakdown gets one additive key: `not_counted` stays as it is, and a top-level
-  `"estimated": n` counts the items whose value at that date was estimated. `v` stays 1, and
-  readers ignore unknown keys (F5.3).
-- The history table marks a backfilled row that contains estimates ("includes 3 estimated
+- Each history point's breakdown gets an `"estimated": n` count of the items whose value at that
+  date was estimated, alongside the categories and not-counted counts.
+- The **Monthly values** table marks a point that contains estimates ("includes 3 estimated
   values"), and the chart tooltip shows the same line.
 - Points are not drawn differently. The table note is the accessible marker.
 
@@ -335,18 +338,18 @@ one drop.
   `networth_item.updated` fields; the value is not audited.
 - A pure domain function (in `domain/networth_history.py`) returns an item's value on `D` and
   whether it was estimated, given the item's ordered valuation points, `D`, today and the switch.
-  `values_at` uses it when called for backfill, and its other callers keep the F5.3 behaviour.
-- Backfill uses it. Automatic snapshots created by the monthly job do not estimate; a backfill
-  run replaces automatic rows in its range with estimates. Manual snapshots never estimate. The
-  breakdown carries `estimated`.
-- History table and tooltip show the estimated count.
+  `values_at` uses it when called with `backfill=True` for completed month-ends; its other
+  callers keep the F5.3 behaviour.
+- The derived history service uses it for completed month-ends. Today's live point and stored
+  legacy snapshots never use it. The breakdown carries `estimated`.
+- The monthly-values table and trend tooltip show the estimated count.
 - Archive: `networth_items.csv` gains the `estimate_between` column (`true|false`) as a minor
   format version (1.3, ADR-0016).
   - A 1.2 archive reads without it, and restore applies the side defaults above.
   - Document it in `docs/archive-format.md`, with the version history, and update the golden
     archive and the docs test.
-- Docs: `docs/net-worth.md` explains the switch, the straight-line rule, the defaults, that only
-  backfill uses it, and that backfill must be re-run after changing it.
+- Docs: `docs/net-worth.md` explains the switch, the straight-line rule, the defaults, that it
+  applies to completed month-ends on the trend, and that changing it needs no rebuild.
 
 **Tests (golden oracle: a hand-computed table in the test module)**
 - The example above at every month-end between the two dates, exact minor units.
@@ -357,7 +360,7 @@ one drop.
 - A future-dated value is never used as `d1`.
 - Linked items ignore the switch.
 - An archived item is still excluded from its archive date.
-- Auto and manual snapshots are unchanged by the switch.
+- Today's live point and stored legacy snapshots are unchanged by the switch.
 - Property tests: an estimate lies between `v0` and `v1`, is monotonic between them, and equals
   `v0`/`v1` at `d0`/`d1`. Rounding happens once.
 - Defaults by side on create, on bulk add, in the migration and on restore of a 1.2 archive.
@@ -373,10 +376,10 @@ one drop.
   before the first value, and never uses an end date after today. The formula is
   `(v0 × (d1 − D) + v1 × (D − d0)) / (d1 − d0)` with day ordinals, rounded half up once with
   `(2·num + den) // (2·den)`.
-- `values_at(backfill=True, today=...)` uses the switch only for backfill; every other caller
-  keeps F5.3. Auto and manual snapshots therefore ignore the switch.
-- The breakdown always writes `estimated`; it counts only items actually in the snapshot totals
-  (not archived, included, base currency, with a value).
+- `values_at(backfill=True, today=...)` uses the switch only for completed month-ends; today's
+  live point and every other caller keep the F5.3 rule. Stored legacy snapshots ignore it.
+- The breakdown carries `estimated`; it counts only items actually in the point totals (not
+  archived, included, base currency, with a value).
 - The history table and tooltip show “includes N estimated values”. The table note is the
   accessible marker; points are not drawn differently.
 - Archive format 1.3 adds the required `estimate_between` column. A 1.2 archive reads without
@@ -386,8 +389,8 @@ one drop.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F5.6 from docs/specs/M5-net-worth.md: the per-item estimate_between switch (model, migration with side defaults,
-item form), straight-line estimates between recorded values in backfill only, the "estimated" breakdown count shown in
-history, and the archive 1.3 column. Golden table and property tests as listed.
+item form), straight-line estimates between recorded values for derived month-end points, the "estimated" count shown in
+the trend, and the archive 1.3 column. Golden table and property tests as listed.
 ```
 
 ---
@@ -475,8 +478,8 @@ that entry without deleting the item, leaving a duplicate, or losing the rest of
   appends a new one.
 - The change is audited as `networth_item.valuation_updated` with the previous and new date,
   amount and currency plus the changed fields. Saving identical values writes no event.
-- Stored snapshots are not rewritten. **Backfill from history** uses the corrected values when it
-  is run again; manual snapshots stay as recorded.
+- The derived history chart uses the corrected values on the next page load; nothing is
+  rewritten.
 - Archive export and restore preserve the corrected row. The archive format does not change.
 
 **Implementation notes (F5.8)**
@@ -504,7 +507,7 @@ that entry without deleting the item, leaving a duplicate, or losing the rest of
   unsupported.
 - Archive: an edited valuation survives export/restore byte-identically; the restore rollback
   still removes batch-created rows.
-- Snapshots: a backfill rerun uses the corrected value.
+- History: the derived trend uses the corrected value on the next load.
 - Web: edit action only for active manual items and editors; GET fragment opens the row; POST
   saves with the redirect notice; invalid input returns 400 with the field error and retained
   values; archived/viewer/linked views have no action.
@@ -514,6 +517,102 @@ that entry without deleting the item, leaving a duplicate, or losing the rest of
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F5.8 from docs/specs/M5-net-worth.md: edit a manual ItemValuation in place (value, as_of, note),
 keep delete unavailable, audit the correction, expose it from the value-history table with an HTMX form and
-a no-JS fallback, and cover service, tenant, archive, snapshot-backfill and web tests. Update the M5/overview
+a no-JS fallback, and cover service, tenant, archive, derived-history and web tests. Update the M5/overview
 append-only wording and docs/net-worth.md.
+```
+
+---
+
+## F5.9 Derived net-worth history
+
+**Story:** I see how my net worth changed month by month without waiting for a snapshot job or
+re-running a backfill after correcting a value.
+
+**Acceptance**
+- The **Summary** page shows a net-worth trend directly after the figure/bar panel, before the
+  warnings and category tables. It has net-worth, assets and liabilities lines; tooltips show
+  the category breakdown and any estimated/unavailable/non-base counts.
+- Every point is derived on read: one per completed month-end plus a live today point. Manual
+  valuation history, linked-item resolution (portfolio prices/FX, loan schedules) and the
+  per-item `estimate_between` switch are the only inputs. Stored snapshots are never read.
+- Completed month-ends use `values_at(..., backfill=True, today=today)`; today uses the live
+  value and is never estimated.
+- A fixed range (1 year, 3 years, 5 years) clips its start to the earliest recorded value
+  (`max(range_start, earliest)`); leading zero months are not shown. **All time** starts at the
+  earliest manual valuation or linked item creation. With no counted base-currency value, the
+  panel shows an empty-state note and no chart, table or ECharts script; if recorded values exist
+  but none are counted, the note points at the existing summary warnings.
+- A recorded zero is data and renders a zero chart. Items without any effective value, only
+  non-base values, only excluded items or only archived items show the empty state and the
+  existing summary warnings.
+- A linked item created after another item's first value can be flagged unavailable at the
+  earlier points; it is never counted as zero there.
+- The range selector is `?range=1y|3y|5y|all` on the Summary page, default `1y`; unknown values
+  normalise to `1y`. Range links keep the `#net-worth-trend` anchor.
+- `GET /net-worth/history` is a 302 redirect to
+  `/net-worth/summary?range=<normalised>#net-worth-trend`. The `POST` snapshot and backfill
+  routes are gone.
+- The **Monthly values** table is collapsed by default, one row per derived point, and marks
+  today. It has no source or currency column.
+- Base currency only. Non-base items stay excluded and keep the existing Summary warning; no FX
+  conversion is added.
+- No snapshot jobs, startup catch-up writes, demo snapshot seeding, History tab, Take snapshot,
+  Backfill, source labels, snapshot currency labels, snapshot notices or snapshot rows in the
+  import/rollback UI remain.
+- `NetWorthSnapshot`, its table/indexes, repository, archive export/import/merge/rollback and
+  emptiness checks stay as **legacy internal data**. The archive format does not change.
+- No schema change, no migration, no new dependency and no projection-math change.
+
+**Implementation notes (F5.9)**
+- `domain.networth_history.history_dates(today, range_code, earliest=...)` builds the dates:
+  completed month-ends stop before the current month, `today` is always last and never
+  duplicates a month-end, and `earliest is None` returns no points. `linked_for_date`,
+  `summarize_values` and `breakdown_for` are pure helpers used by the service; the view renders
+  the resulting `SnapshotBreakdown`.
+- `services.networth_history.networth_history(factory, ctx, range_code="1y")` loads categories,
+  items and valuations once, computes `earliest` from the earliest manual valuation on or before
+  today or a linked item's creation date in the workspace time zone (clamped to today), calls
+  `registry.resolve_many` once for every date, then loops in memory. The number of SQL
+  statements does not grow with the range.
+- `ItemHistory.created_at` is populated by `services.networth.load_item_histories`; the linked
+  item's creation date is the earliest start the current resolver protocol can support. A linked
+  item created after another item's first value can be unavailable at the earlier points.
+- `has_values` means at least one point has a counted base-currency, non-archived,
+  include-in-net-worth value; `has_recorded_values` means any effective value exists even if
+  none is counted. The view uses the former for the chart and the latter for the empty-state
+  wording.
+- `services.networth_snapshots` is deleted. Archive/import/rollback use
+  `NetWorthSnapshotRepository` directly. `RecurringJobs` no longer schedules or catches up a
+  snapshot, and the demo builder writes no snapshot rows (`NetWorthSnapshot` is listed in
+  `DEMO_EXCLUDED_MODELS`).
+- `web.networth_history` is the trend view model; `networth/_trend.html` is included from
+  `_summary_body.html`. `/net-worth/history` is a normal 302 redirect (not permanent), so the
+  URL can change again later.
+- The audit labels for historical `networth_snapshot.created/taken/backfilled` events stay so old
+  audit rows remain readable; no new events are written.
+
+**Tests**
+- Domain: exact clipped dates for 1y/3y/5y/all, no data, month-end today, leap day, a property
+  test for ordering/month-end/today, linked helper, included-only estimate counts and breakdown.
+- Service: one point per completed month-end plus today, clipping, empty/no-value workspaces,
+  zero values, estimates for month-ends and never for today, linked history/live values, one
+  batched resolver call, unavailable links, edited valuation reflected in affected months,
+  archive date, include switch, non-base exclusion and base-currency switch, stored snapshot
+  ignored, no snapshot rows written, today equals the summary, workspace scoping, viewer read,
+  two-factor refusal and a query count independent of range length.
+- Web: trend without snapshots, range/clipping/normalisation, tooltip breakdown and estimated
+  note, today marked and not estimated, collapsed table, no snapshot UI or History tab, empty
+  and no-value states, zero chart, non-base warning, CSP, mobile markup, Polish strings, viewer
+  read, bounded queries and the history redirect.
+- Jobs/demo: no snapshot job, catch-up writes no snapshots, demo build has no snapshot rows.
+- Archive: the existing v1.2/v1.3 round-trip tests stay; restored legacy snapshots are ignored
+  by the derived history.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F5.9 from docs/specs/M5-net-worth.md: derive net-worth history on read from valuations, linked
+resolvers, prices/FX and estimates; move the trend chart to the Summary tab with range clipping and an
+empty state; redirect /net-worth/history; retire snapshot writes, jobs, demo seeding and UI while keeping
+snapshots as legacy archive data. Update M5/F10 docs, translations, CSS and tests as listed.
 ```

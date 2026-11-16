@@ -53,6 +53,9 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "FireScenario": "the FIRE plan is a user what-if, not sample data",
         "FireEvent": "FIRE adjustments belong to a user's plan",
         "FireLoanSetting": "a FIRE loan choice belongs to a user's plan",
+        "NetWorthSnapshot": (
+            "snapshots are legacy data; net-worth history is derived from valuations"
+        ),
     }
 )
 
@@ -296,7 +299,6 @@ class DemoPlan:
     income_source: DemoIncomeSource
     tax_rule: DemoTaxRule
     networth_items: tuple[DemoNetWorthItem, ...]
-    snapshot_dates: tuple[date, ...]
     instruments: tuple[DemoInstrument, ...]
     investment_transactions: tuple[DemoInstrumentTransaction, ...]
     price_points: tuple[DemoPricePoint, ...]
@@ -598,7 +600,6 @@ def build_plan(
     )
 
     networth_items = _networth_items(reference_date, currency, translate)
-    snapshot_dates = tuple(_month_end(reference_date, offset) for offset in range(-12, 0))
 
     instruments, investment_transactions, price_points, fx_points, bond_terms = _investment_plan(
         reference_date, currency, translate, rng
@@ -620,7 +621,6 @@ def build_plan(
         income_source=income_source,
         tax_rule=tax_rule,
         networth_items=networth_items,
-        snapshot_dates=snapshot_dates,
         instruments=instruments,
         investment_transactions=investment_transactions,
         price_points=price_points,

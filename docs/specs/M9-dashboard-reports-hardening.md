@@ -341,7 +341,8 @@ Two PRs, in this order: **F9.11a** builder, then **F9.11b** demo mode.
   - **Net worth:** the suggested categories; a current account, savings, an emergency fund,
     a car (declining value), an apartment (Real estate, F5.7), a mortgage as a manual liability
     (linked to a loan once F7.6 lands) and a credit card. Monthly valuations for 12 months with
-    one gap so the F5.6 estimate shows; monthly snapshots for 12 months.
+    one gap so the F5.6 estimate shows; no stored snapshots (F5.9 derives the chart from the
+    valuations).
   - **Investments:** the suggested asset classes with risk tiers; instruments: a global ETF in
     the base currency (monthly buys for 24 months), an 80/20 fund (allocation split), a US stock
     in USD (a few buys, one sell with realized P&L, quarterly dividends with 15% withholding,

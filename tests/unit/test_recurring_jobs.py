@@ -4,9 +4,11 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from assetboard.config import Settings
 from assetboard.db.models.identity import Workspace
+from assetboard.db.models.networth import NetWorthSnapshot
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.recurring_jobs import RecurringJobs
 from assetboard.services.providers.registry import build_provider_runtime
@@ -40,12 +42,7 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
             None, datetime(2026, 3, 28, 23, tzinfo=UTC)
         )
         assert auto_fire.isoformat() == "2026-03-29T00:05:00+01:00"
-        snapshot = jobs.scheduler.get_job(f"networth-snapshot-{db.workspace_id}")
-        assert snapshot is not None
-        snapshot_fire = snapshot.trigger.get_next_fire_time(
-            None, datetime(2026, 3, 28, 23, tzinfo=UTC)
-        )
-        assert snapshot_fire.isoformat() == "2026-04-01T04:00:00+02:00"
+        assert jobs.scheduler.get_job(f"networth-snapshot-{db.workspace_id}") is None
         other = db.add_workspace("Other")
         with db.factory.begin() as session:
             workspace = session.get(Workspace, db.workspace_id)
@@ -55,9 +52,7 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
         assert jobs.scheduler.get_job(str(other)) is not None
         updated = jobs.scheduler.get_job(str(db.workspace_id))
         assert updated is not None and str(updated.trigger.timezone) == "America/New_York"
-        updated_snapshot = jobs.scheduler.get_job(f"networth-snapshot-{db.workspace_id}")
-        assert updated_snapshot is not None
-        assert str(updated_snapshot.trigger.timezone) == "America/New_York"
+        assert jobs.scheduler.get_job(f"networth-snapshot-{db.workspace_id}") is None
         with db.factory.begin() as session:
             assert set(RecurringWorkspaceReader(session).workspaces()) == {
                 (db.workspace_id, "America/New_York"),
@@ -110,34 +105,15 @@ def test_failed_generation_is_logged_without_data_and_later_runs_can_retry(db, m
     assert logger.error.call_args.kwargs["exc_info"] is True
 
 
-def test_catch_up_takes_one_snapshot_per_workspace_with_its_timezone(db, monkeypatch):
-    calls = []
-
-    def fake_snapshot(_factory, scope, _clock, timezone):
-        calls.append((scope.workspace.id, timezone))
-        return False
-
-    monkeypatch.setattr("assetboard.recurring_jobs.take_auto_snapshot", fake_snapshot)
+def test_catch_up_writes_no_networth_snapshots(db, monkeypatch):
+    monkeypatch.setattr("assetboard.recurring_jobs.generate_workspace", lambda *_args: 0)
+    monkeypatch.setattr("assetboard.recurring_jobs.auto_post_workspace", lambda *_args: None)
+    monkeypatch.setattr("assetboard.recurring_jobs.resync_pending_income", lambda *_args: None)
     jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, Mock())
     jobs.reconcile()
     jobs.catch_up()
-    assert calls == [(db.workspace_id, "UTC")]
-
-
-def test_a_failing_snapshot_is_logged_without_data(db, monkeypatch):
-    def broken(*_args, **_kwargs):
-        raise RuntimeError("secret detail")
-
-    monkeypatch.setattr("assetboard.recurring_jobs.take_auto_snapshot", broken)
-    logger = Mock()
-    jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, logger)
-    jobs.networth_snapshot(db.workspace_id, "UTC")
-    message, *args = logger.error.call_args.args
-    rendered = message % tuple(args)
-    assert "networth_snapshot_failed" in message
-    assert str(db.workspace_id) in rendered
-    assert "RuntimeError" in rendered and "secret detail" not in rendered
-    assert logger.error.call_args.kwargs["exc_info"] is True
+    with db.factory() as session:
+        assert session.scalars(select(NetWorthSnapshot)).all() == []
 
 
 def test_a_deleted_workspace_is_skipped_quietly(db):

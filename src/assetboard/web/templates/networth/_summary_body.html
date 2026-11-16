@@ -19,6 +19,8 @@
     {{ bar(view) }}
   </section>
 
+  {% include "networth/_trend.html" %}
+
   {% if view.non_base_items %}
   {{ warning_list(ngettext("%(num)d item is in another currency and is not counted.", "%(num)d items are in another currency and are not counted.", view.non_base_items|length), view.non_base_items, tone="non_base") }}
   {% endif %}

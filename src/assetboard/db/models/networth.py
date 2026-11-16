@@ -1,4 +1,4 @@
-"""Net-worth models (F5.1/F5.3): categories, items, valuations and snapshots."""
+"""Net-worth models (F5.1/F5.3): categories, items, valuations and legacy snapshots."""
 
 from __future__ import annotations
 
@@ -244,12 +244,13 @@ class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, NoDelete, Bas
 
 
 class NetWorthSnapshot(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """One stored net-worth total (F5.3), never recalculated except by backfill.
+    """One legacy stored net-worth total (F5.3; superseded by F5.9).
 
-    ``as_of`` is a month-end for automatic and backfilled snapshots and the workspace's today
-    for a manual one. ``source`` is ``auto``, ``manual`` or ``backfill``; the unique constraint
-    is the race guard. ``breakdown`` is a versioned JSON object read by the history page, which
-    ignores unknown keys so later versions can add markers without a migration.
+    Older versions wrote these rows. F5.9 derives history on read and never writes or displays
+    them; they stay for archive export/import compatibility. ``as_of`` is a month-end for
+    automatic and backfilled snapshots and the workspace's today for a manual one. ``source`` is
+    ``auto``, ``manual`` or ``backfill``; the unique constraint is the race guard. ``breakdown``
+    is the versioned JSON of the old history page.
     """
 
     __tablename__ = "networth_snapshots"
