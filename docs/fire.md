@@ -46,8 +46,9 @@ first; **Create plan** never saves values that differ from the review you last s
 2. **Income and expenses:** empty by default. Each field has a suggestion card: **Use suggested
    value** copies the suggestion into the field. The income and expense suggestions use the
    last 12 full calendar months, with the window, months with data and any warnings shown. Both
-   cards show their category breakdown (window totals); the expense card also shows the loan
-   payments that are linked to ledger expenses.
+   cards put their category breakdown behind a **Where this value comes from** disclosure; the
+   expense card also shows the loan payments that are linked to ledger expenses, outside that
+   disclosure and always visible.
 3. **Portfolio:** the starting portfolio, with the current investable-assets suggestion, its
    as-of date and a list of the sources (portfolio classes and manual net-worth items) that link
    to the page where each source lives. A **Skipped** subsection lists the sources that are not
@@ -55,10 +56,11 @@ first; **Create plan** never saves values that differ from the review you last s
    counted through their source. Skipped sources show their name, a link and the reason, never
    an amount.
 4. **Assumptions and review:** inflation, return above inflation, income growth and the
-   independence rule. **Withdrawal rate** is used only when the independence rule is
+   independence rule. **Independence rule** and **Withdrawal rate** sit side by side in their
+   own row below the three rates. **Withdrawal rate** is used only when the independence rule is
    **Withdrawal rate**. With **Returns cover expenses** the field stays visible but inactive and
    disabled; without JavaScript it stays enabled, and the server ignores the rate for that rule.
-   The field note says so. The review shows the entered values, the projected window, the
+   The review shows the entered values, the projected window, the
    warnings and a read-only list of active loans with their annual payment, payoff year and
    included state. A changed rate outside the usual range shows a warning. **Create plan** then
    opens a confirmation panel; nothing is saved until **Confirm and create plan**. There is no
@@ -81,7 +83,8 @@ The plan page shows the saved plan without any inputs or preview controls:
   annual payment, payoff year, included/ignored state and effect on the plan. Open it with a
   click, Enter or Space; no JavaScript is needed;
 - the year-by-year schedule and the net-worth and expenses-versus-gain charts;
-- the **Sensitivity** grid, which always uses the saved plan and never unsaved changes.
+- the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
+- the disclaimer, which is the last block on the page.
 
 A converted plan shows a review banner until an editor or owner saves it in edit mode. A plan
 whose values were last reviewed in an earlier year shows the living-plan review banner; its
@@ -94,7 +97,7 @@ Editors and owners open **Edit plan**. The edit page is a separate page; it is n
 viewers. It contains every plan field and the adjustments editor.
 
 The page order is: key metrics and plan progress, the plan-inputs accordion, then the
-year-by-year table and charts, the disclaimer and the sensitivity grid. The accordion has five
+year-by-year table and charts, the sensitivity grid and the disclaimer. The accordion has five
 sections: **Plan**, **Assumptions**, **Starting amounts**, **Adjustments** and **Loans**. All are
 collapsed by default and only one can be open at a time. The server opens the section that owns a
 save error, **Adjustments** for an adjustment-row error, **Assumptions** when unusual rates need
@@ -114,9 +117,10 @@ an **Unsaved changes** indicator shows the state.
 Each amount has a suggestion card:
 
 - **Income** and **expenses** use the last 12 full calendar months, with the window, the months
-  with data, the data date, any warnings and the annualized amount. Both cards show the
-  category breakdown; the expenses card also shows the loan payments linked to ledger expenses
-  in the window.
+  with data, the data date, any warnings and the annualized amount. Both cards put the
+  per-category totals behind a **Where this value comes from** disclosure; the expenses card
+  also shows the loan payments linked to ledger expenses in the window, outside that disclosure
+  and always visible.
 - **Portfolio** shows the current investable assets, the as-of date and the sources that make up
   the value. Its **Skipped** subsection lists the sources that are not counted: non-investable
   asset classes and linked net-worth items whose value is already counted through their source.
@@ -200,14 +204,18 @@ check the values and save to clear the review banner.
 ## Plan fields
 
 - The projection always starts in the current calendar year. There is no first-year input field.
+- The plan currency is the snapshot taken when the plan was created. It is not an input: edit
+  mode shows no currency field, and a workspace base-currency change blocks the plan with a
+  review notice instead of converting the saved amounts.
 - The plan is **living**: in a later year it starts in that year, but the page shows a
   **review** banner until you save it again. The banner names the year the values were last
   reviewed and the current first year. Review income, expenses and portfolio, then press
   **Save changes**; the next year starts with the same saved amounts until you change them.
   The projection does not silently update the amounts. Editors and owners get a link to the plan
   inputs from the banner; viewers see the same notice without the link.
-- **Birth year** turns plan years into ages. New plans prefill it from your profile; the plan
-  keeps its saved value, so later profile changes do not alter an existing plan.
+- **Birth year** turns plan years into ages. The setup wizard prefills it from your profile; the
+  plan keeps the value saved with it, so later profile changes do not alter an existing plan.
+  Edit mode keeps that saved value without showing a birth-year field.
 - **Horizon age** is the last age in the projection. It defaults from your profile's life
   expectancy (90 when the profile has none).
 - **Income stops at age** ends the base income. Income is paid while the age is below this
@@ -242,8 +250,9 @@ withdrawal rate) are illustrative examples, not recommendations.
 
 **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**. With
 **Returns cover expenses** the field stays in the layout but is inactive and disabled; without
-JavaScript it stays enabled, and the server ignores the rate for that rule. A note beside the
-field says when it is used.
+JavaScript it stays enabled, and the server ignores the rate for that rule. The two fields share
+a row below inflation, return above inflation and income growth; there is no separate note
+beside the withdrawal rate.
 
 ## Adjustments
 
@@ -297,7 +306,8 @@ The plan page shows nominal values only:
   income stops;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth.
   Every amount is the actual money of that year, not adjusted for inflation. It sits directly in
-  the page column and keeps the table's own border;
+  the page column and uses the same surface background as the Transactions tables, with the
+  table's own border and the FIRE, depleted and income-stopped row tints;
 - a nominal net-worth chart and a nominal expenses-versus-gain chart, each with accessible
   plotted data;
 - for editors and owners, **Edit plan** and **Reset plan**. The plan page has no download action.
