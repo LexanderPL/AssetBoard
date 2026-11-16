@@ -68,6 +68,5 @@
   {% for g in summary.groups if g.key == "transfer" %}
   {% call sheet("transfer", g.heading) %}{{ group_body(g) }}{% endcall %}
   {% endfor %}
-
   {% endif %}
 </section>
