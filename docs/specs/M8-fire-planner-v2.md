@@ -1202,9 +1202,11 @@ dependencies, projection math and loan math unchanged.
 
 ### As built (M8.F8.18)
 
-- `_table.html` renders only the heading, the scroll region and the table; the first-year and row
-  highlight paragraphs are gone. The table is `sheet bg-surface`, and the `bg-success-soft`,
-  `bg-danger-soft` and `text-muted` row classes and their data hooks are unchanged.
+- `_table.html` renders the heading, the scroll region and the table with no explanatory
+  paragraphs below it; the first-year and row highlight paragraphs are gone. (F8.19 later adds a
+  short first-year hint next to the heading.) The table is `sheet bg-surface`, and the
+  `bg-success-soft`, `bg-danger-soft` and `text-muted` row classes and their data hooks are
+  unchanged.
 - `view.html` puts `mt-8` on `#fire-results-detail`, matching the editor, and includes the
   disclaimer after `_sensitivity_panel.html`; `edit.html` does the same. The disclaimer is the
   last child of the view/editor page wrapper.
@@ -1297,11 +1299,11 @@ dependencies, loan math and the UI layout unchanged.
   saving overrides stay saved. The factor-10,000 cell reuses the direct projection, so it is
   identical by construction. Sensitivity tests cover the scaling, the base-cell equality and
   the negative-cell error.
-- **Current year.** `_table.html` keeps the first-row model and replaces the trailing footnote
-  with a short `data-fire-first-year-hint` next to **Year by year**: the first row is the
-  starting point, today's portfolio earns one year's gain, the current year's income and
-  expenses are shown, and that row's net saving is the starting portfolio. `docs/fire.md`
-  carries the same explanation.
+- **Current year.** `_table.html` keeps the first-row model and adds a short
+  `data-fire-first-year-hint` next to **Year by year**: the first row is the starting point,
+  today's portfolio earns one year's gain, the current year's income and expenses are shown, and
+  that row's net saving is the starting portfolio. The old trailing footnotes stay removed
+  (F8.18). `docs/fire.md` carries the same explanation.
 - **Tests and docs.** Unit tests cover the exact compounding, the real-return predicate and
   FIRE number, strict boundaries, negative-expense errors from both causes, the zero-portfolio
   case, exact sensitivity scaling of all expense components, the base cell and the negative
