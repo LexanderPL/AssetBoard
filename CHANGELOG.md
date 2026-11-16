@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.8](https://github.com/LexanderPL/AssetBoard/compare/v0.7.7...v0.7.8) (2026-11-16)
+
+
+### Features
+
+* **fire:** clean up FIRE results and the editor (F8.15) ([#354](https://github.com/LexanderPL/AssetBoard/issues/354)) ([43e4f26](https://github.com/LexanderPL/AssetBoard/commit/43e4f26a6a05b855c87267b907deef60e9310845))
+* **networth:** derive net-worth history on read (F5.9) ([#356](https://github.com/LexanderPL/AssetBoard/issues/356)) ([aa51bc0](https://github.com/LexanderPL/AssetBoard/commit/aa51bc024c7ce27d10618ac08fff8e9e71c1bc6e))
+
 ## [0.7.7](https://github.com/LexanderPL/AssetBoard/compare/v0.7.6...v0.7.7) (2026-11-15)
 
 
