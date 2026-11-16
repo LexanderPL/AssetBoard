@@ -10,8 +10,8 @@ from uuid import UUID
 from sqlalchemy import event, func, select, update
 
 from assetboard.db.models.fire import FireEvent, FireScenario
-from assetboard.db.models.identity import AuditEvent
-from tests.fire_helpers import create_plan
+from assetboard.db.models.identity import AuditEvent, Workspace
+from tests.fire_helpers import create_plan, freeze_clock
 
 
 def _create(owner, **overrides: str) -> UUID:
@@ -62,29 +62,70 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert "data-fire-edit-page" not in page.text
 
 
-def test_a_previous_year_review_shows_the_living_plan_banner(owner) -> None:
-    plan_id = _create(owner)
-    with owner.db() as session, session.begin():
-        session.execute(
-            update(FireScenario)
-            .where(FireScenario.id == plan_id)
-            .values(updated_at=datetime(2025, 11, 16, 12, tzinfo=UTC))
-        )
+def test_a_current_year_plan_has_no_living_plan_review(owner) -> None:
+    freeze_clock(owner, "2026-01-01T00:00:00+00:00")
+    _create(owner)
+    view = owner.client.get("/fire")
+    assert view.status_code == 200
+    assert "data-fire-year-review" not in view.text
+    edit = owner.client.get("/fire/edit")
+    assert edit.status_code == 200
+    assert "data-fire-year-review" not in edit.text
+
+
+def test_a_previous_year_plan_shows_the_living_plan_banner(owner) -> None:
+    freeze_clock(owner, "2026-01-01T00:00:00+00:00")
+    _create(owner)
+    freeze_clock(owner, "2027-01-01T00:00:00+00:00")
+
     page = owner.client.get("/fire")
     assert page.status_code == 200
     assert "data-fire-year-review" in page.text
-    assert "This plan starts in " in page.text
-    assert "values last reviewed for 2025" in page.text
+    assert "This plan starts in 2027" in page.text
+    assert "values last reviewed for 2026" in page.text
     assert "Review the plan inputs" in page.text
+
+    owner.set_admin_role("editor")
+    try:
+        editor = owner.client.get("/fire")
+        assert "data-fire-year-review" in editor.text
+        assert "Review the plan inputs" in editor.text
+    finally:
+        owner.set_admin_role("owner")
 
     owner.set_admin_role("viewer")
     try:
         viewer = owner.client.get("/fire")
         assert "data-fire-year-review" in viewer.text
-        assert "values last reviewed for 2025" in viewer.text
+        assert "values last reviewed for 2026" in viewer.text
         assert "Review the plan inputs" not in viewer.text
     finally:
         owner.set_admin_role("owner")
+
+
+def test_the_living_plan_review_uses_the_workspace_timezone(owner) -> None:
+    freeze_clock(owner, "2027-01-01T00:30:00+00:00")
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.execute(
+            update(FireScenario)
+            .where(FireScenario.id == plan_id)
+            .values(updated_at=datetime(2026, 12, 31, 23, 30, tzinfo=UTC))
+        )
+    # 23:30 UTC is still 2026 in UTC, so the UTC workspace shows the review.
+    utc_page = owner.client.get("/fire")
+    assert "data-fire-year-review" in utc_page.text
+    assert "values last reviewed for 2026" in utc_page.text
+
+    # At UTC+14 the same instant is already 2027, the current workspace year: no review.
+    with owner.db() as session, session.begin():
+        session.execute(
+            update(Workspace)
+            .where(Workspace.id == owner.home_id)
+            .values(timezone="Pacific/Kiritimati")
+        )
+    local_page = owner.client.get("/fire")
+    assert "data-fire-year-review" not in local_page.text
 
 
 def test_plan_warnings_are_a_compact_stack_without_the_old_overview(owner) -> None:

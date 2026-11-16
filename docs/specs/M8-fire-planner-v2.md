@@ -1050,12 +1050,13 @@ year for a living-plan review banner; keep the current-year anchor; do not auto-
   while viewers see the explanation without the link. The edit banner marks
   `data-fire-review-section="amounts"` so the F8.17 accordion can open the Starting amounts
   section.
-- Saving the plan updates `updated_at`, so the banner clears in the new year. The stored amounts
-  are still reused until the user changes them.
-- Tests use a fixed clock to create a plan in 2026, advance to 2027, assert the banner on view
-  and edit, save, and assert it is gone; the 2028 rollover is covered. Workspace-timezone year
-  conversion and viewer/editor links are covered. No schema, migration, archive or dependency
-  change.
+- Saving the plan updates `updated_at` explicitly, so even an unchanged form counts as a save and
+  clears the banner in the new year. The stored amounts are still reused until the user changes
+  them.
+- Tests freeze the clock in 2026, create a plan, advance it to 2027, assert the banner on view
+  and edit, save the unchanged values and assert it is gone; a current-year plan has no banner.
+  Workspace-timezone year conversion (the same instant is 2026 in UTC and 2027 at UTC+14) and
+  the viewer/editor links are covered. No schema, migration, archive or dependency change.
 
 ---
 

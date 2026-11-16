@@ -9,9 +9,23 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.web.fire_routes import STEP_FIELDS, WIZARD_FIELDS
 
 _HIDDEN_INPUT = re.compile(r'<input type="hidden" name="([^"]+)" value="([^"]*)">')
+
+
+def freeze_clock(owner: Any, value: str) -> None:
+    """Move the app and its write sessions to a fixed instant.
+
+    The signed-in session was created at the real clock, so it can fall outside the idle
+    window when the test jumps years; sign in again under the fixed clock.
+    """
+    clock = FixedClock(value)
+    owner.app.state.clock = clock
+    owner.app.state.session_factory.configure(info={"clock": clock})
+    owner.client.cookies.clear()
+    assert owner.web.sign_in(owner.client).status_code == 303
 
 
 def wizard_values(**overrides: str) -> dict[str, str]:
