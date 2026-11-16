@@ -229,6 +229,7 @@ def test_items_without_a_value_use_a_warning(owner: OwnerApp) -> None:
 
 def test_summary_markup_is_csp_safe_and_escaped(owner: OwnerApp) -> None:
     _create_item(owner, name="<b>Car</b> & boat", value="100", currency="USD")
+    _create_item(owner, name="Base asset", value="100")
     page = owner.client.get("/net-worth/summary").text
     assert "<b>Car</b>" not in page
     assert "&lt;b&gt;Car&lt;/b&gt; &amp; boat" in page
@@ -469,6 +470,18 @@ def test_non_base_items_remain_excluded_with_the_summary_warning(owner: OwnerApp
     assert "Boat" in _note(page, "non_base")
     assert _chart(page)["series"][0]["values"] == [10000] * 13
     assert _chart(page)["tooltips"][0][1].startswith("1 item in another currency")
+
+
+def test_non_base_only_shows_the_empty_trend_and_the_warning(owner: OwnerApp) -> None:
+    owner.app.state.clock = FixedClock("2026-11-16T12:00:00+00:00")
+    _create_item(owner, name="Boat", value="500", currency="USD", as_of="2025-01-01")
+    page = owner.client.get("/net-worth/summary").text
+    assert "Boat" in _note(page, "non_base")
+    assert "No values are counted for this range." in page
+    assert "data-trend-empty" in page
+    assert "data-chart-canvas" not in page
+    assert "data-trend-row" not in page
+    assert "networth-trend-data" not in page
 
 
 def test_summary_trend_markup_is_csp_safe(owner: OwnerApp) -> None:

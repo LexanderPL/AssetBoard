@@ -232,6 +232,29 @@ def values_at(
         archive_day = archived_on(item.archived_at, timezone)
         archived = archive_day is not None and archive_day <= as_of
         if item.valuation_mode == "linked":
+            created_day = (
+                item.created_at.astimezone(ZoneInfo(timezone)).date()
+                if item.created_at is not None
+                else None
+            )
+            if created_day is not None and as_of < created_day:
+                # The linked item did not exist yet; it is not "unavailable", it simply has no
+                # value at this date. This keeps a later-linked holding out of earlier points.
+                values.append(
+                    ItemValue(
+                        id=item.id,
+                        side=item.side,
+                        category_id=item.category_id,
+                        currency=item.currency,
+                        include_in_net_worth=item.include_in_net_worth,
+                        archived_at=item.archived_at,
+                        archived=archived,
+                        value_minor=None,
+                        value_as_of=None,
+                        unavailable=False,
+                    )
+                )
+                continue
             resolution = (linked or {}).get(item.id)
             available = isinstance(resolution, Money)
             values.append(

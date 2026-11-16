@@ -69,6 +69,7 @@ class NetWorthTrendView:
     rows: tuple[TrendRow, ...]
     chart: dict[str, object] | None
     has_chart: bool
+    has_recorded_values: bool
 
 
 def _not_counted(breakdown: SnapshotBreakdown, locale: str) -> tuple[str, ...]:
@@ -284,4 +285,5 @@ def build_trend_view(data: NetWorthHistoryData, locale: str) -> NetWorthTrendVie
             else None
         ),
         has_chart=data.has_chart,
+        has_recorded_values=data.has_recorded_values,
     )

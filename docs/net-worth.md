@@ -47,8 +47,10 @@ lines; the legend toggles them. Hovering a point shows that point's category bre
 The range selector offers 1 year, 3 years, 5 years and all time (default: 1 year). A fixed range
 never shows leading zero months: it starts at the first completed month-end on or after your
 first recorded value. **All time** starts at that value as well. The last point is today and is
-always live. With no values at all, the panel shows **No values yet. Add an item and its first
-value to see the trend.** instead of a chart.
+always live. With no counted base-currency value, the panel shows an empty-state note instead of
+a chart; if recorded values exist but none are counted, the note points at the summary warnings.
+With no values at all it says **No values yet. Add an item and its first value to see the
+trend.**
 
 The **Monthly values** table under the chart is the accessible, no-JavaScript view. It starts
 collapsed and marks today. A breakdown disclosure per row lists the categories and counts the
@@ -60,7 +62,8 @@ Completed month-ends use the value effective on that date:
 - a manual item with **Estimate values between entries** on gets a straight-line value for a
   month-end strictly between two recorded values (see **Estimates between values**);
 - linked items use their historical series (portfolio prices and exchange rates, loan
-  schedules), and today's point uses the live value;
+  schedules), and today's point uses the live value; before a linked item was created it has no
+  value, rather than an unavailable link;
 - a linked value that cannot be resolved is left out and counted as unavailable, never zero.
 
 Today is not estimated: it always uses the live effective value. A base-currency change is

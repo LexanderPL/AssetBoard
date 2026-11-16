@@ -71,6 +71,7 @@ class NetWorthHistoryData:
     points: tuple[HistoryPoint, ...]
     categories: dict[UUID, HistoryCategory]
     has_values: bool
+    has_recorded_values: bool
 
     @property
     def has_chart(self) -> bool:
@@ -130,10 +131,12 @@ def networth_history(
                 points=(),
                 categories=categories,
                 has_values=False,
+                has_recorded_values=False,
             )
         resolved = registry.resolve_many(session, ctx, histories, dates)
         points: list[HistoryPoint] = []
         has_values = False
+        has_recorded_values = False
         for day in dates:
             values = values_at(
                 histories,
@@ -154,7 +157,16 @@ def networth_history(
                     live=day == today,
                 )
             )
-            has_values = has_values or any(value.value_minor is not None for value in values)
+            has_recorded_values = has_recorded_values or any(
+                value.value_minor is not None for value in values
+            )
+            has_values = has_values or any(
+                value.value_minor is not None
+                and not value.archived
+                and value.include_in_net_worth
+                and value.currency == base_currency
+                for value in values
+            )
     return NetWorthHistoryData(
         base_currency=base_currency,
         range_code=code,
@@ -162,4 +174,5 @@ def networth_history(
         points=tuple(points),
         categories=categories,
         has_values=has_values,
+        has_recorded_values=has_recorded_values,
     )

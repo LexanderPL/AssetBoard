@@ -71,6 +71,6 @@
     </div>
   </details>
   {% else %}
-  <p class="mt-5 text-sm text-muted" data-trend-empty>{{ _("No values yet. Add an item and its first value to see the trend.") }}</p>
+  <p class="mt-5 text-sm text-muted" data-trend-empty>{% if trend.has_recorded_values %}{{ _("No values are counted for this range. The warnings below explain any items that were not counted.") }}{% else %}{{ _("No values yet. Add an item and its first value to see the trend.") }}{% endif %}</p>
   {% endif %}
 </section>

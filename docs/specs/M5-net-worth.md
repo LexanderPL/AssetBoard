@@ -539,10 +539,14 @@ re-running a backfill after correcting a value.
   value and is never estimated.
 - A fixed range (1 year, 3 years, 5 years) clips its start to the earliest recorded value
   (`max(range_start, earliest)`); leading zero months are not shown. **All time** starts at the
-  earliest manual valuation or linked item creation. With no data at all, the panel shows an
-  empty-state note and no chart, table or ECharts script.
-- A recorded zero is data and renders a zero chart. Items without any effective value show the
-  empty state and the existing summary warnings.
+  earliest manual valuation or linked item creation. With no counted base-currency value, the
+  panel shows an empty-state note and no chart, table or ECharts script; if recorded values exist
+  but none are counted, the note points at the existing summary warnings.
+- A recorded zero is data and renders a zero chart. Items without any effective value, only
+  non-base values, only excluded items or only archived items show the empty state and the
+  existing summary warnings.
+- A linked item is not counted before its creation date; it has no value there, not an
+  unavailable link.
 - The range selector is `?range=1y|3y|5y|all` on the Summary page, default `1y`; unknown values
   normalise to `1y`. Range links keep the `#net-worth-trend` anchor.
 - `GET /net-worth/history` is a 302 redirect to
@@ -572,6 +576,11 @@ re-running a backfill after correcting a value.
   statements does not grow with the range.
 - `ItemHistory.created_at` is populated by `services.networth.load_item_histories`; the linked
   item's creation date is the earliest start the current resolver protocol can support.
+  `values_at` reports a linked item before that date as having no value, not as unavailable.
+- `has_values` means at least one point has a counted base-currency, non-archived,
+  include-in-net-worth value; `has_recorded_values` means any effective value exists even if
+  none is counted. The view uses the former for the chart and the latter for the empty-state
+  wording.
 - `services.networth_snapshots` is deleted. Archive/import/rollback use
   `NetWorthSnapshotRepository` directly. `RecurringJobs` no longer schedules or catches up a
   snapshot, and the demo builder writes no snapshot rows (`NetWorthSnapshot` is listed in

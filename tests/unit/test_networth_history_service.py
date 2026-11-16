@@ -418,6 +418,24 @@ def test_including_an_item_toggle_changes_every_point(team: WorkspaceDb) -> None
     )
     data = networth_history(team.factory, ctx, "1y")
     assert all(point.assets == Money(0, "EUR") for point in data.points)
+    assert data.has_recorded_values is True
+    assert data.has_values is False and data.has_chart is False
+
+    update_item(
+        team.factory,
+        ctx,
+        item.id,
+        category_id=category.id,
+        name=item.name,
+        currency=item.currency,
+        notes="",
+        acquired_on=None,
+        include_in_net_worth=True,
+        investable=False,
+        estimate_between=False,
+    )
+    data = networth_history(team.factory, ctx, "1y")
+    assert all(point.assets == Money(10_000, "EUR") for point in data.points)
     assert data.has_values is True and data.has_chart is True
 
 
@@ -458,6 +476,64 @@ def test_non_base_items_are_excluded_from_every_point(team: WorkspaceDb) -> None
     data = networth_history(team.factory, ctx, "1y")
     assert all(point.assets == Money(50_000, "USD") for point in data.points)
     assert all(point.breakdown.non_base == 1 for point in data.points)
+
+
+def test_non_base_only_records_values_but_has_no_chart(team: WorkspaceDb) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    _item(
+        team,
+        ctx,
+        category,
+        name="Boat",
+        value="500",
+        currency="USD",
+        as_of=date(2025, 1, 1),
+    )
+
+    data = networth_history(team.factory, ctx, "1y")
+    assert data.points
+    assert data.has_recorded_values is True
+    assert data.has_values is False
+    assert data.has_chart is False
+    assert all(point.assets == Money(0, "EUR") for point in data.points)
+    assert all(point.breakdown.non_base == 1 for point in data.points)
+
+
+def test_a_linked_item_is_not_counted_before_it_was_created(
+    team: WorkspaceDb, fake_links: FakeLinks
+) -> None:
+    _at(team, "2024-01-01T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    _item(team, ctx, category, name="Car", value="100", as_of=date(2024, 1, 1))
+
+    _at(team, "2026-02-01T12:00:00+00:00")
+    target = FakeTarget(
+        workspace_id=team.workspace_id,
+        link_id=uuid4(),
+        label="Holding",
+        values={date(2026, 2, 28): 500, date(2026, 3, 15): 600},
+    )
+    fake_links.register(targets=[target])
+    _item(
+        team,
+        ctx,
+        category,
+        name="Holding",
+        link_type=LINK_TYPE,
+        link_id=target.link_id,
+    )
+    _at(team, "2026-03-15T12:00:00+00:00")
+
+    data = networth_history(team.factory, team.ctx("ed", "editor"), "all")
+    january = next(point for point in data.points if point.as_of == date(2024, 1, 31))
+    february = next(point for point in data.points if point.as_of == date(2026, 2, 28))
+    assert january.assets == Money(10_000, "EUR")
+    assert january.breakdown.no_value == 1
+    assert january.breakdown.unavailable == 0
+    assert february.assets == Money(10_500, "EUR")
 
 
 def test_history_ignores_stored_snapshots(team: WorkspaceDb) -> None:
