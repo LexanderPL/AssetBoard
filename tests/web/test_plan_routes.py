@@ -100,7 +100,8 @@ def test_the_summary_lists_categories_in_groups_with_editable_cells(plan: OwnerA
     assert 'name="amount"' in row and 'inputmode="decimal"' in row and "data-plan-input" in row
     assert 'name="csrf_token"' in row
     assert f"plan-{moving}" not in summary
-    assert "0 or an empty field removes it" in summary
+    assert "0 or an empty field removes it" not in summary
+    assert "plan-hint" not in summary
 
 
 def test_a_planned_value_is_saved_changed_and_removed_without_javascript(plan: OwnerApp) -> None:
