@@ -1148,6 +1148,76 @@ archive, dependencies, projection math and loan math unchanged.
   closed sections, 390/1440 widths and CSP. `docs/fire.md`, this section and the overview range
   were updated. No model, migration, archive, dependency, projection-math or loan-math change.
 
+### F8.18 — FIRE display and input polish
+
+**Acceptance**
+
+- The year-by-year table has no explanatory paragraphs below it. It uses the same `bg-surface`
+  sheet treatment as the Transactions tables and keeps the FIRE, depleted and income-stopped row
+  colours.
+- The view gives the year-by-year results the same spacing below the **Plan values, adjustments
+  and loans** details as the editor.
+- The editor's **Plan** section has no visible currency field and no visible birth-year field or
+  source copy. A hidden `birth_year` posts the saved value, so saving keeps working. The setup
+  wizard keeps its visible birth-year step.
+- The editor and the wizard put **Independence rule** and **Withdrawal rate** side by side in
+  their own two-column row, below the inflation/return/income-growth row. The “used only when the
+  independence rule is Withdrawal rate” note is gone. The withdrawal-rate field stays visible and
+  is JavaScript-disabled for the other rule.
+- The disclaimer is the last block on both the view and edit pages, after the sensitivity panel.
+- In the income and expense suggestion cards, the category table is behind a **Where this value
+  comes from** disclosure, matching the portfolio suggestion. The loan-portion and scheduled-loan
+  lines stay visible outside the disclosure; the category table and its row hooks stay intact.
+- The starting-portfolio input fills its full-width column and matches the width of the
+  full-width **Suggested starting portfolio** card.
+- No schema, migration, archive, dependency, projection-math or loan-math change. The `pl`
+  catalog is complete with no fuzzy entries.
+- Tests cover the removed copy, the hidden birth year and a successful save, the absent visible
+  currency/birth-year fields, the rule/SWR row and absent note, the collapsed category details
+  opening in a browser, the disclaimer order, the table background and row tints, the view
+  spacing and the portfolio input width.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.18 from docs/specs/M8-fire-planner-v2.md: remove the two year-by-year notes, give
+the table the Transactions surface treatment and the view the editor spacing, hide the editor's
+currency and birth-year fields while keeping the hidden birth-year value, move rule/SWR into
+their own row without the note, move the disclaimer below sensitivity, put suggestion categories
+behind a details, and uncap the starting-portfolio input. Keep models, migrations, archive,
+dependencies, projection math and loan math unchanged.
+```
+
+### As built (M8.F8.18)
+
+- `_table.html` renders only the heading, the scroll region and the table; the first-year and row
+  highlight paragraphs are gone. The table is `sheet bg-surface`, and the `bg-success-soft`,
+  `bg-danger-soft` and `text-muted` row classes and their data hooks are unchanged.
+- `view.html` puts `mt-8` on `#fire-results-detail`, matching the editor, and includes the
+  disclaimer after `_sensitivity_panel.html`; `edit.html` does the same. The disclaimer is the
+  last child of the view/editor page wrapper.
+- The editor's Plan section posts `<input type="hidden" name="birth_year">` with the saved value
+  and no longer renders the readonly currency display, a birth-year input or its source text. The
+  wizard step 1 is unchanged.
+- Both `_form_body.html` and `wizard.html` split their assumption fields into a three-column
+  rates row and a two-column rule/SWR row (`data-fire-swr-row`). `data-fire-swr-note` and its
+  copy are removed; the existing `fire.js` visibility/disable behaviour is unchanged.
+- `_suggestion.html` renders the category table inside a native `<details>` whose summary reuses
+  the existing **Where this value comes from** msgid. `data-fire-suggestion-categories`,
+  `data-fire-suggestion-category` and the caption stay inside; the loan-portion and
+  scheduled-loan paragraphs stay outside and visible.
+- The starting-portfolio input no longer carries the `lg:max-w-[calc(50%-0.625rem)]` cap, so it
+  fills its `lg:col-span-2` column like the portfolio suggestion card.
+- Web tests cover the absent copy, hidden birth year and save, hidden currency/birth year, the
+  rule/SWR row, the category disclosure and loan lines, the table background and the FIRE,
+  depleted and income-stopped row tints, view spacing and disclaimer order, and the uncapped
+  portfolio field. Browser tests cover the disclaimer as the last block, `mt-8` spacing, the
+  table class, hidden birth year, category collapse/open in the editor and wizard, the
+  side-by-side rule/SWR layout, absent note, the portfolio input/card width match, CSP and
+  390/1440 widths. `docs/fire.md` and the overview range were updated. No model, migration,
+  archive, dependency, projection-math or loan-math change.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -1185,6 +1255,7 @@ archive, dependencies, projection math and loan math unchanged.
 8. F8.15 — FIRE results and editor cleanup.
 9. F8.16 — living-plan year review.
 10. F8.17 — FIRE projection and editor layout.
+11. F8.18 — FIRE display and input polish.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

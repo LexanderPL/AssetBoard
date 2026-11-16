@@ -100,7 +100,7 @@
     </div>
 
     {% else %}
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="grid gap-4 sm:grid-cols-3">
       <div class="grid gap-1" data-fire-field="inflation">
         {{ field_label("inflation", _("Inflation (%%)")) }}
         <input id="inflation" name="inflation" value="{{ values.get('inflation', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "inflation") }}>
@@ -116,6 +116,8 @@
         <input id="income_growth" name="income_growth" value="{{ values.get('income_growth', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_growth") }}>
         {{ field_error(error_field, "income_growth", error) }}
       </div>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2" data-fire-swr-row>
       <div class="grid gap-1" data-fire-field="rule">
         {{ field_label("rule", _("Independence rule"), _("Returns cover expenses compares the portfolio's return with expenses. Withdrawal rate uses the rate below.")) }}
         <select id="rule" name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule", "rule-hint") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
@@ -125,7 +127,6 @@
         {{ field_label("swr", _("Withdrawal rate (%%)"), _("Share of the portfolio withdrawn in the first year of retirement. 4%% is an example, not a rule.")) }}
         <input id="swr" name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr", "swr-hint") }}>
         {{ field_error(error_field, "swr", error) }}
-        <span class="text-xs font-normal text-muted" data-fire-swr-note>{{ _("Used only when the independence rule is Withdrawal rate.") }}</span>
       </div>
     </div>
 

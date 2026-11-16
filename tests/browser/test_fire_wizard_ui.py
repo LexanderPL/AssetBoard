@@ -216,12 +216,23 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-wizard]")).to_have_attribute("data-fire-wizard", "2")
             expect(page.locator('[data-fire-suggestion="income"]')).to_be_visible()
             expect(page.locator('[data-fire-suggestion="expenses"]')).to_be_visible()
-            expect(
-                page.locator('[data-fire-suggestion="income"] [data-fire-suggestion-categories]')
-            ).to_be_visible()
-            expect(
-                page.locator('[data-fire-suggestion="expenses"] [data-fire-suggestion-categories]')
-            ).to_be_visible()
+            income_categories = page.locator(
+                '[data-fire-suggestion="income"] [data-fire-suggestion-categories]'
+            )
+            expense_categories = page.locator(
+                '[data-fire-suggestion="expenses"] [data-fire-suggestion-categories]'
+            )
+            expect(income_categories).to_be_hidden()
+            expect(expense_categories).to_be_hidden()
+            page.locator(
+                '[data-fire-suggestion="income"] [data-fire-suggestion-categories-details] summary'
+            ).click()
+            page.locator(
+                '[data-fire-suggestion="expenses"] '
+                "[data-fire-suggestion-categories-details] summary"
+            ).click()
+            expect(income_categories).to_be_visible()
+            expect(expense_categories).to_be_visible()
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator('[data-use-suggestion="income_manual"]').click()
             assert page.locator('input[name="income_manual"]').input_value() == "60000.00"
@@ -256,7 +267,19 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
             expect(swr_input).to_be_disabled()
             assert "hidden" not in (swr_wrapper.get_attribute("class") or "")
             expect(swr_wrapper).to_have_attribute("data-fire-swr-inactive", "1")
-            expect(page.locator("[data-fire-swr-note]")).to_be_visible()
+            expect(page.locator("[data-fire-swr-note]")).to_have_count(0)
+            expect(
+                page.get_by_text("Used only when the independence rule is Withdrawal rate.")
+            ).to_have_count(0)
+            row = page.locator("[data-fire-swr-row]")
+            expect(row).to_be_visible()
+            rule = row.locator('select[name="rule"]')
+            expect(rule).to_be_visible()
+            rule_box = rule.bounding_box()
+            swr_box = swr_input.bounding_box()
+            assert rule_box is not None and swr_box is not None
+            assert abs(rule_box["y"] - swr_box["y"]) <= 1
+            assert rule_box["x"] < swr_box["x"]
             page.locator('select[name="rule"]').select_option("swr")
             expect(swr_wrapper).to_be_visible()
             expect(swr_input).to_be_enabled()
