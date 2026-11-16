@@ -48,7 +48,7 @@
     <h2 id="portfolio-holdings-heading" class="text-base font-semibold">{{ _("Holdings") }}</h2>
     {% if view.has_rows %}
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet w-full text-sm">
+      <table class="sheet bg-surface w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Instrument") }}</th>
@@ -103,7 +103,7 @@
     <h2 id="portfolio-classes-heading" class="text-base font-semibold">{{ _("By asset class") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value and cost are split by its allocation weights.") }}</p>
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet w-full text-sm">
+      <table class="sheet bg-surface w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Asset class") }}</th>
@@ -140,7 +140,7 @@
     <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-risk-no-birth-year>{{ _("Set your birth year in Profile to use age-based targets.") }} <a href="{{ url_for('account') }}" class="font-semibold underline">{{ _("Open Profile") }}</a></p>
     {% endif %}
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet w-full text-sm">
+      <table class="sheet bg-surface w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Tier") }}</th>

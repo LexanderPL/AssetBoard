@@ -23,7 +23,7 @@
     {% for name in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ values.get(name, '') }}">{% endfor %}
 
     {% if step == 1 %}
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="grid gap-4">
       <div class="grid gap-1" data-fire-field="birth_year">
         {{ field_label("birth_year", _("Birth year")) }}
         <input id="birth_year" name="birth_year" value="{{ values.get('birth_year', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "birth_year", "birth_year-source") }}>
@@ -40,15 +40,17 @@
         <span id="birth_year-source" class="text-xs font-normal text-muted" data-fire-birth-year-source="profile">{{ _("From your profile. This plan stores its own birth year; changing your profile later does not change this plan.") }}</span>
         {% endif %}
       </div>
-      <div class="grid gap-1" data-fire-field="horizon_age">
-        {{ field_label("horizon_age", _("Horizon age")) }}
-        <input id="horizon_age" name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>
-        {{ field_error(error_field, "horizon_age", error) }}
-      </div>
-      <div class="grid gap-1" data-fire-field="stop_working_age">
-        {{ field_label("stop_working_age", _("Income stops at age")) }}
-        <input id="stop_working_age" name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>
-        {{ field_error(error_field, "stop_working_age", error) }}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-1" data-fire-field="horizon_age">
+          {{ field_label("horizon_age", _("Horizon age")) }}
+          <input id="horizon_age" name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>
+          {{ field_error(error_field, "horizon_age", error) }}
+        </div>
+        <div class="grid gap-1" data-fire-field="stop_working_age">
+          {{ field_label("stop_working_age", _("Income stops at age")) }}
+          <input id="stop_working_age" name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>
+          {{ field_error(error_field, "stop_working_age", error) }}
+        </div>
       </div>
     </div>
     <div class="border border-line bg-subtle px-4 py-3 text-sm" data-fire-wizard-summary>
