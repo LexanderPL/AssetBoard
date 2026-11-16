@@ -1,0 +1,5 @@
+{% set projection = results.projection %}
+{% if projection %}
+  {% include "fire/_table.html" %}
+  {% include "fire/_charts.html" %}
+{% endif %}

@@ -1,0 +1,12 @@
+<details id="plan-inputs" class="panel group" data-fire-plan-inputs>
+  <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-base font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-7 [&::-webkit-details-marker]:hidden">
+    <span class="min-w-0">{{ _("Plan values, adjustments and loans") }}</span>
+    <span aria-hidden="true" class="shrink-0 text-muted transition-transform group-open:rotate-180">▾</span>
+  </summary>
+  <div class="space-y-8 border-t border-line p-6 sm:p-7">
+    {% include "fire/_plan_values.html" %}
+    {% include "fire/_adjustments_view.html" %}
+    {% set loans_embedded = true %}
+    {% include "fire/_loans.html" %}
+  </div>
+</details>

@@ -218,6 +218,50 @@ RULE_LABELS = {
     Rule.SWR.value: _("Withdrawal rate"),
 }
 
+# F8.17: the editor accordion opens the section that owns a save error. Adjustment-row errors
+# are carried by the ``events`` field and everything loan-related by ``loans``.
+EDITOR_SECTION_FIELDS = {
+    "birth_year": "plan",
+    "horizon_age": "plan",
+    "stop_working_age": "plan",
+    "inflation": "assumptions",
+    "real_return": "assumptions",
+    "income_growth": "assumptions",
+    "rule": "assumptions",
+    "swr": "assumptions",
+    "extreme_rates_confirmed": "assumptions",
+    "income_manual": "amounts",
+    "expenses_manual": "amounts",
+    "portfolio_manual": "amounts",
+    "events": "adjustments",
+    "loans": "loans",
+}
+
+
+def _editor_section(
+    *,
+    error_field: str | None,
+    adjustment_error: fire_service.FireError | None,
+    extreme_confirmation: bool,
+    year_review: bool,
+) -> str | None:
+    """The accordion section to open after a save; errors win over the year review."""
+    if error_field:
+        if error_field.startswith("event_"):
+            return "adjustments"
+        if error_field.startswith("loan_include_"):
+            return "loans"
+        section = EDITOR_SECTION_FIELDS.get(error_field)
+        if section is not None:
+            return section
+    if adjustment_error is not None and adjustment_error.row is not None:
+        return "adjustments"
+    if extreme_confirmation:
+        return "assumptions"
+    if year_review:
+        return "amounts"
+    return None
+
 
 def _t(request: Request, message: str) -> str:
     return gettext(message, request.state.locale)
@@ -739,6 +783,7 @@ def _edit_context(
     *,
     results: fire_projection_service.FirePlanResults,
     suggestions: fire_linked_service.SetupSuggestions,
+    sensitivity_results: fire_projection_service.FirePlanResults | None = None,
     values: dict[str, str] | None = None,
     adjustment_rows: tuple[fire_adjustments.AdjustmentRow, ...] | None = None,
     error: str | None = None,
@@ -770,6 +815,24 @@ def _edit_context(
         )
     )
     context.update(_suggestion_context(request, suggestions, results.detail.plan))
+    plan = results.detail.plan
+    values_year = getattr(plan, "values_year", plan.current_year)
+    year_review = values_year < plan.current_year
+    context["open_section"] = _editor_section(
+        error_field=error_field,
+        adjustment_error=adjustment_error,
+        extreme_confirmation=extreme_confirmation,
+        year_review=year_review,
+    )
+    context.update(
+        _sensitivity_context(
+            request,
+            ctx,
+            sensitivity_results if sensitivity_results is not None else results,
+            in_editor=True,
+            refresh=True,
+        )
+    )
     context["loans_editable"] = True
     context["notice"] = notice
     context["dirty"] = dirty
@@ -783,7 +846,6 @@ def _view_context(
     ctx: Context,
     results: fire_projection_service.FirePlanResults,
     *,
-    sensitivity_loaded: bool,
     notice: str | None = None,
     error: str | None = None,
     error_code: str | None = None,
@@ -811,17 +873,10 @@ def _view_context(
             "adjustments_editable": False,
             "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
             "format_day": format_day,
-            "sensitivity_loaded": sensitivity_loaded,
-            "sensitivity_page_url": (
-                request.url_for("fire_scenarios").path + "?sensitivity=1#sensitivity"
-            ),
-            "sensitivity_fragment_url": request.url_for("fire_sensitivity").path,
-            "sensitivity_inputs_url": request.url_for("fire_edit").path + "#amounts",
             "loans_editable": False,
         }
     )
-    if sensitivity_loaded:
-        context.update(_sensitivity_context(request, ctx, results))
+    context.update(_sensitivity_context(request, ctx, results))
     return context
 
 
@@ -853,15 +908,17 @@ def _sensitivity_context(
     request: Request,
     ctx: Context,
     results: fire_projection_service.FirePlanResults,
+    *,
+    in_editor: bool = False,
+    refresh: bool = False,
 ) -> dict[str, object]:
     fragment_url = request.url_for("fire_sensitivity").path
-    page_url = request.url_for("fire_scenarios").path + "?sensitivity=1#sensitivity"
     plan = results.detail.plan
     if plan.currency_mismatch:
         inputs_url = request.url_for("fire_reset").path
         inputs_label = _t(request, _("Reset plan"))
     else:
-        inputs_url = request.url_for("fire_edit").path + "#amounts"
+        inputs_url = "#amounts" if in_editor else request.url_for("fire_edit").path + "#amounts"
         inputs_label = _t(request, _("Edit the plan"))
     context: dict[str, object] = {
         "sensitivity": None,
@@ -872,7 +929,7 @@ def _sensitivity_context(
             code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
         },
         "sensitivity_fragment_url": fragment_url,
-        "sensitivity_page_url": page_url,
+        "sensitivity_refresh": refresh,
         "sensitivity_inputs_url": inputs_url,
         "sensitivity_inputs_label": inputs_label,
         "can_edit": has_role(ctx, Role.EDITOR),
@@ -1123,7 +1180,6 @@ async def fire_scenarios_page(request: Request, ctx: CurrentContext) -> Response
             request,
             ctx,
             results,
-            sensitivity_loaded=request.query_params.get("sensitivity") == "1",
             notice=notice,
             error=error,
             error_code=error_code,
@@ -1202,6 +1258,7 @@ async def _render_edit(
         ctx,
         detail,
     )
+    saved_results = results
     if values is not None:
         try:
             toggles = fire_loan_web.parse_loan_toggles(values)
@@ -1223,6 +1280,7 @@ async def _render_edit(
         ctx,
         results=results,
         suggestions=suggestions,
+        sensitivity_results=saved_results,
         values=values,
         adjustment_rows=adjustment_rows,
         error=error,
@@ -1271,7 +1329,7 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
             preview_error=_error(request, exc.code),
             preview_error_field=_preview_error_field(exc),
         )
-        return render_template(request, "fire/_results.html", context=context)
+        return render_template(request, "fire/_preview.html", context=context)
     context = await run_in_threadpool(
         _results_context,
         request,
@@ -1279,7 +1337,7 @@ async def fire_edit_preview(request: Request, ctx: CurrentContext) -> Response:
         results,
         in_editor=True,
     )
-    return render_template(request, "fire/_results.html", context=context)
+    return render_template(request, "fire/_preview.html", context=context)
 
 
 @router.post("/fire/edit", name="fire_edit_save")
@@ -1635,16 +1693,11 @@ async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id:
         raise NotFound
     if request.query_params.get("edit") == "1":
         return _redirect(request, "fire_edit")
-    params = {
-        key: value
-        for key in ("sensitivity", "notice", "error")
-        if (value := request.query_params.get(key))
-    }
-    anchor = "#sensitivity" if params.get("sensitivity") == "1" else ""
+    params = {key: value for key in ("notice", "error") if (value := request.query_params.get(key))}
     url = request.url_for("fire_scenarios").path
     if params:
         url = f"{url}?{urlencode(params)}"
-    return RedirectResponse(f"{url}{anchor}", status_code=303)
+    return RedirectResponse(url, status_code=303)
 
 
 @router.get("/fire/{scenario_id}/sensitivity", name="fire_scenario_sensitivity")
@@ -1657,7 +1710,9 @@ async def fire_scenario_sensitivity(
     )
     if str(detail.plan.id) != scenario_id:
         raise NotFound
-    return RedirectResponse(request.url_for("fire_sensitivity").path, status_code=303)
+    return RedirectResponse(
+        request.url_for("fire_scenarios").path + "#sensitivity", status_code=303
+    )
 
 
 @router.get("/fire/{scenario_id}/edit", name="fire_scenario_edit")

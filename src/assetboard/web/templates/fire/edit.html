@@ -34,7 +34,19 @@
 </div>
 {% endif %}
 
-<form id="fire-form" method="post" action="{{ scoped_url(request, 'fire_edit_save') }}" class="space-y-6" data-fire-form data-fire-dirty="{{ '1' if dirty else '0' }}" data-current-year="{{ s.current_year }}" novalidate>
+<div data-fire-preview
+     hx-post="{{ scoped_url(request, 'fire_edit_preview') }}"
+     hx-trigger="change from:#fire-form delay:300ms, input from:#fire-form delay:600ms, fire:changed from:#fire-form delay:100ms"
+     hx-include="#fire-form"
+     hx-target="#fire-metrics"
+     hx-swap="innerHTML"
+     hx-sync="this:replace">
+  <div id="fire-metrics">
+    {% include "fire/_results_metrics.html" %}
+  </div>
+</div>
+
+<form id="fire-form" method="post" action="{{ scoped_url(request, 'fire_edit_save') }}" class="mt-6 space-y-6" data-fire-form data-fire-dirty="{{ '1' if dirty else '0' }}" data-current-year="{{ s.current_year }}" novalidate>
   {{ csrf_input() }}
   {% if extreme_confirmation %}
   <section class="panel border-warning-line p-5 sm:p-6" role="alert" aria-labelledby="extreme-confirmation-heading" data-fire-extreme-confirm>
@@ -46,19 +58,12 @@
     <button type="submit" name="extreme_rates_confirmed" value="1" class="btn-primary mt-4" data-fire-confirm-extreme>{{ _("Confirm and save") }}</button>
   </section>
   {% endif %}
-  <div id="fire-results" data-fire-results hx-post="{{ scoped_url(request, 'fire_edit_preview') }}" hx-trigger="change from:#fire-form delay:300ms, input from:#fire-form delay:600ms, fire:changed from:#fire-form delay:100ms" hx-include="#fire-form" hx-target="#fire-results" hx-swap="innerHTML" hx-sync="this:replace">
-    {% include "fire/_results.html" %}
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="text-base font-semibold">{{ _("Plan inputs") }}</h2>
+    <p class="text-sm text-muted">{{ _("Changes preview automatically and are not saved until you press Save changes.") }}</p>
   </div>
 
-  <section id="inputs" class="panel p-6 sm:p-7" aria-labelledby="inputs-heading">
-    <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="inputs-heading" class="text-base font-semibold">{{ _("Plan inputs") }}</h2>
-      <p class="text-sm text-muted">{{ _("Changes preview automatically and are not saved until you press Save changes.") }}</p>
-    </div>
-    <div class="mt-5 space-y-6">
-      {% include "fire/_form_body.html" %}
-    </div>
-  </section>
+  {% include "fire/_form_body.html" %}
 
   <div class="flex flex-wrap items-center gap-3" data-fire-actions>
     <button type="submit" class="btn-primary" data-fire-save>{{ _("Save changes") }}</button>
@@ -66,6 +71,13 @@
     <p role="status" aria-live="polite" class="text-sm font-medium text-warning-strong" data-fire-dirty-status{% if not dirty %} hidden{% endif %}>{{ _("Unsaved changes") }}</p>
   </div>
 </form>
+
+<div id="fire-results-detail" class="mt-8">
+  {% include "fire/_results_detail.html" %}
+</div>
+
+{% include "fire/_disclaimer.html" %}
+{% include "fire/_sensitivity_panel.html" %}
 </div>
 {% endblock %}
 

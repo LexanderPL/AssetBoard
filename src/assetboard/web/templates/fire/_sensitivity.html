@@ -68,8 +68,3 @@
 {% else %}
 <p class="mt-4 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-sensitivity-unavailable>{{ _("The sensitivity grid could not be calculated.") }}</p>
 {% endif %}
-
-<div class="mt-4 flex flex-wrap items-center gap-3">
-  <a href="{{ sensitivity_page_url }}" class="btn-sm" hx-get="{{ sensitivity_fragment_url }}" hx-target="#fire-sensitivity" hx-swap="innerHTML" data-fire-sensitivity-refresh>{{ _("Refresh grid") }}</a>
-  <p class="text-xs text-muted">{{ _("The grid always uses the saved plan, not unsaved changes.") }}</p>
-</div>
