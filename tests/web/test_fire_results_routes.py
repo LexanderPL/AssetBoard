@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, select, update
 
 from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent
@@ -59,6 +60,31 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert 'name="birth_year"' not in page.text
     assert "data-fire-suggestion" not in page.text
     assert "data-fire-edit-page" not in page.text
+
+
+def test_a_previous_year_review_shows_the_living_plan_banner(owner) -> None:
+    plan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        session.execute(
+            update(FireScenario)
+            .where(FireScenario.id == plan_id)
+            .values(updated_at=datetime(2025, 11, 16, 12, tzinfo=UTC))
+        )
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-year-review" in page.text
+    assert "This plan starts in " in page.text
+    assert "values last reviewed for 2025" in page.text
+    assert "Review the plan inputs" in page.text
+
+    owner.set_admin_role("viewer")
+    try:
+        viewer = owner.client.get("/fire")
+        assert "data-fire-year-review" in viewer.text
+        assert "values last reviewed for 2025" in viewer.text
+        assert "Review the plan inputs" not in viewer.text
+    finally:
+        owner.set_admin_role("owner")
 
 
 def test_plan_warnings_are_a_compact_stack_without_the_old_overview(owner) -> None:

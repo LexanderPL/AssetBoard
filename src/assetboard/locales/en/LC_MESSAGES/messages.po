@@ -6635,6 +6635,13 @@ msgid ""
 "save to confirm them."
 msgstr ""
 
+#, python-format
+msgid ""
+"This plan starts in %(current)d with values last reviewed for "
+"%(reviewed)d. Review the starting amounts below; saving confirms them for"
+" the new year."
+msgstr ""
+
 msgid ""
 "The horizon age is not after your current age. Raise it below to project "
 "the plan."
@@ -6751,6 +6758,13 @@ msgstr ""
 msgid ""
 "This plan was converted from the old format. An editor or owner must "
 "review its values and save to confirm them."
+msgstr ""
+
+#, python-format
+msgid ""
+"This plan starts in %(current)d with values last reviewed for "
+"%(reviewed)d. Review the starting values before relying on the "
+"projection."
 msgstr ""
 
 msgid ""

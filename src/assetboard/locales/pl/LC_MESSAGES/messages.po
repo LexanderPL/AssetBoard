@@ -7225,6 +7225,16 @@ msgstr ""
 "Ten plan został przekształcony ze starego formatu. Sprawdź poniższe "
 "wartości i zapisz, aby je potwierdzić."
 
+#, python-format
+msgid ""
+"This plan starts in %(current)d with values last reviewed for "
+"%(reviewed)d. Review the starting amounts below; saving confirms them for"
+" the new year."
+msgstr ""
+"Ten plan rozpoczyna się w %(current)d od wartości ostatnio sprawdzonych dla "
+"%(reviewed)d. Sprawdź poniżej kwoty początkowe; zapis potwierdzi je na nowy "
+"rok."
+
 msgid ""
 "The horizon age is not after your current age. Raise it below to project "
 "the plan."
@@ -7366,6 +7376,15 @@ msgid ""
 msgstr ""
 "Ten plan został przekształcony ze starego formatu. Edytor lub właściciel "
 "musi sprawdzić jego wartości i zapisać, aby je potwierdzić."
+
+#, python-format
+msgid ""
+"This plan starts in %(current)d with values last reviewed for "
+"%(reviewed)d. Review the starting values before relying on the "
+"projection."
+msgstr ""
+"Ten plan rozpoczyna się w %(current)d od wartości ostatnio sprawdzonych dla "
+"%(reviewed)d. Sprawdź wartości początkowe, zanim oprzesz się na prognozie."
 
 msgid ""
 "The horizon age is not after your current age. Raise it in edit mode to "

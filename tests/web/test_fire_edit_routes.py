@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -399,6 +399,25 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert f'action="/fire/{plan_id}"' not in page.text
     assert f'hx-post="/fire/{plan_id}' not in page.text
     assert "js/fire.js" in page.text
+
+
+def test_saving_clears_the_living_plan_review(owner) -> None:
+    plan_id = create_plan(owner)
+    with owner.db() as session, session.begin():
+        session.execute(
+            update(FireScenario)
+            .where(FireScenario.id == plan_id)
+            .values(updated_at=datetime(2025, 11, 16, 12, tzinfo=UTC))
+        )
+    edit = owner.client.get("/fire/edit")
+    assert edit.status_code == 200
+    assert "data-fire-year-review" in edit.text
+    assert 'data-fire-review-section="amounts"' in edit.text
+
+    response = owner.post("/fire/edit", _form(), token_from="/fire/edit")
+    assert response.status_code == 303
+    view = owner.client.get("/fire")
+    assert "data-fire-year-review" not in view.text
 
 
 def test_the_editor_does_not_write_on_get(owner) -> None:

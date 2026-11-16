@@ -15,6 +15,11 @@
 {% if s.needs_review %}
 <p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{{ _("This plan was converted from the old format. Check the values below and save to confirm them.") }}</p>
 {% endif %}
+{% if s.values_year and s.values_year < s.current_year %}
+<p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-year-review data-fire-review-section="amounts">
+  {{ _("This plan starts in %(current)d with values last reviewed for %(reviewed)d. Review the starting amounts below; saving confirms them for the new year.", current=s.current_year, reviewed=s.values_year) }}
+</p>
+{% endif %}
 
 {% if s.horizon_reached or s.income_stopped or s.stop_after_horizon %}
 <div class="mb-4 space-y-2" data-fire-warnings>

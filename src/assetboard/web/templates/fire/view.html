@@ -16,6 +16,12 @@
 {% if s.needs_review and not s.currency_mismatch %}
 <p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-needs-review>{% if can_edit %}{{ _("This plan was converted from the old format. Review its values and save to confirm them.") }} <a href="{{ scoped_url(request, 'fire_edit') }}#amounts" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% else %}{{ _("This plan was converted from the old format. An editor or owner must review its values and save to confirm them.") }}{% endif %}</p>
 {% endif %}
+{% if s.values_year and s.values_year < s.current_year %}
+<p role="status" class="mb-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-year-review>
+  {{ _("This plan starts in %(current)d with values last reviewed for %(reviewed)d. Review the starting values before relying on the projection.", current=s.current_year, reviewed=s.values_year) }}
+  {% if can_edit and not s.currency_mismatch %}<a href="{{ scoped_url(request, 'fire_edit') }}#amounts" class="font-semibold underline underline-offset-2">{{ _("Review the plan inputs") }}</a>.{% endif %}
+</p>
+{% endif %}
 
 {% if s.horizon_reached or s.income_stopped or s.stop_after_horizon %}
 <div class="mb-4 space-y-2" data-fire-warnings>

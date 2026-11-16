@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any, cast
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -183,6 +185,7 @@ class FirePlanView:
     currency_mismatch: bool
     event_count: int
     archived_event_count: int
+    values_year: int = 0
     import_key: str | None = None
 
     @property
@@ -634,11 +637,13 @@ def _view(
     row: FireScenario,
     *,
     current_year: int,
+    timezone: str,
     base_currency: str,
     event_count: int,
     archived_event_count: int,
 ) -> FirePlanView:
     currency = row.currency
+    values_year = row.updated_at.astimezone(ZoneInfo(timezone)).year
     return FirePlanView(
         id=row.id,
         currency=currency,
@@ -659,6 +664,7 @@ def _view(
         currency_mismatch=currency != base_currency,
         event_count=event_count,
         archived_event_count=archived_event_count,
+        values_year=values_year,
         import_key=row.import_key,
     )
 
@@ -675,6 +681,7 @@ def _detail_in_session(
         plan=_view(
             row,
             current_year=current_year,
+            timezone=ctx.workspace.timezone,
             base_currency=base_currency,
             event_count=len(event_rows),
             archived_event_count=len(archived),
@@ -1070,6 +1077,8 @@ def update_fire_plan(factory: sessionmaker[Session], ctx: Context, plan: FirePla
             expenses_minor=validated.expenses_minor,
             portfolio_minor=validated.portfolio_minor,
             needs_review=False,
+            # The living-plan review uses the save year even when no field changed.
+            updated_at=ctx.clock.now().astimezone(UTC),
         )
         _reconcile_events(session, ctx, row.id, validated, existing_rows=saved_rows)
         _reconcile_loan_settings(
