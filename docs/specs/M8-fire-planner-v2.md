@@ -1294,12 +1294,14 @@ dependencies, loan math and the UI layout unchanged.
   year=...)` and renders the visible grid error.
 - **Sensitivity.** The expense factor now scales the starting expenses, every
   `expense_change` event and every loan payment, each rounded once; cash, income changes and
-  saving overrides stay saved. The factor-10,000 cell is byte-for-byte the direct projection
-  inputs. Sensitivity tests cover the scaling, the base-cell equality and the negative-cell
-  error.
+  saving overrides stay saved. The factor-10,000 cell reuses the direct projection, so it is
+  identical by construction. Sensitivity tests cover the scaling, the base-cell equality and
+  the negative-cell error.
 - **Current year.** `_table.html` keeps the first-row model and replaces the trailing footnote
-  with a short `data-fire-first-year-hint` next to **Year by year**; `docs/fire.md` and this
-  section explain the same convention.
+  with a short `data-fire-first-year-hint` next to **Year by year**: the first row is the
+  starting point, today's portfolio earns one year's gain, the current year's income and
+  expenses are shown, and that row's net saving is the starting portfolio. `docs/fire.md`
+  carries the same explanation.
 - **Tests and docs.** Unit tests cover the exact compounding, the real-return predicate and
   FIRE number, strict boundaries, negative-expense errors from both causes, the zero-portfolio
   case, exact sensitivity scaling of all expense components, the base cell and the negative

@@ -59,8 +59,9 @@ has to be fixed, documented and testable against an independent oracle.
   cannot change a plan.
 - Rounding once per line can differ by one minor unit from an unrounded mathematical model. The
   golden test against a `Fraction` oracle accepts exactly the rule above.
-- The additive gain and the strict-`<` FIRE row are parity choices. Changing either is a product
-  decision and needs a spec change, a new ADR and new golden data.
+- The additive gain and the strict-`<` FIRE row were parity choices. ADR-0026 (M8 F8.19)
+  changed both with a spec change and new golden data; the storage, rounding and closed-form
+  growth rules above are unchanged.
 - Real values were display-only in F8.3 and F8.5. M8 v2 decision 8 and F8.13 remove them:
   the planner now shows nominal values only, so this display requirement no longer applies.
   The nominal projection, gain rounding and metric rounding rules above are unchanged.

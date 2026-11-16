@@ -339,8 +339,8 @@ the reason and the year instead of a misleading FIRE cell. The editor additional
 because the grid is already rendered.
 
 Each expense level scales the whole expense line: the starting expenses, every annual expense
-change and the included loan payments, with one rounding for each component. Income, cash flows
-and saving overrides keep their saved values. The saved plan's own expense level therefore
+change and every loan's recurring payment, with one rounding for each component. Income, cash
+flows and saving overrides keep their saved values. The saved plan's own expense level therefore
 matches the direct projection exactly.
 
 ## Archive and restore
