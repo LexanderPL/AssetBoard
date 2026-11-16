@@ -37,6 +37,7 @@ def _plan(*, current_year: int = 2026, last_year: int = 2075) -> FirePlanView:
         currency_mismatch=False,
         event_count=0,
         archived_event_count=0,
+        values_year=current_year,
     )
 
 

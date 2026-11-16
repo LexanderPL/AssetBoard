@@ -185,7 +185,8 @@ class FirePlanView:
     currency_mismatch: bool
     event_count: int
     archived_event_count: int
-    values_year: int = 0
+    # The workspace-local year of ``updated_at``: when the starting values were last saved.
+    values_year: int
     import_key: str | None = None
 
     @property
