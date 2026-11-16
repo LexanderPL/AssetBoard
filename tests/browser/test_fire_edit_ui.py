@@ -228,6 +228,17 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-fire-edit]")).to_be_visible()
             expect(page.locator("[data-fire-form]")).to_have_count(0)
             expect(page.locator('input[name="income_manual"]')).to_have_count(0)
+            expect(page.locator("[data-fire-table]")).to_have_class(
+                "sheet bg-surface w-full min-w-[48rem] text-sm"
+            )
+            expect(page.locator("#fire-results-detail")).to_have_css("margin-top", "32px")
+            expect(
+                page.get_by_text("In the first year, net saving shows the starting portfolio")
+            ).to_have_count(0)
+            expect(page.get_by_text("FIRE rows are highlighted")).to_have_count(0)
+            assert page.locator("[data-fire-view]").evaluate(
+                "(element) => element.lastElementChild.hasAttribute('data-fire-disclaimer')"
+            )
             plan_inputs = page.locator("#plan-inputs")
             expect(plan_inputs).to_have_attribute("data-fire-plan-inputs", "")
             assert plan_inputs.evaluate("(element) => element.open") is False
@@ -265,6 +276,18 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
                 page.locator("[data-fire-edit]").click()
             assert page.url == f"{base}/fire/edit"
             expect(page.locator("[data-fire-form]")).to_have_attribute("data-fire-dirty", "0")
+            birth_year = page.locator('input[name="birth_year"]')
+            expect(birth_year).to_have_count(1)
+            expect(birth_year).to_have_attribute("type", "hidden")
+            assert birth_year.input_value() == str(start_year - 41)
+            expect(page.get_by_text("Birth year", exact=True)).to_have_count(0)
+            expect(page.get_by_text("Currency", exact=True)).to_have_count(0)
+            expect(page.locator("[data-fire-table]")).to_have_class(
+                "sheet bg-surface w-full min-w-[48rem] text-sm"
+            )
+            assert page.locator("[data-fire-edit-page]").evaluate(
+                "(element) => element.lastElementChild.hasAttribute('data-fire-disclaimer')"
+            )
             for section_id in ("plan", "assumptions", "amounts", "adjustments", "loans"):
                 assert page.locator(f"#{section_id}").evaluate("(element) => element.open") is False
             # The editor reveals Refresh grid; the grid itself is server-rendered and the
@@ -294,13 +317,35 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             assert page.locator("#assumptions").evaluate("(element) => element.open") is False
             expect(page.locator('[data-fire-suggestion="income"]')).to_be_visible()
             expect(page.locator('[data-fire-suggestion="expenses"]')).to_be_visible()
-            expect(
-                page.locator('[data-fire-suggestion="income"] [data-fire-suggestion-categories]')
-            ).to_be_visible()
-            expect(
-                page.locator('[data-fire-suggestion="expenses"] [data-fire-suggestion-categories]')
-            ).to_be_visible()
+            income_categories = page.locator(
+                '[data-fire-suggestion="income"] [data-fire-suggestion-categories]'
+            )
+            expense_categories = page.locator(
+                '[data-fire-suggestion="expenses"] [data-fire-suggestion-categories]'
+            )
+            expect(income_categories).to_be_hidden()
+            expect(expense_categories).to_be_hidden()
+            income_summary = page.locator(
+                '[data-fire-suggestion="income"] [data-fire-suggestion-categories-details] summary'
+            )
+            expense_summary = page.locator(
+                '[data-fire-suggestion="expenses"] '
+                "[data-fire-suggestion-categories-details] summary"
+            )
+            expect(income_summary).to_have_text("Where this value comes from")
+            expect(expense_summary).to_have_text("Where this value comes from")
+            income_summary.click()
+            expense_summary.click()
+            expect(income_categories).to_be_visible()
+            expect(expense_categories).to_be_visible()
             assert page.locator('input[name="income_manual"]').input_value() == "50000.00"
+            # The starting-portfolio input and its suggestion card share the full column width.
+            portfolio_input = page.locator('input[name="portfolio_manual"]')
+            portfolio_card = page.locator('[data-fire-suggestion="portfolio"]')
+            input_box = portfolio_input.bounding_box()
+            card_box = portfolio_card.bounding_box()
+            assert input_box is not None and card_box is not None
+            assert abs(input_box["width"] - card_box["width"]) <= 1
             edit_url = page.url
 
             # The portfolio card lists skipped sources one click away and without an amount.
@@ -323,7 +368,19 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             expect(swr_input).to_be_disabled()
             assert "hidden" not in (swr_wrapper.get_attribute("class") or "")
             expect(swr_wrapper).to_have_attribute("data-fire-swr-inactive", "1")
-            expect(page.locator("[data-fire-swr-note]")).to_be_visible()
+            expect(page.locator("[data-fire-swr-note]")).to_have_count(0)
+            expect(
+                page.get_by_text("Used only when the independence rule is Withdrawal rate.")
+            ).to_have_count(0)
+            row = page.locator("[data-fire-swr-row]")
+            expect(row).to_be_visible()
+            rule = row.locator('select[name="rule"]')
+            expect(rule).to_be_visible()
+            rule_box = rule.bounding_box()
+            swr_box = swr_input.bounding_box()
+            assert rule_box is not None and swr_box is not None
+            assert abs(rule_box["y"] - swr_box["y"]) <= 1
+            assert rule_box["x"] < swr_box["x"]
             page.locator('select[name="rule"]').select_option("swr")
             expect(swr_wrapper).to_be_visible()
             expect(swr_input).to_be_enabled()

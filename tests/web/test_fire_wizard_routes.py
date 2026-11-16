@@ -579,6 +579,10 @@ def test_expense_suggestion_shows_categories_and_the_loan_portion(owner) -> None
     assert "Food test" in text
     assert "data-fire-suggestion-categories" in text
     assert 'data-fire-loan-portion="none"' in text
+    expense_card = suggestion_html(text, "expenses")
+    assert 'data-fire-suggestion-categories-details="expenses"' in expense_card
+    assert "Where this value comes from" in expense_card
+    assert expense_card.index("</details>") < expense_card.index("data-fire-loan-portion")
 
     from assetboard.domain.fire import trailing_window
 
@@ -940,8 +944,13 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert " disabled" not in field
     assert " hidden" not in field
     assert "data-fire-swr-field" in field
-    assert "data-fire-swr-note" in field
-    assert "Used only when the independence rule is Withdrawal rate." in field
+    assert "data-fire-swr-note" not in text
+    assert "Used only when the independence rule is Withdrawal rate." not in text
+    row = '<div class="grid gap-4 sm:grid-cols-2" data-fire-swr-row>'
+    assert row in text
+    assert text.index('data-fire-field="income_growth"') < text.index(row)
+    assert text.index(row) < text.index('data-fire-field="rule"')
+    assert text.index('data-fire-field="rule"') < text.index('data-fire-field="swr"')
     assert "js/fire.js" in text
     assert not re.search(r"<script(?![^>]*\bsrc=)", text)
     assert "onclick=" not in text
@@ -991,7 +1000,11 @@ def test_the_wizard_and_reset_render_in_polish(owner) -> None:
             wizard_values(),
         )
         assert step_four.status_code == 200
-        assert "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." in step_four.text
+        assert "Reguła niezależności" in step_four.text
+        assert "Stopa wypłat" in step_four.text
+        assert (
+            "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." not in step_four.text
+        )
     finally:
         owner.client.headers.pop("Accept-Language", None)
     create_plan(owner)

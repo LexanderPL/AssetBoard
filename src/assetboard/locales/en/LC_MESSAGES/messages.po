@@ -6133,17 +6133,6 @@ msgstr ""
 msgid "Plan"
 msgstr ""
 
-msgid "Snapshotted from the workspace base currency when the plan is created."
-msgstr ""
-
-msgid "Birth year"
-msgstr ""
-
-msgid ""
-"New plans prefill this from your profile. This plan keeps the birth year "
-"saved with it."
-msgstr ""
-
 msgid "Horizon age"
 msgstr ""
 
@@ -6186,9 +6175,6 @@ msgstr ""
 msgid ""
 "Share of the portfolio withdrawn in the first year of retirement. 4%% is "
 "an example, not a rule."
-msgstr ""
-
-msgid "Used only when the independence rule is Withdrawal rate."
 msgstr ""
 
 msgid "Starting amounts"
@@ -6398,6 +6384,9 @@ msgid ""
 "model taxes separately. Editors and owners can change them in edit mode."
 msgstr ""
 
+msgid "Birth year"
+msgstr ""
+
 #, python-format
 msgid "Age %(age)d, in %(year)d"
 msgstr ""
@@ -6524,6 +6513,9 @@ msgstr ""
 msgid "Data as of %(day)s."
 msgstr ""
 
+msgid "Where this value comes from"
+msgstr ""
+
 msgid "Window totals by category"
 msgstr ""
 
@@ -6557,9 +6549,6 @@ msgstr ""
 msgid "the starting portfolio"
 msgstr ""
 
-msgid "Where this value comes from"
-msgstr ""
-
 msgid "Skipped"
 msgstr ""
 
@@ -6591,16 +6580,6 @@ msgstr ""
 
 #, python-format
 msgid "Loan paid off: %(names)s"
-msgstr ""
-
-msgid ""
-"In the first year, net saving shows the starting portfolio. Its gain is "
-"earned on that portfolio."
-msgstr ""
-
-msgid ""
-"FIRE rows are highlighted. Rows after income stops are muted; a depleted "
-"row is marked in red."
 msgstr ""
 
 msgid "Choose your FIRE plan"
@@ -14101,5 +14080,29 @@ msgstr ""
 #~ " planned value; 0 or an empty "
 #~ "field removes it. Esc restores the "
 #~ "saved value."
+#~ msgstr ""
+
+#~ msgid "Snapshotted from the workspace base currency when the plan is created."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "New plans prefill this from your "
+#~ "profile. This plan keeps the birth "
+#~ "year saved with it."
+#~ msgstr ""
+
+#~ msgid "Used only when the independence rule is Withdrawal rate."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the first year, net saving "
+#~ "shows the starting portfolio. Its gain"
+#~ " is earned on that portfolio."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "FIRE rows are highlighted. Rows after"
+#~ " income stops are muted; a depleted"
+#~ " row is marked in red."
 #~ msgstr ""
 

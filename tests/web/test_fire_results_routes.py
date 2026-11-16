@@ -76,7 +76,28 @@ def test_the_view_section_order_is_metrics_details_table_charts_sensitivity(owne
         < text.index("data-fire-table-section")
         < text.index("data-fire-charts")
         < text.index("data-fire-sensitivity")
+        < text.index("data-fire-disclaimer")
     )
+
+
+def test_the_view_gives_the_year_by_year_section_space_below_the_plan_inputs(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    assert '<div id="fire-results-detail" class="mt-8">' in text
+    assert text.index('id="plan-inputs"') < text.index(
+        '<div id="fire-results-detail" class="mt-8">'
+    )
+
+
+def test_the_year_by_year_table_uses_the_surface_background_and_keeps_row_tints(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    assert '<table class="sheet bg-surface w-full min-w-[48rem] text-sm" data-fire-table>' in text
+    assert "bg-success-soft" in text
+    assert 'data-fire-row="fire"' in text
+    assert "In the first year, net saving shows the starting portfolio" not in text
+    assert "FIRE rows are highlighted" not in text
+    assert "data-fire-zero-note" not in text
 
 
 def test_the_view_puts_plan_values_adjustments_and_loans_in_one_collapsed_details(owner) -> None:

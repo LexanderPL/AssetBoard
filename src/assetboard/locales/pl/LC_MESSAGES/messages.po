@@ -6635,19 +6635,6 @@ msgstr ""
 msgid "Plan"
 msgstr "Plan"
 
-msgid "Snapshotted from the workspace base currency when the plan is created."
-msgstr "Kopia waluty bazowej obszaru roboczego z chwili utworzenia planu."
-
-msgid "Birth year"
-msgstr "Rok urodzenia"
-
-msgid ""
-"New plans prefill this from your profile. This plan keeps the birth year "
-"saved with it."
-msgstr ""
-"Nowe plany wstępnie wypełniają to z profilu. Ten plan zachowuje zapisany "
-"rok urodzenia."
-
 msgid "Horizon age"
 msgstr "Wiek horyzontu"
 
@@ -6697,9 +6684,6 @@ msgid ""
 msgstr ""
 "Część portfela wypłacana w pierwszym roku emerytury. 4%% to przykład, a "
 "nie reguła."
-
-msgid "Used only when the independence rule is Withdrawal rate."
-msgstr "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat."
 
 msgid "Starting amounts"
 msgstr "Kwoty początkowe"
@@ -6942,6 +6926,9 @@ msgstr ""
 "płacone podatki i spłaty kredytów. Prognoza nie modeluje podatków osobno."
 " Edytorzy i właściciele mogą je zmienić w trybie edycji."
 
+msgid "Birth year"
+msgstr "Rok urodzenia"
+
 #, python-format
 msgid "Age %(age)d, in %(year)d"
 msgstr "Wiek %(age)d, w %(year)d"
@@ -7085,6 +7072,9 @@ msgstr ""
 msgid "Data as of %(day)s."
 msgstr "Dane na dzień %(day)s."
 
+msgid "Where this value comes from"
+msgstr "Skąd pochodzi ta wartość"
+
 msgid "Window totals by category"
 msgstr "Sumy według kategorii w oknie"
 
@@ -7128,9 +7118,6 @@ msgstr "Inwestowalne aktywa na %(day)s."
 msgid "the starting portfolio"
 msgstr "portfela początkowego"
 
-msgid "Where this value comes from"
-msgstr "Skąd pochodzi ta wartość"
-
 msgid "Skipped"
 msgstr "Pominięte"
 
@@ -7165,20 +7152,6 @@ msgstr "Brak dochodów"
 #, python-format
 msgid "Loan paid off: %(names)s"
 msgstr "Spłacone kredyty: %(names)s"
-
-msgid ""
-"In the first year, net saving shows the starting portfolio. Its gain is "
-"earned on that portfolio."
-msgstr ""
-"W pierwszym roku oszczędności netto pokazują portfel początkowy. Zysk "
-"jest naliczany od tego portfela."
-
-msgid ""
-"FIRE rows are highlighted. Rows after income stops are muted; a depleted "
-"row is marked in red."
-msgstr ""
-"Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
-" wyczerpany wiersz jest oznaczony na czerwono."
 
 msgid "Choose your FIRE plan"
 msgstr "Wybierz plan FIRE"
@@ -14999,4 +14972,38 @@ msgstr "Usuń obszar roboczy…"
 #~ "wartość planowaną; 0 lub puste pole "
 #~ "ją usuwa. Esc przywraca zapisaną "
 #~ "wartość."
+
+#~ msgid "Snapshotted from the workspace base currency when the plan is created."
+#~ msgstr "Kopia waluty bazowej obszaru roboczego z chwili utworzenia planu."
+
+#~ msgid ""
+#~ "New plans prefill this from your "
+#~ "profile. This plan keeps the birth "
+#~ "year saved with it."
+#~ msgstr ""
+#~ "Nowe plany wstępnie wypełniają to z "
+#~ "profilu. Ten plan zachowuje zapisany rok"
+#~ " urodzenia."
+
+#~ msgid "Used only when the independence rule is Withdrawal rate."
+#~ msgstr "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat."
+
+#~ msgid ""
+#~ "In the first year, net saving "
+#~ "shows the starting portfolio. Its gain"
+#~ " is earned on that portfolio."
+#~ msgstr ""
+#~ "W pierwszym roku oszczędności netto "
+#~ "pokazują portfel początkowy. Zysk jest "
+#~ "naliczany od tego portfela."
+
+#~ msgid ""
+#~ "FIRE rows are highlighted. Rows after"
+#~ " income stops are muted; a depleted"
+#~ " row is marked in red."
+#~ msgstr ""
+#~ "Wiersze FIRE są wyróżnione. Wiersze po"
+#~ " zakończeniu dochodów są wyciszone; "
+#~ "wyczerpany wiersz jest oznaczony na "
+#~ "czerwono."
 

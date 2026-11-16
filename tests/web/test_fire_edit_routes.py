@@ -389,7 +389,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert "data-fire-progress-bar" in page.text
     assert "data-fire-overview" not in page.text
     assert "First projected year" not in page.text
-    assert ">Currency<" in page.text
+    assert ">Currency<" not in page.text
+    assert ">Birth year<" not in page.text
+    assert 'id="birth_year"' not in page.text
+    assert '<input type="hidden" name="birth_year" value="1985">' in page.text
     assert "data-fire-basis" not in page.text
     assert "Return above inflation" in page.text
     assert "Real return" not in page.text
@@ -423,6 +426,20 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
     assert page.text.index('id="fire-metrics"') < page.text.index('id="plan"')
     assert page.text.index('id="loans"') < page.text.index("data-fire-table-section")
     assert page.text.index("data-fire-table-section") < page.text.index("data-fire-sensitivity")
+    assert page.text.index("data-fire-sensitivity") < page.text.index("data-fire-disclaimer")
+
+
+def test_the_editor_uses_the_surface_table_and_the_uncapped_portfolio_input(owner) -> None:
+    create_plan(owner)
+    text = owner.client.get("/fire/edit").text
+    assert '<table class="sheet bg-surface w-full min-w-[48rem] text-sm" data-fire-table>' in text
+    assert "bg-success-soft" in text
+    assert 'data-fire-row="fire"' in text
+    portfolio = field_html(text, "portfolio_manual")
+    assert "lg:max-w-[calc(50%-0.625rem)]" not in portfolio
+    assert "In the first year, net saving shows the starting portfolio" not in text
+    assert "FIRE rows are highlighted" not in text
+    assert "data-fire-zero-note" not in text
 
 
 @pytest.mark.parametrize(
@@ -1475,22 +1492,20 @@ def test_the_edit_page_and_suggestion_cards_never_write(owner) -> None:
     assert _snapshot(owner, plan_id) == before
 
 
-def test_the_edit_form_explains_the_saved_birth_year_source(owner) -> None:
+def test_the_edit_form_keeps_birth_year_hidden_and_saves_it(owner) -> None:
     plan_id = create_plan(owner, birth_year="1985")
     with owner.db() as session, session.begin():
         session.execute(update(User).where(User.id == owner.admin_id).values(birth_year=1980))
     page = owner.client.get("/fire/edit")
     assert page.status_code == 200
-    field = field_html(page.text, "birth_year")
-    assert 'name="birth_year"' in field and " required" in field
-    assert 'id="birth_year"' in field
-    assert 'for="birth_year"' in field
-    assert 'data-fire-birth-year-source="plan"' in field
-    assert (
-        "New plans prefill this from your profile. This plan keeps the birth year saved with it."
-        in field
-    )
-    assert _input_value(page.text, "birth_year") == "1985"
+    hidden = re.search(r'<input type="hidden" name="birth_year" value="([^"]*)">', page.text)
+    assert hidden is not None
+    assert hidden.group(1) == "1985"
+    assert 'data-fire-field="birth_year"' not in page.text
+    assert 'id="birth_year"' not in page.text
+    assert 'for="birth_year"' not in page.text
+    assert "data-fire-birth-year-source" not in page.text
+    assert ">Birth year<" not in page.text
     response = owner.post("/fire/edit", _form(), token_from="/fire/edit")
     assert response.status_code == 303
     with owner.db() as session:
@@ -1509,7 +1524,6 @@ def test_only_the_non_obvious_edit_fields_keep_a_hint_beside_the_label(owner) ->
     create_plan(owner)
     text = owner.client.get("/fire/edit").text
     for name in (
-        "birth_year",
         "horizon_age",
         "stop_working_age",
         "inflation",
@@ -1539,11 +1553,24 @@ def test_the_edit_income_suggestion_shows_the_category_breakdown_with_its_captio
     expenses = suggestion_html(text, "expenses")
     assert 'data-fire-suggestion-categories="income"' in income
     assert 'data-fire-suggestion-categories="expenses"' in expenses
+    for kind, card in (("income", income), ("expenses", expenses)):
+        details = (
+            f'<details class="mt-4 border-t border-line pt-3" '
+            f'data-fire-suggestion-categories-details="{kind}">'
+        )
+        assert details in card
+        assert "Where this value comes from" in card
+        assert card.index(details) < card.index(f'data-fire-suggestion-categories="{kind}"')
+        assert card.index("Where this value comes from") < card.index(
+            f'data-fire-suggestion-categories="{kind}"'
+        )
     assert "Income by category in the window" in income
     assert "Expenses by category in the window" in expenses
     assert "Salary test" in income and "Food test" in expenses
     assert "data-fire-loan-portion" not in income
     assert "data-fire-loan-portion" in expenses
+    # The loan lines stay outside the collapsed category details.
+    assert expenses.index("</details>") < expenses.index("data-fire-loan-portion")
 
 
 def test_the_edit_portfolio_suggestion_lists_skipped_sources_without_an_amount(owner) -> None:
@@ -1573,8 +1600,15 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert " disabled" not in field
     assert " hidden" not in field
     assert "data-fire-swr-field" in field
-    assert "data-fire-swr-note" in field
-    assert "Used only when the independence rule is Withdrawal rate." in field
+    assert "data-fire-swr-note" not in text
+    assert "Used only when the independence rule is Withdrawal rate." not in text
+    row = '<div class="mt-4 grid gap-4 sm:grid-cols-2" data-fire-swr-row>'
+    assert row in text
+    assumptions = text[text.index('id="assumptions"') : text.index('id="amounts"')]
+    assert row in assumptions
+    assert assumptions.index('data-fire-field="income_growth"') < assumptions.index(row)
+    assert assumptions.index(row) < assumptions.index('data-fire-field="rule"')
+    assert assumptions.index('data-fire-field="rule"') < assumptions.index('data-fire-field="swr"')
     assert "js/fire.js" in text
     assert not re.search(r"<script(?![^>]*\bsrc=)", text)
     assert "onclick=" not in text
@@ -1819,7 +1853,9 @@ def test_the_edit_page_renders_in_polish(owner) -> None:
         assert "Korekta oszczędności" in page.text
         assert "Edytor korekt" in page.text
         assert "Działanie" in page.text
-        assert "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." in page.text
+        assert "Reguła niezależności" in page.text
+        assert "Stopa wypłat" in page.text
+        assert "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." not in page.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
 
