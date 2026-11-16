@@ -6,24 +6,21 @@ import threading
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
 from typing import Any
-from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select, update
 
-from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Workspace
-from assetboard.db.models.networth import NetWorthCategory, NetWorthItem, NetWorthSnapshot
+from assetboard.db.models.networth import NetWorthCategory, NetWorthItem
 from assetboard.db.repositories import FxRateRepository, InvestmentTransactionRepository
 from assetboard.domain.money import Money
 from assetboard.domain.networth import Side, Unavailable
-from assetboard.recurring_jobs import RecurringJobs
 from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import (
@@ -40,8 +37,8 @@ from assetboard.services.networth import (
     create_item,
     list_networth,
 )
+from assetboard.services.networth_history import networth_history
 from assetboard.services.networth_links import UNAVAILABLE, registry
-from assetboard.services.networth_snapshots import take_auto_snapshot, take_manual_snapshot
 from assetboard.services.portfolio import portfolio_page
 from assetboard.services.portfolio_links import (
     create_networth_items_from_asset_classes,
@@ -292,16 +289,6 @@ def _events(team: WorkspaceDb, action: str) -> list[AuditEvent]:
                 .order_by(AuditEvent.ts, AuditEvent.id)
             )
         )
-
-
-def _snapshot(team: WorkspaceDb, as_of: date) -> NetWorthSnapshot:
-    with team.factory() as session:
-        return session.scalars(
-            select(NetWorthSnapshot).where(
-                NetWorthSnapshot.workspace_id == team.workspace_id,
-                NetWorthSnapshot.as_of == as_of,
-            )
-        ).one()
 
 
 def _class_total(team: WorkspaceDb, class_id: UUID) -> Money:
@@ -672,7 +659,7 @@ def test_warning_when_a_legacy_property_instrument_and_real_estate_item_both_hav
     assert [item for item in page.portfolio_warnings if item.code == "legacy_property"] == []
 
 
-def test_manual_snapshot_uses_current_values_and_auto_snapshot_uses_history(
+def test_history_uses_current_values_for_today_and_historical_prices_for_month_ends(
     team: WorkspaceDb,
 ) -> None:
     stocks = _class(team)
@@ -682,33 +669,42 @@ def test_manual_snapshot_uses_current_values_and_auto_snapshot_uses_history(
     _price(team, instrument, "2026-02-15", "110")
     _price(team, instrument, "2026-03-01", "120")
     create_networth_items_from_asset_classes(team.factory, _editor(team))
+    # The linked item must exist before the earlier month-end to be in its range.
+    with team.factory.begin() as session:
+        session.execute(
+            update(NetWorthItem)
+            .where(NetWorthItem.workspace_id == team.workspace_id)
+            .values(created_at=datetime(2026, 1, 1, tzinfo=UTC))
+        )
 
-    assert take_manual_snapshot(team.factory, _editor(team))[0] == TODAY
-    assert _snapshot(team, TODAY).assets_minor == 180_000
-    assert take_auto_snapshot(team.factory, _editor(team), team.clock, "UTC") is True
-    assert _snapshot(team, MONTH_END).assets_minor == 110_000
+    data = networth_history(team.factory, _editor(team), "1y")
+    february = next(point for point in data.points if point.as_of == MONTH_END)
+    assert february.assets == Money(110_000, "EUR")
+    assert data.points[-1].as_of == TODAY
+    assert data.points[-1].assets == Money(180_000, "EUR")
+    assert data.points[-1].live
 
 
-def test_the_scheduler_snapshot_job_resolves_linked_histories(team: WorkspaceDb) -> None:
+def test_history_uses_fx_history_for_a_foreign_instrument(team: WorkspaceDb) -> None:
     stocks = _class(team)
-    instrument = _instrument(team, stocks)
-    _trade(team, instrument, day="2026-01-10")
-    _undated(team, instrument)
-    _price(team, instrument, "2026-02-15", "110")
-    _price(team, instrument, "2026-03-01", "120")
+    instrument = _instrument(team, stocks, currency="USD")
+    _trade(team, instrument, day="2026-01-10", fx="0.9")
+    _price(team, instrument, "2026-01-10", "100")
+    _fx(team, "2026-01-10", "0.9")
+    _fx(team, "2026-02-15", "0.8")
     create_networth_items_from_asset_classes(team.factory, _editor(team))
-    logger = Mock()
+    with team.factory.begin() as session:
+        session.execute(
+            update(NetWorthItem)
+            .where(NetWorthItem.workspace_id == team.workspace_id)
+            .values(created_at=datetime(2026, 1, 1, tzinfo=UTC))
+        )
 
-    jobs = RecurringJobs(
-        team.factory,
-        Settings(_env_file=None),
-        lambda: team.clock,
-        logger,
-    )
-    jobs.networth_snapshot(team.workspace_id, "UTC")
-
-    assert _snapshot(team, MONTH_END).assets_minor == 110_000
-    logger.error.assert_not_called()
+    data = networth_history(team.factory, _editor(team), "1y")
+    february = next(point for point in data.points if point.as_of == MONTH_END)
+    # 10 shares x USD 100 x the 15 February EUR/USD rate.
+    assert february.assets == Money(80_000, "EUR")
+    assert data.points[-1].assets == Money(80_000, "EUR")
 
 
 def test_resolve_many_loads_history_once_and_is_fast(team: WorkspaceDb) -> None:

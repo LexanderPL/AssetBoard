@@ -54,10 +54,6 @@ def test_the_reader_and_recurring_jobs_skip_the_demo_workspace(db, monkeypatch):
         lambda *_args, **_kwargs: calls.append("auto_post"),
     )
     monkeypatch.setattr(
-        "assetboard.recurring_jobs.take_auto_snapshot",
-        lambda *_args, **_kwargs: calls.append("snapshot"),
-    )
-    monkeypatch.setattr(
         "assetboard.recurring_jobs.resync_pending_income",
         lambda *_args, **_kwargs: calls.append("income"),
     )
@@ -65,15 +61,13 @@ def test_the_reader_and_recurring_jobs_skip_the_demo_workspace(db, monkeypatch):
     jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, Mock())
     jobs.run(demo_id)
     jobs.auto_post(demo_id)
-    jobs.networth_snapshot(demo_id, "UTC")
     jobs.resync_income(demo_id)
     assert calls == []
 
     jobs.run(db.workspace_id)
     jobs.auto_post(db.workspace_id)
-    jobs.networth_snapshot(db.workspace_id, "UTC")
     jobs.resync_income(db.workspace_id)
-    assert calls == ["generation", "auto_post", "snapshot", "income"]
+    assert calls == ["generation", "auto_post", "income"]
 
 
 def test_the_reminder_tick_skips_the_demo_workspace(db, monkeypatch):

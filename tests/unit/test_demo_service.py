@@ -19,6 +19,7 @@ from assetboard.clock import FixedClock
 from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import BudgetLine, MonthState, Transaction
+from assetboard.db.models.networth import NetWorthSnapshot
 from assetboard.db.models.prices import PricePoint
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories import InvestmentTransactionRepository
@@ -278,6 +279,10 @@ def test_every_workspace_owned_model_is_covered_or_excluded(built: BuiltWorkspac
             continue
         assert _count(built.db, model) > 0, model.__name__
     assert _count(built.db, ImportBatch) == 1
+
+
+def test_the_builder_writes_no_legacy_networth_snapshots(built: BuiltWorkspace) -> None:
+    assert _count(built.db, NetWorthSnapshot) == 0
 
 
 def test_the_data_page_has_one_completed_real_csv_import(built: BuiltWorkspace) -> None:

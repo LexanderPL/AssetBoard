@@ -80,6 +80,7 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED, name_key
 from assetboard.domain.instruments import ASSET_CLASS_SEED, ASSET_CLASS_SEED_V1
+from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.networth import (
     ASSET_SEED,
@@ -115,6 +116,7 @@ from assetboard.services.imports import (
 from assetboard.services.investments import seed_into as investment_seed_into
 from assetboard.services.networth import seed_into as networth_seed_into
 from assetboard.services.networth import update_category as networth_update_category
+from assetboard.services.networth_history import networth_history
 from assetboard.services.transactions import get_transaction as get_ledger_transaction
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -2219,6 +2221,29 @@ def test_restore_v1_2_applies_estimate_defaults_by_side(db: WorkspaceDb, data_di
     }
 
 
+def test_restored_legacy_snapshot_rows_are_ignored_by_history(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    rows = _rows()
+    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
+    # the exact total this test checks.
+    rows = replace(rows, networth_items=(rows.networth_items[0],))
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
+    assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        snapshot = NetWorthSnapshotRepository(session, ctx).for_range(None)[0]
+    assert (snapshot.as_of, snapshot.assets_minor) == (date(2026, 1, 31), 1_200_000)
+
+    data = networth_history(db.factory, ctx, "all")
+    assert data.points[0].as_of == date(2026, 2, 28)
+    assert all(point.as_of != snapshot.as_of for point in data.points)
+    # The corrected 12,050.00 valuation, not the stored 12,000.00 snapshot total.
+    assert data.points[0].assets == Money(1_205_000, "EUR")
+
+
 def test_restore_keeps_unknown_breakdown_category_ids(db: WorkspaceDb, data_dir: Path) -> None:
     rows = _rows()
     unknown = str(uuid4())
@@ -2247,7 +2272,11 @@ def test_lone_exported_item_valuations_import_as_duplicates(
 ) -> None:
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
-    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    rows = _rows()
+    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
+    # the exact total this test checks.
+    rows = replace(rows, networth_items=(rows.networth_items[0],))
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
     _apply(db, data_dir, batch_id, ctx=ctx)
 
@@ -2296,7 +2325,11 @@ def test_restore_apply_detects_a_workspace_that_became_non_empty(
 ) -> None:
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
-    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    rows = _rows()
+    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
+    # the exact total this test checks.
+    rows = replace(rows, networth_items=(rows.networth_items[0],))
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     _plan(db, data_dir, batch_id, ctx=ctx)
     with db.factory.begin() as session:
         CategoryRepository(session, ctx).create(
@@ -2389,7 +2422,11 @@ def test_restore_rejects_duplicate_active_category_names(db: WorkspaceDb, data_d
 def test_restore_rollback_refuses_a_row_added_after_it(db: WorkspaceDb, data_dir: Path) -> None:
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
-    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    rows = _rows()
+    # Keep only the manual Car item: the linked brokerage would add portfolio value and blur
+    # the exact total this test checks.
+    rows = replace(rows, networth_items=(rows.networth_items[0],))
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
     _plan(db, data_dir, batch_id, ctx=ctx)
     _apply(db, data_dir, batch_id, ctx=ctx)
     with db.factory.begin() as session:
