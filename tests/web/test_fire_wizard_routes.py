@@ -385,7 +385,7 @@ def test_create_plan_writes_once_and_redirects(owner) -> None:
         assert actions.count("fire_plan.created") == 1
     page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert "data-fire-overview" in page.text
+    assert "data-fire-results" in page.text
 
 
 def test_the_review_shows_the_entered_values_and_no_metrics(owner) -> None:
@@ -720,7 +720,9 @@ def test_unusual_rates_need_the_confirmation(owner) -> None:
     for step in (1, 2, 3):
         post_wizard(owner, step, "next", values)
     text = _step(post_wizard(owner, 3, "next", values), 4)
-    assert 'name="extreme_rates_confirmed"' in text
+    assert "data-fire-extreme-warning" in text
+    assert 'name="extreme_rates_confirmed"' not in text
+    assert 'type="checkbox"' not in text
     response = post_wizard(
         owner,
         4,
@@ -728,19 +730,34 @@ def test_unusual_rates_need_the_confirmation(owner) -> None:
         values,
         review_signature=review_signature(text),
     )
-    assert response.status_code == 400
-    assert 'data-fire-wizard="4"' in response.text
+    assert response.status_code == 200
+    assert "data-fire-extreme-confirm" in response.text
+    assert "Confirm and create plan" in response.text
+    assert 'name="extreme_rates_confirmed" value="1"' in response.text
     assert _state(owner) == (0, 0, 0)
-    confirmed = wizard_values(inflation="20", extreme_rates_confirmed="1")
-    for step in (1, 2, 3):
-        post_wizard(owner, step, "next", confirmed)
-    text = _step(post_wizard(owner, 3, "next", confirmed), 4)
+
+    # A rating changed after the panel refreshes the review and asks again; nothing is written.
+    changed = wizard_values(inflation="21")
+    response = post_wizard(
+        owner,
+        4,
+        "create",
+        changed,
+        review_signature=review_signature(response.text),
+        extreme_rates_confirmed="1",
+    )
+    assert response.status_code == 200
+    assert "The plan values changed" in response.text
+    assert "data-fire-extreme-confirm" in response.text
+    assert _state(owner) == (0, 0, 0)
+
+    confirmed = wizard_values(inflation="21", extreme_rates_confirmed="1")
     response = post_wizard(
         owner,
         4,
         "create",
         confirmed,
-        review_signature=review_signature(text),
+        review_signature=review_signature(response.text),
     )
     assert response.status_code == 303
     assert _state(owner) == (1, 0, 1)
@@ -921,6 +938,8 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert " disabled" not in field
     assert " hidden" not in field
     assert "data-fire-swr-field" in field
+    assert "data-fire-swr-note" in field
+    assert "Used only when the independence rule is Withdrawal rate." in field
     assert "js/fire.js" in text
     assert not re.search(r"<script(?![^>]*\bsrc=)", text)
     assert "onclick=" not in text
@@ -963,6 +982,14 @@ def test_the_wizard_and_reset_render_in_polish(owner) -> None:
         assert step_three.status_code == 200
         assert "Pominięte" in step_three.text
         assert "Klasa aktywów nieinwestycyjna; jej wartość nie jest liczona." in step_three.text
+        step_four = post_wizard(
+            owner,
+            3,
+            "next",
+            wizard_values(),
+        )
+        assert step_four.status_code == 200
+        assert "Używana tylko wtedy, gdy regułą niezależności jest stopa wypłat." in step_four.text
     finally:
         owner.client.headers.pop("Accept-Language", None)
     create_plan(owner)

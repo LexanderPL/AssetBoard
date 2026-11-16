@@ -16,7 +16,7 @@ from decimal import Decimal
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -49,7 +49,6 @@ from assetboard.web import fire_adjustments
 from assetboard.web import fire_loans as fire_loan_web
 from assetboard.web.context import CurrentContext
 from assetboard.web.fire_charts import build_fire_charts
-from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
 from assetboard.web.fire_sensitivity import build_sensitivity_view
 from assetboard.web.fire_suggestions import (
     BLOCK_FALLBACK,
@@ -99,9 +98,8 @@ ERRORS = {
     ),
     "events_not_allowed_on_create": _("Create the plan first, then add adjustments."),
     "extreme_rate_confirmation_required": _(
-        "A rate is outside the usual range. Tick the confirmation box to save it."
+        "A rate is outside the usual range. Confirm it to save the plan."
     ),
-    "invalid_extreme_rates": _("Tick the confirmation box only when you mean the unusual rates."),
     "invalid_projection": _("The saved plan cannot be projected."),
     "plan_exists": _("This workspace already has a FIRE plan."),
     "migration_required": _("Choose one of the old FIRE scenarios before creating a new plan."),
@@ -352,6 +350,24 @@ def _plan_input(
         removed_event_ids=parsed.removed_event_ids,
         loan_settings=fire_loan_web.parse_loan_toggles(values),
     )
+
+
+def _extreme_rates_signature(values: dict[str, str]) -> str:
+    """Digest of the rate fields the confirmation panel showed.
+
+    The panel must not confirm a rate the user changed after seeing it. The digest covers the
+    four rates and the rule (the withdrawal rate only counts when the rule uses it); amounts and
+    adjustments can change without invalidating a rate confirmation.
+    """
+    rule = values.get("rule", "").strip()
+    parts = (
+        values.get("inflation", "").strip(),
+        values.get("real_return", "").strip(),
+        values.get("income_growth", "").strip(),
+        rule,
+        values.get("swr", "").strip() if rule == Rule.SWR.value else "",
+    )
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
 
 def _wizard_defaults(defaults: fire_service.FirePlanDefaults, locale: str) -> dict[str, str]:
@@ -731,6 +747,8 @@ def _edit_context(
     adjustment_error: fire_service.FireError | None = None,
     notice: str | None = None,
     dirty: bool = False,
+    extreme_confirmation: bool = False,
+    extreme_rates_signature: str = "",
 ) -> dict[str, object]:
     context = _form_context(
         request,
@@ -755,6 +773,8 @@ def _edit_context(
     context["loans_editable"] = True
     context["notice"] = notice
     context["dirty"] = dirty
+    context["extreme_confirmation"] = extreme_confirmation
+    context["extreme_rates_signature"] = extreme_rates_signature
     return context
 
 
@@ -899,6 +919,7 @@ def _wizard_context(
     error: str | None = None,
     error_field: str | None = None,
     notice: str | None = None,
+    extreme_confirmation: bool = False,
 ) -> dict[str, object]:
     locale = request.state.locale
     summary = _wizard_summary(values, defaults.current_year)
@@ -923,6 +944,7 @@ def _wizard_context(
         "suggestion_warning_text": warning_text,
         "skipped_reason_labels": skipped_reason_labels(locale),
         "review": review,
+        "extreme_confirmation": extreme_confirmation,
         "error": error,
         "error_field": error_field,
         "error_is_field": error_field is not None and error_field in STEP_FIELDS[step],
@@ -1027,6 +1049,7 @@ async def _render_wizard(
     error: str | None = None,
     error_field: str | None = None,
     notice: str | None = None,
+    extreme_confirmation: bool = False,
     status_code: int = 200,
 ) -> Response:
     if suggestions is None:
@@ -1058,6 +1081,7 @@ async def _render_wizard(
         error=error,
         error_field=error_field,
         notice=notice,
+        extreme_confirmation=extreme_confirmation,
     )
     return render_template(request, "fire/wizard.html", context=context, status_code=status_code)
 
@@ -1162,6 +1186,8 @@ async def _render_edit(
     adjustment_error: fire_service.FireError | None = None,
     notice: str | None = None,
     dirty: bool = False,
+    extreme_confirmation: bool = False,
+    extreme_rates_signature: str = "",
     status_code: int = 200,
 ) -> Response:
     suggestions = await run_in_threadpool(
@@ -1205,6 +1231,8 @@ async def _render_edit(
         adjustment_error=adjustment_error,
         notice=notice,
         dirty=dirty,
+        extreme_confirmation=extreme_confirmation,
+        extreme_rates_signature=extreme_rates_signature,
     )
     return render_template(request, "fire/edit.html", context=context, status_code=status_code)
 
@@ -1279,6 +1307,14 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
             status_code=400,
         )
     try:
+        # The confirmation panel's button posts the digest of the rates it showed. A changed rate
+        # after that panel invalidates the digest, so the service asks again instead of trusting
+        # a blanket flag. A forged flag without a matching digest is ignored.
+        if values.get("extreme_rates_confirmed") == "1" and values.get(
+            "extreme_rates_signature", ""
+        ) != _extreme_rates_signature(values):
+            values = dict(values)
+            values["extreme_rates_confirmed"] = ""
         plan = _plan_input(values, request.state.locale, detail.plan.currency)
         await run_in_threadpool(
             fire_service.update_fire_plan,
@@ -1291,6 +1327,16 @@ async def fire_edit_save(request: Request, ctx: CurrentContext) -> Response:
     except fire_service.FireError as exc:
         if exc.code == "plan_currency_mismatch":
             return RedirectResponse(request.url_for("fire_scenarios").path, status_code=303)
+        if exc.code == "extreme_rate_confirmation_required":
+            return await _render_edit(
+                request,
+                ctx,
+                detail,
+                values=values,
+                dirty=True,
+                extreme_confirmation=True,
+                extreme_rates_signature=_extreme_rates_signature(values),
+            )
         return await _render_edit(
             request,
             ctx,
@@ -1316,28 +1362,6 @@ async def fire_sensitivity(request: Request, ctx: CurrentContext) -> Response:
     )
     context = await run_in_threadpool(_sensitivity_context, request, ctx, results)
     return render_template(request, "fire/_sensitivity.html", context=context)
-
-
-@router.get("/fire/results.csv", name="fire_results_csv")
-async def fire_results_csv(request: Request, ctx: CurrentContext) -> Response:
-    results = await run_in_threadpool(
-        fire_projection_service.scenario_results,
-        request.app.state.session_factory,
-        ctx,
-    )
-    if results.projection is None:
-        code = results.blocked.code if results.blocked is not None else "invalid_projection"
-        raise HTTPException(status_code=409, detail=_error(request, code))
-    content = await run_in_threadpool(render_fire_csv, results.projection)
-    return Response(
-        content,
-        media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": 'attachment; filename="fire-plan.csv"',
-            "Cache-Control": "no-store",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
 
 
 @router.get("/fire/setup", name="fire_wizard")
@@ -1450,9 +1474,11 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
     review = _wizard_review(validated, defaults.currency, defaults.current_year)
     if raw.get("go") != "create":
         return await _render_wizard(request, ctx, 4, values, defaults, review=review)
+    confirmed = raw.get("extreme_rates_confirmed") == "1"
     # The hidden digest is rendered with the review. If a step-4 field changed after that render
     # (or the workspace currency/year changed), show the review of the submitted values first;
-    # Create plan must never save values the user has not seen summarised.
+    # Create plan must never save values the user has not seen summarised. A changed unusual rate
+    # also needs a fresh confirmation, so the review reopens the confirmation panel.
     if raw.get("review_signature", "") != review["signature"]:
         return await _render_wizard(
             request,
@@ -1462,6 +1488,17 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
             defaults,
             review=review,
             notice=_notice(request, "review_updated"),
+            extreme_confirmation=bool(validated.needs_extreme_confirmation),
+        )
+    if validated.needs_extreme_confirmation and not confirmed:
+        return await _render_wizard(
+            request,
+            ctx,
+            4,
+            values,
+            defaults,
+            review=review,
+            extreme_confirmation=True,
         )
     try:
         plan = _wizard_plan_input(values, request.state.locale, defaults.currency)
@@ -1474,6 +1511,16 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
     except fire_service.FireError as exc:
         if exc.code in ("plan_exists", "migration_required"):
             return _redirect(request, "fire_scenarios", error=exc.code)
+        if exc.code == "extreme_rate_confirmation_required":
+            return await _render_wizard(
+                request,
+                ctx,
+                4,
+                values,
+                defaults,
+                review=review,
+                extreme_confirmation=True,
+            )
         error_step = _wizard_step_for_field(exc.field)
         return await _render_wizard(
             request,
@@ -1624,16 +1671,6 @@ async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id:
     if str(detail.plan.id) != scenario_id:
         raise NotFound
     return _redirect(request, "fire_edit")
-
-
-@router.get("/fire/{scenario_id}/results.csv", name="fire_scenario_csv")
-async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
-    detail = await run_in_threadpool(
-        fire_service.get_fire_plan, request.app.state.session_factory, ctx
-    )
-    if str(detail.plan.id) != scenario_id:
-        raise NotFound
-    return RedirectResponse(request.url_for("fire_results_csv").path, status_code=303)
 
 
 __all__ = ["router"]

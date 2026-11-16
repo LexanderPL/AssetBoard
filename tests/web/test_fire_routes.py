@@ -85,10 +85,9 @@ def test_the_entry_renders_the_view_for_a_plan(owner) -> None:
     create_plan(owner)
     page = owner.client.get("/fire")
     assert page.status_code == 200
-    assert "data-fire-overview" in page.text
     assert "data-fire-results" in page.text
     assert 'href="/fire/edit"' in page.text
-    assert "/fire/results.csv" in page.text
+    assert "/fire/results.csv" not in page.text
     assert "data-fire-reset" in page.text
     assert "data-fire-edit" in page.text
     assert "data-fire-form" not in page.text
@@ -111,8 +110,7 @@ def test_the_id_url_redirects_to_the_view(owner) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/fire/edit"
     response = owner.client.get(f"/fire/{plan_id}/results.csv", follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/fire/results.csv"
+    assert response.status_code == 404
     response = owner.client.get(f"/fire/{plan_id}/sensitivity", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/fire/sensitivity"
@@ -139,7 +137,7 @@ def test_a_viewer_reads_the_view_without_edit_or_reset(owner) -> None:
     try:
         page = owner.client.get("/fire")
         assert page.status_code == 200
-        assert "data-fire-overview" in page.text
+        assert "data-fire-results" in page.text
         assert "data-fire-edit" not in page.text
         assert "data-fire-reset" not in page.text
         assert "data-fire-form" not in page.text
@@ -156,7 +154,7 @@ def test_one_legacy_plan_auto_migrates_for_an_editor(owner) -> None:
     page = owner.client.get("/fire", follow_redirects=True)
     assert page.status_code == 200
     assert "converted to the one-plan format" in page.text
-    assert "data-fire-overview" in page.text
+    assert "data-fire-results" in page.text
     with owner.db() as session:
         row = session.get_one(FireScenario, legacy_id)
         assert row.is_live is True
