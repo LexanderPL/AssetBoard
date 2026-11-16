@@ -1,0 +1,76 @@
+{# The derived net-worth trend (F5.9). Every point is calculated on read; stored snapshots
+   are never shown. The monthly-values table is the accessible, no-JavaScript view. #}
+<section id="net-worth-trend" class="panel p-4 sm:p-6" aria-labelledby="net-worth-trend-heading" data-networth-trend>
+  <div class="min-w-0">
+    <h2 id="net-worth-trend-heading" class="text-base font-semibold">{{ _("Net worth over time") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Calculated from your saved values each time the page loads. Past month-ends use your value history, linked items and prices; today is live.") }}</p>
+  </div>
+
+  <nav class="mt-4 flex flex-wrap items-center gap-1" aria-label="{{ _('Range') }}" data-trend-range>
+    {% for option in trend.range_options %}
+      {% if option.active %}
+      <span aria-current="true" class="rounded-lg bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-ink" data-range="{{ option.code }}">{{ option.label }}</span>
+      {% else %}
+      <a href="{{ scoped_url(request, 'networth_summary') }}?range={{ option.code }}#net-worth-trend" class="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle hover:text-ink" data-range="{{ option.code }}">{{ option.label }}</a>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  {% if trend.has_chart %}
+  <div class="mt-5 min-w-0" data-chart="line" data-chart-source="networth-trend-data">
+    <script type="application/json" id="networth-trend-data">{{ trend.chart|tojson }}</script>
+    <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
+  </div>
+
+  <details class="mt-5" data-history-table>
+    <summary class="cursor-pointer text-sm font-medium text-primary-ink">{{ _("Monthly values") }}</summary>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Monthly values") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="font-medium">{{ _("Date") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Net worth") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Assets") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Liabilities") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for point in trend.rows %}
+          <tr data-trend-row{% if point.live %} data-trend-today{% endif %}>
+            <th scope="row" class="text-left align-top font-normal">
+              <span class="whitespace-nowrap">{{ point.as_of_text }}</span>
+              {% if point.live %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-trend-today-label>{{ _("Today") }}</span>{% endif %}
+              {% if point.breakdown or point.not_counted %}
+              <details class="mt-1" data-history-breakdown>
+                <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Breakdown") }}</summary>
+                {% if point.breakdown %}
+                <ul class="mt-1 space-y-1 text-xs">
+                  {% for row in point.breakdown %}
+                  <li class="flex justify-between gap-3">
+                    <span>{% if row.color %}<svg class="mr-1.5 inline h-2.5 w-2.5 align-baseline" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="6" fill="{{ row.color }}"/></svg>{% endif %}{{ row.side }} · {{ row.name }}</span>
+                    <span class="whitespace-nowrap tabular-nums">{{ row.amount }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% for line in point.not_counted %}
+                <p class="mt-1 text-xs text-muted">{{ line }}</p>
+                {% endfor %}
+              </details>
+              {% endif %}
+              {% if point.estimated_note %}<p class="mt-1 text-xs text-muted" data-estimated>{{ point.estimated_note }}</p>{% endif %}
+            </th>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.net }}</td>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.assets }}</td>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.liabilities }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% else %}
+  <p class="mt-5 text-sm text-muted" data-trend-empty>{{ _("No values yet. Add an item and its first value to see the trend.") }}</p>
+  {% endif %}
+</section>

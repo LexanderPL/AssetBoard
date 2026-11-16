@@ -4250,12 +4250,6 @@ msgstr ""
 msgid "All time"
 msgstr ""
 
-msgid "Manual"
-msgstr ""
-
-msgid "From history"
-msgstr ""
-
 #, fuzzy, python-format
 msgid "%(num)d item in another currency was not counted."
 msgid_plural "%(num)d items in another currency were not counted."
@@ -4287,21 +4281,6 @@ msgid "Assets"
 msgstr ""
 
 msgid "Liabilities"
-msgstr ""
-
-msgid "Snapshot saved."
-msgstr ""
-
-msgid "Snapshot replaced."
-msgstr ""
-
-msgid "History rebuilt from stored values."
-msgstr ""
-
-msgid "There are no stored values to backfill yet."
-msgstr ""
-
-msgid "A snapshot cannot be dated in the future."
 msgstr ""
 
 msgid "Enter notes of at most 200 characters."
@@ -8194,6 +8173,9 @@ msgstr ""
 msgid "Chart scope"
 msgstr ""
 
+msgid "Manual"
+msgstr ""
+
 msgid "Transaction"
 msgstr ""
 
@@ -10508,8 +10490,8 @@ msgid "Estimate values between entries"
 msgstr ""
 
 msgid ""
-"Backfill draws a straight line between recorded values. Re-run Backfill "
-"from history after changing this."
+"Estimates draw a straight line between recorded values on the net-worth "
+"chart for past month-ends; today's value is never estimated."
 msgstr ""
 
 msgid "Enter values as positive amounts. For a liability, enter the amount owed."
@@ -10547,35 +10529,6 @@ msgid ""
 "worth."
 msgstr ""
 
-msgid ""
-"Automatic snapshots are stored on the 1st of each month at 04:00 in the "
-"workspace time zone. Manual snapshots are never recalculated; Backfill "
-"rebuilds automatic rows for past months."
-msgstr ""
-
-msgid "Take snapshot now"
-msgstr ""
-
-msgid "Backfill from history"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d snapshot is in another currency and is not charted."
-msgid_plural "%(num)d snapshots are in another currency and are not charted."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Net worth history"
-msgstr ""
-
-msgid "Breakdown"
-msgstr ""
-
-msgid ""
-"No snapshots yet. The first automatic snapshot needs at least one net-"
-"worth item."
-msgstr ""
-
 #, python-format
 msgid "Not in totals (%(currency)s)"
 msgstr ""
@@ -10596,9 +10549,7 @@ msgstr ""
 msgid "Value unavailable"
 msgstr ""
 
-msgid ""
-"Stored snapshots are not recalculated. Re-run Backfill from history after"
-" correcting a past value."
+msgid "The net-worth chart uses the corrected value the next time it loads."
 msgstr ""
 
 msgid "This value comes from the linked source and is read-only."
@@ -10668,6 +10619,20 @@ msgid "No counted categories"
 msgstr ""
 
 msgid "Show items"
+msgstr ""
+
+msgid ""
+"Calculated from your saved values each time the page loads. Past month-"
+"ends use your value history, linked items and prices; today is live."
+msgstr ""
+
+msgid "Monthly values"
+msgstr ""
+
+msgid "Breakdown"
+msgstr ""
+
+msgid "No values yet. Add an item and its first value to see the trend."
 msgstr ""
 
 msgid "New channel"
@@ -11713,9 +11678,6 @@ msgid "Net-worth items to remove"
 msgstr ""
 
 msgid "Item valuations to remove"
-msgstr ""
-
-msgid "Net-worth snapshots to remove"
 msgstr ""
 
 msgid "Settings to restore:"
@@ -14045,5 +14007,66 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "With these inputs, returns never cover expenses before age %(age)d."
+#~ msgstr ""
+
+#~ msgid "From history"
+#~ msgstr ""
+
+#~ msgid "Snapshot saved."
+#~ msgstr ""
+
+#~ msgid "Snapshot replaced."
+#~ msgstr ""
+
+#~ msgid "History rebuilt from stored values."
+#~ msgstr ""
+
+#~ msgid "There are no stored values to backfill yet."
+#~ msgstr ""
+
+#~ msgid "A snapshot cannot be dated in the future."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Backfill draws a straight line between"
+#~ " recorded values. Re-run Backfill "
+#~ "from history after changing this."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Automatic snapshots are stored on the"
+#~ " 1st of each month at 04:00 in"
+#~ " the workspace time zone. Manual "
+#~ "snapshots are never recalculated; Backfill "
+#~ "rebuilds automatic rows for past months."
+#~ msgstr ""
+
+#~ msgid "Take snapshot now"
+#~ msgstr ""
+
+#~ msgid "Backfill from history"
+#~ msgstr ""
+
+#~ msgid "%(num)d snapshot is in another currency and is not charted."
+#~ msgid_plural "%(num)d snapshots are in another currency and are not charted."
+#~ msgstr[0] ""
+#~ msgstr[1] ""
+
+#~ msgid "Net worth history"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "No snapshots yet. The first automatic"
+#~ " snapshot needs at least one net-"
+#~ "worth item."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Stored snapshots are not recalculated. "
+#~ "Re-run Backfill from history after "
+#~ "correcting a past value."
+#~ msgstr ""
+
+#~ msgid "Net-worth snapshots to remove"
 #~ msgstr ""
 

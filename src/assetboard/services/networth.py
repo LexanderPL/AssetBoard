@@ -62,19 +62,19 @@ from assetboard.domain.networth import (
 from assetboard.domain.networth import (
     move_category as move_in_order,
 )
-from assetboard.domain.networth_history import ItemHistory, ItemValue, values_at
+from assetboard.domain.networth_history import (
+    ItemHistory,
+    ItemValue,
+    linked_for_date,
+    values_at,
+)
 from assetboard.domain.text import text_key
 from assetboard.domain.transactions import EntryError
 from assetboard.domain.transactions import amount_minor as positive_amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
-from assetboard.services.networth_links import (
-    UNAVAILABLE,
-    LinkOption,
-    LinkTarget,
-    registry,
-)
+from assetboard.services.networth_links import LinkOption, LinkTarget, registry
 from assetboard.services.portfolio_links import (
     LinkedNetWorthItem,
     PortfolioLinkWarning,
@@ -384,6 +384,7 @@ def _item_history(item: NetWorthItem, valuations: Sequence[ItemValuation]) -> It
         link_type=item.link_type,
         link_id=item.link_id,
         estimate_between=item.estimate_between,
+        created_at=item.created_at,
     )
 
 
@@ -474,20 +475,16 @@ def current_values(
     """Every item with its value effective on ``as_of``.
 
     The shared read path for the F5.1 lists (``include_history=True``), the F5.2 summary
-    (default) and F5.3's month-end snapshots (any ``as_of``). A valuation dated after
-    ``as_of`` is ignored even when it exists in the history. The archived flag follows the
-    owner's F5.3 rule: an item is archived from its workspace-local archive date onwards.
-    ``item_ids`` narrows the read to a specific item for a write response.
+    (default) and any date. A valuation dated after ``as_of`` is ignored even when it exists in
+    the history. The archived flag follows the owner's F5.3 rule: an item is archived from its
+    workspace-local archive date onwards. ``item_ids`` narrows the read to a specific item for a
+    write response.
     """
     rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     category_by_id = {category.id: category for category in rows.categories}
     histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
     resolved = registry.resolve_many(session, scope, histories, (as_of,))
-    linked = {
-        item.id: resolved.get((item.id, as_of), UNAVAILABLE)
-        for item in histories
-        if item.valuation_mode == "linked"
-    }
+    linked = linked_for_date(resolved, histories, as_of)
     values = values_at(histories, as_of, timezone=timezone, linked=linked)
     targets = _link_targets(session, scope, histories)
     return [

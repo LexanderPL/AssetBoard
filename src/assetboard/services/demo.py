@@ -9,7 +9,7 @@ realistic.
 
 The writer seeds the suggested categories, net-worth categories and asset classes when they are
 missing (a new workspace normally has them already), writes the ledger, recurring items,
-variable income and taxes, net worth, investments, snapshots and one real CSV import, and closes
+variable income and taxes, net worth, investments and one real CSV import, and closes
 ``M-3`` **last**: closed months refuse ledger writes, including linked dividend income.
 """
 
@@ -64,7 +64,6 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
-    NetWorthSnapshotRepository,
     PricePointRepository,
     ReferenceRateRepository,
     ReferenceRateValueRepository,
@@ -109,7 +108,6 @@ from assetboard.services import (
     investments,
     months,
     networth,
-    networth_snapshots,
     occurrences,
     portfolio_links,
     prices,
@@ -826,23 +824,6 @@ def _write_bond_terms(
     bonds._save_bond_terms_in_session(session, ctx, instrument_id, values=values, locale=locale)
 
 
-def _write_snapshots(session: Session, ctx: Context, plan: DemoPlan) -> int:
-    written = 0
-    for day in plan.snapshot_dates:
-        sctx = _ctx_at(ctx, day)
-        _use(session, sctx)
-        created = networth_snapshots._auto_write(
-            session,
-            sctx,
-            as_of=day,
-            clock=sctx.clock,
-            timezone=ctx.workspace.timezone,
-        )
-        if created:
-            written += 1
-    return written
-
-
 def _csv_content(plan: DemoPlan) -> bytes:
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -938,7 +919,6 @@ _COUNT_REPOSITORIES: tuple[tuple[str, type[ScopedRepository[Any]]], ...] = (
     ("networth_categories", NetWorthCategoryRepository),
     ("networth_items", NetWorthItemRepository),
     ("item_valuations", ItemValuationRepository),
-    ("networth_snapshots", NetWorthSnapshotRepository),
     ("reference_rates", ReferenceRateRepository),
     ("reference_rate_values", ReferenceRateValueRepository),
     ("loans", LoanRepository),
@@ -999,7 +979,6 @@ def build_demo_workspace_in_session(
         _write_networth(session, tctx, plan, lookup)
         _write_loans(session, tctx, plan)
         _write_investments(session, tctx, plan, lookup)
-        _write_snapshots(session, tctx, plan)
         _import_batches, upload_path = _write_import(session, tctx, plan, data_dir)
 
         # Closed months refuse ledger writes (linked dividend income included), so M-3 is the

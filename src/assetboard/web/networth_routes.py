@@ -11,7 +11,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -56,12 +56,14 @@ from assetboard.services.networth import (
     update_item,
     update_valuation,
 )
+from assetboard.services.networth_history import networth_history
 from assetboard.services.networth_links import LinkOption
 from assetboard.services.networth_summary import networth_summary
 from assetboard.services.portfolio_links import create_networth_items_from_asset_classes
 from assetboard.services.workspace_options import currency_codes
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
+from assetboard.web.networth_history import build_trend_view
 from assetboard.web.networth_summary import build_summary_view
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
@@ -489,10 +491,22 @@ async def networth_create_portfolio_links(request: Request, ctx: CurrentContext)
 
 
 @router.get("/net-worth/summary", name="networth_summary")
-async def networth_summary_page(request: Request, ctx: CurrentContext) -> Response:
+async def networth_summary_page(
+    request: Request,
+    ctx: CurrentContext,
+    range_code: Annotated[str, Query(alias="range")] = "1y",
+) -> Response:
     data = await run_in_threadpool(networth_summary, request.app.state.session_factory, ctx)
+    history = await run_in_threadpool(
+        networth_history, request.app.state.session_factory, ctx, range_code
+    )
     view = build_summary_view(data, request.state.locale)
-    return render_template(request, "networth/summary.html", context={"view": view})
+    trend = build_trend_view(history, request.state.locale)
+    return render_template(
+        request,
+        "networth/summary.html",
+        context={"view": view, "trend": trend},
+    )
 
 
 # Categories

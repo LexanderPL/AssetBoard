@@ -48,7 +48,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
         <button type="submit" class="btn-primary px-3 py-1.5 text-xs">{{ _("Save") }}</button>
         <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="btn px-3 py-1.5 text-xs">{{ _("Cancel") }}</a>
       </div>
-      <p class="text-xs text-muted sm:col-span-4">{{ _("Stored snapshots are not recalculated. Re-run Backfill from history after correcting a past value.") }}</p>
+      <p class="text-xs text-muted sm:col-span-4">{{ _("The net-worth chart uses the corrected value the next time it loads.") }}</p>
     </form>
   </td>
 </tr>
@@ -180,7 +180,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
     {% endif %}
   </div>
   {% if item.valuation_mode != "linked" %}
-  <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Backfill draws a straight line between recorded values. Re-run Backfill from history after changing this.") }}</p>
+  <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Estimates draw a straight line between recorded values on the net-worth chart for past month-ends; today's value is never estimated.") }}</p>
   {% endif %}
   <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
     <button type="submit" class="btn-primary">{{ _("Save") }}</button>
