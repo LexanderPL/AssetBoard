@@ -354,7 +354,8 @@ can keep the weight or remove it, but you cannot add a new allocation to an arch
 ## Portfolio
 
 **Investments → Portfolio** values everything you hold today (quantity above zero), in the
-workspace base currency. It is read-only.
+workspace base currency. It is read-only. The Holdings, By asset class and Risk balance tables
+sit directly on the page, without an outer card frame.
 
 - **Holdings**: instrument, quantity, average cost (cost basis ÷ quantity), the price used with
   its date, value, cost basis, unrealized gain (amount and %) and share of the portfolio.
@@ -391,8 +392,7 @@ workspace base currency. It is read-only.
   that class) or the whole portfolio. It opens on the class created as *Stocks* (*Akcje*) when
   you hold something there, otherwise on the whole portfolio. Slices under 2% are grouped into
   *Other*. Slices use the chart palette; the class colours appear in the asset-class table.
-  Without JavaScript the chart's table is shown. The Holdings, By asset class and Risk balance
-  tables sit directly on the page without an outer card frame.
+  Without JavaScript the chart's table is shown.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 
