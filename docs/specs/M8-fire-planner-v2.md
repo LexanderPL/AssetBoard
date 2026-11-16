@@ -978,9 +978,10 @@ Keep models, migrations, archive, dependencies and projection/loan math unchange
   and JavaScript-added rows use a visible **Remove** label around a `peer sr-only` checkbox with
   the existing `event_remove_<index>` name. `fire.js` dims a saved row, changes the label and ARIA
   name to **Undo**, and removes an unsaved row (and its inline error row) from the DOM. Archived
-  adjustments use the same visible control. The server parser, `adjustments_present`, apply-on-save
-  semantics, inline row errors, archived state, empty state, focus and live announcements are
-  unchanged.
+  adjustments use the same visible control. The server parser, `adjustments_present`,
+  apply-on-save semantics, inline row errors and archived state are unchanged. The empty-state
+  hint tracks JavaScript-added and removed rows, removing an unsaved row announces that it was
+  removed, and focus still moves to the new row's year field.
 - **Plan progress.** `_metrics.html` renders `data-fire-progress="plan"` directly below the four
   metric cards. It shows the large percentage, `Starting portfolio` and `Net worth at FIRE`
   amounts from `projection.inputs.start_portfolio` and `projection.networth_at_fire`, and a
