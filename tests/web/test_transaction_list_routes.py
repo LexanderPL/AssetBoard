@@ -164,6 +164,7 @@ def test_pages_of_fifty_keep_the_filters(ledger: OwnerApp) -> None:
     assert len(_descriptions(html)) == 50
     assert "1–50 of 51 entries" in html and "Page 1 of 2" in html
     assert "data-first" not in html
+    assert "data-last" in html
     next_url = re.search(r'href="([^"]+)" rel="next"', html)
     last_url = re.search(r'href="([^"]+)" rel="last"', html)
     assert next_url is not None and last_url is not None
@@ -173,6 +174,11 @@ def test_pages_of_fifty_keep_the_filters(ledger: OwnerApp) -> None:
     assert last_query == {"q": "row", "sort": "amount", "page": "2"}
     second = _page(ledger, "?q=row&sort=amount&page=2")
     assert _descriptions(second) == ["row 50"] and "51–51 of 51 entries" in second
+    first_url = re.search(r'href="([^"]+)" rel="first"', second)
+    assert first_url is not None
+    first_query = dict(parse_qsl(urlsplit(first_url.group(1).replace("&amp;", "&")).query))
+    assert first_query == {"q": "row", "sort": "amount"}  # page 1 has no page parameter
+    assert "data-first" in second and "data-last" not in second
     assert 'rel="first"' in second and 'rel="prev"' in second
     assert 'rel="next"' not in second and 'rel="last"' not in second
     assert "Page 2 of 2" in _page(ledger, "?q=row&sort=amount&page=99")  # clamped
