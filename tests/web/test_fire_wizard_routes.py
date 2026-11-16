@@ -734,6 +734,8 @@ def test_unusual_rates_need_the_confirmation(owner) -> None:
     assert "data-fire-extreme-confirm" in response.text
     assert "Confirm and create plan" in response.text
     assert 'name="extreme_rates_confirmed" value="1"' in response.text
+    # The panel replaces the review's warning rather than repeating the same explanation.
+    assert "data-fire-extreme-warning" not in response.text
     assert _state(owner) == (0, 0, 0)
 
     # A rating changed after the panel refreshes the review and asks again; nothing is written.

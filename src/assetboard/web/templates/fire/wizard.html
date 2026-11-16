@@ -144,7 +144,7 @@
       </dl>
       {% if review.income_stopped %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-income-warning>{{ _("Income already stops at or before your current age, so base income will be zero.") }}</p>{% endif %}
       {% if review.stop_after_horizon %}<p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-stop-warning>{{ _("Income stops after the plan's horizon; the projection has no working years beyond age %(horizon)d.", horizon=review.last_year - review.birth_year) }}</p>{% endif %}
-      {% if review.needs_extreme_confirmation %}
+      {% if review.needs_extreme_confirmation and not extreme_confirmation %}
       <p role="status" class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" data-fire-extreme-warning>{{ _("A changed rate is outside the usual range. Confirm it to create the plan.") }} {{ _("Unusual means inflation outside 0–10%%, return above inflation outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</p>
       {% endif %}
       <p class="mt-3 text-sm text-muted">{{ _("Adjustments can be added after the plan is created.") }}</p>
