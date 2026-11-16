@@ -89,7 +89,7 @@ def test_the_base_cell_equals_the_saved_projection_for_each_rule() -> None:
         assert grid.base_cell.fire_year == expected.fire_year
 
 
-def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
+def test_the_whole_expense_line_scales_with_exact_half_up_scaling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inputs = _inputs(
@@ -102,10 +102,20 @@ def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
             fire.ProjectionEvent(
                 year=2028,
                 kind=fire.EventKind.EXPENSE_CHANGE,
-                amount=Money(-500_000, "EUR"),
+                amount=Money(-500_001, "EUR"),
+            ),
+            fire.ProjectionEvent(
+                year=2027,
+                kind=fire.EventKind.INCOME_CHANGE,
+                amount=Money(300_000, "EUR"),
+            ),
+            fire.ProjectionEvent(
+                year=2026,
+                kind=fire.EventKind.CASH,
+                amount=Money(100_000, "EUR"),
             ),
         ),
-        start_expenses=Money(1, "EUR"),
+        start_expenses=Money(1_000_001, "EUR"),
     )
     captured: list[ProjectionInputs] = []
     real_project = fire.project
@@ -117,17 +127,27 @@ def test_only_the_start_expenses_and_return_change_with_exact_half_up_scaling(
     monkeypatch.setattr(fire, "project", recording)
     sensitivity(inputs, (0, -100), (10_000, 15_000))
     assert len(captured) == 4
-    by_factor = {(item.real_return_bp, item.start_expenses.amount_minor) for item in captured}
-    assert (500, 1) in by_factor
-    assert (400, 1) in by_factor
-    assert (500, 2) in by_factor  # 1 * 1.5 = 1.5, half up to 2
-    assert (400, 2) in by_factor
-    for item in captured:
+    by_factor = {(item.real_return_bp, item.start_expenses.amount_minor): item for item in captured}
+    # 1,000,001 * 1.5 = 1,500,001.5, half up to 1,500,002; the expense change scales the same way.
+    assert set(by_factor) == {
+        (500, 1_000_001),
+        (400, 1_000_001),
+        (500, 1_500_002),
+        (400, 1_500_002),
+    }
+    for item in by_factor.values():
         assert item.start_income == inputs.start_income
         assert item.start_portfolio == inputs.start_portfolio
         assert item.inflation_bp == inputs.inflation_bp
         assert item.income_growth_bp == inputs.income_growth_bp
-        assert item.events == inputs.events
+        by_kind = {event.kind: event.amount.amount_minor for event in item.events}
+        assert by_kind[fire.EventKind.SAVING_OVERRIDE] == 1_200_000
+        assert by_kind[fire.EventKind.INCOME_CHANGE] == 300_000
+        assert by_kind[fire.EventKind.CASH] == 100_000
+        expected_expense_change = (
+            -500_001 if item.start_expenses.amount_minor == 1_000_001 else -750_002
+        )
+        assert by_kind[fire.EventKind.EXPENSE_CHANGE] == expected_expense_change
 
 
 def test_a_live_loan_scales_with_the_expense_factor_and_keeps_its_payoff(
@@ -282,6 +302,61 @@ def test_expense_factors_are_bounded_and_scaled_expenses_must_fit() -> None:
             (10_000, 12_000),
         )
     assert (large.value.field, large.value.code) == ("expense_factors_bp", "expense_too_large")
+
+
+def test_the_base_cell_equals_the_direct_projection_with_expense_events() -> None:
+    inputs = _inputs(
+        events=(
+            fire.ProjectionEvent(
+                year=2027,
+                kind=fire.EventKind.EXPENSE_CHANGE,
+                amount=Money(123_457, "EUR"),
+            ),
+            fire.ProjectionEvent(
+                year=2029,
+                kind=fire.EventKind.EXPENSE_CHANGE,
+                amount=Money(-41_111, "EUR"),
+            ),
+            fire.ProjectionEvent(
+                year=2028,
+                kind=fire.EventKind.INCOME_CHANGE,
+                amount=Money(222_222, "EUR"),
+            ),
+        )
+    )
+    direct = project(inputs)
+    grid = sensitivity(inputs, DEFAULT_RETURN_DELTAS_BP, DEFAULT_EXPENSE_FACTORS_BP)
+    assert (grid.base_cell.fire_age, grid.base_cell.fire_year) == (
+        direct.fire_age,
+        direct.fire_year,
+    )
+
+
+def test_a_scaled_cell_with_negative_expenses_fails_the_grid() -> None:
+    # Two included loans of 1 each are removed from starting expenses of 2 at the base factor.
+    # At half the expense level, half-up scales the base line to 1 but each loan to 1, so the
+    # effective line is -1 and the grid must fail instead of producing a false FIRE cell.
+    inputs = replace(
+        _inputs(
+            start_expenses=Money(2, "EUR"),
+            start_portfolio=Money(0, "EUR"),
+            rule=Rule.SWR,
+            swr_bp=400,
+        ),
+        loans=(
+            ProjectionLoan(Money(1, "EUR"), 2026, True),
+            ProjectionLoan(Money(1, "EUR"), 2026, True),
+        ),
+    )
+    # The direct base plan is valid (expenses are exactly zero).
+    assert project(inputs).rows[0].expenses == Money(0, "EUR")
+    with pytest.raises(SensitivityError) as error:
+        sensitivity(inputs, (0,), (5_000, 10_000))
+    assert (error.value.field, error.value.code, error.value.year) == (
+        "expense_factors_bp",
+        "expenses_negative",
+        2026,
+    )
 
 
 def test_an_invalid_plan_keeps_the_projection_error() -> None:

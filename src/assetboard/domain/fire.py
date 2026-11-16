@@ -249,21 +249,30 @@ def signed_amount_minor(amount: Decimal, currency: str) -> int:
 
 
 class FireProjectionError(ValueError):
-    """Invalid projection input; ``field`` and ``code`` name the problem for the caller."""
+    """Invalid projection input; ``field`` and ``code`` name the problem for the caller.
 
-    def __init__(self, field: str, code: str) -> None:
+    ``year`` names the projection row that triggered a row-level error (for example a negative
+    effective expense line), so the page can show where the plan became impossible.
+    """
+
+    def __init__(self, field: str, code: str, *, year: int | None = None) -> None:
         super().__init__(code)
         self.field = field
         self.code = code
+        self.year = year
 
 
 class SensitivityError(ValueError):
-    """Invalid sensitivity axes; ``field`` and ``code`` name the problem for the caller."""
+    """Invalid sensitivity axes; ``field`` and ``code`` name the problem for the caller.
 
-    def __init__(self, field: str, code: str) -> None:
+    ``year`` names the projected row that failed in a scaled cell, when there is one.
+    """
+
+    def __init__(self, field: str, code: str, *, year: int | None = None) -> None:
         super().__init__(code)
         self.field = field
         self.code = code
+        self.year = year
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,12 +330,14 @@ class ProjectionRow:
 
     ``expenses`` is the net expense line after included loans stop being paid: the gross
     inflated expenses minus the recurring payment of every included loan whose payoff year has
-    arrived. ``loan_payment`` is the part of that net line still attributable to loans in this
-    year: included loans before their payoff and ignored loans for the whole horizon.
-    ``net`` at ``t = 0`` is the starting portfolio (the v1 projection reuses that column), so
-    the first row's net worth is ``net + gain + cash``; later rows add ``net`` and ``cash`` to
-    the opening net worth. ``income_stopped`` marks the first year whose base salary is zero,
-    not event income.
+    arrived. It is never negative: a row that would be negative is a projection error.
+    ``loan_payment`` is the part of that net line still attributable to loans in this year:
+    included loans before their payoff and ignored loans for the whole horizon. ``gain`` is the
+    nominal investment gain on the opening net worth, using exact compounding of inflation and
+    the return above inflation. ``net`` at ``t = 0`` is the starting portfolio (the v1
+    projection reuses that column), so the first row's net worth is ``net + gain + cash``; later
+    rows add ``net`` and ``cash`` to the opening net worth. ``income_stopped`` marks the first
+    year whose base salary is zero, not event income.
     """
 
     year: int
@@ -348,7 +359,8 @@ class Projection:
 
     ``inputs`` is the validated input with its currency canonicalized to uppercase, so it
     matches the currency of every row's ``Money`` values. ``fire_number`` is the portfolio
-    needed at the FIRE row: that row's nominal expenses divided by the rule's rate. It is
+    needed at the FIRE row: that row's nominal expenses divided by the rule's rate (the
+    withdrawal rate, or the return above inflation under returns-cover-expenses). It is
     ``None`` when FIRE is never reached or the rate is not positive. ``plan_progress_bp`` is
     the starting portfolio divided by the nominal net worth at FIRE; it is ``None`` when FIRE
     is never reached or the net worth at FIRE is not positive.
@@ -608,30 +620,36 @@ def project(inputs: ProjectionInputs) -> Projection:
 
     ``t = 0`` reuses the net column as the starting portfolio and earns one gain before the
     row's cash flow; later rows add ``net`` and ``cash`` to the opening net worth. The nominal
-    gain rate is the additive ``inflation + real return``. Base income grows with income growth
-    while the row's age is below the stop age; base expenses grow with inflation; event changes
-    are separate components inflated from the start year and active from their event year.
-    Saving overrides replace the net line for their year but leave the shown income, expenses
-    and cash untouched. All series continue to the horizon after FIRE and after income stops.
+    gain compounds inflation and the return above inflation exactly:
+    ``(1 + inflation) * (1 + real return) - 1``. Base income grows with income growth while the
+    row's age is below the stop age; base expenses grow with inflation; event changes are
+    separate components inflated from the start year and active from their event year. Saving
+    overrides replace the net line for their year but leave the shown income, expenses and cash
+    untouched. All series continue to the horizon after FIRE and after income stops.
 
     A live loan is part of the expenses baseline. From an included loan's payoff year onward the
     projection subtracts its recurring annual payment, so the expense line is net of payments
     that have ended. A future one-off overpayment moves the payoff year but never enters the
     annual payment. Ignored loans never produce a drop and keep their payment in the baseline for
     the whole horizon. ``loan_payment`` reports the part of the net expense line still
-    attributable to loans; it is not an additional subtraction.
+    attributable to loans; it is not an additional subtraction. A negative effective expense
+    line (an expense change, or an included loan drop, below zero) raises
+    :class:`FireProjectionError` with ``expenses_negative`` and the row's ``year``; a plan can
+    never declare FIRE on a negative expense line.
 
-    Under ``returns_cover_expenses`` the first row with ``expenses < gain`` and a non-negative
-    opening net worth is the FIRE row. The strict comparison and the previous-year gain mean the
-    crossing is marked one year after the moment the return first covers the year's expenses.
-    Under ``swr`` the first row with ``opening net worth * swr >= expenses`` wins, and cash does
-    not enter either predicate in its own event year.
+    Under ``returns_cover_expenses`` the first row whose non-negative opening net worth earns a
+    return above inflation that covers the year's nominal expenses is the FIRE row:
+    ``opening * real_return_bp > expenses * 10_000``. That preserves real capital; the strict
+    comparison and the opening balance mean the crossing is marked in the first row where the
+    previous year's balance already earns enough. Under ``swr`` the first row with
+    ``opening net worth * swr >= expenses`` wins, and cash does not enter either predicate in its
+    own event year.
 
     ``fire_number`` is the FIRE row's nominal expenses divided by the rule's rate (the
-    withdrawal rate, or the nominal gain rate when returns must cover expenses), rounded once.
-    It is ``None`` when FIRE is never reached or that rate is not positive. ``plan_progress_bp``
-    is the starting portfolio divided by the nominal net worth at FIRE, rounded once; it is
-    ``None`` when FIRE is never reached or that net worth is not positive.
+    withdrawal rate, or the return above inflation when returns must cover expenses), rounded
+    once. It is ``None`` when FIRE is never reached or that rate is not positive.
+    ``plan_progress_bp`` is the starting portfolio divided by the nominal net worth at FIRE,
+    rounded once; it is ``None`` when FIRE is never reached or that net worth is not positive.
 
     ``depletion_age`` and ``min_networth_after_stop`` look at rows from
     ``max(1, stop_working_age - age_at_start)`` onward, inclusive. Invalid inputs raise
@@ -644,7 +662,13 @@ def project(inputs: ProjectionInputs) -> Projection:
     )
     age = age_at_start(plan.start_year, plan.birth_year)
     last_year = plan.birth_year + plan.horizon_age
-    gain_bp = plan.inflation_bp + plan.real_return_bp
+    # Exact nominal compounding in basis points: ((1 + inflation) * (1 + real return) - 1).
+    # The numerator is over 100,000,000 so one opening * numerator / denominator rounds once.
+    gain_numerator = (
+        plan.inflation_bp * 10_000
+        + plan.real_return_bp * 10_000
+        + plan.inflation_bp * plan.real_return_bp
+    )
 
     rows: list[ProjectionRow] = []
     fire_index: int | None = None
@@ -679,6 +703,11 @@ def project(inputs: ProjectionInputs) -> Projection:
             if not loan.included or loan.payoff_year > year
         )
         expenses = gross_expenses - loan_drop
+        if expenses < 0:
+            # A negative expense change made the gross line negative, or the included loan drop
+            # is larger than the expenses. Name the section that can own the cause.
+            field = "events" if gross_expenses < 0 else "loans"
+            raise FireProjectionError(field, "expenses_negative", year=year)
         net = (
             plan.start_portfolio_minor
             if offset == 0
@@ -686,7 +715,7 @@ def project(inputs: ProjectionInputs) -> Projection:
         )
         cash = plan.cash_by_year.get(year, 0)
         opening = plan.start_portfolio_minor if offset == 0 else previous_net_worth
-        gain = round_ratio(opening * gain_bp, 10_000)
+        gain = round_ratio(opening * gain_numerator, 100_000_000)
         net_worth = net + gain + cash if offset == 0 else opening + net + gain + cash
 
         is_fire = False
@@ -695,7 +724,7 @@ def project(inputs: ProjectionInputs) -> Projection:
                 assert plan.swr_bp is not None
                 is_fire = opening * plan.swr_bp >= expenses * 10_000
             else:
-                is_fire = expenses < gain
+                is_fire = opening * plan.real_return_bp > expenses * 10_000
             if is_fire:
                 fire_index = offset
 
@@ -722,7 +751,7 @@ def project(inputs: ProjectionInputs) -> Projection:
 
     fire_number: Money | None = None
     if fire_row is not None:
-        rate_bp = plan.swr_bp if plan.rule is Rule.SWR else gain_bp
+        rate_bp = plan.swr_bp if plan.rule is Rule.SWR else plan.real_return_bp
         if rate_bp is not None and rate_bp > 0:
             fire_number = Money(
                 round_ratio(fire_row.expenses.amount_minor * 10_000, rate_bp), currency
@@ -785,18 +814,19 @@ def sensitivity(
 ) -> SensitivityGrid:
     """Project the plan across return deltas and expense multipliers (F8.5).
 
-    Each cell changes only the real return (``base + delta``) and the starting expenses
-    (``base * factor / 10000``, rounded half away from zero once); contribution overrides, cash
-    events, income and the expense-change events keep their saved values. A live loan is part of
-    the expense baseline, so its recurring annual payment is scaled by the same factor with one
-    rounding per loan; its payoff year and included flag stay as projected. The axes must include
-    the base cell (delta 0 and factor 10000), are otherwise free, and are validated before any
-    projection: exact integers, unique, non-empty, at most nine values each and 81 cells, with
-    every effective return inside the projection's hard rate bounds and every scaled starting
-    expense inside the projection amount limit. Invalid axes raise :class:`SensitivityError`;
-    an invalid plan raises the projection's own :class:`FireProjectionError`. The function only
-    reads its arguments: it has no I/O, clock, database or mutation. A cell that never reaches
-    FIRE keeps ``None`` for its age and year.
+    Each cell changes only the real return (``base + delta``) and scales the whole expense line
+    by the factor: starting expenses, every ``expense_change`` event and every loan's recurring
+    annual payment are multiplied by ``factor / 10000`` and rounded half away from zero once per
+    component. Cash, income and saving overrides keep their saved values. A loan's payoff year
+    and included flag stay as projected. The axes must include the base cell (delta 0 and factor
+    10000), are otherwise free, and are validated before any projection: exact integers, unique,
+    non-empty, at most nine values each and 81 cells, with every effective return inside the
+    projection's hard rate bounds and every scaled expense component inside the projection
+    amount limit. Invalid axes raise :class:`SensitivityError`; an invalid plan raises the
+    projection's own :class:`FireProjectionError`, and a scaled cell whose effective expenses
+    would be negative raises :class:`SensitivityError` with ``expenses_negative`` and the row's
+    ``year``. The function only reads its arguments: it has no I/O, clock, database or mutation.
+    A cell that never reaches FIRE keeps ``None`` for its age and year.
 
     A higher return cannot delay FIRE while the net-worth path stays non-negative (a negative
     opening balance can be pushed further down); a higher expense level never accelerates it.
@@ -814,6 +844,7 @@ def sensitivity(
     base_expenses = inputs.start_expenses.amount_minor
     currency = inputs.start_expenses.currency
     scaled_expenses: dict[int, int] = {}
+    scaled_events: dict[int, tuple[ProjectionEvent, ...]] = {}
     scaled_loans: dict[int, tuple[ProjectionLoan, ...]] = {}
     for factor in factors:
         if not 0 <= factor <= 100_000:
@@ -822,6 +853,16 @@ def sensitivity(
         if scaled > MAX_AMOUNT_MINOR:
             raise SensitivityError("expense_factors_bp", "expense_too_large")
         scaled_expenses[factor] = scaled
+        events: list[ProjectionEvent] = []
+        for event in inputs.events:
+            if event.kind == EventKind.EXPENSE_CHANGE:
+                amount = round_ratio(event.amount.amount_minor * factor, 10_000)
+                if abs(amount) > MAX_AMOUNT_MINOR:
+                    raise SensitivityError("expense_factors_bp", "expense_too_large")
+                events.append(replace(event, amount=Money(amount, event.amount.currency)))
+            else:
+                events.append(event)
+        scaled_events[factor] = tuple(events)
         loans: list[ProjectionLoan] = []
         included_total = 0
         for loan in inputs.loans:
@@ -855,14 +896,22 @@ def sensitivity(
         for delta in deltas:
             effective_return = base_return + delta
             is_base = delta == 0 and factor == 10_000
-            projection = project(
-                replace(
-                    inputs,
-                    real_return_bp=effective_return,
-                    start_expenses=Money(scaled_expenses[factor], currency),
-                    loans=scaled_loans[factor],
+            try:
+                projection = project(
+                    replace(
+                        inputs,
+                        real_return_bp=effective_return,
+                        start_expenses=Money(scaled_expenses[factor], currency),
+                        events=scaled_events[factor],
+                        loans=scaled_loans[factor],
+                    )
                 )
-            )
+            except FireProjectionError as exc:
+                if exc.code == "expenses_negative":
+                    raise SensitivityError(
+                        "expense_factors_bp", "expenses_negative", year=exc.year
+                    ) from None
+                raise
             cell = SensitivityCell(
                 return_delta_bp=delta,
                 expense_factor_bp=factor,
