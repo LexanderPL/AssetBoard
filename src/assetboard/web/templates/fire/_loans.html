@@ -1,7 +1,10 @@
 {% set section = loan_section %}
-<section id="loans" class="panel mt-6 p-6 sm:p-7" aria-labelledby="fire-loans-heading" data-fire-loans{% if loans_wizard %} data-fire-wizard-loans{% endif %}>
+{% set loans_embedded = loans_embedded|default(false) %}
+{% set loans_heading = loans_heading|default(true) %}
+{% set wrapper_class = "" if loans_embedded else "panel mt-6 p-6 sm:p-7" %}
+<section{% if wrapper_class %} class="{{ wrapper_class }}"{% endif %}{% if loans_heading %} aria-labelledby="fire-loans-heading"{% else %} aria-label="{{ _('Loans') }}"{% endif %} data-fire-loans{% if loans_wizard %} data-fire-wizard-loans{% endif %}>
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="fire-loans-heading" class="text-base font-semibold">{{ _("Loans") }}</h2>
+    {% if loans_heading %}<h2 id="fire-loans-heading" class="text-base font-semibold">{{ _("Loans") }}</h2>{% endif %}
     {% if section %}<p class="text-xs text-muted" data-fire-loans-asof>{{ _("Live loan data as of %(date)s", date=section.as_of_label) }}</p>{% endif %}
   </div>
   <p class="mt-1 text-sm text-muted">{{ _("Your annual expenses are expected to include these loan payments. An included loan is removed from the projection from its payoff year; an ignored loan stays in the forecast through the horizon. Loan payments are fixed nominal amounts and are not inflated.") }}</p>

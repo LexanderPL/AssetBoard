@@ -1,5 +1,4 @@
 {% set projection = results.projection %}
-{% set s = plan %}
 
 {% if preview_error %}
 <p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-fire-preview-error data-fire-preview-error-field="{{ preview_error_field or '' }}">{{ preview_error }}</p>
@@ -33,10 +32,4 @@
 {% endif %}
 {% endif %}
 
-{% if projection %}
-  {% include "fire/_metrics.html" %}
-  {% include "fire/_table.html" %}
-  {% include "fire/_charts.html" %}
-{% endif %}
-
-<p class="mt-6 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The projection assumes constant rates and does not model taxes separately; actual results will differ.") }}</p>
+{% if projection %}{% include "fire/_metrics.html" %}{% endif %}

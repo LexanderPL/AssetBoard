@@ -1,0 +1,17 @@
+{% set s = plan %}
+<section id="plan-values" aria-labelledby="plan-values-heading" data-fire-plan-values>
+  <h2 id="plan-values-heading" class="text-base font-semibold">{{ _("Plan values") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("The assumptions saved in the plan. Income and expenses are the amounts recorded in your ledger. Income may be gross; expenses should include the taxes you actually pay and your loan payments. The projection does not model taxes separately. Editors and owners can change them in edit mode.") }}</p>
+  <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+    <div><dt class="text-muted">{{ _("Birth year") }}</dt><dd class="font-medium">{{ s.birth_year }}</dd></div>
+    <div><dt class="text-muted">{{ _("Income stops") }}</dt><dd class="font-medium">{{ _("Age %(age)d, in %(year)d", age=s.stop_working_age, year=s.birth_year + s.stop_working_age) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Horizon") }}</dt><dd class="font-medium">{{ _("Age %(age)d, in %(year)d", age=s.horizon_age, year=s.last_year) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Annual income") }}</dt><dd class="font-medium tabular-nums">{{ format_money(s.income, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Annual expenses") }}</dt><dd class="font-medium tabular-nums">{{ format_money(s.expenses, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Starting portfolio") }}</dt><dd class="font-medium tabular-nums">{{ format_money(s.portfolio, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Inflation") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.inflation_bp, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Return above inflation") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.real_return_bp, locale) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Income growth") }}</dt><dd class="font-medium tabular-nums">{{ format_rate_short(s.income_growth_bp, locale) }}</dd></div>
+    <div class="sm:col-span-2 lg:col-span-3"><dt class="text-muted">{{ _("Independence rule") }}</dt><dd class="font-medium">{{ rule_labels.get(s.rule, s.rule) }}{% if s.swr_bp is not none %} · {{ _("withdrawal rate %(swr)s", swr=format_rate_short(s.swr_bp, locale)) }}{% endif %}</dd></div>
+  </dl>
+</section>

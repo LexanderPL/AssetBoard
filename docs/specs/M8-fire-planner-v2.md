@@ -1058,6 +1058,96 @@ year for a living-plan review banner; keep the current-year anchor; do not auto-
   Workspace-timezone year conversion (the same instant is 2026 in UTC and 2027 at UTC+14) and
   the viewer/editor links are covered. No schema, migration, archive or dependency change.
 
+### F8.17 — FIRE projection and editor layout
+
+**Acceptance**
+
+- The view puts **Plan values**, **Adjustments** and **Loans** inside one collapsed
+  `<details id="plan-inputs">` between the metrics/progress block and the year-by-year table.
+  The label is **Plan values, adjustments and loans**. The details is native (click, Enter or
+  Space), needs no JavaScript, and the view still loads no `fire.js`.
+- The editor order is: metrics/progress, the five-section exclusive accordion (**Plan**,
+  **Assumptions**, **Starting amounts**, **Adjustments**, **Loans**), then the table/charts,
+  disclaimer and sensitivity. All sections are collapsed by default and only one is open.
+  Native `<details name="fire-inputs">` is used with a JavaScript fallback for older browsers.
+- A save error opens the section that owns the field; an adjustment-row error opens
+  **Adjustments**, unusual-rate confirmation opens **Assumptions**, and the F8.16 year review
+  opens **Starting amounts**. An error section wins over the year review. Preview errors open
+  the section with the invalid control without moving focus. `/fire/edit#amounts` opens that
+  section.
+- Live preview updates the metrics/progress and the table/charts in one request through two
+  fragments. The form is never inside a swapped fragment. The preview response always emits an
+  OOB `#fire-results-detail` wrapper so a blocked or no-projection preview clears a stale table.
+  Preview errors, warnings, blocked, loan-understated and no-projection states stay visible.
+- The sensitivity grid is always rendered on the view and edit pages from the **saved** plan.
+  There is no **Show sensitivity grid** button and no `?sensitivity=1` behaviour. The editor has
+  a **Refresh grid** control, hidden without JavaScript, which still fetches the fragment route
+  and never uses unsaved values or posted loan choices.
+- The year-by-year section has no outer panel/padding; the table's own `.sheet` border remains.
+  Adjustment Year and Amount inputs fill their cells (`w-full`), with sensible header widths.
+- No schema, migration, archive, dependency, projection-math or loan-math change. The `pl`
+  catalog is complete with no fuzzy entries.
+- Tests cover the view structure and order, the collapsed details, the five-section accordion and
+  its open rules, split preview/OOB behaviour (including clearing a blocked detail), the
+  always-on sensitivity grid and saved-plan semantics, the removed load/query path, the table
+  frame and input widths, CSP, no-JavaScript submission, keyboard disclosure, 390/1440 widths and
+  Polish copy.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.17 from docs/specs/M8-fire-planner-v2.md: collapse the view's plan values,
+adjustments and loans into one details; rebuild the editor as a five-section exclusive accordion
+with server-side open rules; split the live preview into metrics and table/charts fragments with
+an always-emitted OOB wrapper; make the sensitivity grid always render from the saved plan with
+an editor-only Refresh grid; and remove the year-by-year panel frame. Keep models, migrations,
+archive, dependencies, projection math and loan math unchanged.
+```
+
+### As built (M8.F8.17)
+
+- **View.** `view.html` composes notices, `#fire-metrics`, one collapsed
+  `_plan_inputs_view.html` (`details#plan-inputs`, `data-fire-plan-inputs`, label “Plan values,
+  adjustments and loans”), `#fire-results-detail`, the disclaimer and the sensitivity panel.
+  `_plan_values.html`, `_adjustments_view.html` and the embedded `_loans.html` render without
+  nested panels; the loans heading stays in the view and is hidden in the editor. The summary
+  wraps at 390px and the disclosure is native. `data-fire-results` stays on the view root.
+- **Editor.** `edit.html` puts `#fire-metrics` inside the preview wrapper, then the form with the
+  heading, `_form_body.html` (five `<details name="fire-inputs">` sections, `space-y-3`,
+  `panel group`, `group-open` marker) and the save/discard actions, then
+  `#fire-results-detail`. All sections are collapsed by default; `open_section` is computed in
+  `fire_routes._editor_section` with precedence error field/row → unusual-rate confirmation →
+  F8.16 year review. `fire.js` (`setupExclusiveAccordion`, `openSectionFor`,
+  `openSectionForHash`, `syncPreviewError`) supplies the exclusivity fallback, hash opening and
+  preview-error opening. Closed controls stay in the DOM and submit normally.
+- **Preview fragments.** `_results_metrics.html` holds the preview error, preview note, extreme
+  warning, block panel, loan-expense warning and `_metrics.html`; `_results_detail.html` holds
+  the table and charts under `{% if projection %}`; `_preview.html` emits the OOB
+  `#fire-results-detail` wrapper first and the metrics content second. `fire_edit_preview`
+  renders `_preview.html` for success and `FireError`. The preview request is unchanged
+  (`hx-include="#fire-form"`, `hx-target="#fire-metrics"`, `hx-swap="innerHTML"`,
+  `hx-sync="this:replace"`), so the form is never swapped.
+- **Sensitivity.** `_view_context` and `_edit_context` always call `_sensitivity_context`.
+  `_render_edit` keeps `saved_results` for the grid while a posted loan toggle may recompute
+  `results` for the editor's metrics and table. `sensitivity_page_url` and the load branch are gone;
+  `sensitivity_refresh` is true only in the editor. `fire.js` reveals the hidden **Refresh grid**
+  button. The fragment route renders `_sensitivity.html` only. The refresh button requests
+  `?in_editor=1`, so a swapped blocked-state link stays at `#amounts` instead of reloading the
+  editor; a plain fragment request still links to `/fire/edit#amounts`. `fire_scenario_sensitivity`
+  redirects to `/fire#sensitivity`; `fire_scenario_page` forwards only `notice`/`error`; the
+  `sensitivity` query parameter is ignored.
+- **Styling.** `_table.html` dropped `panel` and its padding; the table keeps `sheet`,
+  `overflow-x-auto`, heading and row styling. `_adjustments_edit.html` uses `w-full` Year/Amount
+  inputs and `w-24`/`w-36` header cells.
+- **Tests and docs.** Web tests cover the view order and collapsed details, the editor accordion
+  and all open rules (including the year review and error precedence), the split preview/OOB
+  clearing, the absent sensitivity load path, once-per-page grid computation and saved-plan
+  semantics. Browser tests cover keyboard disclosure, exclusivity, preview error reopening, hash
+  opening, year-review opening, edit/view sensitivity refresh visibility, no-JavaScript save of
+  closed sections, 390/1440 widths and CSP. `docs/fire.md`, this section and the overview range
+  were updated. No model, migration, archive, dependency, projection-math or loan-math change.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -1094,6 +1184,7 @@ year for a living-plan review banner; keep the current-year anchor; do not auto-
 7. F8.14 — FIRE setup and input polish.
 8. F8.15 — FIRE results and editor cleanup.
 9. F8.16 — living-plan year review.
+10. F8.17 — FIRE projection and editor layout.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

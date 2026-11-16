@@ -11,6 +11,7 @@ from sqlalchemy import event, func, select, update
 
 from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent, Workspace
+from assetboard.services import fire_projection as fire_projection_service
 from tests.fire_helpers import create_plan, freeze_clock
 
 
@@ -47,6 +48,10 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert "data-fire-adjustments-view" in page.text
     assert "data-fire-loans" in page.text
     assert "data-fire-sensitivity" in page.text
+    assert "data-fire-sensitivity-grid" in page.text
+    assert "data-fire-sensitivity-load" not in page.text
+    assert "data-fire-sensitivity-refresh" not in page.text
+    assert "data-fire-plan-inputs" in page.text
     assert "data-fire-edit" in page.text
     assert "data-fire-reset" in page.text
     # The obsolete plan overview panel and the removed CSV action are gone.
@@ -60,6 +65,54 @@ def test_the_view_is_read_only_and_shows_results_values_and_adjustments(owner) -
     assert 'name="birth_year"' not in page.text
     assert "data-fire-suggestion" not in page.text
     assert "data-fire-edit-page" not in page.text
+
+
+def test_the_view_section_order_is_metrics_details_table_charts_sensitivity(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    assert (
+        text.index('id="fire-metrics"')
+        < text.index('id="plan-inputs"')
+        < text.index("data-fire-table-section")
+        < text.index("data-fire-charts")
+        < text.index("data-fire-sensitivity")
+    )
+
+
+def test_the_view_puts_plan_values_adjustments_and_loans_in_one_collapsed_details(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    marker = '<details id="plan-inputs" class="panel group" data-fire-plan-inputs>'
+    assert marker in text
+    assert " open" not in marker
+    start = text.index(marker)
+    end = text.index("</details>", start)
+    block = text[start:end]
+    for marker_name in (
+        "data-fire-plan-values",
+        "data-fire-adjustments-view",
+        "data-fire-loans",
+    ):
+        assert marker_name in block
+    # The outer details is the only framed panel: the sections inside it are flat.
+    assert block.count('class="panel') == 1
+    for tag in ("<form", "<input", "<select", "<textarea", "<button"):
+        assert tag not in block
+    assert text.count('id="plan-inputs"') == 1
+    assert text.index('data-fire-progress="plan"') < start
+    assert start < text.index("data-fire-table-section")
+
+
+def test_the_year_by_year_section_has_no_panel_frame(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    marker = 'aria-labelledby="projection-table-heading" data-fire-table-section>'
+    start = text.rindex("<section", 0, text.index(marker))
+    opening = text[start : text.index(">", start) + 1]
+    assert "panel" not in opening
+    assert "p-6" not in opening and "p-7" not in opening
+    assert "Year by year" in text
+    assert "data-fire-table" in text
 
 
 def test_a_current_year_plan_has_no_living_plan_review(owner) -> None:
@@ -137,7 +190,7 @@ def test_plan_warnings_are_a_compact_stack_without_the_old_overview(owner) -> No
     assert "data-fire-warnings" in view
     assert "data-fire-horizon-warning" in view
     assert "data-fire-income-warning" not in view
-    assert view.index("data-fire-warnings") < view.index("data-fire-results")
+    assert view.index("data-fire-warnings") < view.index('id="fire-metrics"')
 
     edit = owner.client.get("/fire/edit").text
     assert "data-fire-overview" not in edit
@@ -372,6 +425,7 @@ def test_the_metrics_and_progress_are_translated(owner) -> None:
     assert page.status_code == 200
     assert "Kwota FIRE" in page.text
     assert "Postęp planu" in page.text
+    assert "Wartości planu, korekty i kredyty" in page.text
     assert "Sheet progress" not in page.text
     assert "Postęp arkusza" not in page.text
 
@@ -529,6 +583,27 @@ def test_a_currency_mismatch_hides_the_review_banner_and_editor_link(owner) -> N
     assert "data-fire-edit" not in page.text
     assert "data-fire-reset" in page.text
     assert "/fire/edit" not in page.text
+
+
+def test_the_view_does_not_reload_the_plan_for_sensitivity(owner, monkeypatch) -> None:
+    _create(owner)
+    calls = 0
+    original = fire_projection_service.results_for_detail
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("the view must not reload the plan for the sensitivity grid")
+
+    monkeypatch.setattr(fire_projection_service, "results_for_detail", counted)
+    monkeypatch.setattr(fire_projection_service, "scenario_results", boom)
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-grid" in page.text
+    assert calls == 1
 
 
 def test_the_view_query_count_does_not_grow_with_adjustments(owner) -> None:

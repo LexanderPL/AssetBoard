@@ -158,8 +158,31 @@
     }
   });
 
+  // F8.17: a native <details name> group is exclusive, but older browsers without `name`
+  // support keep every section open. Closing the others on toggle makes the behaviour the same
+  // everywhere and is idempotent when the browser already closed them.
+  function setupExclusiveAccordion() {
+    document.querySelectorAll("[data-fire-accordion]").forEach((group) => {
+      const sections = [...group.querySelectorAll("details[data-fire-accordion-section]")];
+      sections.forEach((section) => {
+        section.addEventListener("toggle", () => {
+          if (!section.open) return;
+          sections.forEach((other) => {
+            if (other !== section && other.open) other.open = false;
+          });
+        });
+      });
+    });
+  }
+
+  function openSectionFor(element) {
+    const section = element.closest("details[data-fire-accordion-section]");
+    if (section instanceof HTMLDetailsElement) section.open = true;
+  }
+
   // A preview error arrives with the results fragment, not a full page. Mark the named input
-  // without moving focus, and clear the marker when a later preview succeeds.
+  // without moving focus, open the section that owns it, and clear the marker when a later
+  // preview succeeds.
   function syncPreviewError() {
     if (!(form instanceof HTMLFormElement)) return;
     form.querySelectorAll("[aria-invalid='true']").forEach((field) => {
@@ -172,12 +195,48 @@
     if (!field && name === "events") {
       field = form.querySelector("[data-fire-adjustments]");
     }
-    if (field instanceof HTMLElement) field.setAttribute("aria-invalid", "true");
+    if (!field && name === "loans") {
+      field = form.querySelector("[data-fire-loans]");
+    }
+    if (field instanceof HTMLElement) {
+      field.setAttribute("aria-invalid", "true");
+      openSectionFor(field);
+    }
   }
 
   for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
     document.addEventListener(eventName, syncPreviewError);
   }
+
+  // /fire/edit#amounts and the F8.16 review link open their section directly.
+  function openSectionForHash() {
+    let id;
+    try {
+      id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    } catch {
+      // A malformed fragment must not stop the rest of the editor script.
+      return;
+    }
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!(target instanceof HTMLElement)) return;
+    openSectionFor(target);
+    requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+  }
+
+  window.addEventListener("hashchange", openSectionForHash);
+
+  // The grid is server-rendered; the button only re-fetches the saved plan. Without JavaScript
+  // it stays hidden and nothing is lost.
+  function revealSensitivityRefresh() {
+    document.querySelectorAll("[data-fire-sensitivity-refresh]").forEach((button) => {
+      if (button instanceof HTMLElement) button.classList.remove("hidden");
+    });
+  }
+
+  setupExclusiveAccordion();
+  revealSensitivityRefresh();
+  openSectionForHash();
 
   // F8.15: the withdrawal rate applies only to the withdrawal-rate rule. The server renders the
   // field visible and enabled so a no-JavaScript user can still use it; this script disables it
