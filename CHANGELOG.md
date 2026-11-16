@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.10](https://github.com/LexanderPL/AssetBoard/compare/v0.7.9...v0.7.10) (2026-11-16)
+
+
+### Features
+
+* **fire:** polish the FIRE display and input layout (F8.18) ([#366](https://github.com/LexanderPL/AssetBoard/issues/366)) ([d3afda7](https://github.com/LexanderPL/AssetBoard/commit/d3afda716a5427be507b92b5c3d7ce629fabcd1a))
+* **fire:** use real-return coverage and exact compounding (F8.19) ([#368](https://github.com/LexanderPL/AssetBoard/issues/368)) ([9bd8a0b](https://github.com/LexanderPL/AssetBoard/commit/9bd8a0b926dd8d9e1b89f53db27b7cc83cfd7478))
+
 ## [0.7.9](https://github.com/LexanderPL/AssetBoard/compare/v0.7.8...v0.7.9) (2026-11-16)
 
 
