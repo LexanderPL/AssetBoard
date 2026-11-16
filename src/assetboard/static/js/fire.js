@@ -210,7 +210,13 @@
 
   // /fire/edit#amounts and the F8.16 review link open their section directly.
   function openSectionForHash() {
-    const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    let id;
+    try {
+      id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    } catch {
+      // A malformed fragment must not stop the rest of the editor script.
+      return;
+    }
     if (!id) return;
     const target = document.getElementById(id);
     if (!(target instanceof HTMLElement)) return;
