@@ -1,6 +1,7 @@
 # ADR-0025: FIRE projection numeric representation and rounding
 
-**Status:** Accepted; the real-value display consequence is superseded by M8 F8.13.
+**Status:** Accepted; the real-value display consequence is superseded by M8 F8.13, and the
+additive gain rate and returns-cover predicate are superseded by ADR-0026 (M8 F8.19).
 **Date:** 2026-11-13
 
 ## Context
@@ -26,10 +27,11 @@ has to be fixed, documented and testable against an independent oracle.
   `deflate(v, i, t) = round_ratio(v * 10000^t, (10000 + i)^t)`. Growing a balance iteratively and
   rounding every year would drift; the spreadsheet keeps full precision in its cells, so its
   iterative product equals this closed form and only the displayed line is rounded.
-- The nominal gain rate is the **additive** `inflation + real return`, not the compounded
-  `(1 + inflation)(1 + real return) - 1`, because that is what the source spreadsheet's formulas
-  say. The gain is `round_ratio(opening * (i + r), 10000)`, where the opening is the previous
-  row's net worth (or the starting portfolio at `t = 0`).
+- **Superseded by ADR-0026.** The nominal gain rate was the **additive**
+  `inflation + real return`, not the compounded `(1 + inflation)(1 + real return) - 1`, because
+  that is what the source spreadsheet's formulas said. The gain was
+  `round_ratio(opening * (i + r), 10000)`, where the opening is the previous row's net worth (or
+  the starting portfolio at `t = 0`).
 - The `t = 0` convention is the spreadsheet's: the net column holds the starting portfolio,
   `gain_0` is computed on it, and `net_worth_0 = net_0 + gain_0 + cash_0`. From `t >= 1`,
   `net_worth_t = net_worth_{t-1} + net_t + gain_t + cash_t`. Cash in a year is added **after**
@@ -42,11 +44,10 @@ has to be fixed, documented and testable against an independent oracle.
   `real = deflate(nominal, i, t)`. They are display values and are not expected to satisfy the
   nominal recurrence exactly after rounding.
 - Undefined metrics are `None` rather than zero. A negative opening net worth blocks the FIRE
-  predicate. The `returns_cover_expenses` rule uses the strict `expenses_t < gain_t`; because the
-  gain is earned on the previous year's balance, the FIRE row is marked one year after the
-  theoretical moment returns first cover that year's expenses. This timing artifact is the
-  spreadsheet's definition and is locked by the golden test. The `swr` rule uses the inclusive
-  `opening_t * swr_bp >= expenses_t * 10000`.
+  predicate. **Superseded by ADR-0026:** the `returns_cover_expenses` rule used the strict
+  `expenses_t < gain_t`; the FIRE row was marked one year after the theoretical moment returns
+  first covered that year's expenses. The `swr` rule uses the inclusive
+  `opening_t * swr_bp >= expenses_t * 10000` and is unchanged.
 - Inputs are validated to `MAX_AMOUNT_MINOR`, the hard rate bounds, the supported year range and
   the plan windows, and the currency is canonicalized to uppercase in the returned
   `Projection.inputs`. Invalid inputs raise `FireProjectionError(field, code)`; the engine is pure
@@ -58,8 +59,9 @@ has to be fixed, documented and testable against an independent oracle.
   cannot change a plan.
 - Rounding once per line can differ by one minor unit from an unrounded mathematical model. The
   golden test against a `Fraction` oracle accepts exactly the rule above.
-- The additive gain and the strict-`<` FIRE row are parity choices. Changing either is a product
-  decision and needs a spec change, a new ADR and new golden data.
+- The additive gain and the strict-`<` FIRE row were parity choices. ADR-0026 (M8 F8.19)
+  changed both with a spec change and new golden data; the storage, rounding and closed-form
+  growth rules above are unchanged.
 - Real values were display-only in F8.3 and F8.5. M8 v2 decision 8 and F8.13 remove them:
   the planner now shows nominal values only, so this display requirement no longer applies.
   The nominal projection, gain rounding and metric rounding rules above are unchanged.

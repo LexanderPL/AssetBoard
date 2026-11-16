@@ -173,9 +173,13 @@ expenses   = base expenses inflated, plus active expense_change events
 loan_drop  = sum of included loans whose projected payoff year <= year
              (their recurring annual payment; §7)
 net        = saving_override if present else income - (expenses - loan_drop)
-gain       = opening net worth * (inflation + real return), rounded once
+gain       = opening net worth * ((1 + inflation) * (1 + real return) - 1), rounded once
 net worth  = opening + net + gain + cash
 ```
+
+The nominal gain compounds inflation and the return above inflation exactly; it is not the
+additive `inflation + return above inflation`. The effective expense line after `loan_drop`
+must be non-negative: a negative line is a projection error naming its year, not a FIRE row.
 
 The base expenses already include the loan payments because the suggested expenses are the
 actual ledger expenses. `loan_drop` removes the included loan's recurring annual payment from
@@ -195,11 +199,16 @@ the payoff year onward; it is not added on top. An ignored loan has no drop.
 ### 5.3 Metrics
 
 - **FIRE age/year:** the first row that satisfies the selected rule, using nominal values.
+  Under **Returns cover expenses** the row's opening net worth times the **return above
+  inflation** must strictly exceed that year's nominal expenses (`opening * real_return_bp >
+  expenses * 10000`), so the portfolio's real capital is preserved; the nominal gain does not
+  enter this test. The withdrawal-rate rule is unchanged.
 - **Years to FIRE:** `fire_age - age_at_start`; the current year is year 0.
 - **FIRE number (at FIRE):** the nominal annual expenses at the FIRE row divided by the
-  selected rule's rate (SWR, or the nominal gain rate for returns-cover-expenses). Shown with
-  its year and a plain-language definition; `—` when FIRE is never reached or the rate is
-  not positive. This replaces the v1 "today's money" FIRE number.
+  selected rule's rate (the SWR, or the return above inflation for
+  returns-cover-expenses), rounded once. Shown with its year and a plain-language definition;
+  `—` when FIRE is never reached or the rate is not positive. This replaces the v1 "today's
+  money" FIRE number.
 - **Plan progress:** starting portfolio divided by net worth at FIRE, shown as a percentage
   with the definition; `—` when FIRE is never reached. **Today's-money progress** is removed.
 - **Sustainability:** depletion age and lowest net worth after income stops; nominal.
@@ -799,7 +808,9 @@ the UI and user docs.
   with a positive rate give zero. Plan progress is the starting portfolio divided by the
   nominal net worth at FIRE, rounded once; it is `None` when FIRE is never reached or that
   net worth is not positive. Both use nominal values only. Sustainability still reports the
-  nominal depletion age and lowest net worth after income stops.
+  nominal depletion age and lowest net worth after income stops. **Superseded by F8.19:** the
+  returns-cover predicate and FIRE number now use the return above inflation, and the gain
+  compounds exactly instead of adding the two rates.
 - **Results.** The basis toggle, `basis` query parameter and all basis links/radios/hidden
   fields and redirect plumbing were removed; an old `?basis=real` request renders the nominal
   page, and legacy id redirects drop the parameter. Charts always use `net_worth` and the
@@ -1191,9 +1202,11 @@ dependencies, projection math and loan math unchanged.
 
 ### As built (M8.F8.18)
 
-- `_table.html` renders only the heading, the scroll region and the table; the first-year and row
-  highlight paragraphs are gone. The table is `sheet bg-surface`, and the `bg-success-soft`,
-  `bg-danger-soft` and `text-muted` row classes and their data hooks are unchanged.
+- `_table.html` renders the heading, the scroll region and the table with no explanatory
+  paragraphs below it; the first-year and row highlight paragraphs are gone. (F8.19 later adds a
+  short first-year hint next to the heading.) The table is `sheet bg-surface`, and the
+  `bg-success-soft`, `bg-danger-soft` and `text-muted` row classes and their data hooks are
+  unchanged.
 - `view.html` puts `mt-8` on `#fire-results-detail`, matching the editor, and includes the
   disclaimer after `_sensitivity_panel.html`; `edit.html` does the same. The disclaimer is the
   last child of the view/editor page wrapper.
@@ -1217,6 +1230,88 @@ dependencies, projection math and loan math unchanged.
   side-by-side rule/SWR layout, absent note, the portfolio input/card width match, CSP and
   390/1440 widths. `docs/fire.md` and the overview range were updated. No model, migration,
   archive, dependency, projection-math or loan-math change.
+
+### F8.19 — FIRE real-return coverage and model corrections
+
+**Acceptance**
+
+- The nominal gain compounds inflation and the return above inflation exactly:
+  `(1 + inflation) * (1 + real return) - 1`, with integer basis-point arithmetic and one
+  half-up rounding per row. `ProjectionRow.gain` remains the nominal investment gain.
+- **Returns cover expenses** compares the opening net worth's return above inflation with the
+  year's nominal expenses (`opening * real_return_bp > expenses * 10000`, strict). The FIRE
+  number under that rule is `fire_row.expenses * 10000 / real_return_bp`, rounded once, and is
+  undefined when FIRE is never reached or the real return is not positive. The withdrawal-rate
+  rule is unchanged. The visible rule label stays **Returns cover expenses**; its hint and the
+  FIRE-number hint explain the real-return meaning.
+- A negative effective expense line (after included-loan drops and expense-change events)
+  raises `FireProjectionError` with code `expenses_negative` and the row's year. The results
+  block, preview and save show the year and a clear message. A plan with zero portfolio and
+  negative expenses never declares FIRE. Both a negative `expense_change` and an included loan
+  drop larger than expenses are covered.
+- Sensitivity scales the whole expense line: starting expenses, every `expense_change` event
+  and every loan's recurring payment, with one rounding per component. Income, cash and saving
+  overrides stay unchanged. The factor-10,000 base cell equals the direct projection. A scaled
+  cell whose expenses would be negative fails the grid with `SensitivityError` and a visible
+  year-aware message, never a false FIRE cell or a server error.
+- The current-year first row is unchanged and keeps a short hint next to the **Year by year**
+  heading: the first row is the starting point, today's portfolio earns one year's gain, and
+  the current-year income/expenses are shown while the row's net saving is the starting
+  portfolio. `docs/fire.md` and this as-built section carry the same explanation.
+- Every new string is translatable; the Polish catalog is complete with no fuzzy entries. No
+  schema, migration, archive, dependency, loan-math or UI-layout change. Tests cover the exact
+  compounding, real-return predicate and FIRE number, negative-expense errors in the domain,
+  preview, save, results block and sensitivity grid, whole-expense-line sensitivity scaling,
+  the first-year hint, i18n and the existing browser suites.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.19 from docs/specs/M8-fire-planner-v2.md: exact nominal compounding, returns-cover
+using the real return, negative-expense projection errors with their year, whole-expense-line
+sensitivity scaling, and the current-year explanation. Keep models, migrations, archive,
+dependencies, loan math and the UI layout unchanged.
+```
+
+### As built (M8.F8.19)
+
+- **Compounding.** `project` computes the nominal gain numerator
+  `inflation_bp*10_000 + real_return_bp*10_000 + inflation_bp*real_return_bp` and applies
+  `round_ratio(opening * numerator, 100_000_000)` once per row. The additive gain rate is gone
+  from the engine, docstrings, test oracle, property tests and golden values.
+- **Returns cover.** The predicate is `opening * real_return_bp > expenses * 10_000` (the
+  non-negative opening guard remains). The FIRE number uses `real_return_bp` under this rule
+  and is `None` when the real return is not positive. The SWR predicate and FIRE number are
+  unchanged. Visible copy says **Returns cover expenses**, explains that the return above
+  inflation must cover the year's expenses and preserve real capital, and the FIRE-number hint
+  and undefined note use **return above inflation** instead of the nominal gain rate.
+- **Negative expenses.** `FireProjectionError` and `SensitivityError` gained an optional
+  `year`; `ResultsBlock` carries it too. A negative effective line raises `expenses_negative`
+  with field `events` when the gross line is negative and `loans` when the included-loan drop
+  causes it. The results and sensitivity panels show the translated message and `(Year YYYY)`;
+  preview and save show the same translated error, and save runs the preview projection before
+  `update_fire_plan` so an unprojectable plan is not written. A scaled sensitivity cell with
+  negative expenses raises `SensitivityError("expense_factors_bp", "expenses_negative",
+  year=...)` and renders the visible grid error.
+- **Sensitivity.** The expense factor now scales the starting expenses, every
+  `expense_change` event and every loan payment, each rounded once; cash, income changes and
+  saving overrides stay saved. The factor-10,000 cell reuses the direct projection, so it is
+  identical by construction. Sensitivity tests cover the scaling, the base-cell equality and
+  the negative-cell error.
+- **Current year.** `_table.html` keeps the first-row model and adds a short
+  `data-fire-first-year-hint` next to **Year by year**: the first row is the starting point,
+  today's portfolio earns one year's gain, the current year's income and expenses are shown, and
+  that row's net saving is the starting portfolio. The old trailing footnotes stay removed
+  (F8.18). `docs/fire.md` carries the same explanation.
+- **Tests and docs.** Unit tests cover the exact compounding, the real-return predicate and
+  FIRE number, strict boundaries, negative-expense errors from both causes, the zero-portfolio
+  case, exact sensitivity scaling of all expense components, the base cell and the negative
+  scaled cell. Web tests cover the translated block/preview/save/sensitivity errors with the
+  year, both negative-expense causes, the first-year hint, the updated golden metrics and
+  Polish rendering. Browser coverage uses the existing FIRE wizard, edit, adjustments and loan
+  modules. `docs/fire.md`, this section, §5.2/§5.3, the overview range and ADR-0025's amended
+  note were updated. No model, migration, archive, dependency, loan-math or UI-layout change.
 
 ---
 
@@ -1256,6 +1351,7 @@ dependencies, projection math and loan math unchanged.
 9. F8.16 — living-plan year review.
 10. F8.17 — FIRE projection and editor layout.
 11. F8.18 — FIRE display and input polish.
+12. F8.19 — FIRE real-return coverage and model corrections.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

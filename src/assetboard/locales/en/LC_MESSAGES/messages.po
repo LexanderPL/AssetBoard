@@ -2885,6 +2885,12 @@ msgstr ""
 msgid "Choose Included or Ignored for each loan."
 msgstr ""
 
+#, python-format
+msgid ""
+"The plan's expenses are negative in %(year)s. Expenses cannot be below "
+"zero; check the annual expense changes and the included loan payments."
+msgstr ""
+
 msgid ""
 "The workspace base currency no longer matches the plan's currency. Reset "
 "the plan and create a new one in the current currency."
@@ -2915,6 +2921,12 @@ msgid "A saving override is stored in the current year and is not applied."
 msgstr ""
 
 msgid "A year has more than one saving override."
+msgstr ""
+
+msgid ""
+"The plan's expenses are negative in at least one year. Expenses cannot be"
+" below zero; check the annual expense changes and the included loan "
+"payments."
 msgstr ""
 
 msgid "The plan could not be saved. Reload the page and try again."
@@ -2951,6 +2963,13 @@ msgstr ""
 msgid ""
 "The expense range would exceed the supported amount. Reduce the starting "
 "expenses and try again."
+msgstr ""
+
+#, python-format
+msgid ""
+"The sensitivity grid cannot be calculated because the scaled expenses "
+"would be negative in %(year)s. Check the annual expense changes and the "
+"included loan payments."
 msgstr ""
 
 msgid "The sensitivity grid could not be calculated."
@@ -6151,8 +6170,8 @@ msgid "Return above inflation (%%)"
 msgstr ""
 
 msgid ""
-"Investment return after inflation. It is added to inflation; it is not a "
-"promise of future returns."
+"Investment return after inflation. It is compounded with inflation to "
+"give the nominal growth; it is not a promise of future returns."
 msgstr ""
 
 #, python-format
@@ -6163,8 +6182,9 @@ msgid "Independence rule"
 msgstr ""
 
 msgid ""
-"Returns cover expenses compares the portfolio's return with expenses. "
-"Withdrawal rate uses the rate below."
+"Returns cover expenses compares the portfolio's return above inflation "
+"with the year's expenses, preserving real capital. Withdrawal rate uses "
+"the rate below."
 msgstr ""
 
 #, python-format
@@ -6319,12 +6339,12 @@ msgstr ""
 
 msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
-"independence rule uses: the withdrawal rate, or the nominal gain rate "
-"when returns must cover expenses. This is the portfolio the plan needs in"
-" that year."
+"independence rule uses: the withdrawal rate, or the return above "
+"inflation when returns must cover expenses. This is the portfolio the "
+"plan needs in that year."
 msgstr ""
 
-msgid "Not defined: the plan's gain rate is not positive."
+msgid "Not defined: the plan's return above inflation is not positive."
 msgstr ""
 
 msgid "Sustainability"
@@ -6423,6 +6443,10 @@ msgid "The projection is unavailable"
 msgstr ""
 
 msgid "The plan cannot be projected."
+msgstr ""
+
+#, python-format
+msgid "Year %(year)d"
 msgstr ""
 
 msgid "Change the plan values below; the projection updates as you edit."
@@ -6561,6 +6585,12 @@ msgstr ""
 msgid ""
 "Every amount is nominal: the actual money of that year, not adjusted for "
 "inflation."
+msgstr ""
+
+msgid ""
+"The first row is the starting point: today's portfolio earns one year's "
+"gain, and the current year's income and expenses are shown, but that "
+"row's net saving is the starting portfolio."
 msgstr ""
 
 msgid "Year-by-year projection"
@@ -14104,5 +14134,30 @@ msgstr ""
 #~ "FIRE rows are highlighted. Rows after"
 #~ " income stops are muted; a depleted"
 #~ " row is marked in red."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Investment return after inflation. It is"
+#~ " added to inflation; it is not "
+#~ "a promise of future returns."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns cover expenses compares the "
+#~ "portfolio's return with expenses. Withdrawal"
+#~ " rate uses the rate below."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The nominal expenses in the FIRE "
+#~ "year divided by the rate the "
+#~ "independence rule uses: the withdrawal "
+#~ "rate, or the nominal gain rate "
+#~ "when returns must cover expenses. This"
+#~ " is the portfolio the plan needs "
+#~ "in that year."
+#~ msgstr ""
+
+#~ msgid "Not defined: the plan's gain rate is not positive."
 #~ msgstr ""
 

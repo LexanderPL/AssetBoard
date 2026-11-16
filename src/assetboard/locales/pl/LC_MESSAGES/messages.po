@@ -3041,6 +3041,14 @@ msgstr "Ten sam kredyt występuje dwa razy. Odśwież stronę i spróbuj ponowni
 msgid "Choose Included or Ignored for each loan."
 msgstr "Wybierz opcję Uwzględniony lub Ignorowany dla każdego kredytu."
 
+#, python-format
+msgid ""
+"The plan's expenses are negative in %(year)s. Expenses cannot be below "
+"zero; check the annual expense changes and the included loan payments."
+msgstr ""
+"Wydatki w planie są ujemne w roku %(year)s. Wydatki nie mogą być poniżej "
+"zera; sprawdź roczne korekty wydatków i uwzględnione płatności kredytów."
+
 msgid ""
 "The workspace base currency no longer matches the plan's currency. Reset "
 "the plan and create a new one in the current currency."
@@ -3075,6 +3083,15 @@ msgstr "Korekta oszczędności jest zapisana w bieżącym roku i nie jest stosow
 
 msgid "A year has more than one saving override."
 msgstr "W jednym roku jest więcej niż jedna korekta oszczędności."
+
+msgid ""
+"The plan's expenses are negative in at least one year. Expenses cannot be"
+" below zero; check the annual expense changes and the included loan "
+"payments."
+msgstr ""
+"Wydatki w planie są ujemne w co najmniej jednym roku. Wydatki nie mogą "
+"być poniżej zera; sprawdź roczne korekty wydatków i uwzględnione "
+"płatności kredytów."
 
 msgid "The plan could not be saved. Reload the page and try again."
 msgstr "Nie udało się zapisać planu. Odśwież stronę i spróbuj ponownie."
@@ -3117,6 +3134,16 @@ msgid ""
 msgstr ""
 "Zakres wydatków przekroczyłby obsługiwaną kwotę. Zmniejsz wydatki "
 "początkowe i spróbuj ponownie."
+
+#, python-format
+msgid ""
+"The sensitivity grid cannot be calculated because the scaled expenses "
+"would be negative in %(year)s. Check the annual expense changes and the "
+"included loan payments."
+msgstr ""
+"Nie można obliczyć siatki analizy wrażliwości, ponieważ przeskalowane "
+"wydatki byłyby ujemne w roku %(year)s. Sprawdź roczne korekty wydatków i "
+"uwzględnione płatności kredytów."
 
 msgid "The sensitivity grid could not be calculated."
 msgstr "Nie udało się obliczyć siatki analizy wrażliwości."
@@ -6653,11 +6680,11 @@ msgid "Return above inflation (%%)"
 msgstr "Zwrot powyżej inflacji (%%)"
 
 msgid ""
-"Investment return after inflation. It is added to inflation; it is not a "
-"promise of future returns."
+"Investment return after inflation. It is compounded with inflation to "
+"give the nominal growth; it is not a promise of future returns."
 msgstr ""
-"Zwrot z inwestycji po inflacji. Jest dodawany do inflacji; nie jest "
-"obietnicą przyszłych wyników."
+"Zwrot z inwestycji po inflacji. Jest łączony z inflacją, dając wzrost "
+"nominalny; nie jest obietnicą przyszłych wyników."
 
 #, python-format
 msgid "Income growth (%%)"
@@ -6667,11 +6694,13 @@ msgid "Independence rule"
 msgstr "Reguła niezależności"
 
 msgid ""
-"Returns cover expenses compares the portfolio's return with expenses. "
-"Withdrawal rate uses the rate below."
+"Returns cover expenses compares the portfolio's return above inflation "
+"with the year's expenses, preserving real capital. Withdrawal rate uses "
+"the rate below."
 msgstr ""
-"Reguła „Zwrot pokrywa wydatki” porównuje zwrot z portfela z wydatkami. "
-"Reguła stopy wypłat używa stopy poniżej."
+"Reguła „Zwrot pokrywa wydatki” porównuje zwrot z portfela powyżej "
+"inflacji z rocznymi wydatkami, zachowując realny kapitał. Reguła stopy "
+"wypłat używa stopy poniżej."
 
 #, python-format
 msgid "Withdrawal rate (%%)"
@@ -6849,16 +6878,16 @@ msgstr "Kwota FIRE"
 
 msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
-"independence rule uses: the withdrawal rate, or the nominal gain rate "
-"when returns must cover expenses. This is the portfolio the plan needs in"
-" that year."
+"independence rule uses: the withdrawal rate, or the return above "
+"inflation when returns must cover expenses. This is the portfolio the "
+"plan needs in that year."
 msgstr ""
 "Nominalne wydatki w roku FIRE podzielone przez stopę, której używa reguła"
-" niezależności: stopę wypłat albo nominalną stopę zysku, gdy zyski mają "
+" niezależności: stopę wypłat albo zwrot powyżej inflacji, gdy zwrot ma "
 "pokrywać wydatki. To portfel potrzebny w tym roku."
 
-msgid "Not defined: the plan's gain rate is not positive."
-msgstr "Nieokreślona: stopa zysku planu nie jest dodatnia."
+msgid "Not defined: the plan's return above inflation is not positive."
+msgstr "Nieokreślona: zwrot planu powyżej inflacji nie jest dodatni."
 
 msgid "Sustainability"
 msgstr "Trwałość"
@@ -6970,6 +6999,10 @@ msgstr "Prognoza jest niedostępna"
 
 msgid "The plan cannot be projected."
 msgstr "Nie można prognozować planu."
+
+#, python-format
+msgid "Year %(year)d"
+msgstr "Rok %(year)d"
 
 msgid "Change the plan values below; the projection updates as you edit."
 msgstr "Zmień poniżej wartości planu; prognoza aktualizuje się podczas edycji."
@@ -7133,6 +7166,15 @@ msgid ""
 msgstr ""
 "Każda kwota jest nominalna: rzeczywiste pieniądze z danego roku, bez "
 "korekty o inflację."
+
+msgid ""
+"The first row is the starting point: today's portfolio earns one year's "
+"gain, and the current year's income and expenses are shown, but that "
+"row's net saving is the starting portfolio."
+msgstr ""
+"Pierwszy wiersz to punkt startowy: dzisiejszy portfel wypracowuje roczny "
+"zysk, a dochody i wydatki bieżącego roku są widoczne, ale oszczędności "
+"netto tego wiersza to portfel początkowy."
 
 msgid "Year-by-year projection"
 msgstr "Prognoza rok po roku"

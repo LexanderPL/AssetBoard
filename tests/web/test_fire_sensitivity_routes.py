@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
-from assetboard.db.models.fire import FireScenario
+from assetboard.db.models.fire import FireEvent, FireScenario
 from assetboard.db.models.identity import User, Workspace
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
@@ -280,6 +280,46 @@ def test_an_extreme_base_return_shows_the_axis_error_in_the_grid(owner) -> None:
     fragment = owner.client.get("/fire/sensitivity")
     assert "data-fire-sensitivity-error" in fragment.text
     assert 'data-fire-sensitivity-error-code="return_out_of_range"' in fragment.text
+    assert "data-fire-sensitivity-grid" not in fragment.text
+
+
+def test_a_scaled_negative_expense_cell_shows_the_grid_error_and_year(owner) -> None:
+    # Three 0.01 reductions against 0.03 of starting expenses keep the saved plan's own line at
+    # zero. At the 80% level the starting line rounds to 0.02 while each 0.01 reduction rounds to
+    # 0.01, so the effective line is -0.01 and the grid must fail instead of showing a FIRE cell.
+    plan_id = _create(
+        owner,
+        income_manual="0",
+        expenses_manual="0.03",
+        portfolio_manual="0",
+        horizon_age="43",
+    )
+    with owner.db() as session, session.begin():
+        session.add_all(
+            [
+                FireEvent(
+                    workspace_id=owner.home_id,
+                    scenario_id=plan_id,
+                    year=2027,
+                    kind="expense_change",
+                    amount_minor=-1,
+                    label="Tiny reduction",
+                )
+                for _ in range(3)
+            ]
+        )
+    page = owner.client.get("/fire")
+    assert page.status_code == 200
+    assert "data-fire-sensitivity-error" in page.text
+    assert 'data-fire-sensitivity-error-code="expenses_negative"' in page.text
+    assert "negative in 2027" in page.text
+    assert "data-fire-sensitivity-grid" not in page.text
+
+    fragment = owner.client.get("/fire/sensitivity")
+    assert fragment.status_code == 200
+    assert "data-fire-sensitivity-error" in fragment.text
+    assert 'data-fire-sensitivity-error-code="expenses_negative"' in fragment.text
+    assert "negative in 2027" in fragment.text
     assert "data-fire-sensitivity-grid" not in fragment.text
 
 

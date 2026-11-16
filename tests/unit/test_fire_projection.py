@@ -1,6 +1,6 @@
-"""Golden and edge tests for the pure FIRE projection engine (F8.2).
+"""Golden and edge tests for the pure FIRE projection engine (F8.2, corrected by F8.19).
 
-The oracle below is a literal transcription of the formulas in docs/specs/M8-fire-planner.md
+The oracle below is a literal transcription of the formulas in docs/specs/M8-fire-planner-v2.md
 using exact ``Fraction`` values and its own half-up helper. It deliberately does not import or
 call any helper from the engine, so a rounding or recurrence mistake in the engine shows up as a
 row-by-row mismatch.
@@ -46,9 +46,11 @@ def _half_up(value: Fraction) -> int:
 def _oracle(inputs: ProjectionInputs) -> Projection:
     current_age = inputs.start_year - inputs.birth_year
     last_year = inputs.birth_year + inputs.horizon_age
-    gain_bp = inputs.inflation_bp + inputs.real_return_bp
+    # Exact nominal compounding straight from the definition:
+    # (1 + inflation) * (1 + return above inflation) - 1.
     inflation = Fraction(10_000 + inputs.inflation_bp, 10_000)
     growth = Fraction(10_000 + inputs.income_growth_bp, 10_000)
+    gain_rate = inflation * Fraction(10_000 + inputs.real_return_bp, 10_000) - 1
 
     overrides: dict[int, int] = {}
     cash: defaultdict[int, int] = defaultdict(int)
@@ -97,6 +99,8 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
             amount for amount, payoff_year, included in loans if not included or payoff_year > year
         )
         expenses = gross_expenses - loan_drop
+        if expenses < 0:
+            raise FireProjectionError("expenses", "expenses_negative", year=year)
 
         if offset == 0:
             net = inputs.start_portfolio.amount_minor
@@ -105,7 +109,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
             net = overrides.get(year, income - expenses)
             opening = previous_net_worth
         cash_amount = cash[year]
-        gain = _half_up(Fraction(opening * gain_bp, 10_000))
+        gain = _half_up(Fraction(opening) * gain_rate)
         net_worth = net + gain + cash_amount if offset == 0 else opening + net + gain + cash_amount
 
         is_fire = False
@@ -114,7 +118,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
                 assert inputs.swr_bp is not None
                 is_fire = opening * inputs.swr_bp >= expenses * 10_000
             else:
-                is_fire = expenses < gain
+                is_fire = opening * inputs.real_return_bp > expenses * 10_000
             if is_fire:
                 fire_index = offset
 
@@ -136,15 +140,19 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
         previous_net_worth = net_worth
 
     fire_row = rows[fire_index] if fire_index is not None else None
-    rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else gain_bp
+    rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else inputs.real_return_bp
     fire_number: Money | None = None
     if fire_row is not None and rate_bp is not None and rate_bp > 0:
-        fire_number = _eur(_half_up(Fraction(fire_row.expenses.amount_minor * 10_000, rate_bp)))
+        fire_number = _eur(
+            _half_up(Fraction(fire_row.expenses.amount_minor) / Fraction(rate_bp, 10_000))
+        )
 
     plan_progress: int | None = None
     if fire_row is not None and fire_row.net_worth.amount_minor > 0:
         plan_progress = _half_up(
-            Fraction(inputs.start_portfolio.amount_minor * 10_000, fire_row.net_worth.amount_minor)
+            Fraction(inputs.start_portfolio.amount_minor)
+            / Fraction(fire_row.net_worth.amount_minor)
+            * 10_000
         )
 
     retirement_start = max(1, inputs.stop_working_age - current_age)
@@ -227,6 +235,7 @@ def _variant(**changes: Any) -> ProjectionInputs:
     return replace(_BASE, **changes)
 
 
+_RETURNS_FIRE = _variant(start_portfolio=_eur(30_000_000))
 _G2 = _variant(
     stop_working_age=50,
     real_return_bp=100,
@@ -266,7 +275,8 @@ _G5 = _variant(
 @pytest.mark.parametrize(
     "inputs",
     [
-        pytest.param(_BASE, id="G1-parity"),
+        pytest.param(_BASE, id="G1-base-never-fire-under-real-return"),
+        pytest.param(_RETURNS_FIRE, id="G1b-returns-cover-fire"),
         pytest.param(_G2, id="G2-never-fire-depletion"),
         pytest.param(_G3, id="G3-first-ten-years-overrides"),
         pytest.param(_G4, id="G4-events"),
@@ -277,26 +287,53 @@ def test_golden_sets_match_the_independent_oracle(inputs: ProjectionInputs) -> N
     _assert_matches_oracle(inputs)
 
 
-def test_parity_t0_and_key_metrics_are_hand_checkable() -> None:
-    result = project(_BASE)
+def test_t0_and_key_metrics_are_hand_checkable() -> None:
+    result = project(_RETURNS_FIRE)
     first = result.rows[0]
     assert (first.year, first.age) == (2026, 41)
     assert (first.income.amount_minor, first.expenses.amount_minor, first.net.amount_minor) == (
         6_000_000,
         4_000_000,
-        10_000_000,
+        30_000_000,
     )
-    # 10,000,000 * (2.5% + 5%) = 750,000.
-    assert first.gain.amount_minor == 750_000
-    assert first.net_worth.amount_minor == 10_750_000
-    assert (result.fire_index, result.fire_year, result.fire_age) == (14, 2040, 55)
-    assert result.years_to_fire == 14
-    # 5,651,895 / 7.5% = 75,358,600 exactly, using the FIRE row's nominal expenses.
-    assert result.fire_number == _eur(75_358_600)
-    # 10,000,000 / 80,949,998 = 12.353...%, using the starting portfolio, not row 0.
-    assert result.plan_progress_bp == 1235
-    assert result.depletion_age == 81
+    # 30,000,000 * ((1.025 * 1.05) - 1) = 30,000,000 * 7.625% = 2,287,500.
+    assert first.gain.amount_minor == 2_287_500
+    assert first.net_worth.amount_minor == 32_287_500
+    assert (result.fire_index, result.fire_year, result.fire_age) == (12, 2038, 53)
+    assert result.years_to_fire == 12
+    # 5,379,555 / 5% = 107,591,100, using the FIRE row's nominal expenses and real return.
+    assert result.fire_number == _eur(107_591_100)
+    # 30,000,000 / 124,568,658 = 24.083...%, using the starting portfolio, not row 0.
+    assert result.plan_progress_bp == 2408
+    assert result.depletion_age is None
     assert result.rows[-1].year == 2075
+
+
+def test_the_gain_compounds_inflation_and_real_return_exactly() -> None:
+    result = project(_variant(start_portfolio=_eur(10_000_000)))
+    # 10,000,000 * ((1.025 * 1.05) - 1) = 762,500, not the additive 10,000,000 * 7.5%.
+    assert result.rows[0].gain == _eur(762_500)
+    assert result.rows[0].gain != _eur(750_000)
+
+
+def test_returns_cover_uses_the_real_return_not_the_nominal_gain() -> None:
+    # The nominal gain (15.5%) covers 100,000 on a 1,000,000 portfolio, but the return above
+    # inflation (5%) does not: the plan has not preserved its real capital, so this is not FIRE.
+    nominal_only = _edge(
+        horizon_age=43,
+        inflation_bp=1_000,
+        real_return_bp=500,
+        start_expenses=_eur(100_000),
+        start_portfolio=_eur(1_000_000),
+    )
+    result = project(nominal_only)
+    assert result.rows[0].gain == _eur(155_000)
+    assert not result.rows[0].is_fire
+    assert result.fire_index != 0
+
+    # With a 2,500,000 portfolio the real return alone covers the same expenses.
+    real_cover = replace(nominal_only, start_portfolio=_eur(2_500_000))
+    assert project(real_cover).rows[0].is_fire
 
 
 def _edge(**changes: Any) -> ProjectionInputs:
@@ -455,24 +492,66 @@ def test_start_year_income_is_zero_when_the_salary_stops_at_the_current_age() ->
     assert rows[1].income_stopped
 
 
-def test_negative_overrides_and_series_are_not_clamped() -> None:
+def test_negative_overrides_are_not_clamped_and_expense_changes_stay_non_negative() -> None:
     inputs = _edge(
         horizon_age=43,
         start_income=_eur(100_000),
         start_expenses=_eur(50_000),
         events=(
             ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(-300_000)),
-            ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),
+            ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-20_000)),
         ),
     )
     rows = project(inputs).rows
-    assert rows[0].expenses == _eur(-150_000)
-    assert rows[1].expenses == _eur(-150_000)
+    assert rows[0].expenses == _eur(30_000)
+    assert rows[1].expenses == _eur(30_000)
     assert rows[1].income == _eur(100_000)
     assert rows[1].net == _eur(-300_000)
 
 
-def test_returns_rule_uses_strict_less_than_and_the_previous_net_worth() -> None:
+def test_a_negative_expense_line_raises_with_the_row_year() -> None:
+    from_change = _edge(
+        horizon_age=43,
+        start_expenses=_eur(100_000),
+        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),),
+    )
+    with pytest.raises(FireProjectionError) as error:
+        project(from_change)
+    assert (error.value.field, error.value.code, error.value.year) == (
+        "events",
+        "expenses_negative",
+        2026,
+    )
+
+    from_loan = _edge(
+        horizon_age=43,
+        start_expenses=_eur(100_000),
+        start_portfolio=_eur(0),
+        loans=(ProjectionLoan(_eur(150_000), 2026, True),),
+    )
+    with pytest.raises(FireProjectionError) as error:
+        project(from_loan)
+    assert (error.value.field, error.value.code, error.value.year) == (
+        "loans",
+        "expenses_negative",
+        2026,
+    )
+
+
+def test_a_zero_portfolio_with_negative_expenses_cannot_declare_fire() -> None:
+    inputs = _edge(
+        horizon_age=43,
+        start_expenses=_eur(0),
+        start_portfolio=_eur(0),
+        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-1)),),
+    )
+    with pytest.raises(FireProjectionError) as error:
+        project(inputs)
+    assert error.value.code == "expenses_negative"
+    assert error.value.year == 2026
+
+
+def test_returns_rule_uses_strictly_greater_and_the_previous_net_worth() -> None:
     inputs = _edge(
         horizon_age=43,
         real_return_bp=1_000,
@@ -481,9 +560,11 @@ def test_returns_rule_uses_strict_less_than_and_the_previous_net_worth() -> None
         start_portfolio=_eur(1_000_000),
     )
     result = project(inputs)
-    # At t=0 expenses (100,000) equal the gain on the starting portfolio exactly: not FIRE.
+    # At t=0 the opening portfolio's real return equals expenses exactly: 1,000,000 * 10% is
+    # not strictly greater than 100,000, so the strict comparison does not fire.
     assert not result.rows[0].is_fire
-    # At t=1 the gain is 10% of 1,100,000, which is strictly above expenses.
+    # At t=1 the opening balance is 1,100,000, so its real return (110,000) is strictly above
+    # expenses.
     assert result.rows[1].is_fire
     assert result.fire_index == 1
 
@@ -520,17 +601,16 @@ def test_swr_rule_is_inclusive_and_uses_the_previous_net_worth() -> None:
 def test_negative_opening_net_worth_blocks_the_fire_predicate() -> None:
     inputs = _edge(
         horizon_age=45,
+        real_return_bp=500,
         start_expenses=_eur(10_000),
         start_portfolio=_eur(100_000),
-        events=(
-            ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(-200_000)),
-            ProjectionEvent(2028, EventKind.EXPENSE_CHANGE, _eur(-20_000)),
-        ),
+        events=(ProjectionEvent(2027, EventKind.SAVING_OVERRIDE, _eur(-200_000)),),
     )
     result = project(inputs)
-    assert result.rows[1].net_worth == _eur(-100_000)
-    assert result.rows[2].expenses == _eur(-10_000)
-    # expenses < gain would be true, but the opening net worth is negative.
+    # t=0 ends at 105,000; t=1 earns 5% and then applies the -200,000 override.
+    assert result.rows[0].net_worth == _eur(105_000)
+    assert result.rows[1].net_worth == _eur(-89_750)
+    # The return on a negative opening balance cannot cover positive expenses.
     assert not result.rows[2].is_fire
     assert result.fire_index is None
 
@@ -586,16 +666,18 @@ def test_fire_number_needs_a_fire_row_and_a_positive_rate() -> None:
     assert result.fire_number is None
     assert result.plan_progress_bp is None
 
-    # A negative expense change can reach the returns-cover rule with a zero gain rate.
-    negative_expenses = _edge(
+    # A zero real return can never cover a positive expense line, so there is no FIRE row and
+    # therefore no FIRE number, even with a positive portfolio.
+    zero_return = _edge(
         horizon_age=43,
         real_return_bp=0,
-        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-200_000)),),
+        start_expenses=_eur(0),
+        start_portfolio=_eur(1_000_000),
     )
-    reached = project(negative_expenses)
-    assert reached.fire_index == 0
-    assert reached.fire_number is None
-    assert reached.plan_progress_bp is None
+    result = project(zero_return)
+    assert result.fire_index is None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
 
 
 def test_zero_expenses_with_a_positive_rate_give_a_zero_fire_number() -> None:
@@ -622,30 +704,26 @@ def test_zero_expenses_with_a_positive_rate_give_a_zero_fire_number() -> None:
     assert result.fire_number == _eur(0)
 
 
-def test_negative_fire_row_expenses_keep_a_negative_target_unclamped() -> None:
-    result = project(
-        _edge(
-            horizon_age=43,
-            rule=Rule.SWR,
-            swr_bp=400,
-            start_expenses=_eur(100_000),
-            start_portfolio=_eur(1_000_000),
-            events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-500_000)),),
-        )
+def test_a_negative_expense_line_is_never_a_fire_row_even_under_swr() -> None:
+    inputs = _edge(
+        horizon_age=43,
+        rule=Rule.SWR,
+        swr_bp=400,
+        start_expenses=_eur(100_000),
+        start_portfolio=_eur(1_000_000),
+        events=(ProjectionEvent(2026, EventKind.EXPENSE_CHANGE, _eur(-500_000)),),
     )
-    assert result.fire_index == 0
-    # -400,000 / 4% = -10,000,000: the literal metric is not clamped to zero.
-    assert result.fire_number == _eur(-10_000_000)
-    # The row's net worth is the starting portfolio (no gain or cash), so progress is 100%.
-    assert result.plan_progress_bp == 10_000
+    with pytest.raises(FireProjectionError) as error:
+        project(inputs)
+    assert (error.value.code, error.value.year) == ("expenses_negative", 2026)
 
 
 def test_plan_progress_uses_the_starting_portfolio_not_the_first_row() -> None:
-    result = project(_BASE)
+    result = project(_RETURNS_FIRE)
     assert result.networth_at_fire is not None
     assert result.plan_progress_bp == _half_up(
         Fraction(
-            _BASE.start_portfolio.amount_minor * 10_000,
+            _RETURNS_FIRE.start_portfolio.amount_minor * 10_000,
             result.networth_at_fire.amount_minor,
         )
     )
@@ -658,18 +736,18 @@ def test_plan_progress_uses_the_starting_portfolio_not_the_first_row() -> None:
 
 
 def test_live_loan_payoff_changes_the_nominal_metrics() -> None:
-    included = project(_variant(loans=(ProjectionLoan(_eur(1_000_000), 2030, True),)))
-    ignored = project(_variant(loans=(ProjectionLoan(_eur(1_000_000), 2030, False),)))
-    assert (included.fire_index, included.fire_year) == (10, 2036)
-    assert included.fire_number == _eur(54_937_840)
-    assert included.plan_progress_bp == 1529
+    included = project(replace(_RETURNS_FIRE, loans=(ProjectionLoan(_eur(1_000_000), 2030, True),)))
+    ignored = project(replace(_RETURNS_FIRE, loans=(ProjectionLoan(_eur(1_000_000), 2030, False),)))
+    assert (included.fire_index, included.fire_year) == (8, 2034)
+    assert included.fire_number == _eur(77_472_240)
+    assert included.plan_progress_bp == 3383
     included_index = included.fire_index
     assert included_index is not None
     assert included.rows[included_index].loan_payment == _eur(0)
 
-    assert (ignored.fire_index, ignored.fire_year) == (14, 2040)
-    assert ignored.fire_number == _eur(75_358_600)
-    assert ignored.plan_progress_bp == 1235
+    assert (ignored.fire_index, ignored.fire_year) == (12, 2038)
+    assert ignored.fire_number == _eur(107_591_100)
+    assert ignored.plan_progress_bp == 2408
     ignored_index = ignored.fire_index
     assert ignored_index is not None
     assert ignored.rows[ignored_index].loan_payment == _eur(1_000_000)
@@ -745,10 +823,10 @@ def test_no_retirement_rows_when_the_stop_age_is_after_the_horizon() -> None:
 
 
 def test_rows_run_to_the_horizon_after_fire_and_income_stop() -> None:
-    result = project(_BASE)
+    result = project(_RETURNS_FIRE)
     assert len(result.rows) == 50
     assert (result.rows[0].year, result.rows[-1].year) == (2026, 2075)
-    assert result.fire_index == 14
+    assert result.fire_index == 12
     assert sum(row.is_fire for row in result.rows) == 1
     assert result.rows[-1].income_stopped
     assert result.rows[-1].income == _eur(0)
@@ -768,10 +846,11 @@ def test_half_up_rounds_negative_values_away_from_zero() -> None:
     negative_expense = _edge(
         horizon_age=43,
         inflation_bp=5_000,
+        start_expenses=_eur(100_000),
         events=(ProjectionEvent(2027, EventKind.EXPENSE_CHANGE, _eur(-1)),),
     )
-    # -1 * 1.5 = -1.5, rounded away from zero.
-    assert project(negative_expense).rows[1].expenses == _eur(-2)
+    # The base line is 150,000 and the change -1 * 1.5 = -1.5, rounded away from zero to -2.
+    assert project(negative_expense).rows[1].expenses == _eur(149_998)
 
 
 def test_projection_returns_inputs_with_the_canonical_currency() -> None:
@@ -790,7 +869,7 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
     ):
         hints.extend(get_type_hints(cls).values())
     assert all("float" not in str(hint) for hint in hints)
-    result = project(_BASE)
+    result = project(_RETURNS_FIRE)
     assert type(result.rows[0].net_worth.amount_minor) is int
     assert type(result.fire_index) is int
 

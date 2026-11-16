@@ -43,6 +43,7 @@ class ResultsBlock:
     code: str
     field: str | None = None
     detail: str | None = None
+    year: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +176,7 @@ def results_from_detail(
             detail=detail,
             projection=None,
             loans=loans,
-            blocks=(ResultsBlock(code=exc.code, field=exc.field),),
+            blocks=(ResultsBlock(code=exc.code, field=exc.field, year=exc.year),),
         )
     return FirePlanResults(detail=detail, projection=projection, loans=loans)
 
@@ -264,7 +265,7 @@ def preview_plan_results(
             inputs_from_validated(saved, validated, current_year=saved.current_year, loans=loans)
         )
     except FireProjectionError as exc:
-        raise FireError(exc.field, exc.code) from None
+        raise FireError(exc.field, exc.code, year=exc.year) from None
     return FirePlanResults(
         detail=detail,
         projection=projection,
