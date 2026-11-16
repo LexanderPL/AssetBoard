@@ -1,8 +1,8 @@
 """The net-worth summary (F5.2): reads current values and runs ``summarize_net_worth``.
 
 Reads one snapshot of the workspace's items, their categories and valuations at the workspace's
-today. The F5.1 list and this summary share ``services.networth.current_values``; F5.3 will call
-it with a month-end date. No writes or audit events.
+today. The F5.1 list, this summary and the F5.9 derived history share ``values_at`` and the
+value-loading path in ``services.networth``. No writes or audit events.
 """
 
 from __future__ import annotations

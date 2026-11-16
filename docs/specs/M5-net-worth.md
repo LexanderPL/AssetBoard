@@ -68,7 +68,7 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - Items under an **archived category** still count while the item itself is not archived (F5.1 rule).
 - Summary page: big net-worth figure, one combined assets-vs-liabilities bar, and a category
   table for each side (assets, then liabilities) with totals and shares of that side's own total.
-  The page loads no chart script.
+  F5.2 shipped without a chart script; F5.9 adds the derived trend chart above the warnings.
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).
 
@@ -76,7 +76,8 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - `GET /net-worth/summary` is its own page; the sidebar points to it and both pages share the
   Summary / Assets / Liabilities tabs. F5.1 URLs stay unchanged.
 - The shared read path is `services.networth.current_values(session, ctx, *, as_of, ...)`; the
-  list uses history, the summary uses current values only, and F5.3 can pass a month-end date.
+  list uses history and the summary uses current values only. F5.9 derives the history points
+  from the same item and valuation rows through `domain.networth_history.values_at`.
   A valuation after `as_of` is ignored.
 - `summarize_net_worth` is pure and works on item IDs, sides and `Money`; names and colours are
   added in the web layer.
@@ -94,7 +95,7 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
   hatched red and a vertical marker line marks the assets end. Equal sides give a full red bar and
   zero net worth; no liabilities gives a full green bar; assets of zero with liabilities gives a
   fully hatched red bar; both zero gives an empty track and the **No assets or liabilities yet.**
-  caption. The page loads no chart script.
+  caption. F5.2 shipped without a chart; F5.9 adds the derived trend above the warnings.
 - Excluded items are a neutral note; non-base and no-value items use warning tones. No FX, no
   base-currency lock, no writes/audit, no migration.
 
@@ -193,8 +194,8 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   the form picker. The production registry is empty until M6/M7 register their resolvers.
 - The picker is shown only for the item side with a registered resolver and offers “Manual
   value” by default. Linking happens at creation. An existing manual item with valuation
-  history must be archived and replaced by a linked item; archive-date snapshots keep its
-  history continuous.
+  history must be archived and replaced by a linked item; the archive date keeps its history
+  continuous up to that point.
 - A linked item has no manual valuations and shows its value read-only with a “Linked to …”
   chip, optional click-through and target currency. Unknown targets, removed resolver modules
   and resolved values in another currency are `Unavailable`, never zero.
@@ -206,9 +207,9 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   `(workspace_id, link_type, link_id)` for active linked items, on SQLite and PostgreSQL.
   Duplicate creation returns `already_linked`; restoring an archived linked item is refused
   while another active item links to the same target.
-- Auto, manual and backfill snapshots resolve linked values at their `as_of`; a backfill makes
-  one `resolve_many` call per link type. The breakdown keeps `v: 1` and adds
-  `not_counted.unavailable`; unavailable linked items do not make an auto snapshot eligible.
+- Derived history points (F5.9) resolve linked values at their `as_of` with one batched
+  `resolve_many` call per link type. The breakdown adds `not_counted.unavailable`; an
+  unavailable linked item is never counted as zero.
 - Follow-up: list pages still call `describe` once per linked item. A batched `describe_many`
   on the protocol would let M6 avoid one lookup per holding; not required for F5.4.
 - The automatic portfolio linking (F6.8) is a workspace setting, not an item flag. Turning it
@@ -562,7 +563,8 @@ re-running a backfill after correcting a value.
 - `domain.networth_history.history_dates(today, range_code, earliest=...)` builds the dates:
   completed month-ends stop before the current month, `today` is always last and never
   duplicates a month-end, and `earliest is None` returns no points. `linked_for_date`,
-  `summarize_values` and `breakdown_for` are pure helpers shared by the service and the view.
+  `summarize_values` and `breakdown_for` are pure helpers used by the service; the view renders
+  the resulting `SnapshotBreakdown`.
 - `services.networth_history.networth_history(factory, ctx, range_code="1y")` loads categories,
   items and valuations once, computes `earliest` from the earliest manual valuation on or before
   today or a linked item's creation date in the workspace time zone (clamped to today), calls

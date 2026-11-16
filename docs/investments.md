@@ -500,12 +500,12 @@ it. The **Link to…** picker also offers active instruments you currently hold.
 archived targets are not offered for new links, but existing links keep resolving.
 
 The linked value is read-only. For today it matches the **Portfolio** tab exactly, including
-undated imported lots and the latest prices and FX rates. For a past snapshot or a backfill it
-uses the **Performance** history: dated transactions only, carried-forward observations and the
-per-date bond value. Undated lots are therefore absent from historical snapshots, so the first
-month-end snapshot can be lower than today's value when such lots exist. A linked class is
-**Value unavailable** when any held instrument in it lacks a price or FX rate; it never shows a
-partial class total.
+undated imported lots and the latest prices and FX rates. At a past month-end the derived
+net-worth trend uses the **Performance** history: dated transactions only, carried-forward
+observations and the per-date bond value. Undated lots are therefore absent from historical
+points, so the first month-end point can be lower than today's value when such lots exist. A
+linked class is **Value unavailable** when any held instrument in it lacks a price or FX rate; it
+never shows a partial class total.
 
 The Assets page warns about possible double counting when a class and one of its holdings are
 both linked, or when a legacy real-estate instrument and a **Real estate** item both have a

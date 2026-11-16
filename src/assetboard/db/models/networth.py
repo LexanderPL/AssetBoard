@@ -1,4 +1,4 @@
-"""Net-worth models (F5.1/F5.3): categories, items, valuations and snapshots."""
+"""Net-worth models (F5.1/F5.3): categories, items, valuations and legacy snapshots."""
 
 from __future__ import annotations
 

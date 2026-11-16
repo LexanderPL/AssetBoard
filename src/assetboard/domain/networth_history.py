@@ -1,8 +1,8 @@
 """Net-worth history (F5.9): completed month-ends, derived values, breakdowns and ranges.
 
 Pure: no I/O, database or clock access. Services pass "today" and the workspace time zone in
-from the injected ``Clock``. The same ``ItemHistory`` rows feed ``values_at`` for every derived
-point, so the Summary figure and the trend cannot drift apart.
+from the injected ``Clock``. Every derived point and the Summary's live point go through
+``values_at`` with the same rules, so the figure and the trend cannot drift apart.
 
 An item counts up to its archive date: at month-end ``D`` it is excluded only when its
 ``archived_at`` falls on or before ``D`` in the workspace's time zone. A restored item has no
