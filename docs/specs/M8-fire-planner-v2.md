@@ -1210,12 +1210,13 @@ dependencies, projection math and loan math unchanged.
 - The starting-portfolio input no longer carries the `lg:max-w-[calc(50%-0.625rem)]` cap, so it
   fills its `lg:col-span-2` column like the portfolio suggestion card.
 - Web tests cover the absent copy, hidden birth year and save, hidden currency/birth year, the
-  rule/SWR row, the category disclosure and loan lines, table background and FIRE tint, view
-  spacing and disclaimer order, and the uncapped portfolio field. Browser tests cover the
-  disclaimer as the last block, `mt-8` spacing, the table class, hidden birth year, category
-  collapse/open in the editor and wizard, the side-by-side rule/SWR layout, absent note, the
-  portfolio input/card width match, CSP and 390/1440 widths. `docs/fire.md` and the overview range
-  were updated. No model, migration, archive, dependency, projection-math or loan-math change.
+  rule/SWR row, the category disclosure and loan lines, the table background and the FIRE,
+  depleted and income-stopped row tints, view spacing and disclaimer order, and the uncapped
+  portfolio field. Browser tests cover the disclaimer as the last block, `mt-8` spacing, the
+  table class, hidden birth year, category collapse/open in the editor and wizard, the
+  side-by-side rule/SWR layout, absent note, the portfolio input/card width match, CSP and
+  390/1440 widths. `docs/fire.md` and the overview range were updated. No model, migration,
+  archive, dependency, projection-math or loan-math change.
 
 ---
 
