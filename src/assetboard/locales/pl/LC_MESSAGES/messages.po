@@ -7726,12 +7726,18 @@ msgstr "Automatycznie zaksięgowano"
 msgid "archived"
 msgstr "zarchiwizowana"
 
+msgid "First"
+msgstr "Pierwsza"
+
 msgid "Previous"
 msgstr "Poprzedni"
 
 #, python-format
 msgid "Page %(number)d of %(pages)d"
 msgstr "Strona %(number)d z %(pages)d"
+
+msgid "Last"
+msgstr "Ostatnia"
 
 msgid ""
 "Tick entries in the list, or change all entries that match the filters. "
@@ -11089,15 +11095,6 @@ msgstr "Cofnij pominięcie %(name)s z dnia %(date)s"
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
 
-msgid ""
-"Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
-"Tab moves to the next field, Enter saves, Esc clears the row or cancels "
-"an edit."
-msgstr ""
-"Dzień: dzień tego miesiąca (7) albo pełna data (2026-10-07 lub "
-"07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
-"czyści wiersz lub anuluje edycję."
-
 msgid "Showing all entries."
 msgstr "Pokazano wszystkie wpisy."
 
@@ -11360,13 +11357,6 @@ msgstr "Wydane i odłożone: wydatki oraz zaoszczędzone / zainwestowane"
 
 msgid "In: income and withdrawn from savings"
 msgstr "Wpływy: przychody oraz wypłacone z oszczędności"
-
-msgid ""
-"Enter or leaving the field saves a planned value; 0 or an empty field "
-"removes it. Esc restores the saved value."
-msgstr ""
-"Enter lub opuszczenie pola zapisuje wartość planowaną; 0 lub puste pole "
-"ją usuwa. Esc przywraca zapisaną wartość."
 
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
@@ -14985,4 +14975,28 @@ msgstr "Usuń obszar roboczy…"
 #~ " zastępuje oszczędności netto w danym "
 #~ "roku i jest unikalna dla roku. "
 #~ "Kwoty ujemne zmniejszają, dodatnie zwiększają."
+
+#~ msgid ""
+#~ "Day: a day of this month (7) "
+#~ "or a full date (2026-10-07 or "
+#~ "07.10.2026). Tab moves to the next "
+#~ "field, Enter saves, Esc clears the "
+#~ "row or cancels an edit."
+#~ msgstr ""
+#~ "Dzień: dzień tego miesiąca (7) albo "
+#~ "pełna data (2026-10-07 lub 07.10.2026). "
+#~ "Tab przechodzi do następnego pola, Enter"
+#~ " zapisuje, Esc czyści wiersz lub "
+#~ "anuluje edycję."
+
+#~ msgid ""
+#~ "Enter or leaving the field saves a"
+#~ " planned value; 0 or an empty "
+#~ "field removes it. Esc restores the "
+#~ "saved value."
+#~ msgstr ""
+#~ "Enter lub opuszczenie pola zapisuje "
+#~ "wartość planowaną; 0 lub puste pole "
+#~ "ją usuwa. Esc przywraca zapisaną "
+#~ "wartość."
 

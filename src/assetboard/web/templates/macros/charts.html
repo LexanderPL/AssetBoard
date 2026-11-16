@@ -6,7 +6,7 @@
    version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
    slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
    script or style. #}
-{% macro donut(d, label=None, compact=false) -%}
+{% macro donut(d, label=None, compact=false, actions=none) -%}
 {% set wrapper_class = "min-w-0" if compact else "panel p-4 sm:p-6" %}
 {% set heading_class = "text-sm font-semibold" if compact else "text-base font-semibold" %}
 {% set total_class = "text-xs tabular-nums text-muted" if compact else "text-sm tabular-nums text-muted" %}
@@ -15,9 +15,12 @@
 {% set table_wrap_class = "mt-2 relative overflow-x-auto" if compact else "mt-3 relative overflow-x-auto" %}
 {% set table_class = "sheet w-full text-xs" if compact else "sheet w-full text-sm" %}
 <section class="{{ wrapper_class }}" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}"{% if compact %} data-donut-compact{% endif %}>
-  <div class="flex flex-wrap items-baseline justify-between gap-2">
+  <div class="flex flex-wrap items-end justify-between gap-2">
     <h2 id="chart-{{ d.key }}-heading" class="{{ heading_class }}">{{ d.heading }}</h2>
-    {% if d.slices %}<p class="{{ total_class }}" data-chart-total>{{ d.total }}</p>{% endif %}
+    <div class="flex flex-wrap items-end justify-end gap-3">
+      {% if actions %}{{ actions }}{% endif %}
+      {% if d.slices %}<p class="{{ total_class }}" data-chart-total>{{ d.total }}</p>{% endif %}
+    </div>
   </div>
   {% if d.slices %}
   <div data-chart="donut" data-chart-source="chart-{{ d.key }}-data">

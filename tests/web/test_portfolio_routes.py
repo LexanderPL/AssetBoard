@@ -257,6 +257,8 @@ def test_scope_selector_whole_portfolio_class_and_unknown(owner: OwnerApp) -> No
     assert "Holdings by instrument" in whole
     assert _chart_data(whole)["slices"][0]["value"] == 100_000  # type: ignore[index]
     assert re.search(r'<option value="all" selected>Whole portfolio</option>', whole)
+    instrument_donut = re.search(r'data-donut="portfolio".*?</section>', whole, re.S)
+    assert instrument_donut is not None and "data-portfolio-scope" in instrument_donut.group(0)
     bonds = owner.client.get(PORTFOLIO, params={"scope": str(classes["Bonds"])}).text
     assert "Holdings by instrument in Bonds" in bonds
     assert _chart_data(bonds)["slices"][0]["value"] == 20_000  # type: ignore[index]
@@ -264,6 +266,15 @@ def test_scope_selector_whole_portfolio_class_and_unknown(owner: OwnerApp) -> No
         fallback = owner.client.get(PORTFOLIO, params={"scope": unknown})
         assert fallback.status_code == 200
         assert "Holdings by instrument in Stocks" in fallback.text
+
+
+def test_the_portfolio_tables_have_no_outer_panel_frame(owner: OwnerApp) -> None:
+    _fund(owner)
+    page = owner.client.get(PORTFOLIO).text
+    for marker in ("data-portfolio-holdings", "data-portfolio-classes", "data-risk-balance"):
+        section = re.search(rf"<section[^>]*{marker}[^>]*>", page)
+        assert section is not None, marker
+        assert "panel" not in section.group(0), marker
 
 
 def test_missing_price_is_warned_and_excluded_from_the_totals(owner: OwnerApp) -> None:

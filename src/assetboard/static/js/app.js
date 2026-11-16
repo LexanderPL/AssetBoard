@@ -1089,9 +1089,7 @@ function clearEntryRow(row) {
     }
     else if (field instanceof HTMLInputElement) field.value = "";
     field.removeAttribute("aria-invalid");
-    const hint = field.getAttribute("data-describedby");
-    if (hint) field.setAttribute("aria-describedby", hint);
-    else field.removeAttribute("aria-describedby");
+    field.removeAttribute("aria-describedby");
     if (field instanceof HTMLInputElement && field.matches("[data-suggest-input]")) {
       delete field.dataset.picked;
       closeSuggestions(field);
@@ -1178,7 +1176,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     input.value = input.dataset.savedValue ?? "";
     input.removeAttribute("aria-invalid");
-    input.setAttribute("aria-describedby", "plan-hint");
+    input.removeAttribute("aria-describedby");
     input.form?.querySelector("[data-field-error]")?.remove();
     input.select();
   }

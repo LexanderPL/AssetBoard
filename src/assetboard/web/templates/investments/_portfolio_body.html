@@ -44,7 +44,7 @@
     {% endif %}
   </section>
 
-  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-holdings-heading" data-portfolio-holdings>
+  <section class="p-6 sm:p-7" aria-labelledby="portfolio-holdings-heading" data-portfolio-holdings>
     <h2 id="portfolio-holdings-heading" class="text-base font-semibold">{{ _("Holdings") }}</h2>
     {% if view.has_rows %}
     <div class="mt-4 overflow-x-auto">
@@ -99,7 +99,7 @@
   </section>
 
   {% if view.classes %}
-  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-classes-heading" data-portfolio-classes>
+  <section class="p-6 sm:p-7" aria-labelledby="portfolio-classes-heading" data-portfolio-classes>
     <h2 id="portfolio-classes-heading" class="text-base font-semibold">{{ _("By asset class") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value and cost are split by its allocation weights.") }}</p>
     <div class="mt-4 overflow-x-auto">
@@ -129,7 +129,7 @@
   </section>
   {% endif %}
 
-  <section class="panel p-6 sm:p-7" aria-labelledby="risk-balance-heading" data-risk-balance>
+  <section class="p-6 sm:p-7" aria-labelledby="risk-balance-heading" data-risk-balance>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="risk-balance-heading" class="text-base font-semibold">{{ _("Risk balance") }}</h2>
       <p class="text-sm text-muted">{{ view.risk.mode_label }}{% if view.risk.mode != "fixed" and view.risk.targets_available and view.risk.age is not none %} · {{ _("based on your age %(age)s and life expectancy %(life)s", age=view.risk.age, life=view.risk.life_expectancy) }}{% endif %}</p>
@@ -239,17 +239,19 @@
   </section>
 
   {% if view.has_rows %}
-  <form method="get" action="{{ scoped_url(request, 'investments_portfolio') }}" class="panel flex flex-wrap items-end gap-3 p-4 sm:p-6" data-portfolio-scope>
-    <div class="space-y-1.5">
-      <label for="portfolio-scope" class="block text-sm font-medium">{{ _("Chart scope") }}</label>
-      <select id="portfolio-scope" name="scope" class="form-select py-2">
+  {% set scope_form %}
+  <form method="get" action="{{ scoped_url(request, 'investments_portfolio') }}" class="flex flex-wrap items-end justify-end gap-2" data-portfolio-scope>
+    <div class="space-y-1">
+      <label for="portfolio-scope" class="block text-xs font-medium text-muted">{{ _("Chart scope") }}</label>
+      <select id="portfolio-scope" name="scope" class="form-select py-1.5 text-sm">
         {% for option in view.scope_options %}
         <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle">{{ _("Show") }}</button>
+    <button type="submit" class="btn-sm">{{ _("Show") }}</button>
   </form>
-  {{ donut(view.donut, label=_("Instrument")) }}
+  {% endset %}
+  {{ donut(view.donut, label=_("Instrument"), actions=scope_form) }}
   {% endif %}
 </div>

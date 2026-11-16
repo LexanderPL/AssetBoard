@@ -68,8 +68,5 @@
   {% for g in summary.groups if g.key == "transfer" %}
   {% call sheet("transfer", g.heading) %}{{ group_body(g) }}{% endcall %}
   {% endfor %}
-  {% if summary.can_write %}
-  <p id="plan-hint" class="text-xs text-muted">{{ _("Enter or leaving the field saves a planned value; 0 or an empty field removes it. Esc restores the saved value.") }}</p>
-  {% endif %}
   {% endif %}
 </section>

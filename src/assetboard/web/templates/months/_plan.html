@@ -43,7 +43,7 @@
     <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
       {{ csrf_input() }}
       <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
-      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="–" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
+      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="–" data-saved-value="{{ r.saved_value }}"{% if r.error %} aria-describedby="{{ row_id }}-error" aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
              class="form-control cell-input text-right tabular-nums">
       {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-left text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>

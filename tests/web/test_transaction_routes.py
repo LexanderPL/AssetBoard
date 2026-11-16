@@ -125,12 +125,13 @@ def test_the_month_page_has_two_tables_with_entry_rows(ledger: OwnerApp) -> None
             assert re.search(rf'name="{name}" form="entry-{direction}"', section)
         assert f'<label for="entry-{direction}-day" class="sr-only">Day</label>' in section
         assert f'value="{direction}"' in section
-        assert f'aria-describedby="ledger-{direction}-hint"' in section
-        assert "Enter saves, Esc clears the row or cancels an edit." in section
+        assert f"ledger-{direction}-hint" not in section
+        assert "Enter saves, Esc clears the row or cancels an edit." not in section
         # Entries are chronological: the new-entry row follows the rows already there.
         tbody = section.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
         assert re.search(rf'<tr id="entry-{direction}-row".*?</tr>\s*$', tbody, re.DOTALL)
     assert "<h2" in page and ">Expenses</h2>" in page and ">Income</h2>" in page
+    assert "plan-hint" not in page
     # F2.7: the entry page has no summary, flow bar or KPI line.
     assert 'id="month-summary"' not in page and "data-summary-kpis" not in page
     assert 'id="ledger-status"' in page and "data-transactions-link aria-current" in page
@@ -319,7 +320,7 @@ def test_day_errors_are_shown_on_the_day_field(ledger: OwnerApp, day: str, messa
     assert response.status_code == 400
     section = _section(response.text, "expense")
     assert message in section
-    assert 'aria-describedby="ledger-expense-hint entry-expense-day-error"' in section
+    assert 'aria-describedby="entry-expense-day-error"' in section
     assert 'aria-invalid="true"' in section and f'value="{day}"' in section
     assert "The entry was not saved. Check the marked fields." in section
     assert _rows(ledger) == []
@@ -834,7 +835,13 @@ def test_viewers_see_the_tables_without_controls_and_cannot_write(ledger: OwnerA
     ledger.set_admin_role("viewer")
     page = _page(ledger)
     assert _descriptions(page, "expense") == ["Groceries"]
-    for marker in ("entry-expense", "data-edit", "data-delete", "Enter saves"):
+    for marker in (
+        "entry-expense",
+        "data-edit",
+        "data-delete",
+        "Enter saves",
+        "ledger-expense-hint",
+    ):
         assert marker not in page
     assert "data-edit-row" not in _page(ledger, f"{PAGE}?edit={row_id}")
     row = _htmx_get(ledger, f"{MONTH}/transactions/{row_id}/edit").text
