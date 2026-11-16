@@ -6015,16 +6015,6 @@ msgstr ""
 msgid "Adjustment removed."
 msgstr ""
 
-msgid "Adjustments"
-msgstr ""
-
-msgid ""
-"A one-off cash flow is added to net worth in that year. An expense or "
-"income change alters the annual series from that year onward. A saving "
-"override replaces that year's net saving and is unique per year. Negative"
-" amounts reduce, positive amounts increase."
-msgstr ""
-
 #, python-format
 msgid "Years %(start)d to %(end)d. A saving override starts in %(override)d."
 msgstr ""
@@ -6074,6 +6064,9 @@ msgid "Adjustment added."
 msgstr ""
 
 msgid "Add an adjustment"
+msgstr ""
+
+msgid "Adjustments"
 msgstr ""
 
 #, fuzzy, python-format
@@ -6129,6 +6122,12 @@ msgid ""
 msgstr ""
 
 msgid "Plotted expenses and gain data"
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The projection "
+"assumes constant rates and does not model taxes separately; actual "
+"results will differ."
 msgstr ""
 
 msgid "Plan"
@@ -6386,6 +6385,39 @@ msgstr ""
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr ""
 
+msgid "Plan values, adjustments and loans"
+msgstr ""
+
+msgid "Plan values"
+msgstr ""
+
+msgid ""
+"The assumptions saved in the plan. Income and expenses are the amounts "
+"recorded in your ledger. Income may be gross; expenses should include the"
+" taxes you actually pay and your loan payments. The projection does not "
+"model taxes separately. Editors and owners can change them in edit mode."
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d, in %(year)d"
+msgstr ""
+
+msgid "Horizon"
+msgstr ""
+
+msgid "Inflation"
+msgstr ""
+
+msgid "Return above inflation"
+msgstr ""
+
+msgid "Income growth"
+msgstr ""
+
+#, python-format
+msgid "withdrawal rate %(swr)s"
+msgstr ""
+
 msgid "Preview of unsaved changes."
 msgstr ""
 
@@ -6405,12 +6437,6 @@ msgid "The plan cannot be projected."
 msgstr ""
 
 msgid "Change the plan values below; the projection updates as you edit."
-msgstr ""
-
-msgid ""
-"Projections are illustrative and not financial advice. The projection "
-"assumes constant rates and does not model taxes separately; actual "
-"results will differ."
 msgstr ""
 
 msgid "Based on the saved plan; unsaved changes are not included."
@@ -6454,12 +6480,6 @@ msgstr ""
 msgid "Never reaches FIRE before the horizon"
 msgstr ""
 
-msgid "Refresh grid"
-msgstr ""
-
-msgid "The grid always uses the saved plan, not unsaved changes."
-msgstr ""
-
 msgid "Sensitivity"
 msgstr ""
 
@@ -6468,7 +6488,10 @@ msgid ""
 "one-percentage-point steps or expenses move in ten-percent steps."
 msgstr ""
 
-msgid "Show sensitivity grid"
+msgid "Refresh grid"
+msgstr ""
+
+msgid "The grid always uses the saved plan, not unsaved changes."
 msgstr ""
 
 #, python-format
@@ -6770,36 +6793,6 @@ msgstr ""
 msgid ""
 "The horizon age is not after your current age. Raise it in edit mode to "
 "project the plan."
-msgstr ""
-
-msgid "Plan values"
-msgstr ""
-
-msgid ""
-"The assumptions saved in the plan. Income and expenses are the amounts "
-"recorded in your ledger. Income may be gross; expenses should include the"
-" taxes you actually pay and your loan payments. The projection does not "
-"model taxes separately. Editors and owners can change them in edit mode."
-msgstr ""
-
-#, python-format
-msgid "Age %(age)d, in %(year)d"
-msgstr ""
-
-msgid "Horizon"
-msgstr ""
-
-msgid "Inflation"
-msgstr ""
-
-msgid "Return above inflation"
-msgstr ""
-
-msgid "Income growth"
-msgstr ""
-
-#, python-format
-msgid "withdrawal rate %(swr)s"
 msgstr ""
 
 msgid "Steps"
@@ -14087,5 +14080,16 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Net-worth snapshots to remove"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A one-off cash flow is added "
+#~ "to net worth in that year. An "
+#~ "expense or income change alters the "
+#~ "annual series from that year onward. "
+#~ "A saving override replaces that year's"
+#~ " net saving and is unique per "
+#~ "year. Negative amounts reduce, positive "
+#~ "amounts increase."
 #~ msgstr ""
 
