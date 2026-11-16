@@ -57,10 +57,12 @@ first; **Create plan** never saves values that differ from the review you last s
    an amount.
 4. **Assumptions and review:** inflation, return above inflation, income growth and the
    independence rule. **Independence rule** and **Withdrawal rate** sit side by side in their
-   own row below the three rates. **Withdrawal rate** is used only when the independence rule is
-   **Withdrawal rate**. With **Returns cover expenses** the field stays visible but inactive and
-   disabled; without JavaScript it stays enabled, and the server ignores the rate for that rule.
-   The review shows the entered values, the projected window, the
+   own row below the three rates. **Returns cover expenses** checks whether the portfolio's
+   return above inflation covers the year's expenses, which preserves the portfolio's real
+   capital. **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**.
+   With **Returns cover expenses** the field stays visible but inactive and disabled; without
+   JavaScript it stays enabled, and the server ignores the rate for that rule. The review shows
+   the entered values, the projected window, the
    warnings and a read-only list of active loans with their annual payment, payoff year and
    included state. A changed rate outside the usual range shows a warning. **Create plan** then
    opens a confirmation panel; nothing is saved until **Confirm and create plan**. There is no
@@ -110,7 +112,8 @@ table/charts independently and never replaces the form, so focus and entered val
 place. A preview error shows the message at the top of the results and opens the section that
 owns the invalid control without moving focus. **Save changes** validates the whole plan, writes
 it, clears the review banner and returns to the read-only view with a notice. An invalid value
-shows an inline error and leaves the saved plan untouched. **Discard changes** reloads the last
+shows an inline error and leaves the saved plan untouched. A plan whose expense line would be
+negative in a year is also refused and the page names that year. **Discard changes** reloads the last
 saved values and keeps you in edit mode. Leaving with unsaved changes asks for confirmation, and
 an **Unsaved changes** indicator shows the state.
 
@@ -169,8 +172,10 @@ term or overpayment plan changes the next FIRE calculation.
   choice; a request that tries to change an excluded loan's choice is rejected rather than
   silently rewriting that saved choice.
 - If the scheduled loan payments are larger than the entered annual expenses, the page warns
-  that the expenses may not include them. The planner does not cap the drop or block the
-  projection.
+  that the expenses may not include them. The planner does not cap the drop. If removing an
+  included loan payment (or an annual expense change) would make the expense line negative in
+  a year, the projection is blocked and names that year; the plan cannot declare FIRE from a
+  negative expense line.
 - Loan payments are fixed nominal amounts; the rest of the expense line inflates with the plan's
   inflation rate. This is an approximation, especially for a loan whose rate or payment changes
   in the future. Sensitivity scaling applies to the whole expense line, including the loan
@@ -245,6 +250,9 @@ confirmation applies to the rates shown: if you change one of them first, the pa
 Only a rate you actually changed asks for confirmation again, so editing another field of a plan
 with an unusual rate does not nag on every save. There is no confirmation checkbox.
 
+The projection compounds inflation and the return above inflation exactly: the nominal gain is
+`(1 + inflation) × (1 + return above inflation) − 1`. The two rates are not added together.
+
 The starting values (2.5% inflation, 5% return above inflation, 3% income growth and 4%
 withdrawal rate) are illustrative examples, not recommendations.
 
@@ -293,8 +301,8 @@ The plan page shows nominal values only:
 
 - **FIRE age** and year, **years to FIRE** and the **FIRE number**. The FIRE number is the
   nominal expenses in the FIRE year divided by the rate the independence rule uses: the
-  withdrawal rate, or the nominal gain rate when returns must cover expenses. It is shown with
-  the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
+  withdrawal rate, or the return above inflation when returns must cover expenses. It is shown
+  with the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
 - **Plan progress** is a full-width bar directly below the four key metric cards. The percentage
   is shown large, and the legend shows the **Starting portfolio** and **Net worth at FIRE** with
   their formatted amounts. The bar fills in success colour and is capped visually at 100%; the
@@ -304,10 +312,15 @@ The plan page shows nominal values only:
   net-worth target;
 - the sustainability check: the nominal depletion age and the lowest nominal net worth after
   income stops;
+- a clear block instead of results when the annual expense line would be negative in any year.
+  The message names the year, and the plan never shows FIRE from negative expenses. The same
+  applies to a sensitivity expense level that would make the line negative;
 - a year-by-year schedule with income, expenses, net saving, investment gain, cash and net worth.
   Every amount is the actual money of that year, not adjusted for inflation. It sits directly in
   the page column and uses the same surface background as the Transactions tables, with the
-  table's own border and the FIRE, depleted and income-stopped row tints;
+  table's own border and the FIRE, depleted and income-stopped row tints. The first row is the
+  starting point: today's portfolio earns one year's gain, and the current year's income and
+  expenses are shown, but that row's net saving is the starting portfolio;
 - a nominal net-worth chart and a nominal expenses-versus-gain chart, each with accessible
   plotted data;
 - for editors and owners, **Edit plan** and **Reset plan**. The plan page has no download action.
@@ -320,8 +333,15 @@ The **Sensitivity** panel projects the saved plan across a range of returns abov
 expense levels. It is always rendered on the view and edit pages; there is no load button. It
 shows only the resulting FIRE age, never amounts. It always uses the saved plan, never unsaved
 preview values or posted loan choices. A blocked plan shows the reason instead of a grid, and
-never a fake zero. The editor additionally shows **Refresh grid**, which re-fetches the grid from
-the saved plan; it is hidden without JavaScript because the grid is already rendered.
+never a fake zero. When an expense level would make the expense line negative, the grid shows
+the reason and the year instead of a misleading FIRE cell. The editor additionally shows
+**Refresh grid**, which re-fetches the grid from the saved plan; it is hidden without JavaScript
+because the grid is already rendered.
+
+Each expense level scales the whole expense line: the starting expenses, every annual expense
+change and the included loan payments, with one rounding for each component. Income, cash flows
+and saving overrides keep their saved values. The saved plan's own expense level therefore
+matches the direct projection exactly.
 
 ## Archive and restore
 
