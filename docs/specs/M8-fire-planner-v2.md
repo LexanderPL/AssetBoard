@@ -987,17 +987,19 @@ Keep models, migrations, archive, dependencies and projection/loan math unchange
   32px `viewBox="0 0 100 32"` SVG. The fill is capped at 100% in its width while
   `aria-valuetext` keeps the exact percentage; `aria-valuenow` is the capped integer. No-FIRE and
   non-positive-target states render a muted track, `aria-valuetext="Not defined"`, a zero value
-  and an explanation. The FIRE-never warning and the exact-value accessible sentence stay. No
-  arithmetic moved into JavaScript.
+  and an explanation. The duplicate never-FIRE banner and the old “Bar capped at 100%, exact
+  value …” sentence are gone; the undefined note carries the reason and the accessible value
+  keeps the exact percentage for defined values. No arithmetic moved into JavaScript.
 - **Unusual rates.** The checkbox and its error field are gone from `_form_body.html` and the
   wizard. Preview keeps `data-fire-extreme-warning` only when `needs_extreme_confirmation` is
   true. The edit save route strips a confirmation unless the posted rate digest matches the one
   the panel rendered, then re-renders `data-fire-extreme-confirm` with **Confirm and save** and
   writes only after that button posts the digest plus `extreme_rates_confirmed=1`. The wizard
-  renders the same panel on step 4 with **Confirm and create plan**; its button posts
-  `extreme_rates_confirmed=1` and `go=create`, while the review signature still forces a fresh
-  review (and a fresh confirmation) when values changed. Copy now says “Confirm it to save the
-  plan” / “Confirm it to create the plan” and keeps the unusual-range explanation.
+  renders the same panel on step 4 with **Confirm and create plan**; the panel posts
+  `extreme_rates_confirmed=1` with `go=create`, while the review signature still forces a fresh
+  review (and a fresh confirmation) when values changed. The review's own unusual-rate warning
+  is not repeated beside the confirmation panel. Copy now says “Confirm it to save the plan” /
+  “Confirm it to create the plan” and keeps the unusual-range explanation.
 - **Withdrawal rate.** Both forms keep the field with its `data-fire-swr-field` wrapper and add
   `data-fire-swr-note`. Server markup is visible and enabled. `fire.js` sets `input.disabled`,
   toggles `opacity-60` and `data-fire-swr-inactive`, and never sets `hidden` or the `hidden`
@@ -1006,13 +1008,16 @@ Keep models, migrations, archive, dependencies and projection/loan math unchange
   **Currency** remains. The wizard review, the table and the projection's current-year start are
   unchanged.
 - **Tests and docs.** Web tests cover the removed overview/CSV/loan preview/column/first-year
-  field, the slim table and hidden checkbox, the save-time confirmation (including a changed rate
-  after the panel), preview warning scope, SWR notes and Polish copy. Chromium covers add/remove/
-  undo/remove-unsaved, keyboard Space on the hidden checkbox, saved-row apply-on-save, the 390px
-  in-panel table scroll, the always-visible disabled/enabled SWR field, the no-JavaScript
-  fallback, CSP and 1440 widths. `docs/fire.md`, this section, the overview range and the F8.13
-  superseded note were updated. No model, migration, archive, dependency, projection-math or
-  loan-math change. All tests ran single-core.
+  field, all three compact warnings and their absence, the slim table and hidden checkbox, the
+  save-time confirmation (including a changed rate after the panel and a forged or missing
+  digest), preview warning scope, the defined/capped/undefined progress states with both legend
+  amounts, the no-nag case for an unchanged unusual saved rate, SWR notes and Polish copy.
+  Chromium covers add/remove/undo/remove-unsaved and the trailing blank row, keyboard Space on
+  the hidden checkbox, saved-row apply-on-save, no-JavaScript removal, the 390px in-panel table
+  scroll, the always-visible disabled/enabled SWR field, the no-JavaScript edit fallback, CSP and
+  1440 widths. `docs/fire.md`, this section, the overview range and the F8.13 superseded note
+  were updated. No model, migration, archive, dependency, projection-math or loan-math change.
+  All tests ran single-core.
 
 ---
 
