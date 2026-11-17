@@ -1,8 +1,8 @@
 # Your account
 
-The profile page (`/account`, "Profile" in the account menu) holds your details, your
-language and theme, and the ways you sign in. Password changes, signing out other devices and
-two-factor authentication are on "Account security".
+The profile page (`/account`, "Profile" in the account menu) holds your details, your sidebar,
+your language and theme, and the ways you sign in. Password changes, signing out other devices
+and two-factor authentication are on "Account security".
 
 ## Signing in
 

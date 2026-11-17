@@ -984,9 +984,9 @@ recomputed from the archived inputs and are never stored in the archive. The pla
 include/ignore choice for a loan is user intent, not derived data, so it is stored in
 `fire_loan_settings.csv`.
 
-The profile's `birth_year` and `life_expectancy` are user data, not workspace data, so they are
-not archived. `investment_cost_basis` and `risk_target_policy` are workspace settings and live
-in `workspace.json`.
+The profile's `birth_year`, `life_expectancy` and `sidebar_items` are user data, not workspace
+data, so they are not archived. `investment_cost_basis` and `risk_target_policy` are workspace
+settings and live in `workspace.json`.
 
 Net-worth, investment, loan and FIRE files are restore-only in a full archive merge: they are
 ignored and listed once as a warning (`networth_restore_only`, `investment_restore_only`,

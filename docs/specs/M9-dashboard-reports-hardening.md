@@ -533,7 +533,10 @@ No new runtime dependency.
 `WebSession.sidebar_items`, `WorkspaceNav.sidebar`, `sidebar_links`/`sidebar_labels` in
 `web/rendering.py`, the Profile panel, both account routes, and `tests/unit/test_navigation_*`
 plus `tests/web/test_sidebar_routes.py` and `tests/browser/test_sidebar_customization.py`.
-No follow-ups beyond the existing feature gate for Taxes.
+The panel's submit button reads "Save sidebar", so it is distinct from the profile form's own
+"Save" button on the same page. A test keeps `SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link
+rules in step with `CANONICAL_KEYS`, and an unhandled canonical key raises instead of silently
+disappearing. No follow-ups beyond the existing feature gate for Taxes.
 
 ---
 
