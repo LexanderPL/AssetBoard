@@ -16,7 +16,6 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.income import (
-    MAX_WORK_DAY_UNITS,
     IncomeSource,
     IncomeSourceTaxRule,
     WorkDay,
@@ -39,6 +38,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.income import (
+    MAX_WORK_DAY_UNITS,
     ExpectedUnitsMode,
     IncomeEstimate,
     IncomeKind,

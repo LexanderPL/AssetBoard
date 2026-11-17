@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import delete, exists, func, select, update
 
 from assetboard.db.models.income import IncomeSourceTaxRule
 from assetboard.db.models.scheduled import ScheduledOccurrence
@@ -115,6 +116,18 @@ class TaxRuleVersionRepository(ScopedRepository[TaxRuleVersion]):
             .limit(1)
         )
         return self._session.scalars(statement).first()
+
+    def delete_for_restore(self, ids: Sequence[UUID]) -> int:
+        """Remove restored append-only versions through an explicit batch rollback path."""
+        if not ids:
+            return 0
+        result = self._session.execute(
+            delete(TaxRuleVersion).where(
+                TaxRuleVersion.workspace_id == self._workspace_id,
+                TaxRuleVersion.id.in_(ids),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def update_future(
         self,

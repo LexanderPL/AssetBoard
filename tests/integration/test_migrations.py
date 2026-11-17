@@ -2579,6 +2579,35 @@ def test_0064_fire_loan_settings_migration_is_reversible(tmp_path: Path) -> None
         engine.dispose()
 
 
+def test_0068_work_logs_import_source_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'work_logs_import.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspect(engine).get_check_constraints("import_batches")
+        }
+        source_check = next(sql for sql in checks if "source IN" in sql)
+        assert "work_logs_csv" in source_check
+        command.downgrade(alembic_config(settings), "0067_f91_dashboard")
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspect(engine).get_check_constraints("import_batches")
+        }
+        source_check = next(sql for sql in checks if "source IN" in sql)
+        assert "work_logs_csv" not in source_check
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0067_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

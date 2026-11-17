@@ -358,8 +358,12 @@ use.
     `services.archive.EMPTINESS_CHECKS` that later milestones extend (like
     `BASE_CURRENCY_LOCKS`). Members, invitations, audit events, notification channels and saved
     import mappings do not count.
-  - **Merge** (editors and owners): data only (categories, transactions, budget lines) through
-    the F4.3 rules and mapping step. The mapping table has one row per archive category, keyed
+  - **Merge** (editors and owners): data only (categories, transactions, budget lines and
+    `work_logs.csv`) through the F4.3 rules and mapping step. Work logs match an income source
+    by its archived id first and case-folded name otherwise; an existing source and month is
+    never overwritten (an identical row is a duplicate, a different one a conflict), and closed
+    or received months are listed and skipped. The mapping table has one row per archive
+    category, keyed
     by its archive id, because an archive may contain an active and an archived category with
     one name. Defaults, in order: explicit choice; lineage match (the archive category id is a
     workspace category id or `import_key = id:<id>`); saved mapping by kind and name (active
@@ -377,13 +381,19 @@ use.
   not archived and stays as it is; (2) categories with every attribute (`kind`, `treatment`,
   `color`, `sort_order`, `archived_at`) and `import_key = id:<id>`; (3) budget lines (lines on
   archived or transfer categories included: they existed in the source); a zero or empty
-  `planned` is "no line" and is not an error; (4) transactions in file order (so entry order
+  `planned` is "no line" and is not an error; (4) tax rules and their versions, income sources,
+  tax attachments, work logs and work days (format 2.3; older archives carry none); (5)
+  transactions in file order (so entry order
   within a day is kept), with `import_key = id:<id>` when the row has an id, strictly
   increasing `created_at` values in file order, and soft-deleted ones with their `deleted_at`;
-  (5) month states last, exactly as in `months.csv` (`plan_started_at`, `closed_at`; nothing is
-  derived from the budget lines). No mapping step, no skipped rows: any error blocks the
-  restore. The restore flushes all rows before `applied_at` is recorded, so its own timestamps
-  never make a rollback look stale.
+  (6) month states exactly as in `months.csv` (`plan_started_at`, `closed_at`; nothing is
+  derived from the budget lines); (7) net-worth categories/items/valuations/snapshots; (8)
+  reference rates, loans and their rows; (9) recurring items and their occurrences, parents
+  before tax children and occurrences after the transactions/income sources/attachments they
+  reference; (10) investment classes/instruments/transactions; (11) risk targets and the
+  investment cost basis; (12) the FIRE plan and its rows. No mapping step, no skipped rows: any
+  error blocks the restore. The restore flushes all rows before `applied_at` is recorded, so
+  its own timestamps never make a rollback look stale.
 - Restored closed months get `closed_by_user_id` = the restoring owner (users are not in the
   archive; see open question 4). Restored data is not audited per row; a restore records one
   `workspace.restored` audit event (batch id, counts, names of the settings fields changed and
@@ -394,10 +404,11 @@ use.
   restore wrote. The check refuses with reasons when: a row exists without the batch's id or a
   batch row is missing; a batch row's `updated_at > applied_at`; the stored month-state set
   differs from the archive's or a month state changed after `applied_at`; the workspace row
-  changed after `applied_at` ("workspace settings changed since the restore"); any M3 row was
-  created after `applied_at`; or any M3 row references a batch category or transaction (the M3
-  foreign keys would block the hard delete). It then **hard-deletes** the batch's rows and
-  month states and puts `previous_settings` back, so the workspace is empty again and a
+  changed after `applied_at` ("workspace settings changed since the restore"); or any M3 row
+  was created or changed after `applied_at`. M3 rows are removed before categories and loans,
+  occurrence children before their parents, and tax rate versions through an explicit
+  batch-delete path because the table is append-only. It then **hard-deletes** the batch's rows
+  and month states and puts `previous_settings` back, so the workspace is empty again and a
   corrected archive can be restored. A restore rollback leaves a truly empty workspace and
   does not re-add the suggested categories; the user can press "Add suggested categories"
   afterwards. (Hard delete is justified: the rows never existed in this workspace before, and
@@ -507,4 +518,5 @@ calls an AI or any external service.
    every transaction of the batch, edited ones included (the confirm page says how many were
    edited). Keep edited ones instead?
 9. **Order of M3 and M4.** M4 now depends only on M2 and could ship before M3; if M3 ships first,
-   its archive extension (F3.8) must land before M4 counts as a full backup.
+   its archive extension (F3.8) must land before M4 counts as a full backup. Landed as format
+   2.3; a 2.2 archive still restores with empty M3 data.

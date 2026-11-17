@@ -43,6 +43,11 @@ from assetboard.domain.fire import (
     event_years,
 )
 from assetboard.domain.holdings import MAX_NOTE_LENGTH, InvestmentTransactionType
+from assetboard.domain.income import (
+    MAX_WORK_DAY_UNITS,
+    ExpectedUnitsMode,
+    IncomeKind,
+)
 from assetboard.domain.instruments import (
     MAX_ASSET_CLASS_NAME_LENGTH,
     MAX_INSTRUMENT_NAME_LENGTH,
@@ -65,10 +70,14 @@ from assetboard.domain.loans import (
 )
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
+from assetboard.domain.notifications import MAX_LEAD_DAYS
+from assetboard.domain.percent_or_fixed import MAX_RATE_BP
+from assetboard.domain.recurrence import Frequency, MonthDay, WeekendPolicy
+from assetboard.domain.taxes import PaymentTiming, TaxBase, TaxKind
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "2.2"
+FORMAT_VERSION = "2.3"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -84,9 +93,131 @@ CSV_COLUMNS = {
         "description",
         "category_id",
         "id",
+        "source",
+        "scheduled_occurrence_id",
         "deleted_at",
     ),
     "months.csv": ("month", "closed_at", "plan_started_at"),
+    "scheduled_items.csv": (
+        "id",
+        "name",
+        "direction",
+        "category_id",
+        "category",
+        "loan_id",
+        "loan",
+        "amount_mode",
+        "amount",
+        "currency",
+        "start_date",
+        "end_date",
+        "max_count",
+        "freq",
+        "interval",
+        "weekdays",
+        "month_day",
+        "month",
+        "weekend_policy",
+        "notes",
+        "auto_post",
+        "is_tax",
+        "reminder_lead_days",
+        "paused_at",
+        "archived_at",
+    ),
+    "scheduled_occurrences.csv": (
+        "id",
+        "scheduled_item_id",
+        "scheduled_item",
+        "income_source_id",
+        "income_source",
+        "work_month",
+        "parent_occurrence_id",
+        "income_source_tax_rule_id",
+        "direction",
+        "category_id",
+        "category",
+        "nominal_date",
+        "due_date",
+        "expected",
+        "currency",
+        "amount_state",
+        "status",
+        "generated_by",
+        "transaction_id",
+        "previous_transaction_id",
+        "rescheduled_at",
+        "amount_overridden",
+        "label",
+    ),
+    "income_sources.csv": (
+        "id",
+        "name",
+        "kind",
+        "category_id",
+        "category",
+        "currency",
+        "fixed_amount",
+        "rate",
+        "unit_label",
+        "pay_day",
+        "pay_lag_months",
+        "expected_mode",
+        "expected_units",
+        "average_months",
+        "active_from",
+        "active_to",
+        "archived_at",
+    ),
+    "tax_rules.csv": (
+        "id",
+        "name",
+        "kind",
+        "base",
+        "payment_day",
+        "payment_timing",
+        "payment_category_id",
+        "payment_category",
+        "notes",
+        "archived_at",
+    ),
+    "tax_rule_versions.csv": (
+        "id",
+        "tax_rule_id",
+        "tax_rule",
+        "effective_from",
+        "mode",
+        "rate_bp",
+        "fixed_amount",
+    ),
+    "income_source_tax_rules.csv": (
+        "id",
+        "income_source_id",
+        "income_source",
+        "tax_rule_id",
+        "tax_rule",
+        "sort_order",
+        "generate_payment",
+        "payment_category_id",
+        "payment_category",
+        "due_day",
+        "due_month_offset",
+    ),
+    "work_logs.csv": (
+        "id",
+        "income_source_id",
+        "income_source",
+        "work_month",
+        "units",
+        "derived_from_days",
+    ),
+    "work_days.csv": (
+        "id",
+        "income_source_id",
+        "income_source",
+        "work_date",
+        "units",
+    ),
     "networth_categories.csv": ("id", "side", "name", "color", "sort_order", "archived_at"),
     "networth_items.csv": (
         "id",
@@ -421,6 +552,16 @@ LOAN_CSV_FILES = (
 FIRE_CSV_FILES = ("fire_plan.csv", "fire_events.csv", "fire_loan_settings.csv")
 FIRE_2_1_ONLY_FILES = ("fire_loan_settings.csv",)
 LOAN_TRANSFER_CSV_FILES = ("loan_transfers.csv",)
+M3_CSV_FILES = (
+    "scheduled_items.csv",
+    "scheduled_occurrences.csv",
+    "income_sources.csv",
+    "tax_rules.csv",
+    "tax_rule_versions.csv",
+    "income_source_tax_rules.csv",
+    "work_logs.csv",
+    "work_days.csv",
+)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
 KNOWN_FILES = frozenset(REQUIRED_FILES) | frozenset(LEGACY_FIRE_CSV_FILES)
@@ -443,9 +584,10 @@ def required_files(version: str) -> tuple[str, ...]:
     """Archive members required by a compatible ``MAJOR.MINOR`` version."""
     major, minor = (int(part) for part in version.split(".", 1))
     if major == 2:
+        excluded: set[str] = set(M3_CSV_FILES) if minor < 3 else set()
         if minor < 1:
-            return tuple(name for name in REQUIRED_FILES if name not in FIRE_2_1_ONLY_FILES)
-        return REQUIRED_FILES
+            excluded.update(FIRE_2_1_ONLY_FILES)
+        return tuple(name for name in REQUIRED_FILES if name not in excluded)
     if major != 1:
         return REQUIRED_FILES
     csv_files = BASE_CSV_FILES + (NETWORTH_CSV_FILES if minor >= 2 else ())
@@ -492,6 +634,8 @@ class TransactionRow:
     category_id: str
     id: str
     deleted_at: str | None
+    source: str = ""
+    scheduled_occurrence_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -851,12 +995,156 @@ class FireLoanSettingRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ScheduledItemRow:
+    id: str
+    name: str
+    direction: str
+    category_id: str
+    category: str
+    loan_id: str | None
+    loan: str
+    amount_mode: str
+    amount: str
+    currency: str
+    start_date: str
+    end_date: str | None
+    max_count: int | None
+    freq: str
+    interval: int
+    weekdays: str
+    month_day: str
+    month: int
+    weekend_policy: str
+    notes: str
+    auto_post: str
+    is_tax: str
+    reminder_lead_days: int | None
+    paused_at: str | None
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduledOccurrenceRow:
+    id: str
+    scheduled_item_id: str | None
+    scheduled_item: str
+    income_source_id: str | None
+    income_source: str
+    work_month: str | None
+    parent_occurrence_id: str | None
+    income_source_tax_rule_id: str | None
+    direction: str
+    category_id: str
+    category: str
+    nominal_date: str
+    due_date: str
+    expected: str
+    currency: str
+    amount_state: str
+    status: str
+    generated_by: str
+    transaction_id: str | None
+    previous_transaction_id: str | None
+    rescheduled_at: str | None
+    amount_overridden: str
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class IncomeSourceRow:
+    id: str
+    name: str
+    kind: str
+    category_id: str
+    category: str
+    currency: str
+    fixed_amount: str
+    rate: str
+    unit_label: str
+    pay_day: int
+    pay_lag_months: int
+    expected_mode: str
+    expected_units: str
+    average_months: int
+    active_from: str
+    active_to: str | None
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TaxRuleRow:
+    id: str
+    name: str
+    kind: str
+    base: str
+    payment_day: int
+    payment_timing: str
+    payment_category_id: str | None
+    payment_category: str
+    notes: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TaxRuleVersionRow:
+    id: str
+    tax_rule_id: str
+    tax_rule: str
+    effective_from: str
+    mode: str
+    rate_bp: int | None
+    fixed_amount: str
+
+
+@dataclass(frozen=True, slots=True)
+class IncomeSourceTaxRuleRow:
+    id: str
+    income_source_id: str
+    income_source: str
+    tax_rule_id: str
+    tax_rule: str
+    sort_order: int
+    generate_payment: str
+    payment_category_id: str | None
+    payment_category: str
+    due_day: int | None
+    due_month_offset: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkLogRow:
+    id: str
+    income_source_id: str
+    income_source: str
+    work_month: str
+    units: str
+    derived_from_days: str
+
+
+@dataclass(frozen=True, slots=True)
+class WorkDayRow:
+    id: str
+    income_source_id: str
+    income_source: str
+    work_date: str
+    units: str
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
     budget_lines: tuple[BudgetLineRow, ...]
     transactions: tuple[TransactionRow, ...]
     months: tuple[MonthRow, ...]
+    scheduled_items: tuple[ScheduledItemRow, ...] = ()
+    scheduled_occurrences: tuple[ScheduledOccurrenceRow, ...] = ()
+    income_sources: tuple[IncomeSourceRow, ...] = ()
+    tax_rules: tuple[TaxRuleRow, ...] = ()
+    tax_rule_versions: tuple[TaxRuleVersionRow, ...] = ()
+    income_source_tax_rules: tuple[IncomeSourceTaxRuleRow, ...] = ()
+    work_logs: tuple[WorkLogRow, ...] = ()
+    work_days: tuple[WorkDayRow, ...] = ()
     networth_categories: tuple[NetWorthCategoryRow, ...] = ()
     networth_items: tuple[NetWorthItemRow, ...] = ()
     item_valuations: tuple[ItemValuationRow, ...] = ()
@@ -950,6 +1238,18 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         "budget_lines.csv": csv_bytes("budget_lines.csv", rows.budget_lines),
         "transactions.csv": csv_bytes("transactions.csv", rows.transactions),
         "months.csv": csv_bytes("months.csv", rows.months),
+        "scheduled_items.csv": csv_bytes("scheduled_items.csv", rows.scheduled_items),
+        "scheduled_occurrences.csv": csv_bytes(
+            "scheduled_occurrences.csv", rows.scheduled_occurrences
+        ),
+        "income_sources.csv": csv_bytes("income_sources.csv", rows.income_sources),
+        "tax_rules.csv": csv_bytes("tax_rules.csv", rows.tax_rules),
+        "tax_rule_versions.csv": csv_bytes("tax_rule_versions.csv", rows.tax_rule_versions),
+        "income_source_tax_rules.csv": csv_bytes(
+            "income_source_tax_rules.csv", rows.income_source_tax_rules
+        ),
+        "work_logs.csv": csv_bytes("work_logs.csv", rows.work_logs),
+        "work_days.csv": csv_bytes("work_days.csv", rows.work_days),
         "networth_categories.csv": csv_bytes("networth_categories.csv", rows.networth_categories),
         "networth_items.csv": csv_bytes("networth_items.csv", rows.networth_items),
         "item_valuations.csv": csv_bytes("item_valuations.csv", rows.item_valuations),
@@ -1493,6 +1793,13 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "property_item_id",
         "transaction_id",
         "source_loan_id",
+        "scheduled_item_id",
+        "income_source_id",
+        "parent_occurrence_id",
+        "income_source_tax_rule_id",
+        "tax_rule_id",
+        "scheduled_occurrence_id",
+        "previous_transaction_id",
     ):
         return str(UUID(value)) if value else ""
     if column == "kind":
@@ -1502,7 +1809,55 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             return LoanPaymentKind(value).value if value else ""
         if file == "fire_events.csv":
             return EventKind(value).value
+        if file == "income_sources.csv":
+            return IncomeKind(value).value if value else ""
+        if file == "tax_rules.csv":
+            return TaxKind(value).value if value else ""
         return Kind(value).value if value else ""
+    if column == "base":
+        return TaxBase(value).value if value else ""
+    if column in ("freq", "month_day", "weekend_policy", "amount_mode", "expected_mode"):
+        if column == "freq":
+            return Frequency(value).value if value else ""
+        if column == "month_day":
+            if not value:
+                return ""
+            if value.lstrip("-").isdigit():
+                number = int(value)
+                if not (-1 <= number <= 31) or number == 0:
+                    raise ValueError("invalid month day")
+                return str(number)
+            return MonthDay(value).value
+        if column == "weekend_policy":
+            return WeekendPolicy(value).value if value else ""
+        if column == "amount_mode":
+            if value not in {"fixed", "estimate", "from_loan"}:
+                raise ValueError("invalid amount mode")
+            return value
+        return ExpectedUnitsMode(value).value if value else ""
+    if column in ("amount_state", "status", "generated_by", "payment_timing"):
+        allowed = {
+            "amount_state": {"estimated", "confirmed"},
+            "status": {"pending", "posted", "skipped"},
+            "generated_by": {"rule", "manual", "income", "tax"},
+            "payment_timing": {timing.value for timing in PaymentTiming},
+        }[column]
+        if value not in allowed:
+            raise ValueError(f"invalid {column.replace('_', ' ')}")
+        return value
+    if column == "weekdays":
+        if not value:
+            return "[]"
+        try:
+            parsed = json.loads(value)
+        except (ValueError, RecursionError):
+            raise ValueError("invalid weekdays") from None
+        if not isinstance(parsed, list):
+            raise ValueError("invalid weekdays")
+        days = cast("list[object]", parsed)
+        if any(type(day) is not int or day not in range(7) for day in days):
+            raise ValueError("invalid weekdays")
+        return json.dumps(sorted(set(cast("list[int]", days))), separators=(",", ":"))
     if column == "direction":
         return Kind(value).value if value else ""
     if column == "side":
@@ -1581,6 +1936,17 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
         return chosen
+    if column in (
+        "auto_post",
+        "is_tax",
+        "amount_overridden",
+        "generate_payment",
+        "derived_from_days",
+    ):
+        chosen = value or "false"
+        if chosen not in {"true", "false"}:
+            raise ValueError("invalid boolean")
+        return chosen
     if column == "is_default":
         chosen = value or "false"
         if chosen not in {"true", "false"}:
@@ -1602,8 +1968,14 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "plan_started_at",
         "created_at",
         "provider_backfilled_at",
+        "paused_at",
+        "rescheduled_at",
     ):
         return _parse_timestamp(value) if value else ""
+    if column == "month" and file == "scheduled_items.csv":
+        if not re.fullmatch(r"[0-9]{1,2}", value) or not 1 <= int(value) <= 12:
+            raise ValueError("invalid month")
+        return str(int(value))
     if column in (
         "date",
         "month",
@@ -1617,6 +1989,13 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "rate_shift_from",
         "one_off_date",
         "end_date",
+        "start_date",
+        "nominal_date",
+        "due_date",
+        "work_date",
+        "work_month",
+        "active_from",
+        "active_to",
     ):
         optional_dates = {
             "acquired_on",
@@ -1624,14 +2003,21 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             "effective_to",
             "rate_shift_from",
             "one_off_date",
+            "active_to",
         }
-        if not value and (column in optional_dates or file == "investment_transactions.csv"):
+        if not value and (
+            column in optional_dates
+            or column == "work_month"
+            or (file == "scheduled_items.csv" and column == "end_date")
+            or file == "investment_transactions.csv"
+        ):
             return ""
-        pattern = r"[0-9]{4}-[0-9]{2}" + ("" if column == "month" else r"-[0-9]{2}")
+        month_like = column in {"month", "work_month"}
+        pattern = r"[0-9]{4}-[0-9]{2}" + ("" if month_like else r"-[0-9]{2}")
         if not re.fullmatch(pattern, value):
             raise ValueError("invalid date or month")
         try:
-            date.fromisoformat(value + "-01" if column == "month" else value)
+            date.fromisoformat(value + "-01" if month_like else value)
         except ValueError:
             raise ValueError("invalid date or month") from None
     if column == "year":
@@ -1678,8 +2064,53 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         return _decimal_text(
             value,
             currency,
-            allow_zero=column in {"planned", "value", "assets", "liabilities"},
+            allow_zero=(
+                column in {"planned", "value", "assets", "liabilities"}
+                or (column == "amount" and file == "scheduled_items.csv")
+            ),
         )
+    if column in ("fixed_amount", "expected"):
+        if not value:
+            return ""
+        if column == "fixed_amount" and file != "tax_rule_versions.csv":
+            return _decimal_text(value, currency, allow_zero=False)
+        return _decimal_text(value, currency, allow_zero=True)
+    if column == "expected_units":
+        return _plain_decimal(value, allow_zero=True) if value else ""
+    if column == "rate" and file == "income_sources.csv":
+        return _decimal_text(value, currency, allow_zero=False) if value else ""
+    if column in ("pay_day", "pay_lag_months", "average_months", "due_day", "due_month_offset"):
+        if not value:
+            return ""
+        maximum = {
+            "pay_day": 31,
+            "pay_lag_months": 24,
+            "average_months": 24,
+            "due_day": 31,
+            "due_month_offset": 24,
+        }[column]
+        minimum = 0 if column in {"pay_lag_months", "due_month_offset"} else 1
+        if not re.fullmatch(r"[0-9]{1,2}", value) or not minimum <= int(value) <= maximum:
+            raise ValueError(f"invalid {column.replace('_', ' ')}")
+        return str(int(value))
+    if column == "interval":
+        if not re.fullmatch(r"[0-9]{1,10}", value) or not 1 <= int(value) <= 2_147_483_647:
+            raise ValueError("invalid interval")
+        return str(int(value))
+    if column == "max_count":
+        if not value:
+            return ""
+        if not re.fullmatch(r"[0-9]{1,10}", value) or not 1 <= int(value) <= 2_147_483_647:
+            raise ValueError("invalid maximum count")
+        return str(int(value))
+    if column == "reminder_lead_days":
+        if not value:
+            return ""
+        if not re.fullmatch(r"[0-9]{1,2}", value) or not 0 <= int(value) <= MAX_LEAD_DAYS:
+            raise ValueError("invalid reminder lead days")
+        return str(int(value))
+    if column == "units":
+        return _plain_decimal(value, allow_zero=True)
     if column in (
         "principal_original",
         "installment_override",
@@ -1692,6 +2123,15 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         return _decimal_text(value, currency, allow_zero=False)
     if column in ("principal", "interest", "costs", "overpayment", "remaining_principal"):
         return _decimal_text(value, currency, allow_zero=True)
+    if column == "rate_bp" and file == "tax_rule_versions.csv":
+        if not value:
+            return ""
+        if not re.fullmatch(r"[0-9]{1,10}", value):
+            raise ValueError("invalid rate")
+        number = int(value)
+        if not 0 <= number <= MAX_RATE_BP:
+            raise ValueError("invalid rate")
+        return str(number)
     if column in ("value_bp", "rate_bp", "margin_bp"):
         if not value and column in {"rate_bp", "margin_bp"}:
             return ""
@@ -1844,6 +2284,8 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         elif column == "asset_class":
             maximum = MAX_ASSET_CLASS_NAME_LENGTH
         elif column == "loan":
+            if not value and file == "scheduled_items.csv":
+                return ""
             maximum = MAX_LOAN_NAME_LENGTH
         elif file == "fire_scenarios.csv":
             try:
@@ -1852,11 +2294,16 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
                 raise ValueError("invalid scenario name") from None
         elif file == "networth_items.csv":
             maximum = MAX_ITEM_NAME_LENGTH
+        elif file in {"income_sources.csv", "scheduled_items.csv", "tax_rules.csv"}:
+            maximum = 200
         elif file == "instruments.csv":
             maximum = MAX_INSTRUMENT_NAME_LENGTH
         else:
             maximum = MAX_ASSET_CLASS_NAME_LENGTH
         if not 1 <= len(value) <= maximum:
+            raise ValueError("invalid name")
+    elif column in ("income_source", "scheduled_item", "tax_rule"):
+        if len(value) > 200:
             raise ValueError("invalid name")
     elif column == "item":
         if not 1 <= len(value) <= MAX_ITEM_NAME_LENGTH:
@@ -1884,6 +2331,10 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         limit = limits[column]
         if column == "unit_label" and not value:
             raise ValueError("required value missing")
+        if column == "unit_label" and file == "income_sources.csv":
+            limit = 40
+        if column == "notes" and file in {"scheduled_items.csv", "tax_rules.csv"}:
+            limit = 200
         if len(value) > limit:
             raise ValueError("text too long")
     elif column == "color":
@@ -1903,6 +2354,15 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         elif file == "loan_payments.csv":
             if value not in {source.value for source in LoanPaymentSource}:
                 raise ValueError("invalid payment source")
+        elif file == "transactions.csv":
+            if value and value not in {
+                "manual",
+                "recurring",
+                "recurring_auto",
+                "import",
+                "investment",
+            }:
+                raise ValueError("invalid transaction source")
         elif value not in SNAPSHOT_SOURCES:
             raise ValueError("invalid snapshot source")
     elif column == "breakdown":
@@ -1920,6 +2380,76 @@ _REQUIRED_COLUMNS = {
     "transactions.csv": {"date", "direction", "amount", "category", "category_id"},
     "budget_lines.csv": {"month", "category", "planned", "category_id"},
     "months.csv": {"month"},
+    "scheduled_items.csv": {
+        "id",
+        "name",
+        "direction",
+        "category_id",
+        "category",
+        "amount_mode",
+        "amount",
+        "currency",
+        "start_date",
+        "freq",
+        "interval",
+        "weekdays",
+        "month_day",
+        "month",
+        "weekend_policy",
+    },
+    "scheduled_occurrences.csv": {
+        "id",
+        "direction",
+        "category_id",
+        "category",
+        "nominal_date",
+        "due_date",
+        "expected",
+        "currency",
+        "amount_state",
+        "status",
+        "generated_by",
+    },
+    "income_sources.csv": {
+        "id",
+        "name",
+        "kind",
+        "category_id",
+        "category",
+        "currency",
+        "unit_label",
+        "pay_day",
+        "pay_lag_months",
+        "expected_mode",
+        "average_months",
+        "active_from",
+    },
+    "tax_rules.csv": {
+        "id",
+        "name",
+        "kind",
+        "base",
+        "payment_day",
+        "payment_timing",
+    },
+    "tax_rule_versions.csv": {
+        "id",
+        "tax_rule_id",
+        "tax_rule",
+        "effective_from",
+        "mode",
+    },
+    "income_source_tax_rules.csv": {
+        "id",
+        "income_source_id",
+        "income_source",
+        "tax_rule_id",
+        "tax_rule",
+        "sort_order",
+        "generate_payment",
+    },
+    "work_logs.csv": {"id", "income_source_id", "income_source", "work_month", "units"},
+    "work_days.csv": {"id", "income_source_id", "income_source", "work_date", "units"},
     "networth_categories.csv": {"id", "side", "name"},
     "networth_items.csv": {"id", "side", "category", "category_id", "name", "currency"},
     "item_valuations.csv": {"id", "item_id", "item", "as_of", "value", "currency"},
@@ -2101,7 +2631,12 @@ def required_columns(version: str) -> dict[str, set[str]]:
     major, minor = (int(part) for part in version.split(".", 1))
     if major == 2 and minor < 1:
         columns["fire_loan_settings.csv"] = set()
+    if major == 2 and minor < 3:
+        for name in M3_CSV_FILES:
+            columns.pop(name, None)
     if major == 1:
+        for name in M3_CSV_FILES:
+            columns.pop(name, None)
         columns.update({name: set(names) for name, names in _LEGACY_REQUIRED_COLUMNS.items()})
     if major == 1 and minor >= 3:
         columns["networth_items.csv"].add("estimate_between")
@@ -2500,6 +3035,310 @@ def _validate_current_fire(
     return plan, tuple(out), tuple(settings_out)
 
 
+def _validate_m3_rows(
+    tables: dict[str, list[dict[str, str]]],
+    categories_by_id: dict[str, dict[str, str]],
+    loans_by_id: dict[str, dict[str, str]],
+    errors: list[ArchiveError],
+    currency: str,
+) -> None:
+    """Cross-file checks for the F3.8 recurring, income, tax and work rows."""
+
+    ledger_transaction_ids = {row["id"] for row in tables["transactions.csv"]}
+
+    def category(
+        file: str,
+        row: dict[str, str],
+        name_column: str = "category",
+        id_column: str = "category_id",
+    ) -> bool:
+        found = categories_by_id.get(row[id_column])
+        if found is None or row[name_column] != found["name"]:
+            errors.append(ArchiveError(file, "category reference mismatch"))
+            return False
+        return True
+
+    tax_rules = tables["tax_rules.csv"]
+    tax_by_id: dict[str, dict[str, str]] = {}
+    for row in tax_rules:
+        if row["id"] in tax_by_id:
+            errors.append(ArchiveError("tax_rules.csv", "duplicate tax rule id"))
+        tax_by_id[row["id"]] = row
+        if row["payment_category_id"]:
+            if not row["payment_category"]:
+                errors.append(ArchiveError("tax_rules.csv", "payment category reference mismatch"))
+            else:
+                category("tax_rules.csv", row, "payment_category", "payment_category_id")
+        elif row["payment_category"]:
+            errors.append(ArchiveError("tax_rules.csv", "payment category reference mismatch"))
+        if row["kind"] == "added" and row["base"] != "net":
+            errors.append(ArchiveError("tax_rules.csv", "an added tax must use the net base"))
+
+    tax_versions = tables["tax_rule_versions.csv"]
+    version_ids: set[str] = set()
+    version_keys: set[tuple[str, str]] = set()
+    for row in tax_versions:
+        rule = tax_by_id.get(row["tax_rule_id"])
+        if rule is None or row["tax_rule"] != rule["name"]:
+            errors.append(ArchiveError("tax_rule_versions.csv", "tax rule reference mismatch"))
+        if row["id"] in version_ids:
+            errors.append(ArchiveError("tax_rule_versions.csv", "duplicate tax rule version id"))
+        version_ids.add(row["id"])
+        key = (row["tax_rule_id"], row["effective_from"])
+        if key in version_keys:
+            errors.append(ArchiveError("tax_rule_versions.csv", "duplicate tax rule version"))
+        version_keys.add(key)
+        if row["mode"] == "percent":
+            valid = bool(row["rate_bp"]) and not row["fixed_amount"]
+        else:
+            valid = not row["rate_bp"] and bool(row["fixed_amount"])
+        if not valid:
+            errors.append(ArchiveError("tax_rule_versions.csv", "invalid tax rule version"))
+
+    income_sources = tables["income_sources.csv"]
+    income_by_id: dict[str, dict[str, str]] = {}
+    for row in income_sources:
+        if row["id"] in income_by_id:
+            errors.append(ArchiveError("income_sources.csv", "duplicate income source id"))
+        income_by_id[row["id"]] = row
+        if category("income_sources.csv", row) and (
+            categories_by_id[row["category_id"]]["kind"] != "income"
+        ):
+            errors.append(
+                ArchiveError("income_sources.csv", "income source category kind mismatch")
+            )
+        if row["currency"] != currency:
+            errors.append(ArchiveError("income_sources.csv", "currency differs from workspace"))
+        if row["kind"] == "fixed":
+            try:
+                positive_amount = _money_minor(row["fixed_amount"], currency, allow_zero=False) > 0
+            except ValueError:
+                positive_amount = False
+            valid = positive_amount and not row["rate"]
+        else:
+            valid = bool(row["rate"]) and not row["fixed_amount"]
+        if not valid:
+            errors.append(ArchiveError("income_sources.csv", "invalid income source amount"))
+        if row["active_to"] and row["active_to"] < row["active_from"]:
+            errors.append(ArchiveError("income_sources.csv", "invalid income source range"))
+        if row["active_from"][-2:] != "01" or (row["active_to"] and row["active_to"][-2:] != "01"):
+            errors.append(ArchiveError("income_sources.csv", "income source starts mid-month"))
+
+    attachments = tables["income_source_tax_rules.csv"]
+    attachment_by_id: dict[str, dict[str, str]] = {}
+    attachment_pairs: set[tuple[str, str]] = set()
+    attachment_orders: set[tuple[str, str]] = set()
+    for row in attachments:
+        source = income_by_id.get(row["income_source_id"])
+        rule = tax_by_id.get(row["tax_rule_id"])
+        if source is None or row["income_source"] != source["name"]:
+            errors.append(
+                ArchiveError("income_source_tax_rules.csv", "income source reference mismatch")
+            )
+        if rule is None or row["tax_rule"] != rule["name"]:
+            errors.append(
+                ArchiveError("income_source_tax_rules.csv", "tax rule reference mismatch")
+            )
+        if row["id"] in attachment_by_id:
+            errors.append(
+                ArchiveError("income_source_tax_rules.csv", "duplicate income tax rule id")
+            )
+        attachment_by_id[row["id"]] = row
+        pair = (row["income_source_id"], row["tax_rule_id"])
+        if pair in attachment_pairs:
+            errors.append(ArchiveError("income_source_tax_rules.csv", "duplicate income tax rule"))
+        attachment_pairs.add(pair)
+        order = (row["income_source_id"], row["sort_order"])
+        if order in attachment_orders:
+            errors.append(
+                ArchiveError("income_source_tax_rules.csv", "duplicate income tax rule order")
+            )
+        attachment_orders.add(order)
+        if row["payment_category_id"]:
+            if not row["payment_category"]:
+                errors.append(
+                    ArchiveError("income_source_tax_rules.csv", "payment category mismatch")
+                )
+            else:
+                category(
+                    "income_source_tax_rules.csv", row, "payment_category", "payment_category_id"
+                )
+        elif row["payment_category"]:
+            errors.append(ArchiveError("income_source_tax_rules.csv", "payment category mismatch"))
+
+    work_logs = tables["work_logs.csv"]
+    work_log_ids: set[str] = set()
+    work_log_keys: set[tuple[str, str]] = set()
+    for row in work_logs:
+        source = income_by_id.get(row["income_source_id"])
+        if source is None or row["income_source"] != source["name"]:
+            errors.append(ArchiveError("work_logs.csv", "income source reference mismatch"))
+        if row["id"] in work_log_ids:
+            errors.append(ArchiveError("work_logs.csv", "duplicate work log id"))
+        work_log_ids.add(row["id"])
+        key = (row["income_source_id"], row["work_month"])
+        if key in work_log_keys:
+            errors.append(ArchiveError("work_logs.csv", "duplicate work log month"))
+        work_log_keys.add(key)
+
+    work_days = tables["work_days.csv"]
+    work_day_ids: set[str] = set()
+    work_day_keys: set[tuple[str, str]] = set()
+    for row in work_days:
+        source = income_by_id.get(row["income_source_id"])
+        if source is None or row["income_source"] != source["name"]:
+            errors.append(ArchiveError("work_days.csv", "income source reference mismatch"))
+        if row["id"] in work_day_ids:
+            errors.append(ArchiveError("work_days.csv", "duplicate work day id"))
+        work_day_ids.add(row["id"])
+        key = (row["income_source_id"], row["work_date"])
+        if key in work_day_keys:
+            errors.append(ArchiveError("work_days.csv", "duplicate work day"))
+        work_day_keys.add(key)
+        try:
+            units = Decimal(row["units"])
+        except InvalidOperation:  # pragma: no cover - the cell validator already parsed it
+            units = Decimal(0)
+        if not 0 < units <= MAX_WORK_DAY_UNITS:
+            errors.append(ArchiveError("work_days.csv", "invalid work day units"))
+
+    items = tables["scheduled_items.csv"]
+    item_by_id: dict[str, dict[str, str]] = {}
+    for row in items:
+        if row["id"] in item_by_id:
+            errors.append(ArchiveError("scheduled_items.csv", "duplicate scheduled item id"))
+        item_by_id[row["id"]] = row
+        category_found = category("scheduled_items.csv", row)
+        if category_found and categories_by_id[row["category_id"]]["kind"] != row["direction"]:
+            errors.append(ArchiveError("scheduled_items.csv", "category kind mismatch"))
+        if row["currency"] != currency:
+            errors.append(ArchiveError("scheduled_items.csv", "currency differs from workspace"))
+        amount = _money_minor(row["amount"], currency, allow_zero=True)
+        if row["amount_mode"] == "from_loan":
+            loan = loans_by_id.get(row["loan_id"]) if row["loan_id"] else None
+            if loan is None or row["loan"] != loan["name"] or amount != 0:
+                errors.append(ArchiveError("scheduled_items.csv", "invalid loan-linked amount"))
+            if row["direction"] != "expense":
+                errors.append(ArchiveError("scheduled_items.csv", "invalid loan-linked direction"))
+        elif row["loan_id"] or row["loan"] or amount <= 0:
+            errors.append(ArchiveError("scheduled_items.csv", "invalid scheduled item amount"))
+        weekdays = cast("list[object]", json.loads(row["weekdays"]))
+        if row["freq"] == "weekly" and not weekdays:
+            errors.append(ArchiveError("scheduled_items.csv", "a weekly item needs weekdays"))
+        if row["freq"] == "yearly" and (
+            not row["month_day"].lstrip("-").isdigit() or row["month_day"] == "-1"
+        ):
+            errors.append(ArchiveError("scheduled_items.csv", "a yearly item needs a month day"))
+        if row["end_date"] and row["start_date"] and row["end_date"] < row["start_date"]:
+            errors.append(ArchiveError("scheduled_items.csv", "invalid scheduled item range"))
+
+    occurrences = tables["scheduled_occurrences.csv"]
+    occurrence_by_id: dict[str, dict[str, str]] = {}
+    occurrence_ids: set[str] = set()
+    item_dates: set[tuple[str, str]] = set()
+    income_months: set[tuple[str, str]] = set()
+    tax_children: set[tuple[str, str]] = set()
+    for row in occurrences:
+        if row["id"] in occurrence_ids:
+            errors.append(ArchiveError("scheduled_occurrences.csv", "duplicate occurrence id"))
+        occurrence_ids.add(row["id"])
+        occurrence_by_id[row["id"]] = row
+        category_found = category("scheduled_occurrences.csv", row)
+        if category_found and categories_by_id[row["category_id"]]["kind"] != row["direction"]:
+            errors.append(ArchiveError("scheduled_occurrences.csv", "category kind mismatch"))
+        if row["currency"] != currency:
+            errors.append(
+                ArchiveError("scheduled_occurrences.csv", "currency differs from workspace")
+            )
+        generated = row["generated_by"]
+        if generated in {"rule", "manual"}:
+            item = item_by_id.get(row["scheduled_item_id"] or "")
+            if item is None or row["scheduled_item"] != item["name"]:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "scheduled item reference mismatch")
+                )
+            if not row["scheduled_item_id"] or row["income_source_id"]:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "invalid occurrence source")
+                )
+            key = (row["scheduled_item_id"] or "", row["nominal_date"])
+            if key in item_dates:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "duplicate occurrence date")
+                )
+            item_dates.add(key)
+        elif generated == "income":
+            source = income_by_id.get(row["income_source_id"] or "")
+            if source is None or row["income_source"] != source["name"]:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "income source reference mismatch")
+                )
+            if not row["work_month"] or row["direction"] != "income":
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "invalid income occurrence")
+                )
+            key = (row["income_source_id"] or "", row["work_month"] or "")
+            if key in income_months:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "duplicate income occurrence month")
+                )
+            income_months.add(key)
+            if row["parent_occurrence_id"] or row["income_source_tax_rule_id"]:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "invalid income occurrence")
+                )
+        else:
+            parent = occurrence_by_id.get(row["parent_occurrence_id"] or "")
+            attachment = attachment_by_id.get(row["income_source_tax_rule_id"] or "")
+            if parent is None:
+                errors.append(
+                    ArchiveError(
+                        "scheduled_occurrences.csv", "parent occurrence reference mismatch"
+                    )
+                )
+            if attachment is None:
+                errors.append(
+                    ArchiveError("scheduled_occurrences.csv", "tax attachment reference mismatch")
+                )
+            if row["direction"] != "expense" or row["scheduled_item_id"] or row["income_source_id"]:
+                errors.append(ArchiveError("scheduled_occurrences.csv", "invalid tax occurrence"))
+            if parent is not None and parent["id"] == row["id"]:
+                errors.append(ArchiveError("scheduled_occurrences.csv", "invalid tax occurrence"))
+            key = (row["parent_occurrence_id"] or "", row["income_source_tax_rule_id"] or "")
+            if key in tax_children:
+                errors.append(ArchiveError("scheduled_occurrences.csv", "duplicate tax occurrence"))
+            tax_children.add(key)
+        if row["status"] == "posted" and not row["transaction_id"]:
+            errors.append(
+                ArchiveError("scheduled_occurrences.csv", "a posted occurrence needs a transaction")
+            )
+        if row["status"] != "posted" and row["transaction_id"]:
+            errors.append(
+                ArchiveError("scheduled_occurrences.csv", "invalid occurrence transaction")
+            )
+        if row["transaction_id"] and row["transaction_id"] not in ledger_transaction_ids:
+            errors.append(
+                ArchiveError("scheduled_occurrences.csv", "occurrence transaction missing")
+            )
+        if (
+            row["previous_transaction_id"]
+            and row["previous_transaction_id"] not in ledger_transaction_ids
+        ):
+            errors.append(
+                ArchiveError("scheduled_occurrences.csv", "occurrence transaction missing")
+            )
+
+    for row in tables["transactions.csv"]:
+        occurrence_id = row.get("scheduled_occurrence_id", "")
+        if not occurrence_id:
+            continue
+        occurrence = occurrence_by_id.get(occurrence_id)
+        if occurrence is None or occurrence["transaction_id"] != row["id"]:
+            errors.append(
+                ArchiveError("transactions.csv", "scheduled occurrence reference mismatch")
+            )
+
+
 def _read_rows(
     files: dict[str, bytes],
     workspace: dict[str, object],
@@ -2531,7 +3370,7 @@ def _read_rows(
             if (
                 len(header) > MAX_COLUMNS
                 or len(header) != len(set(header))
-                or not required[name] <= set(header)
+                or not required.get(name, set()) <= set(header)
             ):
                 errors.append(ArchiveError(name, "invalid or missing header", 1))
                 continue
@@ -2555,7 +3394,7 @@ def _read_rows(
                         value = str(index)
                     try:
                         if (
-                            column in required[name]
+                            column in required.get(name, set())
                             and not value
                             and not (name == "investment_transactions.csv" and column == "date")
                         ):
@@ -3247,6 +4086,8 @@ def _read_rows(
                 ArchiveError("installment_plans.csv", "installment plan category mismatch")
             )
 
+    _validate_m3_rows(tables, by_id, loans_by_id, errors, currency)
+
     if major == 1:
         fire_plan, fire_events, fire_loan_settings = _validate_legacy_fire(tables, errors, warnings)
     else:
@@ -3280,12 +4121,158 @@ def _read_rows(
                 row["category_id"],
                 row["id"],
                 row["deleted_at"] or None,
+                row["source"] or "",
+                row["scheduled_occurrence_id"] or None,
             )
             for row in tables["transactions.csv"]
         ),
         months=tuple(
             MonthRow(row["month"], row["closed_at"] or None, row["plan_started_at"] or None)
             for row in tables["months.csv"]
+        ),
+        scheduled_items=tuple(
+            ScheduledItemRow(
+                row["id"],
+                row["name"],
+                row["direction"],
+                row["category_id"],
+                row["category"],
+                row["loan_id"] or None,
+                row["loan"],
+                row["amount_mode"],
+                row["amount"],
+                row["currency"],
+                row["start_date"],
+                row["end_date"] or None,
+                int(row["max_count"]) if row["max_count"] else None,
+                row["freq"],
+                int(row["interval"]),
+                row["weekdays"],
+                row["month_day"],
+                int(row["month"]),
+                row["weekend_policy"],
+                row["notes"],
+                row["auto_post"],
+                row["is_tax"],
+                int(row["reminder_lead_days"]) if row["reminder_lead_days"] else None,
+                row["paused_at"] or None,
+                row["archived_at"] or None,
+            )
+            for row in tables["scheduled_items.csv"]
+        ),
+        scheduled_occurrences=tuple(
+            ScheduledOccurrenceRow(
+                row["id"],
+                row["scheduled_item_id"] or None,
+                row["scheduled_item"],
+                row["income_source_id"] or None,
+                row["income_source"],
+                row["work_month"] or None,
+                row["parent_occurrence_id"] or None,
+                row["income_source_tax_rule_id"] or None,
+                row["direction"],
+                row["category_id"],
+                row["category"],
+                row["nominal_date"],
+                row["due_date"],
+                row["expected"],
+                row["currency"],
+                row["amount_state"],
+                row["status"],
+                row["generated_by"],
+                row["transaction_id"] or None,
+                row["previous_transaction_id"] or None,
+                row["rescheduled_at"] or None,
+                row["amount_overridden"],
+                row["label"],
+            )
+            for row in tables["scheduled_occurrences.csv"]
+        ),
+        income_sources=tuple(
+            IncomeSourceRow(
+                row["id"],
+                row["name"],
+                row["kind"],
+                row["category_id"],
+                row["category"],
+                row["currency"],
+                row["fixed_amount"],
+                row["rate"],
+                row["unit_label"],
+                int(row["pay_day"]),
+                int(row["pay_lag_months"]),
+                row["expected_mode"],
+                row["expected_units"],
+                int(row["average_months"]),
+                row["active_from"],
+                row["active_to"] or None,
+                row["archived_at"] or None,
+            )
+            for row in tables["income_sources.csv"]
+        ),
+        tax_rules=tuple(
+            TaxRuleRow(
+                row["id"],
+                row["name"],
+                row["kind"],
+                row["base"],
+                int(row["payment_day"]),
+                row["payment_timing"],
+                row["payment_category_id"] or None,
+                row["payment_category"],
+                row["notes"],
+                row["archived_at"] or None,
+            )
+            for row in tables["tax_rules.csv"]
+        ),
+        tax_rule_versions=tuple(
+            TaxRuleVersionRow(
+                row["id"],
+                row["tax_rule_id"],
+                row["tax_rule"],
+                row["effective_from"],
+                row["mode"],
+                int(row["rate_bp"]) if row["rate_bp"] else None,
+                row["fixed_amount"],
+            )
+            for row in tables["tax_rule_versions.csv"]
+        ),
+        income_source_tax_rules=tuple(
+            IncomeSourceTaxRuleRow(
+                row["id"],
+                row["income_source_id"],
+                row["income_source"],
+                row["tax_rule_id"],
+                row["tax_rule"],
+                int(row["sort_order"]),
+                row["generate_payment"],
+                row["payment_category_id"] or None,
+                row["payment_category"],
+                int(row["due_day"]) if row["due_day"] else None,
+                int(row["due_month_offset"]) if row["due_month_offset"] else None,
+            )
+            for row in tables["income_source_tax_rules.csv"]
+        ),
+        work_logs=tuple(
+            WorkLogRow(
+                row["id"],
+                row["income_source_id"],
+                row["income_source"],
+                row["work_month"],
+                row["units"],
+                row["derived_from_days"],
+            )
+            for row in tables["work_logs.csv"]
+        ),
+        work_days=tuple(
+            WorkDayRow(
+                row["id"],
+                row["income_source_id"],
+                row["income_source"],
+                row["work_date"],
+                row["units"],
+            )
+            for row in tables["work_days.csv"]
         ),
         networth_categories=tuple(
             NetWorthCategoryRow(

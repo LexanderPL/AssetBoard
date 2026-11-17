@@ -1750,6 +1750,146 @@ msgstr ""
 "Pliki FIRE służą tylko do przywracania; zostały pominięte podczas tego "
 "scalania."
 
+msgid ""
+"Recurring items, income sources, tax rules and work calendars are "
+"restored only; work logs were merged."
+msgstr ""
+"Pozycje cykliczne, źródła przychodu, reguły podatkowe i kalendarze pracy "
+"są tylko przywracane; dzienniki pracy zostały scalone."
+
+msgid "No income source with this name or id exists."
+msgstr "Nie istnieje źródło przychodu o tej nazwie lub identyfikatorze."
+
+msgid ""
+"More than one income source has this name; add the income_source_id "
+"column to choose one."
+msgstr ""
+"Więcej niż jedno źródło przychodu ma tę nazwę; dodaj kolumnę "
+"income_source_id, aby wybrać właściwe."
+
+msgid "The income source is archived; no work log can be added."
+msgstr "Źródło przychodu jest zarchiwizowane; nie można dodać dziennika pracy."
+
+msgid "A work log already exists for this income source and month."
+msgstr "Dziennik pracy już istnieje dla tego źródła przychodu i miesiąca."
+
+msgid ""
+"A different work log already exists for this income source and month; it "
+"was not overwritten."
+msgstr ""
+"Inny dziennik pracy już istnieje dla tego źródła przychodu i miesiąca; "
+"nie został nadpisany."
+
+msgid ""
+"This month's income was already received; its work log cannot be changed "
+"by an import."
+msgstr ""
+"Przychód za ten miesiąc został już otrzymany; import nie może zmienić "
+"jego dziennika pracy."
+
+msgid "Enter work units as a non-negative number."
+msgstr "Podaj nieujemną liczbę jednostek pracy."
+
+msgid ""
+"This income source is not variable; work logs apply only to variable "
+"income."
+msgstr ""
+"To źródło przychodu nie jest zmienne; dzienniki pracy dotyczą tylko "
+"przychodów zmiennych."
+
+msgid "A tax rule id appears more than once."
+msgstr "Identyfikator reguły podatkowej występuje więcej niż raz."
+
+msgid "A tax rule has an invalid kind or base."
+msgstr "Reguła podatkowa ma nieprawidłowy rodzaj lub podstawę."
+
+msgid "A tax rule has two versions for the same date."
+msgstr "Reguła podatkowa ma dwie wersje na ten sam dzień."
+
+msgid "A tax rule version has an invalid percent or fixed value."
+msgstr "Wersja reguły podatkowej ma nieprawidłową wartość procentową lub stałą."
+
+msgid "A tax row references an unknown or differently named tax rule."
+msgstr ""
+"Wiersz podatku odwołuje się do nieznanej lub inaczej nazwanej reguły "
+"podatkowej."
+
+msgid "An income source id appears more than once."
+msgstr "Identyfikator źródła przychodu występuje więcej niż raz."
+
+msgid "An income source must use an income category."
+msgstr "Źródło przychodu musi używać kategorii przychodów."
+
+msgid "An income source has invalid amounts or dates."
+msgstr "Źródło przychodu ma nieprawidłowe kwoty lub daty."
+
+msgid ""
+"A work or tax row references an unknown or differently named income "
+"source."
+msgstr ""
+"Wiersz pracy lub podatku odwołuje się do nieznanego lub inaczej nazwanego"
+" źródła przychodu."
+
+msgid "A tax attachment id, pair or order appears more than once."
+msgstr ""
+"Identyfikator, para lub kolejność przypisania podatku występuje więcej "
+"niż raz."
+
+msgid "A tax row references an unknown or differently named payment category."
+msgstr ""
+"Wiersz podatku odwołuje się do nieznanej lub inaczej nazwanej kategorii "
+"płatności."
+
+msgid "A work log id or income source and month appears more than once."
+msgstr ""
+"Identyfikator dziennika pracy lub źródło i miesiąc występują więcej niż "
+"raz."
+
+msgid "A work day id or income source and date appears more than once."
+msgstr "Identyfikator dnia pracy lub źródło i data występują więcej niż raz."
+
+msgid "A recurring item id appears more than once."
+msgstr "Identyfikator pozycji cyklicznej występuje więcej niż raz."
+
+msgid "A recurring row's category kind does not match its direction."
+msgstr "Rodzaj kategorii pozycji cyklicznej nie zgadza się z jej kierunkiem."
+
+msgid "A recurring item has an invalid amount, schedule or loan link."
+msgstr ""
+"Pozycja cykliczna ma nieprawidłową kwotę, harmonogram lub powiązanie z "
+"kredytem."
+
+msgid "An occurrence id or its item/source date appears more than once."
+msgstr ""
+"Identyfikator wystąpienia lub data pozycji/źródła występuje więcej niż "
+"raz."
+
+msgid "An occurrence has invalid source, status or amount fields."
+msgstr "Wystąpienie ma nieprawidłowe źródło, status lub kwotę."
+
+msgid "An occurrence references an unknown or differently named recurring item."
+msgstr ""
+"Wystąpienie odwołuje się do nieznanej lub inaczej nazwanej pozycji "
+"cyklicznej."
+
+msgid ""
+"A tax occurrence references an unknown parent occurrence or tax "
+"attachment."
+msgstr ""
+"Wystąpienie podatku odwołuje się do nieznanego wystąpienia nadrzędnego "
+"lub przypisania podatku."
+
+msgid "An occurrence references a transaction that is not in the archive."
+msgstr "Wystąpienie odwołuje się do transakcji, której nie ma w archiwum."
+
+msgid "A transaction references an occurrence that does not point back at it."
+msgstr ""
+"Transakcja odwołuje się do wystąpienia, które nie wskazuje na nią z "
+"powrotem."
+
+msgid "A true/false column has an invalid value."
+msgstr "Kolumna true/false ma nieprawidłową wartość."
+
 #, python-format
 msgid ""
 "A linked FIRE input in %(scenario)s has no source data in this archive; "
@@ -12678,11 +12818,11 @@ msgstr ""
 "wartości, transakcje i status miesięcy."
 
 msgid ""
-"Recurring items, income sources, work logs, tax rules, and notifications "
-"are not included in this archive version."
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels are not included."
 msgstr ""
-"Ta wersja archiwum nie obejmuje pozycji cyklicznych, źródeł dochodu, "
-"ewidencji pracy, reguł podatkowych ani powiadomień."
+"Pozycje cykliczne, źródła przychodu, dzienniki pracy, kalendarze i reguły"
+" podatkowe są uwzględnione. Kanały powiadomień nie są uwzględnione."
 
 msgid "Download archive"
 msgstr "Pobierz archiwum"
@@ -12697,21 +12837,24 @@ msgid "Merge data into this workspace"
 msgstr "Scal dane z tym obszarem roboczym"
 
 msgid ""
-"Categories, transactions, and planned values; settings and closed months "
-"are not applied."
+"Categories, transactions, planned values, and work logs; settings and "
+"closed months are not applied."
 msgstr ""
-"Kategorie, transakcje i planowane wartości; ustawienia i zamknięte "
-"miesiące nie są stosowane."
+"Kategorie, transakcje, planowane wartości i dzienniki pracy; ustawienia i"
+" zamknięte miesiące nie są stosowane."
 
 msgid "Restore into this workspace"
 msgstr "Przywróć do tego obszaru roboczego"
 
 msgid ""
-"Replaces settings, categories, transactions, planned values, and month "
-"states. Only for an empty workspace."
+"Replaces settings, categories, transactions, planned values, month "
+"states, net worth, investments, loans, FIRE, recurring items, income, tax"
+" rules, and work logs. Only for an empty workspace."
 msgstr ""
-"Zastępuje ustawienia, kategorie, transakcje, planowane wartości i stany "
-"miesięcy. Tylko dla pustego obszaru roboczego."
+"Zastępuje ustawienia, kategorie, transakcje, planowane wartości, stany "
+"miesięcy, majątek netto, inwestycje, kredyty, FIRE, pozycje cykliczne, "
+"przychody, reguły podatkowe i dzienniki pracy. Tylko dla pustego obszaru "
+"roboczego."
 
 msgid ""
 "Available only in an empty workspace. The untouched suggested categories "
@@ -12801,6 +12944,24 @@ msgstr "Przywrócone usunięte transakcje"
 
 msgid "Month states"
 msgstr "Stany miesięcy"
+
+msgid "Occurrences"
+msgstr "Wystąpienia"
+
+msgid "Income sources"
+msgstr "Źródła przychodu"
+
+msgid "Tax rules"
+msgstr "Reguły podatkowe"
+
+msgid "Tax rate versions"
+msgstr "Wersje stawek podatkowych"
+
+msgid "Work logs"
+msgstr "Dzienniki pracy"
+
+msgid "Work days"
+msgstr "Dni pracy"
 
 msgid "Instrument allocations"
 msgstr "Alokacje instrumentów"
@@ -13096,6 +13257,12 @@ msgstr "Kategorie do usunięcia"
 msgid "Categories to archive"
 msgstr "Kategorie do zarchiwizowania"
 
+msgid "Work logs to remove"
+msgstr "Dzienniki pracy do usunięcia"
+
+msgid "Pending income and tax occurrences to remove"
+msgstr "Oczekujące wystąpienia przychodów i podatków do usunięcia"
+
 msgid "Instruments to delete"
 msgstr "Instrumenty do usunięcia"
 
@@ -13114,6 +13281,15 @@ msgid ""
 "%(count)s of the transactions were edited after the import; they are "
 "removed too."
 msgstr "Transakcje edytowane po imporcie: %(count)s; one również zostaną usunięte."
+
+#, python-format
+msgid ""
+"%(count)s income or tax occurrences stay as history; only pending rows "
+"created by the import with no later history are removed."
+msgstr ""
+"%(count)s wystąpień przychodów lub podatków pozostanie w historii; "
+"usuwane są tylko oczekujące wiersze utworzone przez import, które nie "
+"mają późniejszej historii."
 
 #, python-format
 msgid "Rollback is not possible while these months are closed: %(months)s"

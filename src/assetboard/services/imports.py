@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.income import WorkLog
 from assetboard.db.models.investments import (
     AssetClass,
     BondTerms,
@@ -57,6 +58,7 @@ from assetboard.db.models.networth import (
     NetWorthSnapshot,
 )
 from assetboard.db.models.prices import FxRate, PricePoint, PriceSourceConfig
+from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
     AssetClassRepository,
     AuditEventRepository,
@@ -88,6 +90,7 @@ from assetboard.db.repositories import (
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
+    NotFound,
     PricePointRepository,
     PriceSourceConfigRepository,
     ReferenceRateRepository,
@@ -116,6 +119,7 @@ from assetboard.domain.import_upload import (
     ParseTimeout,
     parse_upload,
 )
+from assetboard.domain.income import pay_date
 from assetboard.domain.ledger_csv import guard_formula
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
@@ -123,6 +127,7 @@ from assetboard.services.archive import workspace_is_empty
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.holding_rows import holding_transaction
+from assetboard.services.income import resync_work_month
 from assetboard.services.months import close_month_state, current_month, lock_month_writes
 
 MAX_IMPORT_SECONDS = 60
@@ -241,6 +246,62 @@ REPORT_MESSAGES: dict[str, str] = {
     ),
     "loan_restore_only": _("Loan files are restored only; they were ignored in this merge."),
     "fire_restore_only": _("FIRE files are restored only; they were ignored in this merge."),
+    "recurring_restore_only": _(
+        "Recurring items, income sources, tax rules and work calendars are restored only; "
+        "work logs were merged."
+    ),
+    "income_source_not_found": _("No income source with this name or id exists."),
+    "income_source_ambiguous": _(
+        "More than one income source has this name; add the income_source_id column to choose one."
+    ),
+    "income_source_archived": _("The income source is archived; no work log can be added."),
+    "already_logged": _("A work log already exists for this income source and month."),
+    "work_log_changed": _(
+        "A different work log already exists for this income source and month; it was not "
+        "overwritten."
+    ),
+    "income_received": _(
+        "This month's income was already received; its work log cannot be changed by an import."
+    ),
+    "invalid_units": _("Enter work units as a non-negative number."),
+    "income_source_not_variable": _(
+        "This income source is not variable; work logs apply only to variable income."
+    ),
+    "duplicate_tax_rule": _("A tax rule id appears more than once."),
+    "invalid_tax_rule": _("A tax rule has an invalid kind or base."),
+    "duplicate_tax_rule_version": _("A tax rule has two versions for the same date."),
+    "invalid_tax_rule_version": _("A tax rule version has an invalid percent or fixed value."),
+    "tax_rule_reference": _("A tax row references an unknown or differently named tax rule."),
+    "duplicate_income_source": _("An income source id appears more than once."),
+    "income_source_category": _("An income source must use an income category."),
+    "invalid_income_source": _("An income source has invalid amounts or dates."),
+    "income_source_reference": _(
+        "A work or tax row references an unknown or differently named income source."
+    ),
+    "duplicate_income_tax_rule": _("A tax attachment id, pair or order appears more than once."),
+    "payment_category_reference": _(
+        "A tax row references an unknown or differently named payment category."
+    ),
+    "duplicate_work_log": _("A work log id or income source and month appears more than once."),
+    "duplicate_work_day": _("A work day id or income source and date appears more than once."),
+    "duplicate_scheduled_item": _("A recurring item id appears more than once."),
+    "category_kind_mismatch": _("A recurring row's category kind does not match its direction."),
+    "invalid_scheduled_item": _("A recurring item has an invalid amount, schedule or loan link."),
+    "duplicate_occurrence": _("An occurrence id or its item/source date appears more than once."),
+    "invalid_occurrence": _("An occurrence has invalid source, status or amount fields."),
+    "scheduled_item_reference": _(
+        "An occurrence references an unknown or differently named recurring item."
+    ),
+    "occurrence_reference": _(
+        "A tax occurrence references an unknown parent occurrence or tax attachment."
+    ),
+    "occurrence_transaction_missing": _(
+        "An occurrence references a transaction that is not in the archive."
+    ),
+    "scheduled_occurrence_reference": _(
+        "A transaction references an occurrence that does not point back at it."
+    ),
+    "invalid_boolean": _("A true/false column has an invalid value."),
     "fire_linked_fallback": _(
         "A linked FIRE input in %(scenario)s has no source data in this archive; it was "
         "restored as a manual value."
@@ -587,6 +648,67 @@ _PARSER_CODES: dict[str, str] = {
     "duplicate FIRE exclusion id": "duplicate_fire_exclusion",
     "duplicate FIRE exclusion": "duplicate_fire_exclusion_row",
     "FIRE exclusion category mismatch": "fire_exclusion_category",
+    # F3.8 recurring, income, tax and work rows.
+    "duplicate tax rule id": "duplicate_tax_rule",
+    "payment category reference mismatch": "payment_category_reference",
+    "an added tax must use the net base": "invalid_tax_rule",
+    "duplicate tax rule version id": "duplicate_tax_rule_version",
+    "duplicate tax rule version": "duplicate_tax_rule_version",
+    "invalid tax rule version": "invalid_tax_rule_version",
+    "tax rule reference mismatch": "tax_rule_reference",
+    "duplicate income source id": "duplicate_income_source",
+    "income source category kind mismatch": "income_source_category",
+    "invalid income source amount": "invalid_income_source",
+    "invalid income source range": "invalid_income_source",
+    "income source starts mid-month": "invalid_income_source",
+    "income source reference mismatch": "income_source_reference",
+    "duplicate income tax rule id": "duplicate_income_tax_rule",
+    "duplicate income tax rule": "duplicate_income_tax_rule",
+    "duplicate income tax rule order": "duplicate_income_tax_rule",
+    "payment category mismatch": "payment_category_reference",
+    "duplicate work log id": "duplicate_work_log",
+    "duplicate work log month": "duplicate_work_log",
+    "duplicate work day id": "duplicate_work_day",
+    "duplicate work day": "duplicate_work_day",
+    "invalid work day units": "invalid_units",
+    "duplicate scheduled item id": "duplicate_scheduled_item",
+    "category kind mismatch": "category_kind_mismatch",
+    "invalid loan-linked amount": "invalid_scheduled_item",
+    "invalid loan-linked direction": "invalid_scheduled_item",
+    "invalid scheduled item amount": "invalid_scheduled_item",
+    "a weekly item needs weekdays": "invalid_scheduled_item",
+    "a yearly item needs a month day": "invalid_scheduled_item",
+    "invalid scheduled item range": "invalid_scheduled_item",
+    "duplicate occurrence id": "duplicate_occurrence",
+    "invalid occurrence source": "invalid_occurrence",
+    "scheduled item reference mismatch": "scheduled_item_reference",
+    "duplicate occurrence date": "duplicate_occurrence",
+    "invalid income occurrence": "invalid_occurrence",
+    "duplicate income occurrence month": "duplicate_occurrence",
+    "parent occurrence reference mismatch": "occurrence_reference",
+    "tax attachment reference mismatch": "occurrence_reference",
+    "invalid tax occurrence": "invalid_occurrence",
+    "duplicate tax occurrence": "duplicate_occurrence",
+    "a posted occurrence needs a transaction": "invalid_occurrence",
+    "invalid occurrence transaction": "invalid_occurrence",
+    "occurrence transaction missing": "occurrence_transaction_missing",
+    "scheduled occurrence reference mismatch": "scheduled_occurrence_reference",
+    "invalid month day": "invalid_row",
+    "invalid amount mode": "invalid_row",
+    "invalid amount state": "invalid_row",
+    "invalid status": "invalid_row",
+    "invalid generated by": "invalid_row",
+    "invalid payment timing": "invalid_row",
+    "invalid weekdays": "invalid_row",
+    "invalid pay day": "invalid_row",
+    "invalid pay lag months": "invalid_row",
+    "invalid average months": "invalid_row",
+    "invalid due day": "invalid_row",
+    "invalid due month offset": "invalid_row",
+    "invalid interval": "invalid_row",
+    "invalid maximum count": "invalid_row",
+    "invalid reminder lead days": "invalid_row",
+    "invalid transaction source": "invalid_row",
 }
 
 
@@ -1369,6 +1491,10 @@ class _RollbackPlan:
     categories_to_archive: tuple[Category, ...]
     valuations: tuple[ItemValuation, ...]  # history rows, removed by an explicit statement
     closed_months: tuple[str, ...]
+    work_logs: tuple[WorkLog, ...] = ()
+    occurrences: tuple[ScheduledOccurrence, ...] = ()
+    occurrences_kept: int = 0
+    work_log_resync: tuple[tuple[UUID, date], ...] = ()
 
     def counts(self) -> dict[str, int]:
         return {
@@ -1379,6 +1505,9 @@ class _RollbackPlan:
             "categories_to_delete": len(self.categories_to_delete),
             "categories_to_archive": len(self.categories_to_archive),
             "valuations": len(self.valuations),
+            "work_logs": len(self.work_logs),
+            "work_log_occurrences": len(self.occurrences),
+            "work_log_occurrences_kept": self.occurrences_kept,
         }
 
 
@@ -1416,6 +1545,106 @@ def _rollback_plan(
     affected = {YearMonth.from_date(row.date) for row in live}
     affected.update(YearMonth.from_date(line.month) for line in to_remove)
     closed = MonthStateRepository(session, ctx).closed_months()
+    raw_work_logs = (batch.report or {}).get("work_log_rollback")
+    work_log_ids: set[UUID] = set()
+    occurrence_ids: set[UUID] = set()
+    resync: list[tuple[UUID, date]] = []
+    if isinstance(raw_work_logs, dict):
+        rollback = cast("dict[str, object]", raw_work_logs)
+        for key, target in (("work_logs", work_log_ids), ("occurrences", occurrence_ids)):
+            raw_ids = rollback.get(key)
+            if isinstance(raw_ids, list):
+                for value in cast("list[object]", raw_ids):
+                    with contextlib.suppress(ValueError, AttributeError):
+                        target.add(UUID(str(value)))
+        raw_resync = rollback.get("resync")
+        if isinstance(raw_resync, list):
+            for value in cast("list[object]", raw_resync):
+                if not isinstance(value, dict):
+                    continue
+                entry = cast("dict[object, object]", value)
+                source_id = entry.get("income_source_id")
+                work_month = entry.get("work_month")
+                if not isinstance(source_id, str) or not isinstance(work_month, str):
+                    continue
+                try:
+                    resync.append((UUID(source_id), date.fromisoformat(work_month)))
+                except ValueError:
+                    continue
+    work_logs = tuple(
+        row for row in WorkLogRepository(session, ctx).list() if row.id in work_log_ids
+    )
+    all_occurrences = ScheduledOccurrenceRepository(session, ctx).list()
+    by_occurrence_id = {row.id: row for row in all_occurrences}
+    children_by_parent: dict[UUID, list[ScheduledOccurrence]] = {}
+    for row in all_occurrences:
+        if row.parent_occurrence_id is not None:
+            children_by_parent.setdefault(row.parent_occurrence_id, []).append(row)
+
+    def family(root: ScheduledOccurrence) -> set[ScheduledOccurrence]:
+        found: set[ScheduledOccurrence] = set()
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            if node in found:
+                continue
+            found.add(node)
+            stack.extend(children_by_parent.get(node.id, ()))
+        return found
+
+    deletable_ids: set[UUID] = set()
+    kept_ids: set[UUID] = set()
+    for occurrence_id in occurrence_ids:
+        root = by_occurrence_id.get(occurrence_id)
+        if root is None:
+            continue
+        nodes = family(root)
+        if all(node.status == "pending" and node.transaction_id is None for node in nodes):
+            deletable_ids.update(node.id for node in nodes)
+        else:
+            kept_ids.update(node.id for node in nodes)
+    deletable_ids.difference_update(kept_ids)
+    occurrences = tuple(row for row in all_occurrences if row.id in deletable_ids)
+    sources_by_id = {row.id: row for row in IncomeSourceRepository(session, ctx).list()}
+    for work_log in work_logs:
+        affected.add(YearMonth.from_date(work_log.work_month))
+        source = sources_by_id.get(work_log.income_source_id)
+        if source is not None:
+            affected.add(
+                YearMonth.from_date(
+                    pay_date(work_log.work_month, source.pay_day, source.pay_lag_months)
+                )
+            )
+        linked = next(
+            (
+                row
+                for row in all_occurrences
+                if row.income_source_id == work_log.income_source_id
+                and row.work_month == work_log.work_month
+            ),
+            None,
+        )
+        if linked is not None:
+            affected.update(YearMonth.from_date(row.due_date) for row in family(linked))
+    affected.update(YearMonth.from_date(row.due_date) for row in occurrences)
+    affected.update(
+        YearMonth.from_date(row.due_date) for row in by_occurrence_id.values() if row.id in kept_ids
+    )
+    resync_months: list[tuple[UUID, date]] = []
+    for source_id, work_month in resync:
+        linked = next(
+            (
+                row
+                for row in all_occurrences
+                if row.income_source_id == source_id and row.work_month == work_month
+            ),
+            None,
+        )
+        if linked is not None and linked.id in kept_ids and linked.id in occurrence_ids:
+            # A created family kept as history stays at its imported values; resyncing it
+            # without the removed log would silently change that history.
+            continue
+        resync_months.append((source_id, work_month))
     return _RollbackPlan(
         transactions=live,
         edited=sum(row.updated_at > applied_at for row in live),
@@ -1426,6 +1655,10 @@ def _rollback_plan(
         categories_to_archive=tuple(to_archive),
         valuations=tuple(valuations),
         closed_months=tuple(str(month) for month in sorted(affected & closed)),
+        work_logs=work_logs,
+        occurrences=occurrences,
+        occurrences_kept=len(kept_ids),
+        work_log_resync=tuple(resync_months),
     )
 
 
@@ -1451,6 +1684,7 @@ class _RestoreRollbackPlan:
     previous_risk_policy: dict[str, object] | None
     loan_rows: dict[str, tuple[Any, ...]]
     fire_rows: dict[str, tuple[Any, ...]]
+    m3_rows: dict[str, tuple[Any, ...]]
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -1475,19 +1709,21 @@ class _RestoreRollbackPlan:
             "risk_policies": len(self.risk_policies),
             **{key: len(rows) for key, rows in self.loan_rows.items()},
             **{key: len(rows) for key, rows in self.fire_rows.items()},
+            **{key: len(rows) for key, rows in self.m3_rows.items()},
+            "m3_rows_deleted": sum(len(rows) for rows in self.m3_rows.values()),
         }
 
 
-_M3_REPOSITORIES = (
-    ScheduledItemRepository,
-    ScheduledOccurrenceRepository,
-    IncomeSourceRepository,
-    IncomeSourceTaxRuleRepository,
-    WorkLogRepository,
-    WorkDayRepository,
-    TaxRuleRepository,
-    TaxRuleVersionRepository,
-)
+_M3_RESTORE_REPOSITORIES: dict[str, Any] = {
+    "scheduled_items": ScheduledItemRepository,
+    "scheduled_occurrences": ScheduledOccurrenceRepository,
+    "income_sources": IncomeSourceRepository,
+    "income_source_tax_rules": IncomeSourceTaxRuleRepository,
+    "work_logs": WorkLogRepository,
+    "work_days": WorkDayRepository,
+    "tax_rules": TaxRuleRepository,
+    "tax_rule_versions": TaxRuleVersionRepository,
+}
 _LOAN_RESTORE_REPOSITORIES: dict[str, Any] = {
     "reference_rates": ReferenceRateRepository,
     "reference_rate_values": ReferenceRateValueRepository,
@@ -1505,12 +1741,6 @@ _FIRE_RESTORE_REPOSITORIES: dict[str, Any] = {
     "fire_scenarios": FireScenarioRepository,
     "fire_events": FireEventRepository,
 }
-_M3_REFERENCE_ATTRIBUTES = (
-    "category_id",
-    "payment_category_id",
-    "transaction_id",
-    "previous_transaction_id",
-)
 
 
 def _restore_rollback_plan(
@@ -1679,16 +1909,25 @@ def _restore_rollback_plan(
     workspace_settings = {
         key: value for key, value in previous.items() if key != "risk_target_policy"
     }
-    category_ids = {row.id for row in categories}
-    transaction_ids = {row.id for row in transactions}
-    for repository_class in _M3_REPOSITORIES:
-        for row in repository_class(session, ctx).list():
-            if row.created_at > applied_at:
-                reasons.add("restore_m3_rows_added")
-            for attribute in _M3_REFERENCE_ATTRIBUTES:
-                value = getattr(row, attribute, None)
-                if isinstance(value, UUID) and (value in category_ids or value in transaction_ids):
-                    reasons.add("restore_m3_references")
+    raw_m3_ids = (batch.report or {}).get("restored_m3_ids")
+    restored_m3_ids: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_m3_ids) if isinstance(raw_m3_ids, dict) else {}
+    )
+    m3_rows: dict[str, tuple[Any, ...]] = {}
+    for key, repository_class in _M3_RESTORE_REPOSITORIES.items():
+        all_rows = repository_class(session, ctx).list()
+        raw_ids = restored_m3_ids.get(key)
+        expected: set[UUID] = set()
+        if isinstance(raw_ids, list):
+            for value in cast("list[object]", raw_ids):
+                with contextlib.suppress(ValueError, AttributeError):
+                    expected.add(UUID(str(value)))
+        rows = tuple(row for row in all_rows if row.id in expected)
+        if len(all_rows) != len(expected) or len(rows) != len(expected):
+            reasons.add("restore_rows_added")
+        if any(row.updated_at > applied_at for row in rows):
+            reasons.add("restore_rows_changed")
+        m3_rows[key] = rows
     month_values: list[YearMonth] = []
     for raw in cast("list[object]", raw_months or []):
         try:
@@ -1716,6 +1955,7 @@ def _restore_rollback_plan(
         previous_risk_policy=previous_policy,
         loan_rows=loan_rows,
         fire_rows=fire_rows,
+        m3_rows=m3_rows,
         reasons=tuple(sorted(reasons)),
         settings=workspace_settings,
     )
@@ -1726,6 +1966,28 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
+    for key in (
+        "scheduled_occurrences",
+        "scheduled_items",
+        "income_source_tax_rules",
+        "work_days",
+        "work_logs",
+    ):
+        repository = _M3_RESTORE_REPOSITORIES[key](session, ctx)
+        rows = plan.m3_rows.get(key, ())
+        if key == "scheduled_occurrences":
+            rows = tuple(sorted(rows, key=lambda row: row.parent_occurrence_id is None))
+        for row in rows:
+            repository.delete(row)
+    versions = TaxRuleVersionRepository(session, ctx)
+    versions.delete_for_restore([row.id for row in plan.m3_rows.get("tax_rule_versions", ())])
+    tax_rules = TaxRuleRepository(session, ctx)
+    for row in plan.m3_rows.get("tax_rules", ()):
+        tax_rules.delete(row)
+    income_sources = IncomeSourceRepository(session, ctx)
+    for row in plan.m3_rows.get("income_sources", ()):
+        income_sources.delete(row)
+    session.flush()
     # FIRE rows go before the loan rows because restored events sit under the plan.
     for key in ("fire_events", "fire_scenarios"):
         repository = _FIRE_RESTORE_REPOSITORIES[key](session, ctx)
@@ -1825,6 +2087,7 @@ def _rollback_restore(
             "risk_policies_deleted": len(plan.risk_policies),
             "loans_deleted": len(plan.loan_rows.get("loans", ())),
             "loan_rows_deleted": sum(len(rows) for rows in plan.loan_rows.values()),
+            "m3_rows_deleted": sum(len(rows) for rows in plan.m3_rows.values()),
             "fire_scenarios_deleted": len(plan.fire_rows.get("fire_scenarios", ())),
             "fire_events_deleted": len(plan.fire_rows.get("fire_events", ())),
             "fire_rows_deleted": sum(len(rows) for rows in plan.fire_rows.values()),
@@ -2036,6 +2299,25 @@ def rollback_import(
         plan = _rollback_plan(session, ctx, batch, lock=True)
         if plan.closed_months:
             raise ImportClosedMonths(plan.closed_months)
+        occurrences = ScheduledOccurrenceRepository(session, ctx)
+        for occurrence in sorted(
+            plan.occurrences, key=lambda row: row.parent_occurrence_id is None
+        ):
+            occurrences.delete(occurrence)
+        session.flush()
+        work_logs = WorkLogRepository(session, ctx)
+        for work_log in plan.work_logs:
+            work_logs.delete(work_log)
+        session.flush()
+        for source_id, work_month in plan.work_log_resync:
+            with contextlib.suppress(NotFound):
+                exists = any(
+                    row.income_source_id == source_id and row.work_month == work_month
+                    for row in ScheduledOccurrenceRepository(session, ctx).list()
+                )
+                if exists:
+                    resync_work_month(session, ctx, source_id, work_month)
+        session.flush()
         now = ctx.clock.now()
         transactions = TransactionRepository(session, ctx)
         for transaction in plan.transactions:
@@ -2086,6 +2368,9 @@ def rollback_import(
                 "categories_deleted": counts["categories_to_delete"],
                 "categories_archived": counts["categories_to_archive"],
                 "item_valuations_deleted": counts["valuations"],
+                "work_logs_deleted": counts["work_logs"],
+                "work_log_occurrences_deleted": counts["work_log_occurrences"],
+                "work_log_occurrences_kept": counts["work_log_occurrences_kept"],
             },
         )
         return counts

@@ -22,6 +22,9 @@ class ExpectedUnitsMode(StrEnum):
     MANUAL = "manual"
 
 
+MAX_WORK_DAY_UNITS = 24
+
+
 @dataclass(frozen=True, slots=True)
 class IncomeEstimate:
     net: Money

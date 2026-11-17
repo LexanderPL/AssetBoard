@@ -2463,6 +2463,9 @@ def test_tax_rule_queries_stay_in_their_workspace(
     )
     updated = versions_a.get(fixed_version_a.id)
     assert updated is not None and (updated.rate_bp, updated.fixed_minor) == (1900, None)
+    assert versions_b.delete_for_restore([version_a.id, fixed_version_a.id]) == 0
+    assert versions_a.delete_for_restore([fixed_version_a.id]) == 1
+    assert versions_a.get(fixed_version_a.id) is None
     with pytest.raises(ForeignWorkspace):
         rules_b.create(
             workspace_id=ctx_a.workspace.id,

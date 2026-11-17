@@ -1726,6 +1726,116 @@ msgstr ""
 msgid "FIRE files are restored only; they were ignored in this merge."
 msgstr ""
 
+msgid ""
+"Recurring items, income sources, tax rules and work calendars are "
+"restored only; work logs were merged."
+msgstr ""
+
+msgid "No income source with this name or id exists."
+msgstr ""
+
+msgid ""
+"More than one income source has this name; add the income_source_id "
+"column to choose one."
+msgstr ""
+
+msgid "The income source is archived; no work log can be added."
+msgstr ""
+
+msgid "A work log already exists for this income source and month."
+msgstr ""
+
+msgid ""
+"A different work log already exists for this income source and month; it "
+"was not overwritten."
+msgstr ""
+
+msgid ""
+"This month's income was already received; its work log cannot be changed "
+"by an import."
+msgstr ""
+
+msgid "Enter work units as a non-negative number."
+msgstr ""
+
+msgid ""
+"This income source is not variable; work logs apply only to variable "
+"income."
+msgstr ""
+
+msgid "A tax rule id appears more than once."
+msgstr ""
+
+msgid "A tax rule has an invalid kind or base."
+msgstr ""
+
+msgid "A tax rule has two versions for the same date."
+msgstr ""
+
+msgid "A tax rule version has an invalid percent or fixed value."
+msgstr ""
+
+msgid "A tax row references an unknown or differently named tax rule."
+msgstr ""
+
+msgid "An income source id appears more than once."
+msgstr ""
+
+msgid "An income source must use an income category."
+msgstr ""
+
+msgid "An income source has invalid amounts or dates."
+msgstr ""
+
+msgid ""
+"A work or tax row references an unknown or differently named income "
+"source."
+msgstr ""
+
+msgid "A tax attachment id, pair or order appears more than once."
+msgstr ""
+
+msgid "A tax row references an unknown or differently named payment category."
+msgstr ""
+
+msgid "A work log id or income source and month appears more than once."
+msgstr ""
+
+msgid "A work day id or income source and date appears more than once."
+msgstr ""
+
+msgid "A recurring item id appears more than once."
+msgstr ""
+
+msgid "A recurring row's category kind does not match its direction."
+msgstr ""
+
+msgid "A recurring item has an invalid amount, schedule or loan link."
+msgstr ""
+
+msgid "An occurrence id or its item/source date appears more than once."
+msgstr ""
+
+msgid "An occurrence has invalid source, status or amount fields."
+msgstr ""
+
+msgid "An occurrence references an unknown or differently named recurring item."
+msgstr ""
+
+msgid ""
+"A tax occurrence references an unknown parent occurrence or tax "
+"attachment."
+msgstr ""
+
+msgid "An occurrence references a transaction that is not in the archive."
+msgstr ""
+
+msgid "A transaction references an occurrence that does not point back at it."
+msgstr ""
+
+msgid "A true/false column has an invalid value."
+msgstr ""
+
 #, python-format
 msgid ""
 "A linked FIRE input in %(scenario)s has no source data in this archive; "
@@ -11572,8 +11682,8 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Recurring items, income sources, work logs, tax rules, and notifications "
-"are not included in this archive version."
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels are not included."
 msgstr ""
 
 msgid "Download archive"
@@ -11589,16 +11699,17 @@ msgid "Merge data into this workspace"
 msgstr ""
 
 msgid ""
-"Categories, transactions, and planned values; settings and closed months "
-"are not applied."
+"Categories, transactions, planned values, and work logs; settings and "
+"closed months are not applied."
 msgstr ""
 
 msgid "Restore into this workspace"
 msgstr ""
 
 msgid ""
-"Replaces settings, categories, transactions, planned values, and month "
-"states. Only for an empty workspace."
+"Replaces settings, categories, transactions, planned values, month "
+"states, net worth, investments, loans, FIRE, recurring items, income, tax"
+" rules, and work logs. Only for an empty workspace."
 msgstr ""
 
 msgid ""
@@ -11686,6 +11797,24 @@ msgid "Deleted transactions restored"
 msgstr ""
 
 msgid "Month states"
+msgstr ""
+
+msgid "Occurrences"
+msgstr ""
+
+msgid "Income sources"
+msgstr ""
+
+msgid "Tax rules"
+msgstr ""
+
+msgid "Tax rate versions"
+msgstr ""
+
+msgid "Work logs"
+msgstr ""
+
+msgid "Work days"
 msgstr ""
 
 msgid "Instrument allocations"
@@ -11955,6 +12084,12 @@ msgstr ""
 msgid "Categories to archive"
 msgstr ""
 
+msgid "Work logs to remove"
+msgstr ""
+
+msgid "Pending income and tax occurrences to remove"
+msgstr ""
+
 msgid "Instruments to delete"
 msgstr ""
 
@@ -11972,6 +12107,12 @@ msgstr ""
 msgid ""
 "%(count)s of the transactions were edited after the import; they are "
 "removed too."
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s income or tax occurrences stay as history; only pending rows "
+"created by the import with no later history are removed."
 msgstr ""
 
 #, python-format
@@ -14424,5 +14565,36 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "This month"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Recurring items, income sources, work "
+#~ "logs, tax rules, and notifications are"
+#~ " not included in this archive "
+#~ "version."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Categories, transactions, and planned values;"
+#~ " settings and closed months are not"
+#~ " applied."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Replaces settings, categories, transactions, "
+#~ "planned values, and month states. Only"
+#~ " for an empty workspace."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "%(count)s posted income or tax "
+#~ "occurrences stay as history; only "
+#~ "pending ones are removed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "%(count)s posted or skipped income or"
+#~ " tax occurrences stay as history; "
+#~ "only pending ones are removed."
 #~ msgstr ""
 

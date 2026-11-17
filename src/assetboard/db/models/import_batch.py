@@ -31,7 +31,7 @@ class ImportBatch(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "'reference_rate_values_csv', 'loans_csv', 'loan_rate_changes_csv', "
             "'reference_rates_csv', 'loan_cost_components_csv', 'loan_overpayments_csv', "
             "'loan_payments_csv', 'loan_balance_checkpoints_csv', 'loan_scenarios_csv', "
-            "'installment_plans_csv')",
+            "'installment_plans_csv', 'work_logs_csv')",
             name="source_valid",
         ),
         CheckConstraint("mode IN ('restore', 'merge')", name="mode_valid"),

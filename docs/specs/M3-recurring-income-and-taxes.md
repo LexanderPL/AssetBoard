@@ -584,3 +584,43 @@ Implement F3.8 from docs/specs/M3-recurring-income-and-taxes.md as an extension 
 (docs/specs/M4-ledger-export-import.md, ADR-0016): the new files with lineage ids, export, restore order, standalone
 work_logs.csv import in merge mode, exclusions with reasons, emptiness checks, and the extended round-trip test.
 ```
+
+**As built (format 2.3):**
+- The archive format moves to **2.3** (additive). The eight files are
+  `scheduled_items.csv`, `scheduled_occurrences.csv`, `income_sources.csv`, `tax_rules.csv`,
+  `tax_rule_versions.csv`, `income_source_tax_rules.csv`, `work_logs.csv` and `work_days.csv`.
+  Every 2.3 archive requires them (header only when empty); a 2.2 or older archive reads with
+  empty recurring/income/tax/work data. The column reference is in
+  [docs/archive-format.md](../archive-format.md).
+- `transactions.csv` gains `source` and `scheduled_occurrence_id`. The latter is derived on
+  export from the occurrence that points at the transaction; the ledger keeps no such column.
+  A 2.2 archive restores every row as `import` (or `investment` when it is a linked dividend).
+- Restore order: tax rules and versions, income sources, tax attachments, work logs and days
+  after categories and before transactions; recurring items after categories and loans;
+  occurrences after transactions, income sources and tax attachments. Parent occurrences are
+  restored before their tax children. Archived ids are preserved when the target database does
+  not already use them, and every reference is mapped to the restored row.
+- Merge imports `work_logs.csv` only. A row matches an income source by archived id first and
+  case-folded name otherwise; a source that is missing, archived, non-variable or ambiguous is
+  listed. A
+  month that already has a log is never overwritten: identical units are
+  a duplicate, anything else a conflict. Closed months, a closed pay month and months whose
+  income was already received are skipped and listed. A created log is stored as directly
+  entered (`derived_from_days=false`, because work days are restore-only) and recalculates the
+  month's pending income and tax occurrences through the normal F3.4 path. The other seven
+  files trigger one `recurring_restore_only` warning in a merge.
+- A lone `work_logs.csv` is importable through the new `work_logs_csv` source (migration
+  `0068_f38_work_logs_import`); the minimal header is `income_source,work_month,units`, with
+  optional `income_source_id` and `derived_from_days`.
+- Restore rollback removes the restored recurring, income, tax and work rows in dependency
+  order; tax rate versions use an explicit batch-delete path because the table is append-only.
+  A row added or changed after the restore still blocks rollback. A merge rollback removes the
+  work logs its report recorded, deletes fully pending income/tax families the recalculation
+  created (descendants included), recalculates pending occurrences that existed before the
+  import, and keeps a created family at its imported values when any of its rows is posted,
+  skipped or added later. A closed work, pay or occurrence month still blocks the rollback.
+- Notification channels and logs remain excluded (secret Apprise URLs and delivery history).
+  The M3 models are in `ARCHIVE_INCLUDED_MODELS`; notification models stay in
+  `ARCHIVE_EXCLUDED_MODELS`.
+- Golden archive `tests/fixtures/workspace-archive-v2.3.zip` covers one of every new row;
+  `workspace-archive-v2.2.zip` still reads.

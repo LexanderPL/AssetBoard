@@ -30,6 +30,10 @@
     <div><dt class="text-muted">{{ _("Categories to delete") }}</dt><dd>{{ preview.counts.categories_to_delete|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Categories to archive") }}</dt><dd>{{ preview.counts.categories_to_archive|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Item valuations to remove") }}</dt><dd>{{ preview.counts.valuations|default(0) }}</dd></div>
+    {% if preview.counts.work_logs %}
+    <div><dt class="text-muted">{{ _("Work logs to remove") }}</dt><dd>{{ preview.counts.work_logs }}</dd></div>
+    <div><dt class="text-muted">{{ _("Pending income and tax occurrences to remove") }}</dt><dd>{{ preview.counts.work_log_occurrences }}</dd></div>
+    {% endif %}
     {% if preview.batch.source == 'investment_transactions_csv' %}
     <div><dt class="text-muted">{{ _("Instruments to delete") }}</dt><dd>{{ preview.counts.instruments_deleted|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Instruments to archive") }}</dt><dd>{{ preview.counts.instruments_archived|default(0) }}</dd></div>
@@ -44,6 +48,9 @@
     {{ _("%(count)s of the transactions were edited after the import; they are removed too.", count=preview.counts.edited) }}
     {% endif %}
   </p>
+  {% endif %}
+  {% if preview.counts.work_log_occurrences_kept %}
+  <p class="mt-4 text-sm">{{ _("%(count)s income or tax occurrences stay as history; only pending rows created by the import with no later history are removed.", count=preview.counts.work_log_occurrences_kept) }}</p>
   {% endif %}
   {% if preview.closed_months %}<p class="mt-4 text-sm text-danger">{{ _("Rollback is not possible while these months are closed: %(months)s", months=preview.closed_months|join(", ")) }}</p>{% endif %}
   {% endif %}

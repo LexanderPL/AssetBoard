@@ -22,6 +22,7 @@ TRANSACTIONS = "transactions_csv"
 BUDGET_LINES = "budget_lines_csv"
 CATEGORIES = "categories_csv"
 ITEM_VALUATIONS = "item_valuations_csv"
+WORK_LOGS = "work_logs_csv"
 INVESTMENT_TRANSACTIONS = "investment_transactions_csv"
 MONTHS = "months_csv"
 REFERENCE_RATE_VALUES = "reference_rate_values_csv"
@@ -55,6 +56,16 @@ KNOWN_COLUMNS: dict[str, frozenset[str]] = {
     ),
     ITEM_VALUATIONS: frozenset(
         {"id", "item_id", "item", "as_of", "value", "currency", "note", "created_at"}
+    ),
+    WORK_LOGS: frozenset(
+        {
+            "id",
+            "income_source_id",
+            "income_source",
+            "work_month",
+            "units",
+            "derived_from_days",
+        }
     ),
     INVESTMENT_TRANSACTIONS: frozenset(
         {
@@ -189,6 +200,7 @@ REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
     BUDGET_LINES: frozenset({"month", "category", "planned"}),
     CATEGORIES: frozenset({"kind", "name"}),
     ITEM_VALUATIONS: frozenset({"item", "as_of", "value"}),
+    WORK_LOGS: frozenset({"income_source", "work_month", "units"}),
     INVESTMENT_TRANSACTIONS: frozenset({"instrument", "date", "type", "quantity", "unit_price"}),
     MONTHS: frozenset({"month"}),
     REFERENCE_RATE_VALUES: frozenset({"reference_rate", "effective_from", "value_bp"}),
@@ -279,6 +291,7 @@ def classify_header(cells: tuple[str, ...] | list[str]) -> HeaderClassification:
         BUDGET_LINES,
         CATEGORIES,
         ITEM_VALUATIONS,
+        WORK_LOGS,
         INVESTMENT_TRANSACTIONS,
         REFERENCE_RATE_VALUES,
         REFERENCE_RATES,

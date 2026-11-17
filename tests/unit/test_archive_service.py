@@ -124,6 +124,14 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "transactions": 1,
             "budget_lines": 1,
             "months": 1,
+            "scheduled_items": 0,
+            "scheduled_occurrences": 0,
+            "income_sources": 0,
+            "tax_rules": 0,
+            "tax_rule_versions": 0,
+            "income_source_tax_rules": 0,
+            "work_logs": 0,
+            "work_days": 0,
             "networth_categories": 0,
             "networth_items": 0,
             "item_valuations": 0,
@@ -317,7 +325,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "2.2"
+    assert parsed.manifest["format_version"] == "2.3"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 

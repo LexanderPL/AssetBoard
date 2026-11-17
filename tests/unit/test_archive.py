@@ -25,6 +25,8 @@ from assetboard.domain.archive import (
     FireLoanSettingRow,
     FirePlanRow,
     FxRateRow,
+    IncomeSourceRow,
+    IncomeSourceTaxRuleRow,
     InstallmentPlanRow,
     InstrumentAllocationRow,
     InstrumentRow,
@@ -47,14 +49,21 @@ from assetboard.domain.archive import (
     ReferenceRateRow,
     ReferenceRateValueRow,
     RiskTargetPolicyRow,
+    ScheduledItemRow,
+    ScheduledOccurrenceRow,
+    TaxRuleRow,
+    TaxRuleVersionRow,
     TransactionRow,
+    WorkDayRow,
+    WorkLogRow,
     decimal_text,
     parse_archive,
     write_archive,
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v2.2.zip"
+GOLDEN = FIXTURES / "workspace-archive-v2.3.zip"
+GOLDEN_V2_2 = FIXTURES / "workspace-archive-v2.2.zip"
 GOLDEN_V2_1 = FIXTURES / "workspace-archive-v2.1.zip"
 GOLDEN_V2_0 = FIXTURES / "workspace-archive-v2.0.zip"
 GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
@@ -71,7 +80,18 @@ EXPORTED_AT = datetime(2026, 10, 18, 14, 30, tzinfo=UTC)
 
 def _rows() -> ArchiveRows:
     category_id = "2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01"
+    salary_id = "91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77"
     transaction_id = "5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02"
+    tax_rule_id = "0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6"
+    tax_version_id = "1e2f3a4b-5c6d-4e7f-90a1-92a3b4c5d6e7"
+    income_source_id = "2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8"
+    attachment_id = "3a4b5c6d-7e8f-4091-82c3-b4c5d6e7f809"
+    work_log_id = "4b5c6d7e-8f90-41a2-93d4-c5d6e7f8091a"
+    work_day_id = "5c6d7e8f-90a1-42b3-84e5-d6e7f8091a2b"
+    scheduled_item_id = "6d7e8f90-a1b2-43c4-95f6-e7f8091a2b3c"
+    rule_occurrence_id = "7e8f90a1-b2c3-44d5-86a7-f8091a2b3c4d"
+    income_occurrence_id = "8f90a1b2-c3d4-45e6-97b8-091a2b3c4d5e"
+    tax_occurrence_id = "90a1b2c3-d4e5-46f7-a8c9-1a2b3c4d5e6f"
     networth_category_id = "3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70"
     networth_item_id = "c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f"
     linked_item_id = "d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f80"
@@ -130,7 +150,10 @@ def _rows() -> ArchiveRows:
                 "tolerance_bp": 500,
             },
         },
-        categories=(CategoryRow(category_id, "expense", "Food", "regular", "#4f9d69", 0, None),),
+        categories=(
+            CategoryRow(category_id, "expense", "Food", "regular", "#4f9d69", 0, None),
+            CategoryRow(salary_id, "income", "Salary", "regular", "#2f7f5f", 0, None),
+        ),
         budget_lines=(BudgetLineRow("2026-09", "expense", "Food", "550.00", "EUR", category_id),),
         transactions=(
             TransactionRow(
@@ -143,9 +166,197 @@ def _rows() -> ArchiveRows:
                 category_id,
                 transaction_id,
                 "2026-09-03T07:12:44Z",
+                "recurring",
+                rule_occurrence_id,
             ),
         ),
         months=(MonthRow("2026-09", None, "2026-09-01T06:30:12Z"),),
+        tax_rules=(
+            TaxRuleRow(
+                tax_rule_id,
+                "VAT",
+                "added",
+                "net",
+                20,
+                "next_month",
+                category_id,
+                "Food",
+                "Quarterly",
+                None,
+            ),
+        ),
+        tax_rule_versions=(
+            TaxRuleVersionRow(
+                tax_version_id,
+                tax_rule_id,
+                "VAT",
+                "2026-01-01",
+                "percent",
+                2300,
+                "",
+            ),
+        ),
+        income_sources=(
+            IncomeSourceRow(
+                income_source_id,
+                "Clients",
+                "variable",
+                salary_id,
+                "Salary",
+                "EUR",
+                "",
+                "100.00",
+                "day",
+                10,
+                1,
+                "manual",
+                "",
+                3,
+                "2026-01-01",
+                None,
+                None,
+            ),
+        ),
+        income_source_tax_rules=(
+            IncomeSourceTaxRuleRow(
+                attachment_id,
+                income_source_id,
+                "Clients",
+                tax_rule_id,
+                "VAT",
+                0,
+                "true",
+                None,
+                "",
+                20,
+                1,
+            ),
+        ),
+        work_logs=(
+            WorkLogRow(
+                work_log_id,
+                income_source_id,
+                "Clients",
+                "2026-09",
+                "12.5",
+                "false",
+            ),
+        ),
+        work_days=(
+            WorkDayRow(
+                work_day_id,
+                income_source_id,
+                "Clients",
+                "2026-09-02",
+                "1",
+            ),
+        ),
+        scheduled_items=(
+            ScheduledItemRow(
+                scheduled_item_id,
+                "Rent",
+                "expense",
+                category_id,
+                "Food",
+                None,
+                "",
+                "fixed",
+                "1000.00",
+                "EUR",
+                "2026-09-01",
+                None,
+                None,
+                "monthly",
+                1,
+                "[]",
+                "1",
+                1,
+                "none",
+                "On the first",
+                "false",
+                "false",
+                3,
+                None,
+                None,
+            ),
+        ),
+        scheduled_occurrences=(
+            ScheduledOccurrenceRow(
+                rule_occurrence_id,
+                scheduled_item_id,
+                "Rent",
+                None,
+                "",
+                None,
+                None,
+                None,
+                "expense",
+                category_id,
+                "Food",
+                "2026-09-02",
+                "2026-09-02",
+                "4.20",
+                "EUR",
+                "confirmed",
+                "posted",
+                "rule",
+                transaction_id,
+                None,
+                None,
+                "false",
+                "Bakery",
+            ),
+            ScheduledOccurrenceRow(
+                income_occurrence_id,
+                None,
+                "",
+                income_source_id,
+                "Clients",
+                "2026-09",
+                None,
+                None,
+                "income",
+                salary_id,
+                "Salary",
+                "2026-10-10",
+                "2026-10-10",
+                "1250.00",
+                "EUR",
+                "estimated",
+                "pending",
+                "income",
+                None,
+                None,
+                None,
+                "false",
+                "Clients, September",
+            ),
+            ScheduledOccurrenceRow(
+                tax_occurrence_id,
+                None,
+                "",
+                None,
+                "",
+                None,
+                income_occurrence_id,
+                attachment_id,
+                "expense",
+                category_id,
+                "Food",
+                "2026-10-20",
+                "2026-10-20",
+                "287.50",
+                "EUR",
+                "confirmed",
+                "pending",
+                "tax",
+                None,
+                None,
+                None,
+                "false",
+                "VAT on Clients",
+            ),
+        ),
         networth_categories=(
             NetWorthCategoryRow(networth_category_id, "asset", "Vehicles", "#3b6ea8", 0, None),
         ),
@@ -556,6 +767,18 @@ def test_archive_matches_golden_and_is_deterministic() -> None:
     assert _archive() == _archive()
 
 
+def test_released_v2_2_archive_still_reads() -> None:
+    parsed, errors = parse_archive(GOLDEN_V2_2.read_bytes())
+    assert errors == ()
+    assert parsed is not None
+    assert parsed.manifest["format_version"] == "2.2"
+    assert parsed.rows.scheduled_items == ()
+    assert parsed.rows.income_sources == ()
+    assert parsed.rows.tax_rules == ()
+    assert parsed.rows.work_logs == ()
+    assert parsed.rows.transactions[0].source == ""
+
+
 def test_released_v2_1_archive_still_reads() -> None:
     parsed, errors = parse_archive(GOLDEN_V2_1.read_bytes())
     assert errors == ()
@@ -913,16 +1136,35 @@ def test_reader_checks_counts_currency_and_versions() -> None:
 
 
 def test_reader_accepts_reordered_columns_bom_defaults_and_future_minor() -> None:
-    files = _files()
+    from assetboard.domain.archive import build_files
+
+    rows = ArchiveRows(
+        workspace=_rows().workspace,
+        categories=(
+            CategoryRow(
+                "2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01",
+                "expense",
+                "Food",
+                "regular",
+                "#4f9d69",
+                0,
+                None,
+            ),
+        ),
+        budget_lines=(),
+        transactions=(),
+        months=(),
+    )
+    files = build_files(rows)
     files["categories.csv"] = (
         "\ufeffname,id,kind,future\nFood,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,expense,x\n"
     ).encode()
-    parsed, errors = parse_archive(_rewrite(files, format_version="2.3", future=True))
+    parsed, errors = parse_archive(_rewrite(files, format_version="2.4", future=True))
     assert not errors and parsed is not None
     assert parsed.rows.categories[0].treatment == "regular"
     assert parsed.rows.categories[0].sort_order == 0
     assert sorted(w.message for w in parsed.warnings) == [
-        "newer minor version: 2.3",
+        "newer minor version: 2.4",
         "unknown column: future",
         "unknown key: future",
     ]
@@ -1020,7 +1262,12 @@ def test_filtered_csv_columns_match_archive() -> None:
     from assetboard.domain.archive import CSV_COLUMNS
     from assetboard.domain.ledger_csv import TRANSACTION_EXPORT_COLUMNS
 
-    assert CSV_COLUMNS["transactions.csv"] == (*TRANSACTION_EXPORT_COLUMNS, "deleted_at")
+    assert CSV_COLUMNS["transactions.csv"] == (
+        *TRANSACTION_EXPORT_COLUMNS,
+        "source",
+        "scheduled_occurrence_id",
+        "deleted_at",
+    )
 
 
 def test_zip_metadata_and_lossless_text() -> None:
@@ -1406,6 +1653,21 @@ def test_reader_rejects_invalid_investment_rows(
         (
             lambda rows: replace(
                 rows,
+                loan_cost_components=(
+                    replace(
+                        rows.loan_cost_components[0],
+                        mode="fixed",
+                        rate_bp=None,
+                        fixed_amount="0.00",
+                    ),
+                ),
+            ),
+            "invalid precision or zero amount",
+            "loan_cost_components.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
                 loan_payments=(replace(rows.loan_payments[0], total="2000.01"),),
             ),
             "loan payment components differ",
@@ -1699,7 +1961,98 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 38)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 49)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 36)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 47)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)
+
+
+@pytest.mark.parametrize(
+    ("name", "row", "column", "value", "message"),
+    [
+        ("tax_rule_versions.csv", 0, "tax_rule", "Other", "tax rule reference mismatch"),
+        ("income_sources.csv", 0, "kind", "fixed", "invalid income source amount"),
+        (
+            "income_sources.csv",
+            0,
+            "category_id",
+            "0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6",
+            "category reference mismatch",
+        ),
+        ("work_logs.csv", 0, "units", "-1", "invalid decimal"),
+        ("scheduled_items.csv", 0, "weekdays", "nope", "invalid weekdays"),
+        ("scheduled_items.csv", 0, "freq", "weekly", "a weekly item needs weekdays"),
+        ("scheduled_items.csv", 0, "month_day", "32", "invalid month day"),
+        (
+            "scheduled_occurrences.csv",
+            0,
+            "transaction_id",
+            "",
+            "a posted occurrence needs a transaction",
+        ),
+        ("scheduled_occurrences.csv", 0, "status", "pending", "invalid occurrence transaction"),
+        ("transactions.csv", 0, "source", "other", "invalid transaction source"),
+        (
+            "transactions.csv",
+            0,
+            "scheduled_occurrence_id",
+            "8f90a1b2-c3d4-45e6-97b8-091a2b3c4d5e",
+            "scheduled occurrence reference mismatch",
+        ),
+    ],
+)
+def test_reader_validates_m3_rows(
+    name: str, row: int, column: str, value: str, message: str
+) -> None:
+    files = _files()
+    _edit_csv(files, name, row, column, value)
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.file == name and error.message == message for error in errors), errors
+
+
+def test_m3_files_are_required_in_2_3() -> None:
+    from assetboard.domain.archive import M3_CSV_FILES, required_files
+
+    assert all(name in required_files("2.3") for name in M3_CSV_FILES)
+    assert not any(name in required_files("2.2") for name in M3_CSV_FILES)
+    with ZipFile(io.BytesIO(_archive())) as source:
+        members = {name: source.read(name) for name in source.namelist() if name != "work_logs.csv"}
+    output = io.BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    parsed, errors = parse_archive(output.getvalue())
+    assert parsed is None
+    assert errors == (ArchiveError("archive", "missing required members"),)
+
+
+def test_income_source_expected_units_zero_and_invalid_values() -> None:
+    rows = _rows()
+    zero = replace(
+        rows,
+        income_sources=(
+            replace(rows.income_sources[0], expected_mode="fixed", expected_units="0"),
+        ),
+    )
+    parsed, errors = parse_archive(_archive(zero))
+    assert errors == () and parsed is not None
+    assert parsed.rows.income_sources[0].expected_units == "0"
+
+    for value in ("abc", "-1", "NaN"):
+        files = _files()
+        _edit_csv(files, "income_sources.csv", 0, "expected_units", value)
+        parsed, errors = parse_archive(_rewrite(files))
+        assert parsed is None
+        assert any(error.column == "expected_units" for error in errors), value
+
+
+def test_income_source_fixed_amount_must_be_positive() -> None:
+    files = _files()
+    _edit_csv(files, "income_sources.csv", 0, "kind", "fixed")
+    _edit_csv(files, "income_sources.csv", 0, "fixed_amount", "0.00")
+    _edit_csv(files, "income_sources.csv", 0, "rate", "")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "invalid precision or zero amount" for error in errors)
+    assert any(error.column == "fixed_amount" for error in errors)

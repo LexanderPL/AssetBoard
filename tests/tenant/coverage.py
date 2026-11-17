@@ -95,6 +95,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "effective",
             "any_fixed_amount",
             "update_future",
+            "delete_for_restore",
         )
     },
     **{

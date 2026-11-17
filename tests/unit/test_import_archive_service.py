@@ -2012,6 +2012,7 @@ def test_restore_rollback_is_refused_after_a_change(db: WorkspaceDb, data_dir: P
     [
         ("workspace-archive-v1.0.zip", False, None),
         ("workspace-archive-v1.1.zip", True, 14),
+        ("workspace-archive-v2.3.zip", True, 14),
     ],
 )
 def test_restore_reads_released_golden_archives(
@@ -2301,7 +2302,7 @@ def test_newer_major_archive_is_refused_and_newer_minor_warns(
     assert major["errors"][0]["code"] == "newer_major_version"
     assert major["counts"]["invalid"] == 1
 
-    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.3"), ctx=ctx)
+    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.4"), ctx=ctx)
     minor = _plan(db, data_dir, minor_batch, ctx=ctx)
     assert minor["counts"]["invalid"] == 0
     assert any(warning["code"] == "newer_minor_version" for warning in minor["warnings"])
@@ -2476,8 +2477,7 @@ def test_restore_rollback_refuses_settings_month_and_m3_changes(
     assert {
         "restore_months_changed",
         "restore_settings_changed",
-        "restore_m3_rows_added",
-        "restore_m3_references",
+        "restore_rows_added",
     } <= set(preview.blocked_reasons)
     with pytest.raises(ImportRestoreRollbackBlocked):
         rollback_import(db.factory, target_ctx, batch_id)
@@ -2521,6 +2521,7 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
         "investment_restore_only",
         "loan_restore_only",
         "fire_restore_only",
+        "recurring_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
@@ -2548,6 +2549,7 @@ def test_merge_into_another_workspace_keeps_settings_and_maps_archived(
         "investment_restore_only",
         "loan_restore_only",
         "fire_restore_only",
+        "recurring_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=target_ctx)
     with db.factory() as session:
@@ -2999,3 +3001,931 @@ def test_loans_and_reference_rates_make_a_workspace_non_empty(db: WorkspaceDb) -
             archived_at=None,
         )
         assert not workspace_is_empty(session, ctx)
+
+
+def _m3_source_workspace(db: WorkspaceDb) -> None:
+    """One source with a tax rule, work logs, recurring rules and linked occurrences."""
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        IncomeSourceTaxRuleRepository,
+        ScheduledOccurrenceRepository,
+        TaxRuleRepository,
+        TaxRuleVersionRepository,
+        WorkDayRepository,
+        WorkLogRepository,
+    )
+
+    ctx = db.ctx("own", "owner")
+    with db.factory.begin() as session:
+        categories = CategoryRepository(session, ctx)
+        food = categories.create(
+            name="Food",
+            name_key="food",
+            kind="expense",
+            treatment="regular",
+            color="#4f9d69",
+            sort_order=0,
+        )
+        salary = categories.create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        tax = TaxRuleRepository(session, ctx).create(
+            name="VAT",
+            kind="added",
+            base="net",
+            payment_day=20,
+            payment_timing="next_month",
+            payment_category_id=food.id,
+        )
+        TaxRuleVersionRepository(session, ctx).create(
+            tax_rule_id=tax.id,
+            effective_from=date(2026, 1, 1),
+            mode="percent",
+            rate_bp=2300,
+        )
+        source = IncomeSourceRepository(session, ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=salary.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+        attachment = IncomeSourceTaxRuleRepository(session, ctx).create(
+            income_source_id=source.id,
+            tax_rule_id=tax.id,
+            sort_order=0,
+            generate_payment=True,
+            due_day=20,
+            due_month_offset=1,
+        )
+        WorkLogRepository(session, ctx).create(
+            income_source_id=source.id,
+            work_month=date(2026, 2, 1),
+            units=Decimal("12.5"),
+        )
+        WorkDayRepository(session, ctx).create(
+            income_source_id=source.id,
+            work_date=date(2026, 2, 2),
+            units=Decimal("1"),
+        )
+        item = ScheduledItemRepository(session, ctx).create(
+            name="Rent",
+            direction="expense",
+            category_id=food.id,
+            amount_mode="fixed",
+            amount_minor=100_000,
+            currency="EUR",
+            start_date=date(2026, 1, 1),
+            freq="monthly",
+            interval=1,
+            weekdays=[],
+            month_day="1",
+            month=1,
+            weekend_policy="none",
+            notes="On the first",
+            auto_post=False,
+            reminder_lead_days=3,
+        )
+        occurrences = ScheduledOccurrenceRepository(session, ctx)
+        occurrences.create(
+            scheduled_item_id=item.id,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=None,
+            income_source_tax_rule_id=None,
+            direction="expense",
+            category_id=food.id,
+            nominal_date=date(2026, 2, 1),
+            due_date=date(2026, 2, 1),
+            expected_minor=100_000,
+            currency="EUR",
+            amount_state="confirmed",
+            status="pending",
+            generated_by="rule",
+            label="Rent",
+        )
+        transaction = TransactionRepository(session, ctx).create(
+            direction="expense",
+            day=date(2026, 3, 1),
+            amount_minor=100_000,
+            currency="EUR",
+            category_id=food.id,
+            description="Rent paid",
+            description_key="rent paid",
+            source="recurring",
+            created_by_user_id=db.users["own"],
+        )
+        occurrences.create(
+            scheduled_item_id=item.id,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=None,
+            income_source_tax_rule_id=None,
+            direction="expense",
+            category_id=food.id,
+            nominal_date=date(2026, 3, 1),
+            due_date=date(2026, 3, 1),
+            expected_minor=100_000,
+            currency="EUR",
+            amount_state="confirmed",
+            status="posted",
+            generated_by="rule",
+            transaction_id=transaction.id,
+            label="Rent",
+        )
+        income_occurrence = occurrences.create(
+            scheduled_item_id=None,
+            income_source_id=source.id,
+            work_month=date(2026, 2, 1),
+            parent_occurrence_id=None,
+            income_source_tax_rule_id=None,
+            direction="income",
+            category_id=salary.id,
+            nominal_date=date(2026, 3, 10),
+            due_date=date(2026, 3, 10),
+            expected_minor=12_500,
+            currency="EUR",
+            amount_state="estimated",
+            status="pending",
+            generated_by="income",
+            label="Clients, February",
+        )
+        occurrences.create(
+            scheduled_item_id=None,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=income_occurrence.id,
+            income_source_tax_rule_id=attachment.id,
+            direction="expense",
+            category_id=food.id,
+            nominal_date=date(2026, 3, 20),
+            due_date=date(2026, 3, 20),
+            expected_minor=2_875,
+            currency="EUR",
+            amount_state="confirmed",
+            status="pending",
+            generated_by="tax",
+            label="VAT on Clients",
+        )
+
+
+def test_m3_rows_export_restore_and_round_trip(db: WorkspaceDb, tmp_path: Path) -> None:
+    _m3_source_workspace(db)
+    source_ctx = db.ctx("own", "owner")
+    first = export_workspace(db.factory, source_ctx).content
+    parsed, errors = parse_archive(first)
+    assert errors == (), errors
+    assert parsed is not None
+    assert parsed.manifest["format_version"] == "2.3"
+    rows = parsed.rows
+    assert [row.name for row in rows.tax_rules] == ["VAT"]
+    assert rows.tax_rule_versions[0].rate_bp == 2300
+    assert rows.income_sources[0].rate == "100.00"
+    assert rows.income_sources[0].expected_mode == "manual"
+    assert rows.income_source_tax_rules[0].generate_payment == "true"
+    assert rows.work_logs[0].units == "12.5"
+    assert rows.work_days[0].work_date == "2026-02-02"
+    assert [row.name for row in rows.scheduled_items] == ["Rent"]
+    assert rows.scheduled_items[0].weekdays == "[]"
+    assert rows.scheduled_items[0].reminder_lead_days == 3
+    assert len(rows.scheduled_occurrences) == 4
+    posted = next(row for row in rows.scheduled_occurrences if row.status == "posted")
+    assert any(row.id == posted.transaction_id for row in rows.transactions)
+    assert any(
+        row.generated_by == "tax" and row.parent_occurrence_id for row in rows.scheduled_occurrences
+    )
+    linked = next(row for row in rows.transactions if row.scheduled_occurrence_id)
+    assert linked.scheduled_occurrence_id == posted.id
+    assert linked.source == "recurring"
+
+    fresh_dir = tmp_path / "fresh"
+    fresh_dir.mkdir()
+    fresh = workspace_db(fresh_dir)
+    target_db = next(fresh)
+    try:
+        target_db.add_member("own", "owner")
+        target_ctx = target_db.ctx("own", "owner")
+        import_dir = tmp_path / "fresh-imports"
+        import_dir.mkdir()
+        batch_id = _upload(target_db, import_dir, first, ctx=target_ctx)
+        report = _plan(target_db, import_dir, batch_id, ctx=target_ctx)
+        assert report["counts"]["invalid"] == 0, report
+        assert report["counts"]["scheduled_items_created"] == 1
+        assert report["counts"]["scheduled_occurrences_created"] == 4
+        assert report["counts"]["work_logs_created"] == 1
+        assert report["counts"]["work_days_created"] == 1
+        assert report["counts"]["tax_rule_versions_created"] == 1
+        _apply(target_db, import_dir, batch_id, ctx=target_ctx)
+
+        second = export_workspace(target_db.factory, target_ctx).content
+        second_parsed, second_errors = parse_archive(second)
+        assert second_errors == () and second_parsed is not None
+        for name in (
+            "scheduled_items.csv",
+            "scheduled_occurrences.csv",
+            "income_sources.csv",
+            "tax_rules.csv",
+            "tax_rule_versions.csv",
+            "income_source_tax_rules.csv",
+            "work_logs.csv",
+            "work_days.csv",
+            "transactions.csv",
+        ):
+            assert parsed.files[name] == second_parsed.files[name], name
+
+        from assetboard.db.repositories import (
+            IncomeSourceRepository,
+            ScheduledOccurrenceRepository,
+            WorkDayRepository,
+            WorkLogRepository,
+        )
+
+        with target_db.factory() as session:
+            source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+            assert source.rate_minor == 10_000
+            assert WorkLogRepository(session, target_ctx).for_source(source.id)[0].units == Decimal(
+                "12.5"
+            )
+            assert WorkDayRepository(session, target_ctx).for_month(
+                source.id, date(2026, 2, 1), date(2026, 2, 28)
+            )[0].units == Decimal("1")
+            occurrences = ScheduledOccurrenceRepository(session, target_ctx)
+            item = ScheduledItemRepository(session, target_ctx).ordered()[0]
+            assert len(occurrences.for_item(item.id)) == 2
+            assert len(occurrences.for_income_source(source.id)) == 1
+    finally:
+        target_db.engine.dispose()
+
+
+def test_work_logs_merge_by_source_name_and_never_overwrite(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import IncomeSourceRepository, WorkLogRepository
+
+    _m3_source_workspace(db)
+    content = export_workspace(db.factory, db.ctx("own", "owner")).content
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["work_logs_created"] == 1
+    assert any(warning["code"] == "recurring_restore_only" for warning in report["warnings"])
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        logs = WorkLogRepository(session, target_ctx).for_source(source.id)
+        assert [(row.work_month, row.units) for row in logs] == [
+            (date(2026, 2, 1), Decimal("12.5"))
+        ]
+        assert not ScheduledItemRepository(session, target_ctx).any_exists()
+
+    again = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    repeated = _plan(db, data_dir, again, ctx=target_ctx)
+    assert repeated["counts"]["to_create"] == 0
+    assert any(entry["code"] == "already_logged" for entry in repeated["skipped"])
+
+    standalone = b"income_source,work_month,units,derived_from_days\nClients,2026-03,9,false\n"
+    batch_id = _upload(db, data_dir, standalone, ctx=target_ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["to_create"] == 1
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        assert [
+            row.work_month for row in WorkLogRepository(session, target_ctx).for_source(source.id)
+        ] == [
+            date(2026, 2, 1),
+            date(2026, 3, 1),
+        ]
+    repeated_standalone = _upload(db, data_dir, standalone, ctx=target_ctx, mode="merge")
+    repeated = _plan(db, data_dir, repeated_standalone, ctx=target_ctx)
+    assert repeated["counts"]["to_create"] == 0
+    assert any(entry["code"] == "already_logged" for entry in repeated["skipped"])
+
+
+def test_restore_rollback_removes_the_restored_m3_rows(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        ScheduledOccurrenceRepository,
+        TaxRuleRepository,
+        WorkLogRepository,
+    )
+
+    _m3_source_workspace(db)
+    content = export_workspace(db.factory, db.ctx("own", "owner")).content
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx)
+    assert _plan(db, data_dir, batch_id, ctx=target_ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert preview.blocked_reasons == ()
+    result = rollback_import(db.factory, target_ctx, batch_id)
+    assert result["m3_rows_deleted"] > 0
+    with db.factory() as session:
+        assert not ScheduledItemRepository(session, target_ctx).any_exists()
+        assert not ScheduledOccurrenceRepository(session, target_ctx).any_exists()
+        assert not IncomeSourceRepository(session, target_ctx).any_exists()
+        assert not TaxRuleRepository(session, target_ctx).any_exists()
+        assert not WorkLogRepository(session, target_ctx).any_exists()
+
+
+def test_every_archive_parser_code_has_a_report_message() -> None:
+    from assetboard.services.imports import _PARSER_CODES, REPORT_MESSAGES
+
+    missing = set(_PARSER_CODES.values()) - set(REPORT_MESSAGES)
+    assert not missing, sorted(missing)
+
+
+def test_work_log_import_rollback_removes_logs_and_created_occurrences(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        ScheduledOccurrenceRepository,
+        WorkLogRepository,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+    content = b"income_source,work_month,units\nClients,2026-03,10\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    assert _plan(db, data_dir, batch_id, ctx=target_ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    source = None
+    with db.factory() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        assert WorkLogRepository(session, target_ctx).for_source(source.id)
+        assert ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert preview.counts["work_logs"] == 1
+    assert preview.counts["work_log_occurrences"] >= 1
+    counts = rollback_import(db.factory, target_ctx, batch_id)
+    assert counts["work_logs"] == 1
+    with db.factory() as session:
+        assert not WorkLogRepository(session, target_ctx).for_source(source.id)
+        assert not ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)
+
+
+def test_work_log_merge_skips_a_closed_pay_month_and_a_fixed_source(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        MonthStateRepository,
+        WorkLogRepository,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Fixed",
+            kind="fixed",
+            category_id=category.id,
+            currency="EUR",
+            fixed_minor=100_000,
+            unit_label="month",
+            pay_day=10,
+            pay_lag_months=0,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+        months = MonthStateRepository(session, target_ctx)
+        state = months.create(YearMonth(2026, 4))
+        months.update(state.id, closed_at=db.clock.now())
+    content = b"income_source,work_month,units\nClients,2026-03,10\nFixed,2026-02,1\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["to_create"] == 0
+    assert any(entry["code"] == "closed_month" for entry in report["skipped"])
+    assert any(entry["code"] == "income_source_not_variable" for entry in report["skipped"])
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory() as session:
+        source = next(
+            row
+            for row in IncomeSourceRepository(session, target_ctx).ordered()
+            if row.name == "Clients"
+        )
+        assert WorkLogRepository(session, target_ctx).for_source(source.id) == []
+
+
+def test_archive_merge_duplicate_named_sources_do_not_fail(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.db.repositories import IncomeSourceRepository, WorkLogRepository
+    from assetboard.domain.archive import (
+        ArchiveRows,
+        CategoryRow,
+        IncomeSourceRow,
+        WorkLogRow,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+    category_id = str(uuid4())
+    first = str(uuid4())
+    second = str(uuid4())
+    rows = ArchiveRows(
+        workspace={
+            "name": "Source",
+            "base_currency": "EUR",
+            "country_code": None,
+            "timezone": "UTC",
+            "locale": "en",
+            "auto_copy_plan": False,
+        },
+        categories=(CategoryRow(category_id, "income", "Salary", "regular", "#2f7f5f", 0, None),),
+        budget_lines=(),
+        transactions=(),
+        months=(),
+        income_sources=(
+            IncomeSourceRow(
+                first,
+                "Clients",
+                "variable",
+                category_id,
+                "Salary",
+                "EUR",
+                "",
+                "100.00",
+                "day",
+                10,
+                1,
+                "manual",
+                "",
+                3,
+                "2026-01-01",
+                None,
+                None,
+            ),
+            IncomeSourceRow(
+                second,
+                "Clients",
+                "variable",
+                category_id,
+                "Salary",
+                "EUR",
+                "",
+                "100.00",
+                "day",
+                10,
+                1,
+                "manual",
+                "",
+                3,
+                "2026-01-01",
+                None,
+                None,
+            ),
+        ),
+        work_logs=(
+            WorkLogRow(str(uuid4()), first, "Clients", "2026-02", "5", "false"),
+            WorkLogRow(str(uuid4()), second, "Clients", "2026-02", "6", "false"),
+        ),
+    )
+    content = _archive(rows)
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["work_logs_created"] == 1
+    assert report["counts"]["conflicts_skipped"] >= 1
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        logs = WorkLogRepository(session, target_ctx).for_source(source.id)
+        assert [(row.work_month, row.units) for row in logs] == [(date(2026, 2, 1), Decimal("5"))]
+
+
+def test_work_log_rollback_restores_a_preexisting_occurrence_and_keeps_later_children(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        ScheduledOccurrenceRepository,
+        WorkLogRepository,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        source = IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+        parent = ScheduledOccurrenceRepository(session, target_ctx).create(
+            scheduled_item_id=None,
+            income_source_id=source.id,
+            work_month=date(2026, 3, 1),
+            parent_occurrence_id=None,
+            income_source_tax_rule_id=None,
+            direction="income",
+            category_id=category.id,
+            nominal_date=date(2026, 4, 10),
+            due_date=date(2026, 4, 10),
+            expected_minor=1234,
+            currency="EUR",
+            amount_state="estimated",
+            status="pending",
+            generated_by="income",
+            label="Clients",
+        )
+    content = b"income_source,work_month,units\nClients,2026-03,10\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    _plan(db, data_dir, batch_id, ctx=target_ctx)
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory.begin() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        parent = ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)[0]
+        assert parent.expected_minor == 100_000
+        item = ScheduledItemRepository(session, target_ctx).create(
+            name="Later tax",
+            direction="expense",
+            category_id=parent.category_id,
+            amount_mode="fixed",
+            amount_minor=1000,
+            currency="EUR",
+            start_date=date(2026, 4, 20),
+            freq="once",
+            interval=1,
+            weekdays=[],
+            month_day="1",
+            month=1,
+            weekend_policy="none",
+        )
+        ScheduledOccurrenceRepository(session, target_ctx).create(
+            scheduled_item_id=item.id,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=parent.id,
+            income_source_tax_rule_id=None,
+            direction="expense",
+            category_id=parent.category_id,
+            nominal_date=date(2026, 4, 20),
+            due_date=date(2026, 4, 20),
+            expected_minor=1000,
+            currency="EUR",
+            amount_state="confirmed",
+            status="pending",
+            generated_by="rule",
+            label="Later tax",
+        )
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert preview.counts["work_log_occurrences"] == 0
+    rollback_import(db.factory, target_ctx, batch_id)
+    with db.factory() as session:
+        source = IncomeSourceRepository(session, target_ctx).ordered()[0]
+        assert WorkLogRepository(session, target_ctx).for_source(source.id) == []
+        parent = ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)[0]
+        assert (parent.expected_minor, parent.amount_state) == (0, "estimated")
+        children = ScheduledOccurrenceRepository(session, target_ctx).children(parent.id)
+        assert [row.label for row in children] == ["Later tax"]
+
+
+def test_work_log_rollback_removes_a_later_child_of_a_created_occurrence(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        ScheduledOccurrenceRepository,
+        WorkLogRepository,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        source = IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+    content = b"income_source,work_month,units\nClients,2026-03,10\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    _plan(db, data_dir, batch_id, ctx=target_ctx)
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory.begin() as session:
+        parent = ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)[0]
+        item = ScheduledItemRepository(session, target_ctx).create(
+            name="Later",
+            direction="expense",
+            category_id=parent.category_id,
+            amount_mode="fixed",
+            amount_minor=1000,
+            currency="EUR",
+            start_date=date(2026, 4, 20),
+            freq="once",
+            interval=1,
+            weekdays=[],
+            month_day="1",
+            month=1,
+            weekend_policy="none",
+        )
+        ScheduledOccurrenceRepository(session, target_ctx).create(
+            scheduled_item_id=item.id,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=parent.id,
+            income_source_tax_rule_id=None,
+            direction="expense",
+            category_id=parent.category_id,
+            nominal_date=date(2026, 4, 20),
+            due_date=date(2026, 4, 20),
+            expected_minor=1000,
+            currency="EUR",
+            amount_state="confirmed",
+            status="pending",
+            generated_by="rule",
+            label="Later",
+        )
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert preview.counts["work_log_occurrences"] == 2
+    rollback_import(db.factory, target_ctx, batch_id)
+    with db.factory() as session:
+        assert WorkLogRepository(session, target_ctx).for_source(source.id) == []
+        assert ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id) == []
+
+
+def test_work_log_rollback_refuses_a_closed_pay_month(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.db.repositories import IncomeSourceRepository, MonthStateRepository
+    from assetboard.services.imports import ImportClosedMonths
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        category = CategoryRepository(session, target_ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+    content = b"income_source,work_month,units\nClients,2026-03,10\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    _plan(db, data_dir, batch_id, ctx=target_ctx)
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory.begin() as session:
+        months = MonthStateRepository(session, target_ctx)
+        state = months.create(YearMonth(2026, 4))
+        months.update(state.id, closed_at=db.clock.now())
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert "2026-04" in preview.closed_months
+    with pytest.raises(ImportClosedMonths):
+        rollback_import(db.factory, target_ctx, batch_id)
+
+
+def test_work_log_rollback_keeps_a_mixed_status_family(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        IncomeSourceTaxRuleRepository,
+        ScheduledOccurrenceRepository,
+        TaxRuleRepository,
+        TaxRuleVersionRepository,
+        WorkLogRepository,
+    )
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        categories = CategoryRepository(session, target_ctx)
+        food = categories.create(
+            name="Taxes",
+            name_key="taxes",
+            kind="expense",
+            treatment="regular",
+            color="#a35d3b",
+            sort_order=0,
+        )
+        salary = categories.create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#2f7f5f",
+            sort_order=0,
+        )
+        tax = TaxRuleRepository(session, target_ctx).create(
+            name="VAT",
+            kind="added",
+            base="net",
+            payment_day=20,
+            payment_timing="next_month",
+            payment_category_id=food.id,
+        )
+        TaxRuleVersionRepository(session, target_ctx).create(
+            tax_rule_id=tax.id,
+            effective_from=date(2026, 1, 1),
+            mode="percent",
+            rate_bp=2300,
+        )
+        local = TaxRuleRepository(session, target_ctx).create(
+            name="Local",
+            kind="added",
+            base="net",
+            payment_day=21,
+            payment_timing="next_month",
+            payment_category_id=food.id,
+        )
+        TaxRuleVersionRepository(session, target_ctx).create(
+            tax_rule_id=local.id,
+            effective_from=date(2026, 1, 1),
+            mode="percent",
+            rate_bp=500,
+        )
+        source = IncomeSourceRepository(session, target_ctx).create(
+            name="Clients",
+            kind="variable",
+            category_id=salary.id,
+            currency="EUR",
+            rate_minor=10_000,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            average_months=3,
+            active_from=date(2026, 1, 1),
+        )
+        attachments = IncomeSourceTaxRuleRepository(session, target_ctx)
+        attachments.create(
+            income_source_id=source.id,
+            tax_rule_id=tax.id,
+            sort_order=0,
+            generate_payment=True,
+            due_day=20,
+            due_month_offset=0,
+        )
+        attachments.create(
+            income_source_id=source.id,
+            tax_rule_id=local.id,
+            sort_order=1,
+            generate_payment=True,
+            due_day=21,
+            due_month_offset=0,
+        )
+    content = b"income_source,work_month,units\nClients,2026-03,10\n"
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx, mode="merge")
+    _plan(db, data_dir, batch_id, ctx=target_ctx)
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory.begin() as session:
+        parent = ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)[0]
+        children = ScheduledOccurrenceRepository(session, target_ctx).children(parent.id)
+        assert len(children) == 2
+        children[0].status = "skipped"
+        session.flush()
+    preview = preview_rollback_import(db.factory, target_ctx, batch_id)
+    assert preview.counts["work_log_occurrences"] == 0
+    assert preview.counts["work_log_occurrences_kept"] == 3
+    rollback_import(db.factory, target_ctx, batch_id)
+    with db.factory() as session:
+        assert WorkLogRepository(session, target_ctx).for_source(source.id) == []
+        parent = ScheduledOccurrenceRepository(session, target_ctx).for_income_source(source.id)[0]
+        assert (parent.expected_minor, parent.amount_state) == (128_000, "confirmed")
+        children = ScheduledOccurrenceRepository(session, target_ctx).children(parent.id)
+        assert len(children) == 2
+        assert sorted(child.status for child in children) == ["pending", "skipped"]

@@ -32,9 +32,11 @@ manual and provider prices, stored FX rates, and provider settings without their
 and the loan configuration: reference rates and their values, loans (including installment
 plans), fixed and variable rate segments, cost components, planned overpayments, actual payments, balance
 checkpoints and saved loan scenarios. The FIRE planner is included too: one plan and its
-adjustments. Schedules and projections are not archived; they are recomputed from those terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
-archive version yet. Notification channels and delivery logs are never exported, because channel URLs
-can contain secrets; provider API keys are not exported either.
+adjustments. Recurring items and their occurrences, income sources, work logs and calendars, and
+tax rules and their rate history are included as well. Schedules and projections are not
+archived; they are recomputed from those terms. Notification channels and delivery logs are
+never exported, because channel URLs can contain secrets; provider API keys are not exported
+either.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
 and the number of rows of each kind, without descriptions or amounts.
@@ -60,14 +62,14 @@ uploading the archive.
 A new workspace starts with the **suggested categories**. As long as you have not renamed,
 edited, archived or used any of them, the workspace still counts as empty: the restore removes
 them and puts the archive's categories in their place. Recurring items, income sources, work
-logs and calendars, and tax rules make the workspace non-empty, because the archive cannot
-carry them yet. The suggested net-worth categories follow the same rule as the ledger ones:
-untouched, unused and seeded automatically, they are removed before the archive's net-worth
-categories are written. The suggested asset classes follow the same rule: untouched, unused and
-seeded automatically, they are removed before the archive's classes are written. Edited
-categories, items, values, legacy snapshots or asset classes make the workspace non-empty. FIRE
-scenarios and their rows do too: a restore replaces the workspace's data rather than merging
-it.
+logs and calendars, and tax rules also make the workspace non-empty, because a restore replaces
+them rather than merging them. The suggested net-worth categories follow the same rule as the
+ledger ones: untouched, unused and seeded automatically, they are removed before the archive's
+net-worth categories are written. The suggested asset classes follow the same rule: untouched,
+unused and seeded automatically, they are removed before the archive's classes are written.
+Edited categories, items, values, legacy snapshots or asset classes make the workspace
+non-empty. FIRE scenarios and their rows do too: a restore replaces the workspace's data rather
+than merging it.
 
 Restore writes, all at once:
 
@@ -78,22 +80,28 @@ Restore writes, all at once:
 3. planned values, including those of archived and transfer categories;
 4. transactions, including deleted entries, in their original order within each day;
 5. month states exactly as stored: closed months and plan-start markers;
-6. net-worth categories, items and value histories, then legacy snapshots. Values keep their
+6. tax rules and their rate history, then income sources and their tax attachments, then work
+   logs and calendar days. A 2.3 archive carries these files; an older one restores none of
+   them;
+7. net-worth categories, items and value histories, then legacy snapshots. Values keep their
    `created_at`, so several values on one day restore in the same order and the current value
    does not change. The estimate switch is carried; a 1.2 archive restores assets with it on
    and liabilities off;
-7. asset classes, instruments and their allocations, then investment transactions (including
-   undated legacy lots and deleted rows), bond terms, stored prices and FX rates, and provider
-   settings. Investment quantities, prices and FX rates are restored from their plain decimal
-   text without going through `float`;
 8. reference rates and their values, then loans, rate changes, costs, planned overpayments,
    actual payments, balance checkpoints, scenarios and installment plans. Property and
    transaction links are mapped to the restored net-worth items and ledger rows; a link whose
    target is missing blocks the restore rather than being left dangling. Loan rows keep their
    archived ids when the target database does not already use them, so linked net-worth items
    and installment-plan references keep pointing at the right loan;
-9. the saved risk targets and the investment cost basis;
-10. The FIRE plan, its adjustments and its ignored-loan choices. A 2.1 archive carries one plan
+9. recurring items after their loan or category targets, then their occurrences after the
+   transactions, income sources and tax attachments they reference. A posted occurrence is
+   re-linked to its restored transaction, and the transaction keeps its `source`;
+10. asset classes, instruments and their allocations, then investment transactions (including
+    undated legacy lots and deleted rows), bond terms, stored prices and FX rates, and provider
+    settings. Investment quantities, prices and FX rates are restored from their plain decimal
+    text without going through `float`;
+11. the saved risk targets and the investment cost basis;
+12. The FIRE plan, its adjustments and its ignored-loan choices. A 2.1 archive carries one plan
     with manual amounts, `needs_review` and the loan choices; a 2.0 archive carries the plan
     without loan choices, so every loan is included. A 1.8 archive is upgraded: one scenario is kept (default active, else first
     active, else first archived), linked values use the archived fallbacks, contribution
@@ -127,16 +135,19 @@ plan copy from filling a restored month.
 Merge brings an archive's ledger data into a workspace you already use, for example to combine
 two workspaces. Owners and editors can merge; it is the default mode.
 
-A merge writes categories, transactions and planned values only. The archive's settings,
-closed months, net-worth files, investment files and loan files are listed for information but
-never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
-archive lists its investment files once with the same kind of warning, a 1.5+ archive lists
-its loan files once with `loan_restore_only`, and a 1.8+ archive lists its FIRE files once with
-`fire_restore_only` (a legacy 1.8 archive's four FIRE files use the same warning). The settings diff also
-reports the investment cost basis and risk targets when they differ. The archive's base currency
-must match the workspace's; otherwise the whole archive is refused. Existing net-worth,
-investment and FIRE data is left untouched. To merge a valuation history, import its
-`item_valuations.csv` alone.
+A merge writes categories, transactions and planned values, plus `work_logs.csv` by income source
+name. The archive's settings, closed months, net-worth files, investment files, loan files,
+recurring items, occurrences, income sources, tax rules and work calendars are listed for
+information but never applied; a 1.2+ archive lists its net-worth files once with a restore-only
+warning, a 1.4 archive lists its investment files once with the same kind of warning, a 1.5+
+archive lists its loan files once with `loan_restore_only`, a 1.8+ archive lists its FIRE files
+once with `fire_restore_only`, and a 2.3 archive lists the recurring files once with
+`recurring_restore_only` (a legacy 1.8 archive's four FIRE files use the same warning). The
+settings diff also reports the investment cost basis and risk targets when they differ. The
+archive's base currency must match the workspace's; otherwise the whole archive is refused.
+Existing net-worth, investment, FIRE and recurring data is left untouched. To merge a valuation
+history, import its `item_valuations.csv` alone; to merge work logs, import its `work_logs.csv`
+alone (or merge the archive, which does it for you).
 
 Each category in the archive is a row in the [category mapping](#category-mapping) step, so an
 active and an archived category with the same name stay separate. By default, a category the
@@ -159,10 +170,17 @@ file name:
 | Item valuations | `item,as_of,value` | `currency`, `note` and `item_id` are optional; `id` and `created_at` are accepted for an exported file |
 | Investment transactions | `instrument,date,type,quantity,unit_price` | `quote_currency`, `fee`, `fx_to_base`, `note`, the three settlement fields and `id` are optional; `instrument_id` is ignored and the instrument is matched by name |
 | Reference-rate values | `reference_rate,effective_from,value_bp` | `id` and `reference_rate_id` are accepted for an exported file; the series is matched by case-folded name and created when absent |
+| Work logs | `income_source,work_month,units` | `income_source_id` and `derived_from_days` are accepted for an exported file; the source is matched by id first and case-folded name otherwise |
 
 Download a ready-made template for transactions, planned values or item valuations from the
 links under the upload form. A `months.csv` or `workspace.json` on its own is refused: only a
 full archive can restore those.
+
+Work logs are merged by income source name (or `income_source_id` when present) into a
+variable income source. A month that already has a log is never overwritten: an identical row
+is a duplicate, a different one a conflict. A closed month or a month whose income was already
+received is skipped and listed. A merged log is stored as directly entered, because work-day
+rows are restore-only.
 
 Item valuations are matched by `item_id` first and by name otherwise. Names are not unique, so
 add `item_id` when **item_ambiguous** is listed; it is the lineage id written by an export. A
@@ -326,7 +344,11 @@ shows what will be removed.
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
   rates, provider settings and risk targets it wrote; valuations created by the batch are removed
   only through this explicit batch rollback. It also removes the FIRE plan and its events it
-  wrote, before the loans.
+  wrote, before the loans, and the recurring items, occurrences, income sources, tax rules and
+  rate versions, work logs and calendar days it wrote, before the categories. A work-log merge
+  rollback removes the merged logs, deletes the fully pending income/tax families the import
+  created (descendants included), recalculates pending occurrences that existed before it, and
+  keeps a created family at its imported values when any row is posted, skipped or added later.
   It is refused, with the reason, once anything changed
   after the restore: a new or edited entry, category, planned value, net-worth or investment
   row, a closed or reopened month, a changed setting, or a new recurring item, income source,
