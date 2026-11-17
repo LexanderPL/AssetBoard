@@ -67,88 +67,130 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
         else:
             overrides[event.year] = amount
 
-    income_exact = Fraction(inputs.start_income.amount_minor)
-    expenses_exact = Fraction(inputs.start_expenses.amount_minor)
     loans = tuple(
         (loan.annual_payment.amount_minor, loan.payoff_year, loan.included) for loan in inputs.loans
     )
-    rows: list[ProjectionRow] = []
-    fire_index: int | None = None
-    previous_net_worth = 0
-    for offset, year in enumerate(range(inputs.start_year, last_year + 1)):
-        age = year - inputs.birth_year
-        if offset > 0:
-            if age < inputs.stop_working_age:
-                income_exact *= growth
-            else:
+
+    def build_rows(stop_working_age: int) -> list[ProjectionRow]:
+        income_exact = Fraction(inputs.start_income.amount_minor)
+        expenses_exact = Fraction(inputs.start_expenses.amount_minor)
+        rows: list[ProjectionRow] = []
+        previous_net_worth = 0
+        for offset, year in enumerate(range(inputs.start_year, last_year + 1)):
+            age = year - inputs.birth_year
+            if offset > 0:
+                if age < stop_working_age:
+                    income_exact *= growth
+                else:
+                    income_exact = Fraction(0)
+                expenses_exact *= inflation
+            elif age >= stop_working_age:
+                # The first row also has no base income when income stops at the current age.
                 income_exact = Fraction(0)
-            expenses_exact *= inflation
 
-        income = _half_up(income_exact)
-        for event_year, amount in income_changes.items():
-            if event_year <= year:
-                income += _half_up(Fraction(amount) * growth**offset)
-        gross_expenses = _half_up(expenses_exact)
-        for event_year, amount in expense_changes.items():
-            if event_year <= year:
-                gross_expenses += _half_up(Fraction(amount) * inflation**offset)
-        loan_drop = sum(
-            amount for amount, payoff_year, included in loans if included and payoff_year <= year
-        )
-        loan_payment = sum(
-            amount for amount, payoff_year, included in loans if not included or payoff_year > year
-        )
-        expenses = gross_expenses - loan_drop
-        if expenses < 0:
-            raise FireProjectionError("expenses", "expenses_negative", year=year)
+            income = _half_up(income_exact)
+            for event_year, amount in income_changes.items():
+                if event_year <= year:
+                    income += _half_up(Fraction(amount) * growth**offset)
+            gross_expenses = _half_up(expenses_exact)
+            for event_year, amount in expense_changes.items():
+                if event_year <= year:
+                    gross_expenses += _half_up(Fraction(amount) * inflation**offset)
+            loan_drop = sum(
+                amount
+                for amount, payoff_year, included in loans
+                if included and payoff_year <= year
+            )
+            loan_payment = sum(
+                amount
+                for amount, payoff_year, included in loans
+                if not included or payoff_year > year
+            )
+            expenses = gross_expenses - loan_drop
+            if expenses < 0:
+                raise FireProjectionError("expenses", "expenses_negative", year=year)
 
-        if offset == 0:
-            net = inputs.start_portfolio.amount_minor
-            opening = inputs.start_portfolio.amount_minor
-        else:
-            net = overrides.get(year, income - expenses)
-            opening = previous_net_worth
-        cash_amount = cash[year]
-        gain = _half_up(Fraction(opening) * gain_rate)
-        net_worth = net + gain + cash_amount if offset == 0 else opening + net + gain + cash_amount
+            if offset == 0:
+                net = inputs.start_portfolio.amount_minor
+                opening = inputs.start_portfolio.amount_minor
+            else:
+                net = overrides.get(year, income - expenses)
+                opening = previous_net_worth
+            cash_amount = cash[year]
+            gain = _half_up(Fraction(opening) * gain_rate)
+            net_worth = (
+                net + gain + cash_amount if offset == 0 else opening + net + gain + cash_amount
+            )
+            rows.append(
+                ProjectionRow(
+                    year=year,
+                    age=age,
+                    income=_eur(income),
+                    expenses=_eur(expenses),
+                    loan_payment=_eur(loan_payment),
+                    net=_eur(net),
+                    gain=_eur(gain),
+                    cash=_eur(cash_amount),
+                    net_worth=_eur(net_worth),
+                    is_fire=False,
+                    income_stopped=offset > 0 and age >= stop_working_age,
+                )
+            )
+            previous_net_worth = net_worth
+        return rows
 
-        is_fire = False
-        if fire_index is None and opening >= 0:
+    rows = build_rows(inputs.stop_working_age)
+    fire_index: int | None = None
+    if inputs.rule is Rule.LASTS_TO_HORIZON:
+        last_candidate = max(current_age, min(inputs.stop_working_age, inputs.horizon_age - 1))
+        for stop_age in range(current_age, last_candidate + 1):
+            candidate = build_rows(stop_age)
+            fire_offset = stop_age - current_age
+            opening = (
+                inputs.start_portfolio.amount_minor
+                if fire_offset == 0
+                else candidate[fire_offset - 1].net_worth.amount_minor
+            )
+            if opening < 0:
+                continue
+            if all(row.net_worth.amount_minor >= 0 for row in candidate[fire_offset:]):
+                fire_index = fire_offset
+                break
+    else:
+        for offset, row in enumerate(rows):
+            opening = (
+                inputs.start_portfolio.amount_minor
+                if offset == 0
+                else rows[offset - 1].net_worth.amount_minor
+            )
+            if opening < 0:
+                continue
             if inputs.rule is Rule.SWR:
                 assert inputs.swr_bp is not None
-                is_fire = opening * inputs.swr_bp >= expenses * 10_000
-            else:
-                is_fire = opening * inputs.real_return_bp > expenses * 10_000
-            if is_fire:
+                if opening * inputs.swr_bp >= row.expenses.amount_minor * 10_000:
+                    fire_index = offset
+                    break
+            elif opening * inputs.real_return_bp > row.expenses.amount_minor * 10_000:
                 fire_index = offset
-
-        rows.append(
-            ProjectionRow(
-                year=year,
-                age=age,
-                income=_eur(income),
-                expenses=_eur(expenses),
-                loan_payment=_eur(loan_payment),
-                net=_eur(net),
-                gain=_eur(gain),
-                cash=_eur(cash_amount),
-                net_worth=_eur(net_worth),
-                is_fire=is_fire,
-                income_stopped=offset > 0 and age >= inputs.stop_working_age,
-            )
-        )
-        previous_net_worth = net_worth
+                break
+    if fire_index is not None:
+        rows[fire_index] = replace(rows[fire_index], is_fire=True)
 
     fire_row = rows[fire_index] if fire_index is not None else None
-    rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else inputs.real_return_bp
     fire_number: Money | None = None
-    if fire_row is not None and rate_bp is not None and rate_bp > 0:
-        fire_number = _eur(
-            _half_up(Fraction(fire_row.expenses.amount_minor) / Fraction(rate_bp, 10_000))
-        )
+    if fire_row is not None and inputs.rule is not Rule.LASTS_TO_HORIZON:
+        rate_bp = inputs.swr_bp if inputs.rule is Rule.SWR else inputs.real_return_bp
+        if rate_bp is not None and rate_bp > 0:
+            fire_number = _eur(
+                _half_up(Fraction(fire_row.expenses.amount_minor) / Fraction(rate_bp, 10_000))
+            )
 
     plan_progress: int | None = None
-    if fire_row is not None and fire_row.net_worth.amount_minor > 0:
+    if (
+        fire_row is not None
+        and inputs.rule is not Rule.LASTS_TO_HORIZON
+        and fire_row.net_worth.amount_minor > 0
+    ):
         plan_progress = _half_up(
             Fraction(inputs.start_portfolio.amount_minor)
             / Fraction(fire_row.net_worth.amount_minor)
@@ -270,6 +312,18 @@ _G5 = _variant(
     swr_bp=400,
     start_portfolio=_eur(50_000_000),
 )
+_HORIZON = _variant(
+    rule=Rule.LASTS_TO_HORIZON,
+    swr_bp=None,
+    horizon_age=87,
+    stop_working_age=68,
+    inflation_bp=0,
+    real_return_bp=0,
+    income_growth_bp=0,
+    start_income=_eur(5_000_000),
+    start_expenses=_eur(3_000_000),
+    start_portfolio=_eur(10_000_000),
+)
 
 
 @pytest.mark.parametrize(
@@ -281,6 +335,7 @@ _G5 = _variant(
         pytest.param(_G3, id="G3-first-ten-years-overrides"),
         pytest.param(_G4, id="G4-events"),
         pytest.param(_G5, id="G5-swr"),
+        pytest.param(_HORIZON, id="G6-horizon"),
     ],
 )
 def test_golden_sets_match_the_independent_oracle(inputs: ProjectionInputs) -> None:
@@ -307,6 +362,140 @@ def test_t0_and_key_metrics_are_hand_checkable() -> None:
     assert result.plan_progress_bp == 2408
     assert result.depletion_age is None
     assert result.rows[-1].year == 2075
+
+
+def test_horizon_rule_finds_the_earliest_age_where_stopping_income_lasts() -> None:
+    result = project(_HORIZON)
+    # Working one more year than 68 would also survive; retiring at 41 or 67 would not.
+    assert (result.fire_age, result.fire_year, result.years_to_fire) == (68, 2053, 27)
+    assert result.fire_index is not None
+    assert result.rows[result.fire_index].is_fire
+    assert sum(row.is_fire for row in result.rows) == 1
+    assert result.networth_at_fire is not None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
+
+
+def test_horizon_rule_never_fires_after_income_stops() -> None:
+    result = project(replace(_HORIZON, stop_working_age=67))
+    assert result.fire_index is None
+    assert result.fire_age is None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
+
+
+def test_horizon_rule_does_not_consider_retiring_at_the_horizon() -> None:
+    # Retiring at 43 (the horizon year) would leave a positive balance, but the rule stops at the
+    # year before the horizon; retiring at 42 runs out of money, so there is no FIRE age.
+    result = project(
+        _edge(
+            rule=Rule.LASTS_TO_HORIZON,
+            horizon_age=43,
+            stop_working_age=90,
+            start_income=_eur(100_000),
+            start_expenses=_eur(10_000),
+            start_portfolio=_eur(0),
+        )
+    )
+    assert result.fire_index is None
+    assert result.fire_age is None
+
+
+def test_horizon_rule_allows_the_year_before_the_horizon() -> None:
+    # Retiring at 42 fails; retiring at 43 (the last candidate, one year before the horizon)
+    # succeeds because the salary at 42 is still paid. The candidate bound is inclusive.
+    result = _assert_matches_oracle(
+        _edge(
+            rule=Rule.LASTS_TO_HORIZON,
+            horizon_age=44,
+            stop_working_age=90,
+            start_income=_eur(100_000),
+            start_expenses=_eur(10_000),
+            start_portfolio=_eur(0),
+        )
+    )
+    assert result.fire_age == 43
+    assert result.fire_index is not None
+    # The table keeps the configured income-stop age, so the FIRE row still shows its salary.
+    assert result.rows[result.fire_index].income == _eur(100_000)
+
+
+def test_horizon_rule_tests_today_when_income_already_stopped() -> None:
+    # Base income already stopped, so today is the only candidate; a portfolio that lasts from
+    # today is independent now.
+    result = project(
+        replace(
+            _HORIZON,
+            stop_working_age=40,
+            start_portfolio=_eur(200_000_000),
+        )
+    )
+    assert result.rows[-1].net_worth.amount_minor > 0
+    assert result.fire_age == 41
+    assert result.rows[0].is_fire
+    assert result.networth_at_fire is not None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
+
+
+def test_horizon_rule_keeps_events_and_loans_in_the_candidate_simulation() -> None:
+    # The loan payoff drop, the post-retirement saving override and the expense change stay in
+    # the candidate simulation; without the drop the plan would not last at 67.
+    inputs = replace(
+        _HORIZON,
+        stop_working_age=67,
+        events=(
+            ProjectionEvent(2060, EventKind.SAVING_OVERRIDE, _eur(1_000_000)),
+            ProjectionEvent(2071, EventKind.EXPENSE_CHANGE, _eur(500_000)),
+        ),
+        loans=(ProjectionLoan(_eur(1_000_000), 2070, True),),
+    )
+    result = _assert_matches_oracle(inputs)
+    assert result.fire_age == 67
+    assert result.rows[-1].net_worth.amount_minor > 0
+
+
+def test_horizon_rule_counts_zero_at_the_horizon_as_lasting() -> None:
+    result = project(replace(_HORIZON, horizon_age=86, stop_working_age=67))
+    assert result.fire_age == 67
+    assert result.rows[-1].net_worth == _eur(0)
+
+
+def test_horizon_rule_tests_income_stopping_at_the_candidate_not_the_plan_path() -> None:
+    # The full plan (income to 68) survives to the horizon, but retiring at 41 does not; a rule
+    # that checked the full plan's path would wrongly fire at the current age.
+    result = project(_HORIZON)
+    assert result.fire_age == 68
+    assert not result.rows[0].is_fire
+
+
+def test_horizon_rule_validates_without_a_withdrawal_rate() -> None:
+    result = project(
+        _edge(
+            rule=Rule.LASTS_TO_HORIZON,
+            horizon_age=43,
+            stop_working_age=42,
+            start_expenses=_eur(0),
+            start_portfolio=_eur(0),
+        )
+    )
+    assert result.fire_age == 41
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
+
+
+def test_oracle_agrees_when_income_stops_in_the_current_year() -> None:
+    inputs = _edge(
+        rule=Rule.LASTS_TO_HORIZON,
+        horizon_age=43,
+        stop_working_age=41,
+        start_income=_eur(100_000),
+        start_expenses=_eur(50_000),
+        start_portfolio=_eur(0),
+    )
+    result = _assert_matches_oracle(inputs)
+    assert result.rows[0].income == _eur(0)
+    assert result.fire_index is None
 
 
 def test_the_gain_compounds_inflation_and_real_return_exactly() -> None:
@@ -908,6 +1097,7 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
         ({"rule": Rule.SWR, "swr_bp": 49}, "swr_bp", "invalid_swr"),
         ({"rule": Rule.SWR, "swr_bp": 2_001}, "swr_bp", "invalid_swr"),
         ({"rule": Rule.SWR, "swr_bp": 400.0}, "swr_bp", "invalid_swr"),
+        ({"rule": Rule.LASTS_TO_HORIZON, "swr_bp": 400}, "swr_bp", "invalid_swr"),
         ({"swr_bp": 400}, "swr_bp", "invalid_swr"),
         ({"start_income": _eur(-1)}, "start_income", "invalid_amount"),
         ({"start_expenses": _eur(MAX_AMOUNT_MINOR + 1)}, "start_expenses", "invalid_amount"),

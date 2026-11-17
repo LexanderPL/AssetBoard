@@ -266,6 +266,20 @@ def test_the_entry_renders_the_wizard_without_a_plan(owner) -> None:
     assert _state(owner) == (0, 0, 0)
 
 
+def test_step_one_puts_birth_year_on_its_own_row_and_pairs_the_two_ages(owner) -> None:
+    text = _step(owner.client.get("/fire"), 1)
+    birth = field_html(text, "birth_year")
+    pair_start = text.index('<div class="grid gap-4 sm:grid-cols-2">')
+    pair = text[pair_start : text.index("data-fire-wizard-summary")]
+    assert text.index(birth) + len(birth) <= pair_start
+    assert 'data-fire-field="horizon_age"' in pair
+    assert 'data-fire-field="stop_working_age"' in pair
+    assert 'data-fire-field="birth_year"' not in pair
+    assert pair.index('data-fire-field="horizon_age"') < pair.index(
+        'data-fire-field="stop_working_age"'
+    )
+
+
 def test_a_viewer_without_a_plan_sees_an_empty_state(owner) -> None:
     owner.set_admin_role(Role.VIEWER.value)
     try:
@@ -935,6 +949,13 @@ def test_a_portfolio_with_only_skipped_sources_explains_the_missing_value(owner)
     assert "data-suggested-minor" not in text
     assert 'data-use-suggestion="portfolio_manual"' not in text
     assert 'name="portfolio_manual" value=""' in text
+
+
+def test_the_wizard_offers_the_horizon_rule_without_changing_the_default(owner) -> None:
+    text = _step(post_wizard(owner, 3, "next", wizard_values()), 4)
+    field = field_html(text, "rule")
+    assert '<option value="lasts_to_horizon">Portfolio lasts to the horizon</option>' in field
+    assert '<option value="returns_cover_expenses" selected>' in field
 
 
 def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(owner) -> None:

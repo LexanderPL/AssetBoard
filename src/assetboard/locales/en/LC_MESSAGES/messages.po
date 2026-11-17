@@ -2295,6 +2295,12 @@ msgid ""
 "sign-in method or set a password first."
 msgstr ""
 
+msgid "Your sidebar is saved."
+msgstr ""
+
+msgid "Your sidebar is back to the default order."
+msgstr ""
+
 msgid "Browser language"
 msgstr ""
 
@@ -3095,6 +3101,9 @@ msgid "Returns cover expenses"
 msgstr ""
 
 msgid "Withdrawal rate"
+msgstr ""
+
+msgid "Portfolio lasts to the horizon"
 msgstr ""
 
 msgid "Reset plan"
@@ -4774,6 +4783,21 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Home"
+msgstr ""
+
+msgid "History"
+msgstr ""
+
+msgid "Upcoming"
+msgstr ""
+
+msgid "Recurring"
+msgstr ""
+
+msgid "FIRE projection"
+msgstr ""
+
 msgid "on Monday"
 msgstr ""
 
@@ -5246,19 +5270,10 @@ msgid ""
 " named below and confirm again."
 msgstr ""
 
-msgid "Home"
-msgstr ""
-
 msgid "Menu"
 msgstr ""
 
 msgid "Main navigation"
-msgstr ""
-
-msgid "History"
-msgstr ""
-
-msgid "Upcoming"
 msgstr ""
 
 #, python-format
@@ -5266,12 +5281,6 @@ msgid "%(num)d overdue occurrence"
 msgid_plural "%(num)d overdue occurrences"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Recurring"
-msgstr ""
-
-msgid "FIRE projection"
-msgstr ""
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -5409,6 +5418,34 @@ msgid "The dark-mode button changes the theme on one device only."
 msgstr ""
 
 msgid "Use the saved theme on this device"
+msgstr ""
+
+msgid "Sidebar"
+msgstr ""
+
+msgid ""
+"Choose which pages appear in the sidebar and in which order. Some pages "
+"appear only where the workspace enables the feature, such as Taxes."
+msgstr ""
+
+msgid "Only shown when Taxes is turned on in the workspace settings."
+msgstr ""
+
+msgid "Always shown"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr ""
+
+msgid "Save sidebar"
+msgstr ""
+
+msgid "Reset to default"
 msgstr ""
 
 msgid "Notifications"
@@ -5963,14 +6000,6 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#, python-format
-msgid "Move %(name)s up"
-msgstr ""
-
-#, python-format
-msgid "Move %(name)s down"
-msgstr ""
-
 msgid "Archive"
 msgstr ""
 
@@ -6016,9 +6045,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Save Home"
-msgstr ""
-
-msgid "Reset to default"
 msgstr ""
 
 msgid "No FIRE plan yet."
@@ -6071,7 +6097,7 @@ msgstr ""
 msgid "Imports waiting to be applied"
 msgstr ""
 
-#, fuzzy
+#, fuzzy, python-format
 msgid "Open month"
 msgstr ""
 
@@ -6408,7 +6434,9 @@ msgstr ""
 msgid ""
 "Returns cover expenses compares the portfolio's return above inflation "
 "with the year's expenses, preserving real capital. Withdrawal rate uses "
-"the rate below."
+"the rate below. Portfolio lasts to the horizon assumes base income stops "
+"at the candidate FIRE age and checks that the portfolio is not depleted "
+"before the horizon."
 msgstr ""
 
 #, python-format
@@ -6559,10 +6587,18 @@ msgid "FIRE number"
 msgstr ""
 
 msgid ""
+"Not used by Portfolio lasts to the horizon: that rule tests the portfolio"
+" through the horizon rather than a rate-based target."
+msgstr ""
+
+msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
 "independence rule uses: the withdrawal rate, or the return above "
 "inflation when returns must cover expenses. This is the portfolio the "
 "plan needs in that year."
+msgstr ""
+
+msgid "Not defined for this rule: it does not use a withdrawal rate."
 msgstr ""
 
 msgid "Not defined: the plan's return above inflation is not positive."
@@ -6591,6 +6627,11 @@ msgstr ""
 msgid "Not checked: no years after income stops fall inside the horizon."
 msgstr ""
 
+msgid ""
+"Not used by Portfolio lasts to the horizon: the rule has no net-worth "
+"target at FIRE."
+msgstr ""
+
 #, python-format
 msgid ""
 "Starting portfolio divided by the projected nominal net worth at FIRE. "
@@ -6604,6 +6645,9 @@ msgid "Not defined"
 msgstr ""
 
 msgid "Not defined: this plan does not reach FIRE."
+msgstr ""
+
+msgid "Not defined for this rule: it does not use a net-worth target."
 msgstr ""
 
 msgid "Not defined: net worth at FIRE is not positive."
@@ -14360,12 +14404,14 @@ msgstr ""
 #~ msgid "Not defined: the plan's gain rate is not positive."
 #~ msgstr ""
 
+#~ msgid ""
+#~ "Returns cover expenses compares the "
+#~ "portfolio's return above inflation with "
+#~ "the year's expenses, preserving real "
+#~ "capital. Withdrawal rate uses the rate"
+#~ " below."
+#~ msgstr ""
+
 #~ msgid "This month"
-#~ msgstr ""
-
-#~ msgid "PricepriceFX rate"
-#~ msgstr ""
-
-#~ msgid "Stale prices"
 #~ msgstr ""
 

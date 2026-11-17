@@ -57,7 +57,7 @@ def _projection_inputs(
         inflation_bp = draw(st.integers(RATE_HARD_MIN_BP, RATE_HARD_MAX_BP))
         real_return_bp = draw(st.integers(RATE_HARD_MIN_BP, RATE_HARD_MAX_BP))
         income_growth_bp = draw(st.integers(RATE_HARD_MIN_BP, RATE_HARD_MAX_BP))
-        rule = draw(st.sampled_from([Rule.RETURNS_COVER_EXPENSES, Rule.SWR]))
+        rule = draw(st.sampled_from([Rule.RETURNS_COVER_EXPENSES, Rule.SWR, Rule.LASTS_TO_HORIZON]))
         swr_bp = draw(st.integers(SWR_HARD_MIN_BP, SWR_HARD_MAX_BP)) if rule is Rule.SWR else None
 
     events: list[ProjectionEvent] = []
@@ -201,6 +201,12 @@ def test_without_events_or_overrides_the_compounding_recurrence_holds(
 @given(inputs=_projection_inputs())
 def test_nominal_fire_metrics_follow_the_fire_row(inputs: ProjectionInputs) -> None:
     result = project(inputs)
+    if inputs.rule is Rule.LASTS_TO_HORIZON:
+        assert result.fire_number is None
+        assert result.plan_progress_bp is None
+        if result.fire_index is not None:
+            assert result.rows[result.fire_index].is_fire
+        return
     if result.fire_index is None:
         assert result.fire_number is None
         assert result.plan_progress_bp is None

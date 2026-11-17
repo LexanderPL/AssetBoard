@@ -1,4 +1,4 @@
-# Workspace archive format (v2.1)
+# Workspace archive format (v2.2)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -102,8 +102,10 @@ FIRE files, which format 2.0 upgrades; a 1.7 archive reads with no FIRE plan, an
 requires every new file (header only when empty). Format 2.0 (breaking): replaces those four
 files with `fire_plan.csv` and the new `fire_events.csv`. Format 2.1 (additive): adds
 `fire_loan_settings.csv` with the FIRE plan's ignored-loan choices; a 2.0 archive reads with
-every loan included, and a 2.1 archive requires the new file (header only when empty). Loan
-schedules and projections are not archived and are recomputed from the restored terms. Golden archives of every released version
+every loan included, and a 2.1 archive requires the new file (header only when empty). Format
+2.2 (additive): `fire_plan.csv` accepts the additional `lasts_to_horizon` independence rule; a
+2.1 archive reads with only the two older rule values. Loan schedules and projections are not
+archived and are recomputed from the restored terms. Golden archives of every released version
 are in `tests/fixtures/`.
 
 ## `manifest.json`
@@ -111,7 +113,7 @@ are in `tests/fixtures/`.
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "2.1",
+  "format_version": "2.2",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -888,8 +890,8 @@ the amounts.
 | `income_growth_bp` | yes | integer −2000 to 5000 |
 | `stop_working_age` | yes | integer 0–120 |
 | `horizon_age` | yes | integer 1–120; the last year stays within 2199 |
-| `rule` | yes | `returns_cover_expenses` \| `swr` |
-| `swr_bp` | with the `swr` rule | integer 50–2000; blank for `returns_cover_expenses` |
+| `rule` | yes | `returns_cover_expenses` \| `swr` \| `lasts_to_horizon` |
+| `swr_bp` | with the `swr` rule | integer 50–2000; blank for `returns_cover_expenses` and `lasts_to_horizon` |
 | `income` | yes | decimal ≥ 0 in the plan currency |
 | `expenses` | yes | decimal ≥ 0 in the plan currency |
 | `portfolio` | yes | decimal ≥ 0 in the plan currency |
@@ -927,7 +929,7 @@ f3a4b5c6-d7e8-4f90-a1b2-3c4d5e6f7081,2027,saving_override,-1200.00,Sabbatical
 a4b5c6d7-e8f9-4a01-b2c3-4d5e6f708192,2030,cash,-5000.00,Home renovation
 ```
 
-## `fire_loan_settings.csv` (restore only, format 2.1)
+## `fire_loan_settings.csv` (restore only, format 2.1+)
 
 The FIRE plan's explicit ignored-loan choices. A loan is included when it has no row, so export
 writes only ignored loans; the file is header-only when every loan is included. The loan id is
@@ -972,7 +974,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 2.1)
+## Not in the archive (format 2.2)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
@@ -984,10 +986,11 @@ recomputed from the archived inputs and are never stored in the archive. The pla
 include/ignore choice for a loan is user intent, not derived data, so it is stored in
 `fire_loan_settings.csv`.
 
-The profile's `birth_year` and `life_expectancy` are user data, not workspace data, so they are
-not archived. Dashboard widget layouts (`DashboardPreference`) are per-user interface state, not
-financial data; a restore starts from the default Home catalogue. `investment_cost_basis` and
-`risk_target_policy` are workspace settings and live in `workspace.json`.
+The profile's `birth_year`, `life_expectancy` and `sidebar_items` are user data, not workspace
+data, so they are not archived. Dashboard widget layouts (`DashboardPreference`) are per-user
+interface state, not financial data; a restore starts from the default Home catalogue.
+`investment_cost_basis` and `risk_target_policy` are workspace settings and live in
+`workspace.json`.
 
 Net-worth, investment, loan and FIRE files are restore-only in a full archive merge: they are
 ignored and listed once as a warning (`networth_restore_only`, `investment_restore_only`,

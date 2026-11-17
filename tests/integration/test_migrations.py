@@ -675,6 +675,58 @@ def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypat
     assert not Path(calls[0][1].removeprefix("sqlite:///")).parent.exists()
 
 
+def test_0066_horizon_rule_constraint_accepts_the_new_value_and_downgrades(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'horizon_rule.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id = "11111111111141118111111111111111"
+    plan_id = "22222222222242228222222222222222"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces "
+                "(id, name, base_currency, locale, timezone, require_two_factor, "
+                "auto_copy_plan, taxes_enabled, upcoming_days, investment_cost_basis, "
+                "created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', 0, 0, 0, 30, "
+                "'average', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO fire_scenarios "
+                "(id, workspace_id, currency, birth_year, stop_working_age, horizon_age, "
+                "inflation_bp, real_return_bp, income_growth_bp, rule, swr_bp, income_minor, "
+                "expenses_minor, portfolio_minor, needs_review, is_live, created_at, updated_at) "
+                "VALUES (?, ?, 'EUR', 1985, 55, 90, 250, 500, 300, 'lasts_to_horizon', NULL, "
+                "500000, 300000, 10000000, 0, 1, '2026-01-01 00:00:00', "
+                "'2026-01-01 00:00:00')",
+                (plan_id, workspace_id),
+            )
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(
+                "UPDATE fire_scenarios SET swr_bp = 400 WHERE id = ?", (plan_id,)
+            )
+        command.downgrade(alembic_config(settings), "0065_f912_sidebar_items")
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT rule, swr_bp FROM fire_scenarios WHERE id = ?", (plan_id,)
+            ).one()
+        assert row == ("returns_cover_expenses", None)
+        upgrade_database(settings)
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT rule, swr_bp FROM fire_scenarios WHERE id = ?", (plan_id,)
+            ).one()
+        assert row == ("returns_cover_expenses", None)
+    finally:
+        engine.dispose()
+
+
 def test_identity_migration_is_reversible_and_head_detection_is_read_only(tmp_path: Path) -> None:
     database_path = tmp_path / "reversible.db"
     settings = Settings(
@@ -2519,23 +2571,25 @@ def test_0064_fire_loan_settings_migration_is_reversible(tmp_path: Path) -> None
         assert (("workspace_id", "loan_id"), "loans") in foreign_keys
         command.downgrade(alembic_config(settings), "0063_f88_one_fire_plan")
         assert "fire_loan_settings" not in set(inspect(engine).get_table_names())
-        command.upgrade(alembic_config(settings), "head")
+        command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        assert "fire_loan_settings" in set(inspect(engine).get_table_names())
+        upgrade_database(settings)
         assert database_is_at_head(settings)
     finally:
         engine.dispose()
 
 
-def test_0065_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> None:
+def test_0067_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
         data_dir=tmp_path,
         database_url=f"sqlite:///{tmp_path / 'dashboard.db'}",
     )
-    command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+    command.upgrade(alembic_config(settings), "0066_f821_horizon_rule")
     engine = create_database_engine(settings.database_url or "")
     try:
         assert "dashboard_preferences" not in set(inspect(engine).get_table_names())
-        command.upgrade(alembic_config(settings), "0065_f91_dashboard")
+        command.upgrade(alembic_config(settings), "0067_f91_dashboard")
         inspector = inspect(engine)
         columns = {column["name"] for column in inspector.get_columns("dashboard_preferences")}
         assert {"id", "workspace_id", "user_id", "widgets", "customised_at"} <= columns
@@ -2544,9 +2598,34 @@ def test_0065_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> N
             for constraint in inspector.get_unique_constraints("dashboard_preferences")
         }
         assert "uq_dashboard_preferences_workspace_user" in unique
-        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        command.downgrade(alembic_config(settings), "0066_f821_horizon_rule")
         assert "dashboard_preferences" not in set(inspect(engine).get_table_names())
         command.upgrade(alembic_config(settings), "head")
         assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0065_f912_sidebar_items_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'sidebar_items.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        columns = {column["name"] for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" not in columns
+        command.upgrade(alembic_config(settings), "0065_f912_sidebar_items")
+        upgraded = {column["name"]: column for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" in upgraded
+        assert upgraded["sidebar_items"]["nullable"] is True
+        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        downgraded = {column["name"] for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" not in downgraded
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
     finally:
         engine.dispose()

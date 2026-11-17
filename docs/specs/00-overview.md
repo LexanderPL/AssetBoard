@@ -128,9 +128,9 @@ M3 and M5–M8 each end with an "archive extension" feature that adds the module
 The FIRE planner v2 rework replaces the user-facing M8 v1 behaviour with one plan per
 workspace, a current-year anchor, manual inputs with explicit suggestions, view/edit modes,
 live loans and nominal-only results. It is specified in
-[M8-fire-planner-v2.md](M8-fire-planner-v2.md) as F8.8–F8.19. Each feature is a separate PR;
-the spec must be approved first. Archive format 2.1 is part of the rework; 2.0 archives stay
-readable.
+[M8-fire-planner-v2.md](M8-fire-planner-v2.md) as F8.8–F8.21. Each feature is a separate PR;
+the spec must be approved first. Archive format 2.2 is part of the rework; 2.0 and 2.1 archives
+stay readable.
 
 ## 6. Non-goals (v1)
 Bank sync/aggregation; receipt OCR; tax filing; advice of any kind; native mobile apps (a responsive PWA is enough); built-in country tax tables (tax rules are user-defined; labelled example templates may come later).

@@ -2388,6 +2388,12 @@ msgstr ""
 "To Twój ostatni sposób logowania, więc nie można go usunąć. Najpierw "
 "powiąż inną metodę logowania albo ustaw hasło."
 
+msgid "Your sidebar is saved."
+msgstr "Pasek boczny został zapisany."
+
+msgid "Your sidebar is back to the default order."
+msgstr "Pasek boczny wrócił do domyślnej kolejności."
+
 msgid "Browser language"
 msgstr "Język przeglądarki"
 
@@ -3277,6 +3283,9 @@ msgstr "Zwrot pokrywa wydatki"
 
 msgid "Withdrawal rate"
 msgstr "Stopa wypłat"
+
+msgid "Portfolio lasts to the horizon"
+msgstr "Portfel wystarcza do końca horyzontu"
 
 msgid "Reset plan"
 msgstr "Zresetuj plan"
@@ -5125,6 +5134,21 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Home"
+msgstr "Strona główna"
+
+msgid "History"
+msgstr "Historia"
+
+msgid "Upcoming"
+msgstr "Nadchodzące"
+
+msgid "Recurring"
+msgstr "Cykliczne"
+
+msgid "FIRE projection"
+msgstr "Prognoza FIRE"
+
 msgid "on Monday"
 msgstr "w poniedziałek"
 
@@ -5651,20 +5675,11 @@ msgstr ""
 " albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
 "podany poniżej i potwierdź ponownie."
 
-msgid "Home"
-msgstr "Strona główna"
-
 msgid "Menu"
 msgstr "Menu"
 
 msgid "Main navigation"
 msgstr "Menu główne"
-
-msgid "History"
-msgstr "Historia"
-
-msgid "Upcoming"
-msgstr "Nadchodzące"
 
 #, python-format
 msgid "%(num)d overdue occurrence"
@@ -5672,12 +5687,6 @@ msgid_plural "%(num)d overdue occurrences"
 msgstr[0] "%(num)d zaległe wystąpienie"
 msgstr[1] "%(num)d zaległe wystąpienia"
 msgstr[2] "%(num)d zaległych wystąpień"
-
-msgid "Recurring"
-msgstr "Cykliczne"
-
-msgid "FIRE projection"
-msgstr "Prognoza FIRE"
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -5822,6 +5831,39 @@ msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
 
 msgid "Use the saved theme on this device"
 msgstr "Użyj zapisanego motywu na tym urządzeniu"
+
+msgid "Sidebar"
+msgstr "Pasek boczny"
+
+msgid ""
+"Choose which pages appear in the sidebar and in which order. Some pages "
+"appear only where the workspace enables the feature, such as Taxes."
+msgstr ""
+"Wybierz, które strony pojawiają się na pasku bocznym i w jakiej "
+"kolejności. Niektóre strony pojawiają się tylko wtedy, gdy obszar roboczy"
+" włączy daną funkcję, np. Podatki."
+
+msgid "Only shown when Taxes is turned on in the workspace settings."
+msgstr ""
+"Widoczne tylko wtedy, gdy w ustawieniach obszaru roboczego włączono "
+"Podatki."
+
+msgid "Always shown"
+msgstr "Zawsze widoczna"
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr "Przesuń %(name)s w górę"
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr "Przesuń %(name)s w dół"
+
+msgid "Save sidebar"
+msgstr "Zapisz pasek boczny"
+
+msgid "Reset to default"
+msgstr "Przywróć domyślne"
 
 msgid "Notifications"
 msgstr "Powiadomienia"
@@ -6435,14 +6477,6 @@ msgstr "Przywróć"
 msgid "Edit"
 msgstr "Edytuj"
 
-#, python-format
-msgid "Move %(name)s up"
-msgstr "Przesuń %(name)s w górę"
-
-#, python-format
-msgid "Move %(name)s down"
-msgstr "Przesuń %(name)s w dół"
-
 msgid "Archive"
 msgstr "Archiwizuj"
 
@@ -6493,9 +6527,6 @@ msgstr[2] "%(num)d wybranych widżetów"
 
 msgid "Save Home"
 msgstr "Zapisz stronę główną"
-
-msgid "Reset to default"
-msgstr "Przywróć domyślne"
 
 msgid "No FIRE plan yet."
 msgstr "Nie ma jeszcze planu FIRE."
@@ -6926,11 +6957,15 @@ msgstr "Reguła niezależności"
 msgid ""
 "Returns cover expenses compares the portfolio's return above inflation "
 "with the year's expenses, preserving real capital. Withdrawal rate uses "
-"the rate below."
+"the rate below. Portfolio lasts to the horizon assumes base income stops "
+"at the candidate FIRE age and checks that the portfolio is not depleted "
+"before the horizon."
 msgstr ""
 "Reguła „Zwrot pokrywa wydatki” porównuje zwrot z portfela powyżej "
 "inflacji z rocznymi wydatkami, zachowując realny kapitał. Reguła stopy "
-"wypłat używa stopy poniżej."
+"wypłat używa stopy poniżej. Reguła „Portfel wystarcza do końca horyzontu”"
+" zakłada, że dochód bazowy kończy się w wieku kandydata do FIRE, i "
+"sprawdza, że portfel nie zostanie wyczerpany przed końcem horyzontu."
 
 #, python-format
 msgid "Withdrawal rate (%%)"
@@ -7104,6 +7139,13 @@ msgid "FIRE number"
 msgstr "Kwota FIRE"
 
 msgid ""
+"Not used by Portfolio lasts to the horizon: that rule tests the portfolio"
+" through the horizon rather than a rate-based target."
+msgstr ""
+"Nie używane przez regułę „Portfel wystarcza do końca horyzontu”: sprawdza"
+" ona portfel w całym horyzoncie, a nie cel oparty na stopie."
+
+msgid ""
 "The nominal expenses in the FIRE year divided by the rate the "
 "independence rule uses: the withdrawal rate, or the return above "
 "inflation when returns must cover expenses. This is the portfolio the "
@@ -7112,6 +7154,9 @@ msgstr ""
 "Nominalne wydatki w roku FIRE podzielone przez stopę, której używa reguła"
 " niezależności: stopę wypłat albo zwrot powyżej inflacji, gdy zwrot ma "
 "pokrywać wydatki. To portfel potrzebny w tym roku."
+
+msgid "Not defined for this rule: it does not use a withdrawal rate."
+msgstr "Nieokreślona dla tej reguły: nie używa stopy wypłat."
 
 msgid "Not defined: the plan's return above inflation is not positive."
 msgstr "Nieokreślona: zwrot planu powyżej inflacji nie jest dodatni."
@@ -7142,6 +7187,13 @@ msgstr "Portfel wystarcza do końca horyzontu."
 msgid "Not checked: no years after income stops fall inside the horizon."
 msgstr "Nie sprawdzono: w horyzoncie nie ma lat po zakończeniu dochodów."
 
+msgid ""
+"Not used by Portfolio lasts to the horizon: the rule has no net-worth "
+"target at FIRE."
+msgstr ""
+"Nie używane przez regułę „Portfel wystarcza do końca horyzontu”: reguła "
+"nie ma celu wartości netto w roku FIRE."
+
 #, python-format
 msgid ""
 "Starting portfolio divided by the projected nominal net worth at FIRE. "
@@ -7158,6 +7210,9 @@ msgstr "Nieokreślona"
 
 msgid "Not defined: this plan does not reach FIRE."
 msgstr "Nieokreślony: ten plan nie osiąga FIRE."
+
+msgid "Not defined for this rule: it does not use a net-worth target."
+msgstr "Nieokreślony dla tej reguły: nie używa celu wartości netto."
 
 msgid "Not defined: net worth at FIRE is not positive."
 msgstr "Nieokreślony: wartość netto w roku FIRE nie jest dodatnia."
@@ -15253,10 +15308,4 @@ msgstr "Usuń obszar roboczy…"
 #~ " zakończeniu dochodów są wyciszone; "
 #~ "wyczerpany wiersz jest oznaczony na "
 #~ "czerwono."
-
-#~ msgid "PricepriceFX rate"
-#~ msgstr "Dostawca cen"
-
-#~ msgid "Stale prices"
-#~ msgstr "Nieaktualne ceny"
 

@@ -45,25 +45,11 @@
       </div>
       <div id="sidebar-panel" class="sidebar-panel lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" data-sidebar-panel>
       <nav class="mt-4 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:mt-7 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:pb-4" aria-label="{{ _('Main navigation') }}">
-        {# F2.7: Home, Month, Transactions, History first; aria-current marks the page shown. #}
-        {% set path = request.url.path %}
-        <a class="nav-link" href="{{ scoped_url(request, 'home') }}" data-home-link{% if path == scoped_url(request, 'home') %} aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ _("Home") }}</a>
-        {% set month_base = scoped_url(request, 'month_current') %}
-        {% set transactions_base = scoped_url(request, 'transactions') %}
-        {% set history_base = scoped_url(request, 'history') %}
-        {# On a month's Month or Transactions page both links keep that month (web.rendering.month_nav_links). #}
-        {% set month_href, transactions_href = month_nav_links(request) %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ month_href }}" data-month-link{% if path == month_base or path.startswith(month_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ transactions_href }}" data-transactions-link{% if path == transactions_base or path.startswith(transactions_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ history_base }}" data-history-link{% if path == history_base or path.startswith(history_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>{{ _("History") }}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-upcoming-link{% if request.url.path.endswith('/upcoming') %} aria-current="page"{% endif %}><span aria-hidden="true">◔</span>{{ _("Upcoming") }}{% if workspace_nav.overdue_count %}<span class="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger" data-overdue-badge="{{ workspace_nav.overdue_count }}"><span aria-hidden="true">{{ workspace_nav.overdue_count }}</span><span class="sr-only">{{ ngettext('%(num)d overdue occurrence', '%(num)d overdue occurrences', workspace_nav.overdue_count) }}</span></span>{% endif %}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link{% if '/recurring' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
-        {% if workspace_nav %}{% set income_base = scoped_url(request, 'income_sources') %}<a class="nav-link" href="{{ income_base }}" data-income-link{% if path == income_base or path.startswith(income_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">¤</span>{{ _("Income") }}</a>{% endif %}
-        {% if workspace_nav and workspace_nav.current.taxes_enabled %}<a class="nav-link" href="{{ scoped_url(request, 'tax_rules') }}" data-taxes-link{% if '/taxes' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">%</span>{{ _("Taxes") }}</a>{% endif %}
-        {% if workspace_nav %}{% set networth_base = scoped_url(request, 'networth') %}<a class="nav-link" href="{{ scoped_url(request, 'networth_summary') }}" data-net-worth-link{% if path == networth_base or path.startswith(networth_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>{% endif %}
-        {% if workspace_nav %}{% set investments_href = scoped_url(request, 'investments_portfolio') %}{% set investments_root = scoped_url(request, 'investments') %}<a class="nav-link" href="{{ investments_href }}" data-investments-link{% if path == investments_root or path.startswith(investments_root ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">↗</span>{{ _("Investments") }}</a>{% endif %}
-        {% if workspace_nav %}{% set loans_base = scoped_url(request, 'loans') %}<a class="nav-link" href="{{ loans_base }}" data-loans-link{% if path == loans_base or path.startswith(loans_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">▤</span>{{ _("Loans") }}</a>{% endif %}
-        {% if workspace_nav %}{% set fire_base = scoped_url(request, 'fire_scenarios') %}<a class="nav-link" href="{{ fire_base }}" data-fire-link{% if path == fire_base or path.startswith(fire_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">✦</span>{{ _("FIRE projection") }}</a>{% endif %}
+        {# F9.12: the user's visible destinations in their saved order; aria-current marks the
+           page shown. Home is always present; without a workspace Context only Home shows. #}
+        {% for link in sidebar_links(request, workspace_nav) %}
+        <a class="nav-link" href="{{ link.href }}" data-{{ link.key | replace('_', '-') }}-link{% if link.current %} aria-current="page"{% endif %}><span aria-hidden="true">{{ sidebar_glyphs[link.key] }}</span>{{ sidebar_labels[link.key] }}{% if link.key == "upcoming" and workspace_nav and workspace_nav.overdue_count %}<span class="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger" data-overdue-badge="{{ workspace_nav.overdue_count }}"><span aria-hidden="true">{{ workspace_nav.overdue_count }}</span><span class="sr-only">{{ ngettext('%(num)d overdue occurrence', '%(num)d overdue occurrences', workspace_nav.overdue_count) }}</span></span>{% endif %}</a>
+        {% endfor %}
       </nav>
       <div class="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-line px-2 pt-4 lg:mt-auto" data-sidebar-footer>
         <div class="min-w-0 text-xs text-sidebar-ink">

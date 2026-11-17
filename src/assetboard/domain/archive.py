@@ -68,7 +68,7 @@ from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, S
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "2.1"
+FORMAT_VERSION = "2.2"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365

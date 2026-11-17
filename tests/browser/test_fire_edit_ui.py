@@ -366,6 +366,7 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             swr_input = page.locator('input[name="swr"]')
             expect(swr_wrapper).to_be_visible()
             expect(swr_input).to_be_disabled()
+            assert swr_input.input_value() == "4"
             assert "hidden" not in (swr_wrapper.get_attribute("class") or "")
             expect(swr_wrapper).to_have_attribute("data-fire-swr-inactive", "1")
             expect(page.locator("[data-fire-swr-note]")).to_have_count(0)

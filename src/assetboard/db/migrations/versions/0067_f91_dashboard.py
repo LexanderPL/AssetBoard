@@ -1,6 +1,6 @@
 """Per-user Home widget preferences (F9.1)
 
-Revision ID: 0065_f91_dashboard
+Revision ID: 0067_f91_dashboard
 Revises: 0064_f812_fire_loan_settings
 Create Date: 2026-11-17
 
@@ -16,8 +16,8 @@ from alembic import op
 
 from assetboard.db.types import UtcDateTime
 
-revision = "0065_f91_dashboard"
-down_revision = "0064_f812_fire_loan_settings"
+revision = "0067_f91_dashboard"
+down_revision = "0066_f821_horizon_rule"
 branch_labels = None
 depends_on = None
 

@@ -17,10 +17,12 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
 from assetboard.db.models.identity import User
+from assetboard.domain.navigation import normalize_sidebar
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.auth import WebSession
 from assetboard.services.external_identity import PROXY_PROVIDER
+from assetboard.services.navigation import reset_sidebar, save_sidebar
 from assetboard.services.oidc import OidcError
 from assetboard.services.oidc_flow import FlowState
 from assetboard.services.profile import (
@@ -36,7 +38,7 @@ from assetboard.services.profile import (
 )
 from assetboard.services.proxy_auth import proxy_identity_owner
 from assetboard.web.confirm import confirm_view, refusal, run_confirmed
-from assetboard.web.rendering import render_template
+from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import (
     client_host,
     oidc_flow_cookie_name,
@@ -95,6 +97,11 @@ UNLINK_LAST = _(
     "This is your last way to sign in, so it cannot be removed. Link another sign-in method "
     "or set a password first."
 )
+# ``/account?sidebar=saved|reset`` after the customiser posts; shown inside the Sidebar panel.
+SIDEBAR_MESSAGES: dict[str, str] = {
+    "saved": _("Your sidebar is saved."),
+    "reset": _("Your sidebar is back to the default order."),
+}
 
 
 def _state(request: Request) -> Any:
@@ -130,6 +137,7 @@ async def _profile_page(
     errors: dict[str, str] | None = None,
     notice: str | None = None,
     error: str | None = None,
+    sidebar_notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
     current = _require_session(request)
@@ -184,6 +192,10 @@ async def _profile_page(
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
             "error": error,
+            # The fresh WebSession already carries the user row's stored preference: no second
+            # query. Malformed stored data normalises to the default instead of failing.
+            "sidebar_items": normalize_sidebar(current.sidebar_items),
+            "sidebar_notice": sidebar_notice,
         },
         status_code=status_code,
     )
@@ -194,14 +206,21 @@ def _issuer_host(issuer: str | None) -> str:
 
 
 @router.get("/account", name="account")
-async def profile(request: Request, link: str = "") -> Response:
+async def profile(request: Request, link: str = "", sidebar: str = "") -> Response:
     _require_session(request)
+    sidebar_message = SIDEBAR_MESSAGES.get(sidebar)
+    sidebar_notice = _t(request, sidebar_message) if sidebar_message is not None else None
     outcome = LINK_MESSAGES.get(link)
     if outcome is None:
-        return await _profile_page(request)
+        return await _profile_page(request, sidebar_notice=sidebar_notice)
     ok, message = outcome
     text = _t(request, message)
-    return await _profile_page(request, notice=text if ok else None, error=None if ok else text)
+    return await _profile_page(
+        request,
+        notice=text if ok else None,
+        error=None if ok else text,
+        sidebar_notice=sidebar_notice,
+    )
 
 
 @router.post("/account/profile", name="account_profile")
@@ -235,6 +254,44 @@ async def profile_submit(
         )
     # Shown with the new language: the next request reads the saved locale.
     return Response(status_code=303, headers={"Location": "/account"})
+
+
+# The personal sidebar (F9.12)
+
+
+def _form_values(form: Any, name: str) -> list[str]:
+    return [value for value in form.getlist(name)[:1000] if isinstance(value, str)]
+
+
+def _sidebar_redirect(request: Request, outcome: str) -> Response:
+    target = f"{scoped_url(request, 'account')}?sidebar={outcome}#sidebar-settings"
+    return Response(status_code=303, headers={"Location": target})
+
+
+@router.post("/account/sidebar", name="account_sidebar")
+async def sidebar_submit(request: Request) -> Response:
+    current = _require_session(request)
+    state = _state(request)
+    form = await request.form()
+    move = form.get("move")
+    await run_in_threadpool(
+        lambda: save_sidebar(
+            state.session_factory,
+            user_id=current.user_id,
+            order=_form_values(form, "item"),
+            visible=_form_values(form, "visible"),
+            move=move if isinstance(move, str) else "",
+        )
+    )
+    return _sidebar_redirect(request, "saved")
+
+
+@router.post("/account/sidebar/reset", name="account_sidebar_reset")
+async def sidebar_reset(request: Request) -> Response:
+    current = _require_session(request)
+    state = _state(request)
+    await run_in_threadpool(lambda: reset_sidebar(state.session_factory, user_id=current.user_id))
+    return _sidebar_redirect(request, "reset")
 
 
 async def _refused(request: Request, outcome: ConfirmOutcome[Any]) -> Response:

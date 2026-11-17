@@ -41,8 +41,10 @@ first; **Create plan** never saves values that differ from the review you last s
 
 1. **About you:** birth year (prefilled from your profile for a new plan, editable for this
    plan), horizon age (prefilled from your profile's life expectancy) and the age at which
-   income stops. The page shows your current age and the first and last projected years. A new
-   plan stores its own birth year; changing your profile later does not change an existing plan.
+   income stops. Birth year has its own full-width row; horizon age and the income-stop age share
+   the row below it. The page shows your current age and the first and last projected years. A
+   new plan stores its own birth year; changing your profile later does not change an existing
+   plan.
 2. **Income and expenses:** empty by default. Each field has a suggestion card: **Use suggested
    value** copies the suggestion into the field. The income and expense suggestions use the
    last 12 full calendar months, with the window, months with data and any warnings shown. Both
@@ -57,12 +59,13 @@ first; **Create plan** never saves values that differ from the review you last s
    an amount.
 4. **Assumptions and review:** inflation, return above inflation, income growth and the
    independence rule. **Independence rule** and **Withdrawal rate** sit side by side in their
-   own row below the three rates. **Returns cover expenses** checks whether the portfolio's
-   return above inflation covers the year's expenses, which preserves the portfolio's real
-   capital. **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**.
-   With **Returns cover expenses** the field stays visible but inactive and disabled; without
-   JavaScript it stays enabled, and the server ignores the rate for that rule. The review shows
-   the entered values, the projected window, the
+   own row below the three rates. **Returns cover expenses** is the default: it checks whether
+   the portfolio's return above inflation covers the year's expenses, which preserves the
+   portfolio's real capital. **Withdrawal rate** is used only when the independence rule is
+   **Withdrawal rate**. **Portfolio lasts to the horizon** is an optional rule described below.
+   With any rule other than **Withdrawal rate** the rate field stays visible but inactive and
+   disabled; without JavaScript it stays enabled, and the server ignores the rate for those
+   rules. The review shows the entered values, the projected window, the
    warnings and a read-only list of active loans with their annual payment, payoff year and
    included state. A changed rate outside the usual range shows a warning. **Create plan** then
    opens a confirmation panel; nothing is saved until **Confirm and create plan**. There is no
@@ -257,10 +260,37 @@ The starting values (2.5% inflation, 5% return above inflation, 3% income growth
 withdrawal rate) are illustrative examples, not recommendations.
 
 **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**. With
-**Returns cover expenses** the field stays in the layout but is inactive and disabled; without
-JavaScript it stays enabled, and the server ignores the rate for that rule. The two fields share
-a row below inflation, return above inflation and income growth; there is no separate note
-beside the withdrawal rate.
+**Returns cover expenses** or **Portfolio lasts to the horizon** the field stays in the layout
+but is inactive and disabled; without JavaScript it stays enabled, and the server ignores the
+rate for those rules. When the saved plan stores no withdrawal rate, edit mode shows the
+illustrative 4% in the inactive field so it matches the help text; the rate is still not stored
+for those rules. The two fields share a row below inflation, return above inflation and income
+growth; there is no separate note beside the withdrawal rate.
+
+## Independence rules
+
+The plan reaches FIRE at the first age that satisfies the selected rule. The rule is only a
+definition of independence; the year-by-year table always shows the plan you entered, including
+the configured **Income stops at age**.
+
+- **Returns cover expenses** (the default): the portfolio's return above inflation covers that
+  year's expenses. This preserves the portfolio's real capital.
+- **Withdrawal rate**: the portfolio multiplied by the withdrawal rate covers the year's
+  expenses. The rate is stored with the plan and is used only by this rule.
+- **Portfolio lasts to the horizon**: the earliest age at which stopping base income *at that
+  age* leaves the portfolio non-negative in every year through the horizon. Zero at the horizon
+  counts as lasting. The rule considers retiring at any age from today up to the earlier of
+  **Income stops at age** and the year before the horizon; it cannot choose a retirement age
+  later than **Income stops at age**. If base income has already stopped, it tests whether the
+  portfolio lasts from today. Income and expense changes, saving overrides, loans and all other
+  assumptions stay as entered. This rule deliberately allows spending principal and is not a
+  perpetual-withdrawal or longevity guarantee. Like the rest of the plan it uses the entered
+  constant rates, not a set of market paths, so the result is one illustrative projection.
+
+The FIRE number is defined for **Returns cover expenses** and **Withdrawal rate**. **Portfolio
+lasts to the horizon** has no rate-based FIRE number and no net-worth target, so the FIRE-number
+and plan-progress cards explain that they are not defined for that rule; **Net worth at FIRE**
+still shows the projected amount.
 
 ## Adjustments
 
@@ -302,14 +332,16 @@ The plan page shows nominal values only:
 - **FIRE age** and year, **years to FIRE** and the **FIRE number**. The FIRE number is the
   nominal expenses in the FIRE year divided by the rate the independence rule uses: the
   withdrawal rate, or the return above inflation when returns must cover expenses. It is shown
-  with the FIRE year, and is a dash when FIRE is never reached or the rate is not positive;
+  with the FIRE year, and is a dash when FIRE is never reached or the rate is not positive.
+  **Portfolio lasts to the horizon** has no rate-based FIRE number; the card says so explicitly;
 - **Plan progress** is a full-width bar directly below the four key metric cards. The percentage
   is shown large, and the legend shows the **Starting portfolio** and **Net worth at FIRE** with
   their formatted amounts. The bar fills in success colour and is capped visually at 100%; the
   accessible value keeps the exact percentage. When FIRE is not reached or net worth at FIRE is
   not positive, the bar is muted and the page explains why. It is the starting portfolio divided
   by the projected nominal net worth at FIRE, so 100% means the plan has reached its FIRE
-  net-worth target;
+  net-worth target. **Portfolio lasts to the horizon** has no net-worth target, so its progress
+  is not defined and the card says so;
 - the sustainability check: the nominal depletion age and the lowest nominal net worth after
   income stops;
 - a clear block instead of results when the annual expense line would be negative in any year.

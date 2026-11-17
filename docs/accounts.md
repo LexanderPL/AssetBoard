@@ -1,8 +1,8 @@
 # Your account
 
-The profile page (`/account`, "Profile" in the account menu) holds your details, your
-language and theme, and the ways you sign in. Password changes, signing out other devices and
-two-factor authentication are on "Account security".
+The profile page (`/account`, "Profile" in the account menu) holds your details, your sidebar,
+your language and theme, and the ways you sign in. Password changes, signing out other devices
+and two-factor authentication are on "Account security".
 
 ## Signing in
 
@@ -90,7 +90,7 @@ their own account; use the account security page instead. An operator with shell
 also run `assetboard reset-mfa <email>` (see [administrator commands](deployment.md#administrator-commands)).
 A CLI password reset does not remove your second factor.
 
-## Details, language, theme and planning
+## Details, language, theme, planning and sidebar
 
 - **Display name**: 1 to 120 characters, no control or invisible characters.
 - **Language**: "Browser language" (the default) follows your browser's language setting;
@@ -102,6 +102,12 @@ A CLI password reset does not remove your second factor.
 - **Birth year** (optional) and **Life expectancy** (50–120, default 90): used by age-based
   investment risk targets (see [Investments](investments.md#risk-balance)) and by the FIRE
   projection. Leave the birth year empty to disable age-based targets for yourself.
+- **Sidebar** (the Sidebar panel): choose which pages appear in the main sidebar and in which
+  order. The choice belongs to your account, so it follows you across workspaces; Home always
+  stays first and shown. Hiding a page only removes its link: the page remains reachable by its
+  address, and it is not a permission change. A page whose feature the workspace has not
+  enabled, such as Taxes, stays hidden there whatever your choice. "Reset to default" restores
+  the canonical order with every page shown.
 
 ## Sign-in methods
 

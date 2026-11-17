@@ -277,6 +277,21 @@ def test_the_portfolio_tables_have_no_outer_panel_frame(owner: OwnerApp) -> None
         assert "panel" not in section.group(0), marker
 
 
+def test_the_portfolio_tables_use_the_transactions_surface_background(
+    owner: OwnerApp,
+) -> None:
+    _fund(owner)
+    page = owner.client.get(PORTFOLIO).text
+    for marker in ("data-portfolio-holdings", "data-portfolio-classes", "data-risk-balance"):
+        section = re.search(rf"<section[^>]*{marker}[^>]*>.*?</section>", page, re.S)
+        assert section is not None, marker
+        table = re.search(r'<table class="([^"]*)"', section.group(0))
+        assert table is not None, marker
+        classes = table.group(1).split()
+        assert "sheet" in classes, marker
+        assert "bg-surface" in classes, marker
+
+
 def test_missing_price_is_warned_and_excluded_from_the_totals(owner: OwnerApp) -> None:
     fund, classes = _fund(owner)
     legacy = _instrument(owner, "Legacy fund", {classes["Stocks"]: "100"})
