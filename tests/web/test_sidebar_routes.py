@@ -105,6 +105,32 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
         assert f'name="item" value="{key}"' in row(settings, key)
     assert "data-sidebar-save" in settings and "data-sidebar-reset" in settings
     assert "data-sidebar-taxes-note" in row(settings, "taxes")
+    assert "data-sidebar-list" in settings
+    assert "data-sidebar-nojs-note" in settings
+    # The glyph-only arrows still carry an accessible name.
+    assert 'aria-label="Move Month up"' in row(settings, "month")
+    assert 'aria-label="Move FIRE projection down"' in row(settings, "fire")
+
+
+def test_the_sidebar_actions_share_one_row_and_reset_submits_its_own_route(
+    owner: OwnerApp,
+) -> None:
+    settings = panel(owner.client.get("/account").text)
+    actions = re.search(r"<div [^>]*data-sidebar-actions.*?</div>", settings, re.DOTALL)
+    assert actions is not None
+    markup = actions.group(0)
+    assert "data-sidebar-save" in markup and "data-sidebar-reset" in markup
+    assert 'formaction="/account/sidebar/reset"' in markup
+    # Reset is not a second form below Save: it submits the one sidebar form to its route.
+    assert settings.count("account/sidebar/reset") == 1
+
+
+def test_the_sidebar_script_is_external_and_only_loaded_on_the_profile(owner: OwnerApp) -> None:
+    account = owner.client.get("/account").text
+    assert account.count("js/sidebar.js") == 1
+    # CSP-safe: a same-origin external script, not an inline block.
+    assert 'src="/static/js/sidebar.js?v=' in account
+    assert "js/sidebar.js" not in owner.client.get("/").text
 
 
 def test_the_sidebar_save_button_is_distinct_from_the_profile_save_button(owner: OwnerApp) -> None:
@@ -341,7 +367,12 @@ def test_polish_labels(owner: OwnerApp) -> None:
     assert "Pasek boczny" in settings
     assert "Zawsze widoczna" in settings
     assert "Miesiąc" in settings
-    assert "Zapisz pasek boczny" in settings
+    # The shorter label keeps Save and Reset on one row at 390 px; the help text names it too.
+    assert "Zapisz pasek boczny" not in settings
+    assert "Zapisz pasek" in settings
+    assert "Naciśnij Zapisz pasek" in settings
+    assert "Przywróć domyślne" in settings
+    assert "Bez JavaScriptu przesunięcie strony od razu zapisuje nową kolejność." in settings
 
 
 def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:

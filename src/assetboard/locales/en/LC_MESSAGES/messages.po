@@ -5424,8 +5424,9 @@ msgid "Sidebar"
 msgstr ""
 
 msgid ""
-"Choose which pages appear in the sidebar and in which order. Some pages "
-"appear only where the workspace enables the feature, such as Taxes."
+"Choose which pages appear in the sidebar and in which order. Press Save "
+"sidebar to apply your changes. Some pages appear only where the workspace"
+" enables the feature, such as Taxes."
 msgstr ""
 
 msgid "Only shown when Taxes is turned on in the workspace settings."
@@ -5446,6 +5447,9 @@ msgid "Save sidebar"
 msgstr ""
 
 msgid "Reset to default"
+msgstr ""
+
+msgid "Without JavaScript, moving a page saves the new order immediately."
 msgstr ""
 
 msgid "Notifications"
@@ -14410,6 +14414,13 @@ msgstr ""
 #~ "the year's expenses, preserving real "
 #~ "capital. Withdrawal rate uses the rate"
 #~ " below."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Choose which pages appear in the "
+#~ "sidebar and in which order. Some "
+#~ "pages appear only where the workspace"
+#~ " enables the feature, such as Taxes."
 #~ msgstr ""
 
 #~ msgid "This month"

@@ -44,7 +44,7 @@
 
   <section id="sidebar-settings" class="panel p-6 sm:p-7" aria-labelledby="sidebar-heading" data-sidebar-settings>
     <h2 id="sidebar-heading" class="text-base font-semibold">{{ _("Sidebar") }}</h2>
-    <p class="mt-2 text-sm text-muted">{{ _("Choose which pages appear in the sidebar and in which order. Some pages appear only where the workspace enables the feature, such as Taxes.") }}</p>
+    <p class="mt-2 text-sm text-muted">{{ _("Choose which pages appear in the sidebar and in which order. Press Save sidebar to apply your changes. Some pages appear only where the workspace enables the feature, such as Taxes.") }}</p>
     {% if sidebar_notice %}
     <p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-sidebar-notice>{{ sidebar_notice }}</p>
     {% endif %}
@@ -53,7 +53,7 @@
     {% else %}
     <form method="post" action="{{ scoped_url(request, 'account_sidebar') }}" class="mt-4" data-sidebar-form>
       {{ csrf_input() }}
-      <ul class="divide-y divide-line">
+      <ul class="divide-y divide-line" data-sidebar-list>
         {% for item in sidebar_items %}
         {% set row_class = "flex flex-wrap items-center gap-3 py-3 opacity-60" if not item.visible else "flex flex-wrap items-center gap-3 py-3" %}
         {% set label_class = "text-sm text-muted line-through" if not item.visible and item.key != "home" else "text-sm" %}
@@ -73,11 +73,11 @@
         </li>
         {% endfor %}
       </ul>
-      <button type="submit" class="btn-primary mt-4" data-sidebar-save>{{ _("Save sidebar") }}</button>
-    </form>
-    <form method="post" action="{{ scoped_url(request, 'account_sidebar_reset') }}" class="mt-3">
-      {{ csrf_input() }}
-      <button type="submit" class="btn" data-sidebar-reset>{{ _("Reset to default") }}</button>
+      <div class="mt-4 flex flex-wrap items-center gap-2" data-sidebar-actions>
+        <button type="submit" class="btn-primary whitespace-nowrap px-2" data-sidebar-save>{{ _("Save sidebar") }}</button>
+        <button type="submit" class="btn whitespace-nowrap px-2" formaction="{{ scoped_url(request, 'account_sidebar_reset') }}" data-sidebar-reset>{{ _("Reset to default") }}</button>
+      </div>
+      <p class="mt-3 text-xs text-muted" data-sidebar-nojs-note>{{ _("Without JavaScript, moving a page saves the new order immediately.") }}</p>
     </form>
     {% endif %}
   </section>
@@ -140,4 +140,7 @@
     {% endif %}
   </section>
 </div>
+{% endblock %}
+{% block scripts %}
+<script defer src="{{ static_url(request, 'js/sidebar.js') }}" referrerpolicy="no-referrer"></script>
 {% endblock %}
