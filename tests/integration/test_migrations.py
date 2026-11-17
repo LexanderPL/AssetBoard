@@ -2635,6 +2635,69 @@ def test_0067_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> N
         engine.dispose()
 
 
+def test_0069_home_widget_settings_migration_backfills_and_reverses(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'home_settings.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0068_f38_work_logs_import")
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id = "11111111111141118111111111111111"
+    user_id = "22222222222242228222222222222222"
+    preference_id = "33333333333343338333333333333333"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, "
+                "created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', "
+                "'2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, locale, theme, is_active, "
+                "is_instance_admin, created_at, updated_at) VALUES (?, 'a@example.com', 'A', "
+                "'en', 'system', 1, 0, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (user_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO dashboard_preferences "
+                "(id, workspace_id, user_id, widgets, customised_at, created_at, updated_at) "
+                "VALUES (?, ?, ?, '[\"month-in-out\"]', NULL, '2026-01-01 00:00:00', "
+                "'2026-01-01 00:00:00')",
+                (preference_id, workspace_id, user_id),
+            )
+        command.upgrade(alembic_config(settings), "head")
+        inspector = inspect(engine)
+        columns = {
+            column["name"]: column for column in inspector.get_columns("dashboard_preferences")
+        }
+        assert columns["upcoming_limit"]["nullable"] is False
+        assert columns["portfolio_range"]["nullable"] is False
+        checks = {
+            check["name"] for check in inspector.get_check_constraints("dashboard_preferences")
+        }
+        assert "ck_dashboard_preferences_upcoming_limit_valid" in checks
+        assert "ck_dashboard_preferences_portfolio_range_valid" in checks
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT upcoming_limit, portfolio_range FROM dashboard_preferences WHERE id = ?",
+                (preference_id,),
+            ).one()
+        assert row == (10, "1y")
+
+        command.downgrade(alembic_config(settings), "0068_f38_work_logs_import")
+        downgraded = {
+            column["name"] for column in inspect(engine).get_columns("dashboard_preferences")
+        }
+        assert "upcoming_limit" not in downgraded and "portfolio_range" not in downgraded
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0065_f912_sidebar_items_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

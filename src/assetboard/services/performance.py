@@ -62,6 +62,8 @@ from assetboard.services.holding_rows import holding_transaction
 DEFAULT_RANGE = "1y"
 RANGES: tuple[str, ...] = ("ytd", "1y", "3y", "5y", "all")
 PERIODS: tuple[str, ...] = ("1m", "3m", "ytd", "1y", "all")
+# The Home portfolio widget offers shorter spans than the performance page (F9.1 polish).
+VALUE_RANGES: tuple[str, ...] = ("1m", "3m", "6m", "1y", "all")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,11 +98,22 @@ class PerformancePage:
     first_date: date | None
 
 
-def normalize_range(value: str) -> str:
-    return value if value in RANGES else DEFAULT_RANGE
+def normalize_range(value: str, ranges: tuple[str, ...] = RANGES) -> str:
+    return value if value in ranges else DEFAULT_RANGE
+
+
+def normalize_value_range(value: str) -> str:
+    """The Home portfolio range; an unknown stored value falls back to one year."""
+    return normalize_range(value, VALUE_RANGES)
 
 
 def _range_start(code: str, today: date, first_date: date | None) -> date:
+    if code == "1m":
+        return add_months(today, -1)
+    if code == "3m":
+        return add_months(today, -3)
+    if code == "6m":
+        return add_months(today, -6)
     if code == "ytd":
         return date(today.year, 1, 1)
     if code == "1y":
@@ -246,10 +259,12 @@ def performance_page(
     *,
     range_code: str = "",
     asset_class_id: UUID | None = None,
+    ranges: tuple[str, ...] = RANGES,
+    with_periods: bool = True,
 ) -> PerformancePage:
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
-    chosen_range = normalize_range(range_code)
+    chosen_range = normalize_range(range_code, ranges)
     with factory() as session:
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         base = workspace.base_currency
@@ -323,11 +338,23 @@ def performance_page(
         else ()
     )
     chart = _trim_leading_empty(chart, first_date)
-    periods = tuple(
-        _period(
-            code, today, first_date, transactions, prices, fx, base, allocation_map, class_scope
+    periods = (
+        tuple(
+            _period(
+                code,
+                today,
+                first_date,
+                transactions,
+                prices,
+                fx,
+                base,
+                allocation_map,
+                class_scope,
+            )
+            for code in PERIODS
         )
-        for code in PERIODS
+        if with_periods
+        else ()
     )
     return PerformancePage(
         currency=base,

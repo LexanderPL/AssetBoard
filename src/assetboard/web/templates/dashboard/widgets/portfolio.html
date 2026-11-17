@@ -1,13 +1,42 @@
 {% from "macros/charts.html" import donut as chart_donut with context %}
 <section class="panel p-4 sm:p-6" data-home-widget="portfolio" aria-labelledby="widget-portfolio-heading">
-  <h2 id="widget-portfolio-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+  <h2 id="widget-portfolio-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
   {% if has_data %}
   <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
     <div><dt class="text-xs text-muted">{{ _("Value") }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums" data-portfolio-value>{{ value }}</dd></div>
     {% set gain_class = "text-danger" if page.valuation.gain.amount_minor < 0 else ("text-success-strong" if page.valuation.gain.amount_minor > 0 else "") %}
     <div><dt class="text-xs text-muted">{{ _("Gain") }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums {{ gain_class }}" data-portfolio-gain>{{ gain }}{% if gain_pct %} <span class="text-sm font-normal text-muted">({{ gain_pct }})</span>{% endif %}</dd></div>
   </dl>
-  {{ chart_donut(donut, compact=true, inline_json=true) }}
+  {{ chart_donut(donut, compact=true, canvas_size="regular", inline_json=true) }}
+  <section class="mt-4 border-t border-line pt-4" aria-labelledby="widget-portfolio-history-heading" data-portfolio-history>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 id="widget-portfolio-history-heading" class="text-sm font-semibold">{{ _("Value over time") }}</h3>
+      <p class="text-xs text-muted" data-portfolio-range>{{ history.range_label }}</p>
+    </div>
+    {% if history.has_data %}
+    <div class="mt-3 min-w-0" data-chart="performance" data-chart-json='{{ history.chart|tojson }}'>
+      <div class="h-40 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    {% if history.incomplete_points %}<p class="mt-2 text-xs text-warning-strong" data-portfolio-incomplete>{{ ngettext("%(num)d chart point is incomplete because an instrument has no price or FX rate.", "%(num)d chart points are incomplete because an instrument has no price or FX rate.", history.incomplete_points) }}</p>{% endif %}
+    <details class="mt-3" data-portfolio-history-table>
+      <summary class="cursor-pointer text-sm font-medium text-primary-ink">{{ _("Plotted data") }}</summary>
+      <div class="mt-2 overflow-x-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Portfolio value over time") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Value") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Invested capital") }}</th></tr></thead>
+          <tbody>
+            {% for point in history.rows %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.value }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.invested }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-portfolio-history-empty>{% if has_history_data %}{{ _("No value history in this range yet. Choose a longer range in Customise Home.") }}{% else %}{{ _("No dated investment transactions yet. Add investment transactions and prices to see the value over time.") }}{% endif %}</p>
+    <p class="mt-2 text-sm"><a href="{{ module_url }}" class="font-medium text-primary-ink underline">{{ _("Open the portfolio") }}</a></p>
+    {% endif %}
+  </section>
   {% else %}
   <p class="mt-3 text-sm text-muted" data-empty>{{ _("No holdings are valued yet.") }}</p>
   <p class="mt-2 text-sm"><a href="{{ module_url }}" class="font-medium text-primary-ink underline">{{ _("Set up investments") }}</a></p>

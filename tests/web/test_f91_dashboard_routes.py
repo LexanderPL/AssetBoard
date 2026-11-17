@@ -6,6 +6,7 @@ import html as html_module
 import json
 import re
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -16,12 +17,20 @@ from sqlalchemy import select
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.ledger import Category
-from assetboard.db.repositories import DashboardPreferenceRepository, ImportBatchRepository
+from assetboard.db.repositories import (
+    AssetClassRepository,
+    DashboardPreferenceRepository,
+    ImportBatchRepository,
+    InvestmentTransactionRepository,
+    PricePointRepository,
+)
 from assetboard.domain.dashboard import WIDGET_KEYS
 from assetboard.domain.money import Money
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.demo import build_demo_workspace, plan_for_workspace
 from assetboard.services.fire_scenarios import FirePlanInput, create_fire_plan
+from assetboard.services.investments import create_instrument
+from assetboard.services.performance import VALUE_RANGES
 from assetboard.web import dashboard as dashboard_module
 from assetboard.web.dashboard import WIDGETS
 from tests.conftest import OwnerApp
@@ -72,6 +81,24 @@ def _chart_data(fragment: str) -> dict:
     match = re.search(r"data-chart-json='([^']*)'", fragment)
     assert match is not None
     return json.loads(html_module.unescape(match.group(1)))
+
+
+def _performance_chart_data(fragment: str) -> dict:
+    match = re.search(r'data-chart="performance" data-chart-json=\'([^\']*)\'', fragment)
+    assert match is not None
+    return json.loads(html_module.unescape(match.group(1)))
+
+
+def _setting_value(html: str, name: str) -> str | None:
+    match = re.search(rf'name="{name}"[^>]*value="([^"]*)"', html)
+    return match.group(1) if match is not None else None
+
+
+def _selected_option(html: str, name: str) -> str | None:
+    match = re.search(rf'name="{name}"[^>]*>(.*?)</select>', html, re.DOTALL)
+    assert match is not None
+    selected = re.search(r'<option value="([^"]*)" selected>', match.group(1))
+    return selected.group(1) if selected is not None else None
 
 
 def _widget_order(html: str) -> list[str]:
@@ -135,6 +162,61 @@ def _planned_import(app: OwnerApp) -> UUID:
         return batch.id
 
 
+def _one_time(app: OwnerApp, day: str) -> None:
+    with app.db() as session:
+        category_id = session.scalars(
+            select(Category.id).where(Category.kind == "expense").limit(1)
+        ).one()
+    response = app.post(
+        "/upcoming/one-time",
+        {
+            "name": f"One-time {day}",
+            "amount": "10",
+            "direction": "expense",
+            "category_id": str(category_id),
+            "day": day,
+        },
+        token_from="/upcoming",
+    )
+    assert response.status_code == 303, response.text
+
+
+def _undated_portfolio(app: OwnerApp) -> None:
+    """A held lot whose legacy transaction has no date: value now, no dated history."""
+    ctx = _ctx(app)
+    with app.db() as session:
+        class_id = AssetClassRepository(session, ctx).ordered()[0].id
+    instrument = create_instrument(
+        app.app.state.session_factory,
+        ctx,
+        name="Legacy fund",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(class_id, 10_000)],
+        locale="en",
+    )
+    with app.db() as session, session.begin():
+        InvestmentTransactionRepository(session, ctx).create(
+            instrument_id=instrument.id,
+            date=None,
+            type="buy",
+            quantity=Decimal("1"),
+            unit_price=Decimal("50"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=None,
+        )
+    with app.db() as session, session.begin():
+        PricePointRepository(session, ctx).create(
+            instrument_id=instrument.id,
+            date=date(2026, 3, 1),
+            price=Decimal("60"),
+            source="manual",
+        )
+
+
 def test_the_widget_registry_matches_the_domain_keys_and_templates() -> None:
     assert tuple(widget.key for widget in WIDGETS) == WIDGET_KEYS
     templates = Path(dashboard_module.__file__).parent / "templates"
@@ -147,6 +229,10 @@ def test_home_shell_lists_the_default_widgets_in_order(owner: OwnerApp) -> None:
     html = owner.client.get("/").text
     assert _widget_order(html) == list(WIDGET_KEYS)
     assert "data-customise-link" in html
+    # The Customise control sits after the widget grid, not in the page header.
+    assert html.index("data-customise-link") > html.index("data-home-widgets")
+    header = html.split("data-header-actions")[1].split("</div>")[0]
+    assert "data-customise-link" not in header
     assert "data-home-month" in html and "March 2026" in html
     assert "data-summary-kpis" not in html  # the shell has no widget data
     assert 'hx-trigger="load"' in html and 'hx-swap="outerHTML"' in html
@@ -214,6 +300,17 @@ def test_every_widget_links_to_its_module(owner: OwnerApp) -> None:
         assert f'href="{href}"' in _fragment(owner, key), key
 
 
+@pytest.mark.parametrize("key", WIDGET_KEYS)
+def test_widget_title_links_have_no_persistent_underline(owner: OwnerApp, key: str) -> None:
+    _fixed(owner)
+    fragment = _fragment(owner, key)
+    match = re.search(r'<h2[^>]*><a href="[^"]+" class="([^"]*)"', fragment)
+    assert match is not None, fragment
+    classes = match.group(1).split()
+    assert "underline" not in classes
+    assert "hover:underline" in classes
+
+
 def test_month_widgets_render_actual_data(owner: OwnerApp) -> None:
     _fixed(owner)
     owner.clear_categories()
@@ -259,7 +356,12 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
     response = _post_many(
         owner,
         "/dashboard/customise",
-        [("order", order_csv), *(("enabled", key) for key in chosen)],
+        [
+            ("order", order_csv),
+            ("upcoming_limit", "7"),
+            ("portfolio_range", "6m"),
+            *(("enabled", key) for key in chosen),
+        ],
         token_from="/dashboard/customise",
     )
     assert response.status_code == 303
@@ -268,10 +370,44 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
     with owner.db() as session:
         row = DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id)
         assert row is not None and row.widgets == chosen
+        assert row.upcoming_limit == 7 and row.portfolio_range == "6m"
 
     reset = owner.post("/dashboard/customise/reset", token_from="/dashboard/customise")
     assert reset.status_code == 303 and reset.headers["location"] == "/?reset=1"
     assert _widget_order(owner.client.get("/").text) == list(WIDGET_KEYS)
+    with owner.db() as session:
+        assert DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id) is None
+
+
+def test_customise_page_renders_arrows_local_reordering_markup_and_settings(
+    owner: OwnerApp,
+) -> None:
+    _fixed(owner)
+    page = owner.client.get("/dashboard/customise").text
+    assert page.count('data-customise-move="') == len(WIDGET_KEYS) * 2
+    assert "↑" in page and "↓" in page
+    assert page.count("/dashboard/customise/move") == len(WIDGET_KEYS) * 2
+    assert 'aria-label="Move This month: in vs out up"' in page
+    assert 'aria-label="Move Missing data down"' in page
+    assert re.search(r'data-customise-move="month-in-out:up"[^>]* disabled', page)
+    assert re.search(r'data-customise-move="missing-data:down"[^>]* disabled', page)
+    assert "data-customise-form" in page and "data-customise-list" in page
+    assert page.count("data-customise-form") == 1
+    assert "js/customise.js" in page
+    assert _setting_value(page, "upcoming_limit") == "10"
+    assert 'min="1"' in page and 'max="50"' in page
+    assert _selected_option(page, "portfolio_range") == "1y"
+    assert page.count('name="portfolio_range"') == 1
+    for code in ("1m", "3m", "6m", "1y", "all"):
+        assert f'<option value="{code}"' in page
+    assert page.index("data-customise-save") < page.index("data-customise-reset")
+    assert re.search(
+        r'<button[^>]*formaction="[^"]*/dashboard/customise/reset"[^>]*data-customise-reset',
+        page,
+    )
+    content = page.split("data-customise>")[1]
+    assert content.count("<form") == 1  # one form; Reset is a formaction POST
+    assert "data-customise-nojs-note" in content
 
 
 def test_move_previews_the_draft_without_saving(owner: OwnerApp) -> None:
@@ -286,12 +422,17 @@ def test_move_previews_the_draft_without_saving(owner: OwnerApp) -> None:
             ("move", "loans:up"),
             ("enabled", "month-in-out"),
             ("enabled", "loans"),
+            ("upcoming_limit", "25"),
+            ("portfolio_range", "3m"),
         ],
         token_from="/dashboard/customise",
     )
     assert response.status_code == 200
     moved, _new_order = _customise_order(response.text)
     assert moved.index("loans") < moved.index("fire")
+    # The draft keeps the unsaved settings in the form.
+    assert _setting_value(response.text, "upcoming_limit") == "25"
+    assert _selected_option(response.text, "portfolio_range") == "3m"
     with owner.db() as session:
         assert DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id) is None
 
@@ -354,6 +495,75 @@ def test_customise_posts_require_csrf(owner: OwnerApp) -> None:
     )
 
 
+def test_the_upcoming_widget_uses_the_saved_limit(owner: OwnerApp) -> None:
+    _fixed(owner)
+    for day in ("2026-03-11", "2026-03-12", "2026-03-13"):
+        _one_time(owner, day)
+    assert _fragment(owner, "upcoming").count("data-occurrence=") == 3
+
+    with owner.db() as session, session.begin():
+        DashboardPreferenceRepository(session, _ctx(owner)).upsert(
+            user_id=owner.admin_id,
+            widgets=list(WIDGET_KEYS),
+            upcoming_limit=2,
+            portfolio_range="1y",
+            customised_at=owner.app.state.clock.now(),
+        )
+    limited = _fragment(owner, "upcoming")
+    assert limited.count("data-occurrence=") == 2
+    assert "More items are waiting on the Upcoming page." in limited
+    assert "One-time 2026-03-11" in limited and "One-time 2026-03-13" not in limited
+
+    with owner.db() as session, session.begin():
+        DashboardPreferenceRepository(session, _ctx(owner)).upsert(
+            user_id=owner.admin_id,
+            widgets=list(WIDGET_KEYS),
+            upcoming_limit=50,
+            portfolio_range="1y",
+            customised_at=owner.app.state.clock.now(),
+        )
+    assert _fragment(owner, "upcoming").count("data-occurrence=") == 3
+    assert "More items are waiting" not in _fragment(owner, "upcoming")
+
+
+def test_the_portfolio_widget_uses_the_saved_range_and_chart_only_read(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fixed(owner)
+    calls: list[dict[str, object]] = []
+    original = dashboard_module.performance_page
+
+    def recording(*args: object, **kwargs: object):
+        calls.append(kwargs)
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(dashboard_module, "performance_page", recording)
+    _undated_portfolio(owner)
+    with owner.db() as session, session.begin():
+        DashboardPreferenceRepository(session, _ctx(owner)).upsert(
+            user_id=owner.admin_id,
+            widgets=list(WIDGET_KEYS),
+            upcoming_limit=10,
+            portfolio_range="6m",
+            customised_at=owner.app.state.clock.now(),
+        )
+    portfolio = _fragment(owner, "portfolio")
+    assert calls[-1]["range_code"] == "6m"
+    assert calls[-1]["ranges"] == VALUE_RANGES
+    assert calls[-1]["with_periods"] is False
+    assert "data-portfolio-range" in portfolio and "6 months" in portfolio
+
+
+def test_the_portfolio_widget_has_a_useful_empty_history_state(owner: OwnerApp) -> None:
+    _fixed(owner)
+    _undated_portfolio(owner)
+    portfolio = _fragment(owner, "portfolio")
+    assert "data-portfolio-value" in portfolio
+    assert "data-portfolio-history-empty" in portfolio
+    assert "No dated investment transactions yet" in portfolio
+    assert 'data-chart="performance"' not in portfolio
+
+
 def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> None:
     _fixed(owner, "2026-11-20T12:00:00+00:00")
     ctx = _ctx(owner)
@@ -390,6 +600,12 @@ def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> Non
     portfolio = _fragment(owner, "portfolio")
     assert "data-portfolio-value" in portfolio and "data-portfolio-gain" in portfolio
     assert "data-donut" in portfolio
+    assert "data-donut-compact" in portfolio
+    assert "h-80 w-full" in portfolio  # the Home pie matches the expense/income donuts
+    portfolio_chart = _performance_chart_data(portfolio)
+    assert portfolio_chart["labels"] and portfolio_chart["value"]
+    assert portfolio_chart["legend"]["value"] == "Value"
+    assert "data-portfolio-history-table" in portfolio
     assert "data-change-day" in _fragment(owner, "portfolio-changes")
     loans = _fragment(owner, "loans")
     assert "data-loan-row" in loans and "Payoff" in loans and "repaid" in loans

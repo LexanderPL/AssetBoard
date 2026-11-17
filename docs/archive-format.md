@@ -1204,8 +1204,9 @@ the archived inputs and are never stored in the archive. The plan's include/igno
 loan is user intent, not derived data, so it is stored in `fire_loan_settings.csv`.
 
 The profile's `birth_year`, `life_expectancy` and `sidebar_items` are user data, not workspace
-data, so they are not archived. Dashboard widget layouts (`DashboardPreference`) are per-user
-interface state, not financial data; a restore starts from the default Home catalogue.
+data, so they are not archived. Dashboard widget layouts and their settings
+(`DashboardPreference`) are per-user interface state, not financial data; a restore starts from
+the default Home catalogue.
 `investment_cost_basis` and `risk_target_policy` are workspace settings and live in
 `workspace.json`.
 

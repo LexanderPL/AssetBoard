@@ -3,7 +3,7 @@
 {{ chart_donut(donut, inline_json=true, heading=widget_title, link_url=module_url, link_label=_("Open month"), widget_key="month-expenses") }}
 {% else %}
 <section class="panel p-4 sm:p-6" data-home-widget="month-expenses" aria-labelledby="widget-month-expenses-heading">
-  <h2 id="widget-month-expenses-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+  <h2 id="widget-month-expenses-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
   <p class="mt-3 text-sm text-muted" data-empty>{{ _("Add an expense category and an entry to see this chart.") }}</p>
 </section>
 {% endif %}

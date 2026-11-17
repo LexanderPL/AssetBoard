@@ -3,7 +3,7 @@
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 <section class="panel p-4 sm:p-6" data-home-widget="upcoming" data-home-upcoming aria-labelledby="widget-upcoming-heading">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="widget-upcoming-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+    <h2 id="widget-upcoming-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
     <a href="{{ module_url }}" class="text-sm font-medium text-primary-ink underline" data-upcoming-all>{{ _("All upcoming items") }}</a>
   </div>
   {% if upcoming %}
