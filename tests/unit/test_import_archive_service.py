@@ -2012,7 +2012,18 @@ def test_restore_rollback_is_refused_after_a_change(db: WorkspaceDb, data_dir: P
     [
         ("workspace-archive-v1.0.zip", False, None),
         ("workspace-archive-v1.1.zip", True, 14),
+        ("workspace-archive-v1.2.zip", True, 14),
+        ("workspace-archive-v1.3.zip", True, 14),
+        ("workspace-archive-v1.4.zip", True, 14),
+        ("workspace-archive-v1.5.zip", True, 14),
+        ("workspace-archive-v1.6.zip", True, 14),
+        ("workspace-archive-v1.7.zip", True, 14),
+        ("workspace-archive-v1.8.zip", True, 14),
+        ("workspace-archive-v2.0.zip", True, 14),
+        ("workspace-archive-v2.1.zip", True, 14),
+        ("workspace-archive-v2.2.zip", True, 14),
         ("workspace-archive-v2.3.zip", True, 14),
+        ("workspace-archive-v2.4.zip", True, 14),
     ],
 )
 def test_restore_reads_released_golden_archives(
@@ -2302,7 +2313,7 @@ def test_newer_major_archive_is_refused_and_newer_minor_warns(
     assert major["errors"][0]["code"] == "newer_major_version"
     assert major["counts"]["invalid"] == 1
 
-    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.4"), ctx=ctx)
+    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.5"), ctx=ctx)
     minor = _plan(db, data_dir, minor_batch, ctx=ctx)
     assert minor["counts"]["invalid"] == 0
     assert any(warning["code"] == "newer_minor_version" for warning in minor["warnings"])
@@ -3187,7 +3198,7 @@ def test_m3_rows_export_restore_and_round_trip(db: WorkspaceDb, tmp_path: Path) 
     parsed, errors = parse_archive(first)
     assert errors == (), errors
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "2.3"
+    assert parsed.manifest["format_version"] == "2.4"
     rows = parsed.rows
     assert [row.name for row in rows.tax_rules] == ["VAT"]
     assert rows.tax_rule_versions[0].rate_bp == 2300

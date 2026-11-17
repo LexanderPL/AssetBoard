@@ -23,6 +23,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from assetboard.config import Settings
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.networth import NetWorthItem
 from assetboard.db.repositories import ItemValuationRepository, NetWorthItemRepository
@@ -331,8 +332,10 @@ class ItemValuationsCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del base_currency, skip_invalid
+        del base_currency, skip_invalid, secrets_passphrase, instance_settings
         matches, skipped, errors = _plan(session, ctx, batch, parsed, out_of_time=lambda: False)
         repository = ItemValuationRepository(session, ctx)
         created = 0

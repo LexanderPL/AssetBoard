@@ -1755,6 +1755,11 @@ msgid ""
 "restored only; work logs were merged."
 msgstr ""
 
+msgid ""
+"The encrypted secrets member is restored only; it was ignored in this "
+"merge."
+msgstr ""
+
 msgid "No income source with this name or id exists."
 msgstr ""
 
@@ -1780,6 +1785,9 @@ msgid ""
 msgstr ""
 
 msgid "Enter work units as a non-negative number."
+msgstr ""
+
+msgid "The archive's encrypted secrets member is invalid."
 msgstr ""
 
 msgid ""
@@ -5360,6 +5368,24 @@ msgid "This archive cannot be imported into this workspace."
 msgstr ""
 
 msgid "Restore needs a complete workspace archive (a ZIP file)."
+msgstr ""
+
+msgid ""
+"Enter a passphrase of at least 12 characters to include secrets, and "
+"repeat it."
+msgstr ""
+
+msgid "Only a workspace owner can include secrets in an archive."
+msgstr ""
+
+msgid ""
+"This archive contains encrypted secrets. Enter its passphrase to restore "
+"them."
+msgstr ""
+
+msgid ""
+"The passphrase does not open this archive's secrets. Check it and try "
+"again."
 msgstr ""
 
 #, python-format
@@ -11791,7 +11817,31 @@ msgstr ""
 
 msgid ""
 "Recurring items, income sources, work logs, calendars, and tax rules are "
-"included. Notification channels are not included."
+"included. Notification channels and provider API keys are included only "
+"in the optional encrypted secrets member."
+msgstr ""
+
+msgid ""
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels and provider API keys are not included in"
+" this download."
+msgstr ""
+
+msgid "Secrets"
+msgstr ""
+
+msgid "Include notification URLs and provider API keys"
+msgstr ""
+
+msgid ""
+"They are written to a separate encrypted member and need this passphrase "
+"to restore. Keep it somewhere safe; it cannot be recovered."
+msgstr ""
+
+msgid "Archive secrets passphrase"
+msgstr ""
+
+msgid "Repeat the passphrase"
 msgstr ""
 
 msgid "Download archive"
@@ -11870,6 +11920,9 @@ msgstr ""
 msgid "Cancel import"
 msgstr ""
 
+msgid "Secrets passphrase"
+msgstr ""
+
 #, python-format
 msgid "Skip %(count)s invalid rows"
 msgstr ""
@@ -11899,6 +11952,12 @@ msgid "Invalid rows"
 msgstr ""
 
 msgid "Unresolved category mappings"
+msgstr ""
+
+msgid ""
+"This archive contains an encrypted secrets member. Enter its passphrase "
+"in the Apply import form to restore notification channels and provider "
+"keys."
 msgstr ""
 
 msgid "Deleted transactions restored"
@@ -14704,5 +14763,12 @@ msgstr ""
 #~ "%(count)s posted or skipped income or"
 #~ " tax occurrences stay as history; "
 #~ "only pending ones are removed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Recurring items, income sources, work "
+#~ "logs, calendars, and tax rules are "
+#~ "included. Notification channels are not "
+#~ "included."
 #~ msgstr ""
 

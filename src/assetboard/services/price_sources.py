@@ -123,7 +123,7 @@ def save_provider_config(
         if clear_settings:
             row.settings_encrypted = None
         elif settings_values is not None:
-            row.settings_encrypted = _encrypt_settings(
+            row.settings_encrypted = encrypt_provider_settings(
                 settings,
                 row.id,
                 provider_key,
@@ -233,7 +233,7 @@ def _binding(config_id: UUID, provider_key: str) -> str:
     return f"{config_id}|{provider_key}"
 
 
-def _encrypt_settings(
+def encrypt_provider_settings(
     settings: Settings,
     config_id: UUID,
     provider_key: str,

@@ -145,6 +145,30 @@ passphrase-encrypted secrets member, the full round-trip test over the demo buil
 and the golden-archive regression tests for every released format version.
 ```
 
+
+**As built (format 2.4):**
+- `tests/unit/test_archive_coverage.py` asserts every workspace-owned model is in
+  `ARCHIVE_INCLUDED_MODELS`, `ARCHIVE_SECRET_MODELS` or `ARCHIVE_EXCLUDED_MODELS`, with no
+  overlap and a non-empty reason for every exclusion. `FireLoanSetting` was the missing model
+  found while adding the test. Notification channels are conditional secrets; notification
+  logs, provider error logs, audit history, imports/mappings, membership data and per-user UI
+  preferences stay excluded with documented reasons in `docs/archive-format.md`.
+- The optional `secrets.json.enc` member is written only when an owner ticks **Include
+  notification URLs and provider API keys** and supplies a passphrase of at least 12 characters.
+  It is a compact JSON envelope (PBKDF2-HMAC-SHA256, 600 000 iterations, 16-byte salt, Fernet)
+  listed in the manifest and checksummed. The payload holds the exporting owner's
+  notification-channel configuration and provider settings including API keys; other members'
+  channels stay private. No new dependency was added: both primitives come
+  from the already-vendored `cryptography` package.
+- Restore decrypts the member at apply time, after the plan has shown `secrets_present`.
+  Notification channels are restored for the restoring owner (per-user ownership is not
+  archived) and provider settings are re-encrypted with the target instance secret. A missing
+  or wrong passphrase raises a translated 409 and the whole restore transaction rolls back, so
+  the workspace stays empty. Merge ignores the member and reports `secrets_restore_only`.
+- A full demo-builder round trip into a fresh database now compares every required data file
+  byte-for-byte (the manifest is excluded because `exported_at` and the app version differ).
+  The parameterized golden-archive test restores every fixture from 1.0 through 2.4.
+
 ---
 
 ## F9.4 Backups and restore

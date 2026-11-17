@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.1](https://github.com/LexanderPL/AssetBoard/compare/v0.8.0...v0.8.1) (2026-11-17)
+
+
+### Features
+
+* **archive:** archive recurring, income, tax and work data (F3.8) ([#380](https://github.com/LexanderPL/AssetBoard/issues/380)) ([f4866db](https://github.com/LexanderPL/AssetBoard/commit/f4866db504a64fa173e6f5cabe77d48717cf5c68))
+* **dashboard:** add configurable Home widgets (F9.1) ([#376](https://github.com/LexanderPL/AssetBoard/issues/376)) ([027d9db](https://github.com/LexanderPL/AssetBoard/commit/027d9dbc6648b60e51e38b1e2513ae1d7981ea15))
+
+
+### Bug Fixes
+
+* **account:** reorder the sidebar locally until Save ([#379](https://github.com/LexanderPL/AssetBoard/issues/379)) ([e603cf5](https://github.com/LexanderPL/AssetBoard/commit/e603cf5ed7100a667b9c81566be1a0396648dd79))
+
 ## [0.8.0](https://github.com/LexanderPL/AssetBoard/compare/v0.7.10...v0.8.0) (2026-11-17)
 
 
