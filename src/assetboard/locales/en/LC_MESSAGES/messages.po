@@ -5369,10 +5369,10 @@ msgstr ""
 msgid "Move %(name)s down"
 msgstr ""
 
-msgid "Reset to default"
+msgid "Save sidebar"
 msgstr ""
 
-msgid "Save sidebar"
+msgid "Reset to default"
 msgstr ""
 
 msgid "Notifications"

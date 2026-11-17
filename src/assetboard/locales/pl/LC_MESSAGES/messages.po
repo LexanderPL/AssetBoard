@@ -5766,13 +5766,14 @@ msgid ""
 "Choose which pages appear in the sidebar and in which order. Some pages "
 "appear only where the workspace enables the feature, such as Taxes."
 msgstr ""
-"Wybierz, które strony pojawiają się na pasku bocznym i w jakiej kolejności. "
-"Niektóre strony pojawiają się tylko wtedy, gdy obszar roboczy włączy daną "
-"funkcję, np. Podatki."
+"Wybierz, które strony pojawiają się na pasku bocznym i w jakiej "
+"kolejności. Niektóre strony pojawiają się tylko wtedy, gdy obszar roboczy"
+" włączy daną funkcję, np. Podatki."
 
 msgid "Only shown when Taxes is turned on in the workspace settings."
 msgstr ""
-"Widoczne tylko wtedy, gdy w ustawieniach obszaru roboczego włączono Podatki."
+"Widoczne tylko wtedy, gdy w ustawieniach obszaru roboczego włączono "
+"Podatki."
 
 msgid "Always shown"
 msgstr "Zawsze widoczna"
@@ -5785,11 +5786,11 @@ msgstr "Przesuń %(name)s w górę"
 msgid "Move %(name)s down"
 msgstr "Przesuń %(name)s w dół"
 
-msgid "Reset to default"
-msgstr "Przywróć domyślne"
-
 msgid "Save sidebar"
 msgstr "Zapisz pasek boczny"
+
+msgid "Reset to default"
+msgstr "Przywróć domyślne"
 
 msgid "Notifications"
 msgstr "Powiadomienia"
