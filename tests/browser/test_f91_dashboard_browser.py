@@ -243,6 +243,14 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             upcoming = nojs_page.locator("[data-customise-widget='upcoming']")
             upcoming.locator("button[value='upcoming:up']").click()
             expect(nojs_page.locator("[data-customise-widget='upcoming']")).to_be_visible()
+            # Enter in a settings field uses the hidden default Save button, not the first
+            # arrow, even without JavaScript.
+            nojs_page.locator("#customise-upcoming-limit").fill("4")
+            nojs_page.locator("#customise-upcoming-limit").press("Enter")
+            nojs_page.wait_for_url(f"{base}/?saved=1")
+            assert _stored_preferences(app).upcoming_limit == 4
+            nojs_page.locator("[data-customise-link]").click()
+            nojs_page.wait_for_url(re.compile(r"/dashboard/customise$"))
             nojs_page.locator("#customise-upcoming").uncheck()
             nojs_page.locator("[data-customise-save]").click()
             nojs_page.wait_for_url(f"{base}/?saved=1")

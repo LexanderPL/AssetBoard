@@ -217,6 +217,55 @@ def _undated_portfolio(app: OwnerApp) -> None:
         )
 
 
+def _sold_out_portfolio(app: OwnerApp) -> None:
+    """A dated buy and a sell of the whole lot: no current value, but a real history."""
+    ctx = _ctx(app)
+    with app.db() as session:
+        class_id = AssetClassRepository(session, ctx).ordered()[0].id
+    instrument = create_instrument(
+        app.app.state.session_factory,
+        ctx,
+        name="Closed fund",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(class_id, 10_000)],
+        locale="en",
+    )
+    with app.db() as session, session.begin():
+        transactions = InvestmentTransactionRepository(session, ctx)
+        transactions.create(
+            instrument_id=instrument.id,
+            date=date(2025, 6, 1),
+            type="buy",
+            quantity=Decimal("1"),
+            unit_price=Decimal("50"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=None,
+        )
+        transactions.create(
+            instrument_id=instrument.id,
+            date=date(2026, 2, 1),
+            type="sell",
+            quantity=Decimal("1"),
+            unit_price=Decimal("60"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=None,
+        )
+    with app.db() as session, session.begin():
+        prices = PricePointRepository(session, ctx)
+        for day, value in ((date(2025, 6, 1), "50"), (date(2026, 2, 1), "60")):
+            prices.create(
+                instrument_id=instrument.id,
+                date=day,
+                price=Decimal(value),
+                source="manual",
+            )
+
+
 def test_the_widget_registry_matches_the_domain_keys_and_templates() -> None:
     assert tuple(widget.key for widget in WIDGETS) == WIDGET_KEYS
     templates = Path(dashboard_module.__file__).parent / "templates"
@@ -394,6 +443,8 @@ def test_customise_page_renders_arrows_local_reordering_markup_and_settings(
     assert "data-customise-form" in page and "data-customise-list" in page
     assert page.count("data-customise-form") == 1
     assert "js/customise.js" in page
+    # Enter in a settings field must save, not trigger the first arrow (the no-JS default).
+    assert page.index("data-customise-default-submit") < page.index("data-customise-move=")
     assert _setting_value(page, "upcoming_limit") == "10"
     assert 'min="1"' in page and 'max="50"' in page
     assert _selected_option(page, "portfolio_range") == "1y"
@@ -562,6 +613,16 @@ def test_the_portfolio_widget_has_a_useful_empty_history_state(owner: OwnerApp) 
     assert "data-portfolio-history-empty" in portfolio
     assert "No dated investment transactions yet" in portfolio
     assert 'data-chart="performance"' not in portfolio
+
+
+def test_a_sold_out_portfolio_still_shows_its_value_history(owner: OwnerApp) -> None:
+    _fixed(owner)
+    _sold_out_portfolio(owner)
+    portfolio = _fragment(owner, "portfolio")
+    assert "data-portfolio-value" not in portfolio
+    assert 'data-chart="performance"' in portfolio
+    assert "data-portfolio-history-empty" not in portfolio
+    assert "data-portfolio-history-table" in portfolio
 
 
 def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> None:

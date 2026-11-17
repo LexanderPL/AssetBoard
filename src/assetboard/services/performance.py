@@ -34,6 +34,7 @@ from assetboard.db.repositories import (
     PricePointRepository,
 )
 from assetboard.domain.bonds import bond_value
+from assetboard.domain.dashboard import PORTFOLIO_RANGES
 from assetboard.domain.holdings import HoldingTransaction
 from assetboard.domain.money import Money
 from assetboard.domain.performance import (
@@ -62,8 +63,9 @@ from assetboard.services.holding_rows import holding_transaction
 DEFAULT_RANGE = "1y"
 RANGES: tuple[str, ...] = ("ytd", "1y", "3y", "5y", "all")
 PERIODS: tuple[str, ...] = ("1m", "3m", "ytd", "1y", "all")
-# The Home portfolio widget offers shorter spans than the performance page (F9.1 polish).
-VALUE_RANGES: tuple[str, ...] = ("1m", "3m", "6m", "1y", "all")
+# The Home portfolio widget offers shorter spans than the performance page (F9.1 polish). The
+# stored preference, the database check constraint and this service share one list.
+VALUE_RANGES: tuple[str, ...] = PORTFOLIO_RANGES
 
 
 @dataclass(frozen=True, slots=True)
