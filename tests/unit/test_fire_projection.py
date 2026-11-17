@@ -415,6 +415,8 @@ def test_horizon_rule_allows_the_year_before_the_horizon() -> None:
         )
     )
     assert result.fire_age == 43
+    # The table keeps the configured income-stop age, so the FIRE row still shows its salary.
+    assert result.rows[result.fire_index].income == _eur(100_000)
 
 
 def test_horizon_rule_has_no_candidate_when_income_stopped_before_today() -> None:
