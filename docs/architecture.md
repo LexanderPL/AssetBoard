@@ -91,6 +91,16 @@ Context exists:
   invitation lives; the accept flow builds a `WorkspaceScope` from that row and continues
   through the scoped repositories (ADR-0013).
 
+A few tables are **instance-level operational state**, not workspace data: `InstanceSettings`,
+`SetupState`, `AuthThrottle` and `BackupRun` carry no `workspace_id`. They are read and written
+by instance-level services (and `InstanceAuditReader` for audit rows with `workspace_id NULL`),
+are excluded from the tenant-isolation factory list by construction, and only instance
+administrators can reach their pages. `BackupRun` in particular has no workspace relationship:
+a copy covers the whole database, so it belongs to the installation, not to any workspace.
+`InstanceNotificationReader` is the one cross-workspace reader: it returns only the enabled
+channels of active instance administrators, for instance-wide failure notices, and never a
+URL.
+
 **Creating a workspace.** `db.repositories.create_owned_workspace` is the only code that
 creates a workspace: it inserts the row, makes the given user its owner and returns a
 `NewWorkspaceScope` for that workspace, so everything else written into it goes through the

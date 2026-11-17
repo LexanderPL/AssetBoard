@@ -74,6 +74,19 @@ def reminder_message(
     return title, "\n".join(lines)
 
 
+def backup_failure_message(*, locale: str, code: str) -> tuple[str, str]:
+    """``(title, body)`` for an instance-wide scheduled backup failure (F9.4)."""
+    title = gettext(_("%(app)s: database backup failed"), locale) % {"app": APP_NAME}
+    body = gettext(
+        _(
+            "The database backup failed (code: %(code)s). Check the log, then run "
+            "Back up now in Instance settings."
+        ),
+        locale,
+    ) % {"code": code}
+    return title, body
+
+
 def test_message(*, locale: str, workspace_name: str) -> tuple[str, str]:
     title = gettext(_("%(app)s · %(workspace)s: test"), locale) % {
         "app": APP_NAME,

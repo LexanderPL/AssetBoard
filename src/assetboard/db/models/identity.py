@@ -336,7 +336,18 @@ class InstanceSettings(Base):
     """
 
     __tablename__ = "instance_settings"
-    __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(
+            "backup_daily_retention BETWEEN 0 AND 365", name="backup_daily_retention_valid"
+        ),
+        CheckConstraint(
+            "backup_weekly_retention BETWEEN 0 AND 365", name="backup_weekly_retention_valid"
+        ),
+        CheckConstraint(
+            "backup_monthly_retention BETWEEN 0 AND 365", name="backup_monthly_retention_valid"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # Any signed-in user may create a workspace (instance administrators always may).
@@ -352,6 +363,16 @@ class InstanceSettings(Base):
     # latest release tag seen and when the check last succeeded.
     check_for_updates: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
+    )
+    # Grandfather-father-son retention for scheduled database backups (F9.4).
+    backup_daily_retention: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=7, server_default="7"
+    )
+    backup_weekly_retention: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=4, server_default="4"
+    )
+    backup_monthly_retention: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=6, server_default="6"
     )
     latest_release_tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
     update_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)

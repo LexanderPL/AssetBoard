@@ -36,6 +36,7 @@ def test_assetboard_console_script_help_runs() -> None:
     assert "create-admin" in result.stdout
     assert "reset-password" in result.stdout
     assert "reset-mfa" in result.stdout
+    assert "restore" in result.stdout
     assert "revision" not in result.stdout
 
 
@@ -52,6 +53,7 @@ def test_assetboard_module_help_runs() -> None:
     assert "migrate" in result.stdout
     assert "create-admin" in result.stdout
     assert "reset-password" in result.stdout
+    assert "restore" in result.stdout
     assert "revision" not in result.stdout
 
 

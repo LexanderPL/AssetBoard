@@ -64,6 +64,8 @@ from assetboard.db.repositories.networth import (
     NetWorthSnapshotRepository,
 )
 from assetboard.db.repositories.notifications import (
+    AdminChannel,
+    InstanceNotificationReader,
     NotificationChannelRepository,
     NotificationLogRepository,
 )
@@ -93,6 +95,8 @@ from assetboard.db.repositories.workspace import (
 )
 
 __all__ = [
+    "AdminChannel",
+    "InstanceNotificationReader",
     "NotificationChannelRepository",
     "NotificationLogRepository",
     "FireEventRepository",

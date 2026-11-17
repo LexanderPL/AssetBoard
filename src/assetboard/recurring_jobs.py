@@ -16,6 +16,8 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
+from assetboard.domain.backups import BACKUP_HOUR_UTC, BACKUP_MINUTE_UTC
+from assetboard.services.backups import run_scheduled_backup
 from assetboard.services.demo_mode import reset_demo_instance
 from assetboard.services.imports import cleanup_expired_imports
 from assetboard.services.income import resync_pending_income
@@ -58,11 +60,13 @@ class RecurringJobs:
         monotonic: Callable[[], float] = time.monotonic,
         release_source: Callable[[], ReleaseSource] | None = None,
         provider_runtime: ProviderRuntime | None = None,
+        backup_enabled: bool = False,
     ) -> None:
         self.factory, self.settings, self.clock, self.logger = factory, settings, clock, logger
         self.notifier, self.monotonic = notifier, monotonic
         self.release_source = release_source
         self.provider_runtime = provider_runtime
+        self.backup_enabled = backup_enabled
         self._last_update_attempt: datetime | None = None
         self._notify_offset = 0
         self.scheduler = BackgroundScheduler(timezone="UTC")
@@ -232,6 +236,27 @@ class RecurringJobs:
                     type(exc).__name__,
                     exc_info=True,
                 )
+
+    def backup(self, *, force: bool = True) -> None:
+        """Scheduled database backup (F9.4); failures are recorded and notified by the service."""
+        if not self.backup_enabled:
+            return
+        try:
+            run_scheduled_backup(
+                self.factory,
+                self.settings,
+                self.clock(),
+                self.notifier() if self.notifier is not None else None,
+                force=force,
+            )
+        except Exception as exc:  # noqa: BLE001 - the next run retries
+            self.logger.error(
+                "backup_job_failed exception_type=%s; next run will retry", type(exc).__name__
+            )
+
+    def backup_if_due(self) -> None:
+        """Startup catch-up: one scheduled backup when the last one is a day old."""
+        self.backup(force=False)
 
     def demo_reset(self) -> None:
         """Rebuild the public demo dataset; a failure never stops the scheduler (F9.11b)."""
@@ -405,6 +430,24 @@ class RecurringJobs:
             coalesce=True,
             max_instances=1,
         )
+        if self.backup_enabled:
+            self.scheduler.add_job(
+                self.backup_if_due,
+                "date",
+                run_date=self.clock().now() + timedelta(seconds=30),
+                id="backup-startup",
+                replace_existing=True,
+                misfire_grace_time=None,
+            )
+            self.scheduler.add_job(
+                self.backup,
+                CronTrigger(hour=BACKUP_HOUR_UTC, minute=BACKUP_MINUTE_UTC, timezone="UTC"),
+                id="database-backup",
+                replace_existing=True,
+                coalesce=True,
+                max_instances=1,
+                misfire_grace_time=None,
+            )
         if self.settings.demo_enabled:
             hour, minute = self.settings.demo_reset_hour_minute
             self.scheduler.add_job(

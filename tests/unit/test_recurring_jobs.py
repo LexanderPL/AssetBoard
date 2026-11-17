@@ -69,6 +69,40 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
     assert not jobs.scheduler.running
 
 
+def test_scheduler_registers_the_daily_backup_only_when_enabled(db):
+    jobs = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None),
+        lambda: db.clock,
+        Mock(),
+        backup_enabled=True,
+    )
+    jobs.start()
+    try:
+        assert jobs.caught_up.wait(timeout=30)
+        job = jobs.scheduler.get_job("database-backup")
+        assert job is not None
+        fire = job.trigger.get_next_fire_time(None, datetime(2026, 3, 1, 12, tzinfo=UTC))
+        assert fire.isoformat() == "2026-03-02T03:30:00+00:00"
+    finally:
+        jobs.stop()
+
+    disabled = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None),
+        lambda: db.clock,
+        Mock(),
+        backup_enabled=False,
+    )
+    disabled.start()
+    try:
+        assert disabled.caught_up.wait(timeout=30)
+        assert disabled.scheduler.get_job("database-backup") is None
+        assert disabled.scheduler.get_job("backup-startup") is None
+    finally:
+        disabled.stop()
+
+
 def test_start_returns_before_the_catch_up_generates(db, monkeypatch):
     started = threading.Event()
     release = threading.Event()

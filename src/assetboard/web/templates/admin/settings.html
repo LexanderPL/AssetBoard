@@ -36,10 +36,72 @@
       </label>
       <p id="check_for_updates-help" class="text-xs text-muted">{{ _("Once a day, ask GitHub for the latest release. Off by default; nothing else is sent.") }}</p>
     </div>
+    <h2 class="pt-2 text-base font-semibold">{{ _("Backup retention") }}</h2>
+    <p class="text-xs text-muted">{{ _("The newest backup of each day, week and month is kept. One file can count for several. Manual and pre-restore copies are never deleted automatically.") }}</p>
+    <div class="space-y-3" data-backup-retention>
+      <div class="space-y-1.5">
+        <label for="backup_daily_retention" class="block text-sm font-medium text-ink">{{ _("Daily backups") }}</label>
+        <input id="backup_daily_retention" name="backup_daily_retention" type="number" min="0" max="365" step="1" value="{{ backup_daily_retention }}" class="form-control w-full"{% if not backup_panel.available %} disabled{% endif %}>
+      </div>
+      <div class="space-y-1.5">
+        <label for="backup_weekly_retention" class="block text-sm font-medium text-ink">{{ _("Weekly backups") }}</label>
+        <input id="backup_weekly_retention" name="backup_weekly_retention" type="number" min="0" max="365" step="1" value="{{ backup_weekly_retention }}" class="form-control w-full"{% if not backup_panel.available %} disabled{% endif %}>
+      </div>
+      <div class="space-y-1.5">
+        <label for="backup_monthly_retention" class="block text-sm font-medium text-ink">{{ _("Monthly backups") }}</label>
+        <input id="backup_monthly_retention" name="backup_monthly_retention" type="number" min="0" max="365" step="1" value="{{ backup_monthly_retention }}" class="form-control w-full"{% if not backup_panel.available %} disabled{% endif %}>
+      </div>
+    </div>
     <div class="flex flex-wrap items-end gap-3">
       {{ confirm_block(confirm, "admin-settings", _("Save settings")) }}
     </div>
   </form>
+</section>
+
+<section class="panel mt-6 max-w-3xl p-6 sm:p-7" aria-labelledby="backups-heading" data-backup-panel>
+  <h2 id="backups-heading" class="text-base font-semibold">{{ _("Backups") }}</h2>
+  {% if not backup_panel.available %}
+  <p class="mt-3 text-sm text-muted" data-backup-unavailable>{% if backup_panel.reason == "in_memory" %}{{ _("Automatic backups are not available for an in-memory database.") }}{% else %}{{ _("Automatic backups are available for SQLite databases only. For PostgreSQL, use pg_dump and pg_restore.") }}{% endif %}</p>
+  {% else %}
+  <dl class="mt-4 space-y-2 text-sm">
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Last backup") }}</dt><dd data-backup-last>{% if backup_panel.last_success %}{{ format_moment_utc(backup_panel.last_success.started_at, locale) }}{% else %}{{ _("Never") }}{% endif %}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Last failure") }}</dt><dd data-backup-last-failure>{% if backup_panel.last_failure %}{{ format_moment_utc(backup_panel.last_failure.started_at, locale) }}{% else %}{{ _("None") }}{% endif %}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Next scheduled backup") }}</dt><dd data-backup-next>{% if backup_panel.next_run_at %}{{ format_moment_utc(backup_panel.next_run_at, locale) }}{% else %}{{ _("Not scheduled") }}{% endif %}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Location") }}</dt><dd><code class="text-xs">{{ backup_panel.directory }}</code></dd></div>
+  </dl>
+  <form method="post" action="{{ scoped_url(request, 'backup_now') }}" class="mt-5">
+    {{ csrf_input() }}
+    <button type="submit" class="btn-primary" data-backup-now>{{ _("Back up now") }}</button>
+  </form>
+  {% if backup_panel.runs %}
+  <div class="mt-6 overflow-x-auto">
+    <table class="sheet w-full text-sm" data-backup-runs>
+      <thead>
+        <tr>
+          <th scope="col">{{ _("Started") }}</th>
+          <th scope="col">{{ _("Type") }}</th>
+          <th scope="col">{{ _("Status") }}</th>
+          <th scope="col">{{ _("Size") }}</th>
+          <th scope="col"><span class="sr-only">{{ _("Download") }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in backup_panel.runs %}
+        <tr data-backup-run="{{ run.id }}">
+          <td>{{ format_moment_utc(run.started_at, locale) }}</td>
+          <td>{% if run.origin == "scheduled" %}{{ _("Scheduled") }}{% elif run.origin == "manual" %}{{ _("Manual") }}{% else %}{{ _("Pre-restore") }}{% endif %}</td>
+          <td>{% if run.status == "ok" %}{{ _("Completed") }}{% elif run.status == "failed" %}{{ _("Failed") }}{% if run.error %}: {{ run.error }}{% endif %}{% else %}{{ _("Running") }}{% endif %}</td>
+          <td>{{ run.size_label or "—" }}</td>
+          <td>{% if run.downloadable %}<a href="{{ scoped_url(request, 'backup_download', run_id=run.id|string) }}" class="link" data-backup-download>{{ _("Download") }}</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-6 text-sm text-muted" data-backup-empty>{{ _("No backups yet.") }}</p>
+  {% endif %}
+  {% endif %}
 </section>
 
 {% if demo_configured or demo_workspace_exists %}
