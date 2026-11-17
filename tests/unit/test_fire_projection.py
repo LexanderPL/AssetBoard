@@ -139,7 +139,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
     rows = build_rows(inputs.stop_working_age)
     fire_index: int | None = None
     if inputs.rule is Rule.LASTS_TO_HORIZON:
-        last_candidate = max(current_age, min(inputs.stop_working_age, inputs.horizon_age - 1))
+        last_candidate = min(inputs.stop_working_age, inputs.horizon_age - 1)
         for stop_age in range(current_age, last_candidate + 1):
             candidate = build_rows(stop_age)
             fire_offset = stop_age - current_age
@@ -379,6 +379,58 @@ def test_horizon_rule_never_fires_after_income_stops() -> None:
     assert result.fire_age is None
     assert result.fire_number is None
     assert result.plan_progress_bp is None
+
+
+def test_horizon_rule_does_not_consider_retiring_at_the_horizon() -> None:
+    # Retiring at 43 (the horizon year) would leave a positive balance, but the rule stops at the
+    # year before the horizon; retiring at 42 runs out of money, so there is no FIRE age.
+    result = project(
+        _edge(
+            rule=Rule.LASTS_TO_HORIZON,
+            horizon_age=43,
+            stop_working_age=90,
+            start_income=_eur(100_000),
+            start_expenses=_eur(10_000),
+            start_portfolio=_eur(0),
+        )
+    )
+    assert result.fire_index is None
+    assert result.fire_age is None
+
+
+def test_horizon_rule_has_no_candidate_when_income_stopped_before_today() -> None:
+    # The plan already has no base income and survives to the horizon, but the rule cannot
+    # declare FIRE after the configured income-stop age.
+    result = project(
+        replace(
+            _HORIZON,
+            stop_working_age=40,
+            start_portfolio=_eur(200_000_000),
+        )
+    )
+    assert result.rows[-1].net_worth.amount_minor > 0
+    assert result.fire_index is None
+    assert result.fire_age is None
+    assert result.networth_at_fire is None
+    assert result.fire_number is None
+    assert result.plan_progress_bp is None
+
+
+def test_horizon_rule_keeps_events_and_loans_in_the_candidate_simulation() -> None:
+    # The loan payoff drop, the post-retirement saving override and the expense change stay in
+    # the candidate simulation; without the drop the plan would not last at 67.
+    inputs = replace(
+        _HORIZON,
+        stop_working_age=67,
+        events=(
+            ProjectionEvent(2060, EventKind.SAVING_OVERRIDE, _eur(1_000_000)),
+            ProjectionEvent(2071, EventKind.EXPENSE_CHANGE, _eur(500_000)),
+        ),
+        loans=(ProjectionLoan(_eur(1_000_000), 2070, True),),
+    )
+    result = _assert_matches_oracle(inputs)
+    assert result.fire_age == 67
+    assert result.rows[-1].net_worth.amount_minor > 0
 
 
 def test_horizon_rule_counts_zero_at_the_horizon_as_lasting() -> None:

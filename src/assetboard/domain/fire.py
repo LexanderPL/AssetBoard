@@ -717,10 +717,11 @@ def _horizon_fire_index(plan: _ProjectionPlan, currency: str, *, age: int) -> in
 
     Candidate ages stop at the earlier of the configured income-stop age and the year before the
     horizon: the rule cannot declare FIRE after base income has already stopped or after the last
-    projected year. The check starts at the candidate's opening balance and requires every later
+    projected year. When the configured stop age is already behind the current age there is no
+    candidate at all. The check starts at the candidate's opening balance and requires every later
     net worth to be non-negative; zero at the horizon counts as lasting.
     """
-    last_candidate = max(age, min(plan.stop_working_age, plan.horizon_age - 1))
+    last_candidate = min(plan.stop_working_age, plan.horizon_age - 1)
     for stop_age in range(age, last_candidate + 1):
         rows = _build_rows(plan, currency, stop_working_age=stop_age)
         fire_offset = stop_age - age
