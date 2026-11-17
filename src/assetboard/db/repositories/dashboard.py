@@ -7,6 +7,7 @@ from uuid import UUID
 
 from assetboard.db.models.dashboard import DashboardPreference
 from assetboard.db.repositories.base import ScopedRepository
+from assetboard.domain.dashboard import DEFAULT_PORTFOLIO_RANGE, DEFAULT_UPCOMING_LIMIT
 
 
 class DashboardPreferenceRepository(ScopedRepository[DashboardPreference]):
@@ -24,15 +25,23 @@ class DashboardPreferenceRepository(ScopedRepository[DashboardPreference]):
         user_id: UUID,
         widgets: list[str],
         customised_at: datetime,
+        upcoming_limit: int = DEFAULT_UPCOMING_LIMIT,
+        portfolio_range: str = DEFAULT_PORTFOLIO_RANGE,
     ) -> DashboardPreference:
         row = self.for_user(user_id)
         if row is None:
             return self.add(
                 DashboardPreference(
-                    user_id=user_id, widgets=list(widgets), customised_at=customised_at
+                    user_id=user_id,
+                    widgets=list(widgets),
+                    upcoming_limit=upcoming_limit,
+                    portfolio_range=portfolio_range,
+                    customised_at=customised_at,
                 )
             )
         row.widgets = list(widgets)
+        row.upcoming_limit = upcoming_limit
+        row.portfolio_range = portfolio_range
         row.customised_at = customised_at
         self._session.flush()
         return row

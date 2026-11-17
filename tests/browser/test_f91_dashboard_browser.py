@@ -12,9 +12,11 @@ from pathlib import Path
 import pytest
 import uvicorn
 from playwright.sync_api import Page, expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.dashboard import DashboardPreference
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
@@ -71,6 +73,25 @@ def _home_order(page: Page) -> list[str]:
     )
 
 
+def _customise_order(page: Page) -> list[str]:
+    return page.locator("[data-customise-widget]").evaluate_all(
+        "els => els.map(el => el.getAttribute('data-customise-widget'))"
+    )
+
+
+def _stored_preferences(app) -> DashboardPreference | None:
+    with app.state.session_factory() as session:
+        return session.scalars(select(DashboardPreference)).first()
+
+
+def _actions_are_inline(page: Page) -> None:
+    save = page.locator("[data-customise-save]").bounding_box()
+    reset = page.locator("[data-customise-reset]").bounding_box()
+    assert save is not None and reset is not None
+    assert abs(save["y"] - reset["y"]) <= 1, (save, reset)
+    assert save["x"] < reset["x"], (save, reset)
+
+
 def test_dashboard_in_a_browser(tmp_path: Path) -> None:
     app, server, thread, port = _start(tmp_path)
     try:
@@ -105,7 +126,7 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             )
             assert columns >= 2
 
-            # Phone: Home does not scroll sideways.
+            # Phone: Home does not scroll sideways and Customise stays below the widgets.
             page.set_viewport_size({"width": 390, "height": 844})
             page.reload(wait_until="networkidle")
             expect(page.locator("[data-widget='month-in-out'] [data-summary-kpis]")).to_have_count(
@@ -116,44 +137,65 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
                 "el => getComputedStyle(el).gridTemplateColumns.split(' ').length"
             )
             assert phone_columns == 1
+            widgets_box = page.locator("[data-home-widgets]").bounding_box()
+            customise_box = page.locator("[data-customise-link]").bounding_box()
+            assert widgets_box is not None and customise_box is not None
+            assert customise_box["y"] >= widgets_box["y"] + widgets_box["height"] - 1
 
-            # Customise: keyboard move, save and reset. No drag and drop.
+            # Customise: the Customise link is below the widgets, the arrows reorder rows
+            # locally, and Save/Reset share one horizontal action row. No drag and drop.
             page.locator("[data-customise-link]").click()
             page.wait_for_url(f"{base}/dashboard/customise")
             expect(page.locator("[data-customise-widget]")).to_have_count(11)
-            rows = page.locator("[data-customise-widget]")
-            before = rows.evaluate_all(
-                "els => els.map(el => el.getAttribute('data-customise-widget'))"
+            expect(page.locator("[data-customise-nojs-note]")).to_have_count(0)
+            expect(page.locator("[data-customise-save]")).to_have_text("Save")
+            expect(page.locator('[data-customise-move="loans:up"]')).to_have_attribute(
+                "type", "button"
             )
+            expect(page.locator('[data-customise-move="month-in-out:up"]')).to_be_disabled()
+            expect(page.locator('[data-customise-move="missing-data:down"]')).to_be_disabled()
+            _actions_are_inline(page)
+            assert _stored_preferences(app) is None
+
+            before = _customise_order(page)
             loans = page.locator("[data-customise-widget='loans']")
             loans.locator("button[value='loans:up']").focus()
             page.keyboard.press("Enter")
+            assert page.url == f"{base}/dashboard/customise"
             expect(page.locator("[data-customise-widget='loans']")).to_be_visible()
-            after = page.locator("[data-customise-widget]").evaluate_all(
-                "els => els.map(el => el.getAttribute('data-customise-widget'))"
-            )
+            after = _customise_order(page)
             assert after != before and after.index("loans") < after.index("fire")
+            assert page.evaluate("document.activeElement?.dataset?.customiseMove") == "loans:up"
+            assert _stored_preferences(app) is None  # local until Save
 
             expenses = page.locator("[data-customise-widget='month-expenses']")
             expenses.locator("button[value='month-expenses:down']").click()
+            assert page.url == f"{base}/dashboard/customise"
             expect(page.locator("[data-customise-widget='month-expenses']")).to_be_visible()
-            moved_down = page.locator("[data-customise-widget]").evaluate_all(
-                "els => els.map(el => el.getAttribute('data-customise-widget'))"
-            )
+            moved_down = _customise_order(page)
             assert moved_down.index("month-expenses") > after.index("month-expenses")
 
             page.locator("#customise-month-expenses").uncheck()
+            page.locator("[data-customise-upcoming-limit]").fill("3")
+            page.locator("[data-customise-portfolio-range]").select_option("3m")
             page.locator("[data-customise-save]").click()
             page.wait_for_url(f"{base}/?saved=1")
             order = _home_order(page)
             assert "month-expenses" not in order and order.index("loans") < order.index("fire")
+            stored = _stored_preferences(app)
+            assert stored is not None
+            assert stored.upcoming_limit == 3 and stored.portfolio_range == "3m"
             assert page.evaluate("window.__cspViolations") == []
 
             page.locator("[data-customise-link]").click()
             page.wait_for_url(f"{base}/dashboard/customise")
+            expect(page.locator("[data-customise-upcoming-limit]")).to_have_value("3")
+            expect(page.locator("[data-customise-portfolio-range]")).to_have_value("3m")
+            _actions_are_inline(page)
             page.locator("[data-customise-reset]").click()
             page.wait_for_url(f"{base}/?reset=1")
             assert "month-expenses" in _home_order(page)
+            assert _stored_preferences(app) is None
 
             # A failing fragment keeps a usable shell instead of a permanent "Loading…".
             page.evaluate(
@@ -194,9 +236,22 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             nojs_page.locator("[data-customise-link]").click()
             nojs_page.wait_for_url(re.compile(r"/dashboard/customise$"))
             expect(nojs_page.locator("[data-customise-widget]")).to_have_count(11)
+            expect(nojs_page.locator("[data-customise-nojs-note]")).to_be_visible()
+            expect(nojs_page.locator('[data-customise-move="upcoming:up"]')).to_have_attribute(
+                "type", "submit"
+            )
             upcoming = nojs_page.locator("[data-customise-widget='upcoming']")
             upcoming.locator("button[value='upcoming:up']").click()
             expect(nojs_page.locator("[data-customise-widget='upcoming']")).to_be_visible()
+            # Enter in a settings field uses the hidden default Save button, not the first
+            # arrow, even without JavaScript.
+            nojs_page.locator("#customise-upcoming-limit").fill("4")
+            nojs_page.locator("#customise-upcoming-limit").press("Enter")
+            nojs_page.wait_for_url(f"{base}/?saved=1")
+            saved_by_enter = _stored_preferences(app)
+            assert saved_by_enter is not None and saved_by_enter.upcoming_limit == 4
+            nojs_page.locator("[data-customise-link]").click()
+            nojs_page.wait_for_url(re.compile(r"/dashboard/customise$"))
             nojs_page.locator("#customise-upcoming").uncheck()
             nojs_page.locator("[data-customise-save]").click()
             nojs_page.wait_for_url(f"{base}/?saved=1")

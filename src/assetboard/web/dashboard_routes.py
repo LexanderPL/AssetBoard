@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import FormData
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
-from assetboard.domain.dashboard import WIDGET_KEYS, selected_widgets
+from assetboard.domain.dashboard import WIDGET_KEYS, clean_upcoming_limit, selected_widgets
 from assetboard.services.dashboard import (
     reset_dashboard_preferences,
     save_dashboard_preferences,
@@ -33,11 +34,16 @@ from assetboard.web.security import require_csrf
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
-async def _form_values(request: Request) -> tuple[tuple[str, ...], set[str]]:
+async def _form(request: Request) -> tuple[tuple[str, ...], set[str], FormData]:
     form = await request.form()
     order = parse_order(str(form.get("order", "")))
     enabled = {str(value) for value in form.getlist("enabled") if isinstance(value, str)}
-    return order, enabled
+    return order, enabled, form
+
+
+def _setting(form: FormData, name: str) -> str:
+    value = form.get(name)
+    return value if isinstance(value, str) else ""
 
 
 @router.get("/dashboard/widgets/{widget_key}", name="dashboard_widget")
@@ -62,26 +68,34 @@ async def dashboard_customise(request: Request, ctx: CurrentContext) -> Response
 @router.post("/dashboard/customise/move", name="dashboard_customise_move")
 async def dashboard_customise_move(request: Request, ctx: CurrentContext) -> Response:
     """Rerender the draft with one widget moved; nothing is saved until Save."""
-    order, enabled = await _form_values(request)
-    form = await request.form()
+    order, enabled, form = await _form(request)
     move = parse_move(str(form.get("move", "")))
     if move is not None:
         order = moved_order(order, move[0], move[1])
     context = await run_in_threadpool(
-        lambda: customise_context(request, ctx, order=order, enabled=enabled)
+        lambda: customise_context(
+            request,
+            ctx,
+            order=order,
+            enabled=enabled,
+            upcoming_limit=clean_upcoming_limit(_setting(form, "upcoming_limit")),
+            portfolio_range=_setting(form, "portfolio_range") or None,
+        )
     )
     return render_template(request, "dashboard/customise.html", context=context)
 
 
 @router.post("/dashboard/customise", name="dashboard_customise_save")
 async def dashboard_customise_save(request: Request, ctx: CurrentContext) -> Response:
-    order, enabled = await _form_values(request)
+    order, enabled, form = await _form(request)
     widgets = selected_widgets(order, enabled, WIDGET_KEYS)
     await run_in_threadpool(
         save_dashboard_preferences,
         request.app.state.session_factory,
         ctx,
         widgets,
+        upcoming_limit=clean_upcoming_limit(_setting(form, "upcoming_limit")),
+        portfolio_range=_setting(form, "portfolio_range"),
     )
     return RedirectResponse(scoped_url(request, "home") + "?saved=1", status_code=303)
 

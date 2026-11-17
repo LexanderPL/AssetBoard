@@ -2759,6 +2759,19 @@ msgstr ""
 msgid "Nothing is valued in the portfolio yet."
 msgstr ""
 
+#, fuzzy
+msgid "Incomplete: an instrument has no price or FX rate."
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Invested capital"
+msgstr ""
+
+msgid "Gain"
+msgstr ""
+
 msgid "The password is not correct."
 msgstr ""
 
@@ -2768,6 +2781,21 @@ msgstr ""
 msgid ""
 "Sign in again to confirm this change: without a password, it needs a "
 "sign-in from the last 10 minutes."
+msgstr ""
+
+msgid "1 month"
+msgstr ""
+
+msgid "3 months"
+msgstr ""
+
+msgid "6 months"
+msgstr ""
+
+msgid "1 year"
+msgstr ""
+
+msgid "All time"
 msgstr ""
 
 msgid "Missing price"
@@ -4531,16 +4559,10 @@ msgstr ""
 msgid "Entry planned in %(month)s."
 msgstr ""
 
-msgid "1 year"
-msgstr ""
-
 msgid "3 years"
 msgstr ""
 
 msgid "5 years"
-msgstr ""
-
-msgid "All time"
 msgstr ""
 
 #, fuzzy, python-format
@@ -4836,26 +4858,7 @@ msgstr ""
 msgid "Year to date"
 msgstr ""
 
-msgid "1 month"
-msgstr ""
-
-msgid "3 months"
-msgstr ""
-
 msgid "Whole portfolio"
-msgstr ""
-
-#, fuzzy
-msgid "Incomplete: an instrument has no price or FX rate."
-msgstr ""
-
-msgid "Value"
-msgstr ""
-
-msgid "Invested capital"
-msgstr ""
-
-msgid "Gain"
 msgstr ""
 
 msgid "Annualised XIRR"
@@ -5536,9 +5539,6 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-msgid "Customise"
-msgstr ""
-
 #, python-format
 msgid "Loading %(widget)s…"
 msgstr ""
@@ -5556,7 +5556,10 @@ msgstr ""
 msgid "Choose the widgets you want to see."
 msgstr ""
 
-msgid "Customise Home"
+msgid "Choose which widgets appear on Home and in what order."
+msgstr ""
+
+msgid "Customise"
 msgstr ""
 
 msgid "Link a sign-in method"
@@ -6281,6 +6284,9 @@ msgstr ""
 msgid "Add category"
 msgstr ""
 
+msgid "Customise Home"
+msgstr ""
+
 msgid "Back to Home"
 msgstr ""
 
@@ -6292,18 +6298,17 @@ msgstr ""
 msgid "You are using the default layout."
 msgstr ""
 
+msgid "Widget settings"
+msgstr ""
+
+msgid "Upcoming payments shown"
+msgstr ""
+
 #, python-format
-msgid "Move %(widget)s up"
+msgid "Between %(min)d and %(max)d; the rest stay on the Upcoming page."
 msgstr ""
 
-msgid "Move up"
-msgstr ""
-
-#, python-format
-msgid "Move %(widget)s down"
-msgstr ""
-
-msgid "Move down"
+msgid "Portfolio chart range"
 msgstr ""
 
 #, fuzzy, python-format
@@ -6312,7 +6317,9 @@ msgid_plural "%(num)d widgets selected"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Save Home"
+msgid ""
+"Without JavaScript, moving a widget rerenders this page with the new "
+"order; press Save to keep it."
 msgstr ""
 
 msgid "No FIRE plan yet."
@@ -6385,6 +6392,38 @@ msgid "No values yet. Add an item and its first value to see the trend."
 msgstr ""
 
 msgid "Set up net worth"
+msgstr ""
+
+msgid "Value over time"
+msgstr ""
+
+#, fuzzy, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Plotted data"
+msgstr ""
+
+msgid "Portfolio value over time"
+msgstr ""
+
+msgid ""
+"No value history in this range yet. Choose a longer range in Customise "
+"Home."
+msgstr ""
+
+msgid ""
+"No dated investment transactions yet. Add investment transactions and "
+"prices to see the value over time."
+msgstr ""
+
+msgid "Open the portfolio"
 msgstr ""
 
 msgid "No holdings are valued yet."
@@ -6639,9 +6678,6 @@ msgid "Net worth over time"
 msgstr ""
 
 msgid "Amounts are nominal: each year's own money, not adjusted for inflation."
-msgstr ""
-
-msgid "Plotted data"
 msgstr ""
 
 msgid "Plotted net worth data"
@@ -14791,5 +14827,20 @@ msgstr ""
 #~ "(code: %(code)s). Check the log, then"
 #~ " run Back up now in Instance "
 #~ "settings."
+#~ msgstr ""
+
+#~ msgid "Move %(widget)s up"
+#~ msgstr ""
+
+#~ msgid "Move up"
+#~ msgstr ""
+
+#~ msgid "Move %(widget)s down"
+#~ msgstr ""
+
+#~ msgid "Move down"
+#~ msgstr ""
+
+#~ msgid "Save Home"
 #~ msgstr ""
 

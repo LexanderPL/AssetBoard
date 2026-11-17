@@ -1,21 +1,25 @@
-"""The category donuts of the Home and Month pages (F2.7): view models.
+"""Chart view models shared by the module pages and Home (F2.7, F6.7, F9.1).
 
-``domain.charts.category_breakdown`` builds the slices from the month summary; this module adds
-the category names and colours and the labels formatted by the server's locale helpers. The
+``domain.charts.category_breakdown`` builds the donut slices from the month summary; this module
+adds the category names and colours and the labels formatted by the server's locale helpers. The
 template (``macros/charts.html``) renders the data as a ``<script type="application/json">``
 block read by ``static/js/charts.js`` and as a table (visible without JavaScript, sr-only once
-the chart is drawn). Amounts travel as minor-unit integers with the currency; the browser never
-parses or rounds money.
+the chart is drawn). ``build_performance_chart`` shapes the F6.7 value series for the existing
+performance chart JS; the performance page and the Home Portfolio widget share it. Amounts travel
+as minor-unit integers with the currency; the browser never parses or rounds money.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from assetboard.domain.charts import ChartBlock, category_breakdown, share_tenths
+from assetboard.domain.money import Money
 from assetboard.i18n import gettext
+from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import format_money, format_rate_tenths
+from assetboard.services.performance import PerformancePage
 from assetboard.services.portfolio import PortfolioPage
 from assetboard.services.summary import SummaryData
 
@@ -144,3 +148,96 @@ def build_class_donut(page: PortfolioPage, locale: str) -> DonutView:
         total=format_money(page.valuation.value, locale),
         slices=tuple(slices),
     )
+
+
+def _nice_step(span: int) -> int:
+    raw = max(1, span // 5)
+    magnitude = 10 ** (len(str(raw)) - 1)
+    for factor in (1, 2, 5, 10):
+        step = factor * magnitude
+        if step >= raw:
+            return step
+    return 10 * magnitude
+
+
+def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int, dict[str, str]]:
+    low_value = min((0, *values))
+    high_value = max((0, *values))
+    if high_value == low_value:
+        high_value = low_value + 1
+    step = _nice_step(high_value - low_value)
+    low = (low_value // step) * step
+    high = -((-high_value) // step) * step
+    if high == low:
+        high = low + step
+    labels = {
+        str(tick): format_money(Money(tick, currency), locale)
+        for tick in range(low, high + 1, step)
+    }
+    return low, high, step, labels
+
+
+def build_performance_chart(page: PerformancePage, locale: str) -> dict[str, Any] | None:
+    """The value/invested performance chart data, shared by the module page and Home.
+
+    Amounts travel as minor units; labels, amounts and tooltips are formatted on the server.
+    The Home portfolio widget reads the same JSON with the existing performance chart JS.
+    """
+    if not page.chart:
+        return None
+    values: list[int | None] = [
+        None if point.incomplete else point.value.amount_minor for point in page.chart
+    ]
+    invested: list[int | None] = [
+        None if point.incomplete else point.net_invested.amount_minor for point in page.chart
+    ]
+    gain: list[int | None] = [
+        None if value is None or cost is None else value - cost
+        for value, cost in zip(values, invested, strict=True)
+    ]
+    complete = [value for value in (*values, *invested) if value is not None]
+    low, high, step, axis_labels = _axis(complete, page.currency, locale)
+    dash = "—"
+    incomplete_text = gettext("Incomplete: an instrument has no price or FX rate.", locale)
+    tooltips: list[list[str]] = []
+    for point in page.chart:
+        if point.incomplete:
+            tooltips.append([incomplete_text])
+            continue
+        gain_minor = point.value.amount_minor - point.net_invested.amount_minor
+        tooltips.append(
+            [
+                f"{gettext('Value', locale)}: {format_money(point.value, locale)}",
+                f"{gettext('Invested capital', locale)}: "
+                f"{format_money(point.net_invested, locale)}",
+                f"{gettext('Gain', locale)}: "
+                f"{format_money(Money(gain_minor, page.currency), locale)}",
+            ]
+        )
+    return {
+        "labels": [format_day(point.date, locale) for point in page.chart],
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "value": values,
+        "invested": invested,
+        "gain": gain,
+        "value_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in values
+        ],
+        "invested_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in invested
+        ],
+        "gain_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in gain
+        ],
+        "tooltips": tooltips,
+        "legend": {
+            "value": gettext("Value", locale),
+            "invested": gettext("Invested capital", locale),
+        },
+    }

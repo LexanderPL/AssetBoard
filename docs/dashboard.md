@@ -14,7 +14,7 @@ widgets appear and in what order; the choice is saved separately for each worksp
 | This month: planned vs actual | Spending and income against the plan, the savings rate and the forecast |
 | Upcoming payments | Overdue items and payments due in the Upcoming window; editors and owners can confirm or skip them |
 | Net worth | The current net worth and its 12-month trend |
-| Portfolio | The portfolio value, gain and allocation by asset class |
+| Portfolio | The portfolio value, gain, allocation by asset class and a value-over-time chart |
 | Portfolio changes | The change since yesterday and since the start of the month, plus the largest movers |
 | Loans | The remaining principal, payoff date and repaid share of up to three active loans |
 | FIRE | Plan progress and the FIRE age from the workspace's FIRE plan |
@@ -34,15 +34,24 @@ If you remove every widget, Home shows an empty state with a link back to the pi
 
 ## Customising Home
 
-Choose **Customise** on Home:
+Choose **Customise** at the bottom of Home, below the widgets:
 
 - tick the widgets you want;
-- use **Move up** and **Move down** to set their order (no drag and drop needed; it works with a
+- use the **↑** and **↓** buttons to set their order (no drag and drop needed; it works with a
   keyboard and on a phone);
-- **Save Home** applies the layout, or **Reset to default** returns to the full catalogue.
+- choose how many upcoming payments the Upcoming widget lists (between 1 and 50; the default is
+  10; the rest stay on the Upcoming page);
+- choose the Portfolio chart range: 1 month, 3 months, 6 months, 1 year (the default) or all time;
+- **Save** applies the layout, or **Reset to default** returns to the full catalogue and default
+  settings.
 
-Moving a widget only changes the draft on the screen until you save. The page is a plain form, so
-it also works without JavaScript.
+With JavaScript, moving a widget only changes the draft on the screen until you save. The page is
+a plain form, so without JavaScript an arrow rerenders the draft on the server and **Save** still
+applies it.
+
+The Portfolio value-over-time chart shows the current value and the invested capital. When there
+is no dated investment history it says so and links to the portfolio page instead of drawing an
+empty chart.
 
 ## Loading and accessibility
 
