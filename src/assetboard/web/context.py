@@ -42,7 +42,12 @@ async def current_context(request: Request) -> Context:
             can_create = workspace_creation_allowed(
                 session, is_instance_admin=signed_in.is_instance_admin
             )
-            return ctx, workspace_nav(session, ctx, can_create_workspace=can_create)
+            return ctx, workspace_nav(
+                session,
+                ctx,
+                can_create_workspace=can_create,
+                sidebar_items=signed_in.sidebar_items,
+            )
 
     ctx, nav = await run_in_threadpool(build)
     request.state.context = ctx

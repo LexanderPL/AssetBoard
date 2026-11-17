@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
 from importlib import resources
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
 import anyio.from_thread
@@ -2775,6 +2775,8 @@ class WebSession:
     must_change_password: bool = False
     second_factor_verified: bool = False
     is_demo: bool = False
+    # F9.12: NULL means the canonical sidebar order with every destination shown.
+    sidebar_items: list[dict[str, Any]] | None = None
 
 
 def read_web_session(
@@ -2807,6 +2809,7 @@ def read_web_session(
         must_change_password=user.must_change_password,
         second_factor_verified=row.second_factor_verified,
         is_demo=user.is_demo,
+        sidebar_items=user.sidebar_items,
     )
 
 

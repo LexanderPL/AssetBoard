@@ -73,6 +73,8 @@ class User(IdMixin, TimestampMixin, Base):
     highlight_large_amounts: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    # F9.12: the personal sidebar order and visibility; NULL means never customised.
+    sidebar_items: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     # F6.11: age-based risk targets (and later the FIRE planner) use these optional fields.
     birth_year: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     life_expectancy: Mapped[int] = mapped_column(
