@@ -452,3 +452,36 @@ def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) 
     assert set(first_files) == set(second_files)
     for name in first_files:
         assert first_files[name] == second_files[name], name
+
+
+def test_demo_archive_round_trips_byte_identically_into_a_fresh_database(
+    built: BuiltWorkspace, tmp_path: Path
+) -> None:
+    from assetboard.domain.archive import FILE_ORDER, parse_archive
+
+    content = export_workspace(built.db.factory, built.ctx).content
+    (tmp_path / "fresh").mkdir()
+    for fresh in workspace_db(tmp_path / "fresh"):
+        fresh.add_member("owner", "owner")
+        ctx = fresh.ctx("owner", "owner")
+        batch_id = upload_import(
+            fresh.factory,
+            ctx,
+            data_dir=tmp_path,
+            filename="demo.zip",
+            content=content,
+            mode="restore",
+        )
+        registry = ImportAdapterRegistry(default_import_adapters())
+        report = plan_import(fresh.factory, ctx, tmp_path, batch_id, registry)
+        assert report["counts"]["invalid"] == 0, report
+        apply_import(fresh.factory, ctx, tmp_path, batch_id, registry)
+        second = export_workspace(fresh.factory, ctx).content
+        first_parsed, first_errors = parse_archive(content)
+        second_parsed, second_errors = parse_archive(second)
+        assert first_errors == () and first_parsed is not None
+        assert second_errors == () and second_parsed is not None
+        for name in FILE_ORDER:
+            if name == "manifest.json":
+                continue
+            assert first_parsed.files[name] == second_parsed.files[name], name

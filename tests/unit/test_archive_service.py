@@ -160,6 +160,10 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "fire_loan_settings": 0,
             "fire_legacy_scenarios_skipped": 0,
             "fire_plan_zeroed_fields": "",
+            "secrets_included": 0,
+            "notification_channels_in_secrets": 0,
+            "provider_settings_in_secrets": 0,
+            "secrets_skipped": 0,
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -325,7 +329,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "2.3"
+    assert parsed.manifest["format_version"] == "2.4"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 

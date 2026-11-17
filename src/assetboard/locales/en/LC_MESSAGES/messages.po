@@ -58,6 +58,41 @@ msgstr ""
 msgid "An unexpected error occurred. Please try again."
 msgstr ""
 
+msgid "The secret key stored next to the backup was restored to DATA_DIR."
+msgstr ""
+
+msgid ""
+"No secret key is stored next to the backup: encrypted values only work "
+"with the key this instance already uses."
+msgstr ""
+
+msgid ""
+"ASSETBOARD_SECRET_KEY is set, so the database was restored with the "
+"existing key; make sure it is the key the backup was made with."
+msgstr ""
+
+msgid ""
+"The previous database could not be verified; a raw copy was saved as the "
+"pre-restore backup. Check it before relying on it."
+msgstr ""
+
+msgid ""
+"Refusing to restore into the default ./data directory: pass --data-dir, "
+"--database-url or ASSETBOARD_DATA_DIR so the live database is "
+"unambiguous."
+msgstr ""
+
+#, python-format
+msgid "Restored %(file)s into %(target)s."
+msgstr ""
+
+msgid "Schema migrations were applied to the restored database."
+msgstr ""
+
+#, python-format
+msgid "Pre-restore backup: %(path)s"
+msgstr ""
+
 msgid "Food"
 msgstr ""
 
@@ -1056,6 +1091,15 @@ msgstr ""
 msgid "Check for updates"
 msgstr ""
 
+msgid "Daily backups"
+msgstr ""
+
+msgid "Weekly backups"
+msgstr ""
+
+msgid "Monthly backups"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -1731,6 +1775,11 @@ msgid ""
 "restored only; work logs were merged."
 msgstr ""
 
+msgid ""
+"The encrypted secrets member is restored only; it was ignored in this "
+"merge."
+msgstr ""
+
 msgid "No income source with this name or id exists."
 msgstr ""
 
@@ -1756,6 +1805,9 @@ msgid ""
 msgstr ""
 
 msgid "Enter work units as a non-negative number."
+msgstr ""
+
+msgid "The archive's encrypted secrets member is invalid."
 msgstr ""
 
 msgid ""
@@ -2326,6 +2378,16 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, python-format
+msgid "%(app)s: database backup failed"
+msgstr ""
+
+#, python-format
+msgid ""
+"The database backup failed (code: %(code)s). Check the log, then run Back"
+" up now in Instance settings."
+msgstr ""
+
+#, python-format
 msgid "%(app)s · %(workspace)s: test"
 msgstr ""
 
@@ -2496,6 +2558,15 @@ msgid ""
 msgstr ""
 
 msgid "Choose a value for each setting."
+msgstr ""
+
+msgid "Backup created."
+msgstr ""
+
+msgid "The backup failed. Check the log for the reason."
+msgstr ""
+
+msgid "Backups are not available for this database type."
 msgstr ""
 
 msgid "The demo workspace was rebuilt."
@@ -5319,6 +5390,24 @@ msgstr ""
 msgid "Restore needs a complete workspace archive (a ZIP file)."
 msgstr ""
 
+msgid ""
+"Enter a passphrase of at least 12 characters to include secrets, and "
+"repeat it."
+msgstr ""
+
+msgid "Only a workspace owner can include secrets in an archive."
+msgstr ""
+
+msgid ""
+"This archive contains encrypted secrets. Enter its passphrase to restore "
+"them."
+msgstr ""
+
+msgid ""
+"The passphrase does not open this archive's secrets. Check it and try "
+"again."
+msgstr ""
+
 #, python-format
 msgid "Rollback was refused because these months are closed: %(months)s"
 msgstr ""
@@ -5721,16 +5810,84 @@ msgid ""
 "else is sent."
 msgstr ""
 
+msgid "Backup retention"
+msgstr ""
+
+msgid ""
+"The newest backup of each day, week and month is kept. One file can count"
+" for several. Manual and pre-restore copies are never deleted "
+"automatically."
+msgstr ""
+
 msgid "Save settings"
+msgstr ""
+
+msgid "Backups"
+msgstr ""
+
+msgid "Automatic backups are not available for an in-memory database."
+msgstr ""
+
+msgid ""
+"Automatic backups are available for SQLite databases only. For "
+"PostgreSQL, use pg_dump and pg_restore."
+msgstr ""
+
+msgid "Last backup"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "Last failure"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Next scheduled backup"
+msgstr ""
+
+msgid "Not scheduled"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Back up now"
+msgstr ""
+
+msgid "Started"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Scheduled"
+msgstr ""
+
+msgid "Manual"
+msgstr ""
+
+msgid "Pre-restore"
+msgstr ""
+
+msgid "Completed"
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "No backups yet."
 msgstr ""
 
 msgid "On: anyone who can reach this instance can try the shared demo workspace."
 msgstr ""
 
 msgid "Last reset"
-msgstr ""
-
-msgid "Never"
 msgstr ""
 
 msgid "Result"
@@ -5747,9 +5904,6 @@ msgid "None yet"
 msgstr ""
 
 msgid "Next reset"
-msgstr ""
-
-msgid "Not scheduled"
 msgstr ""
 
 msgid ""
@@ -8015,9 +8169,6 @@ msgid ""
 "redemption fee."
 msgstr ""
 
-msgid "None"
-msgstr ""
-
 msgid "Percent of face value"
 msgstr ""
 
@@ -8563,9 +8714,6 @@ msgid "Save risk targets"
 msgstr ""
 
 msgid "Chart scope"
-msgstr ""
-
-msgid "Manual"
 msgstr ""
 
 msgid "Transaction"
@@ -11690,7 +11838,31 @@ msgstr ""
 
 msgid ""
 "Recurring items, income sources, work logs, calendars, and tax rules are "
-"included. Notification channels are not included."
+"included. Notification channels and provider API keys are included only "
+"in the optional encrypted secrets member."
+msgstr ""
+
+msgid ""
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels and provider API keys are not included in"
+" this download."
+msgstr ""
+
+msgid "Secrets"
+msgstr ""
+
+msgid "Include notification URLs and provider API keys"
+msgstr ""
+
+msgid ""
+"They are written to a separate encrypted member and need this passphrase "
+"to restore. Keep it somewhere safe; it cannot be recovered."
+msgstr ""
+
+msgid "Archive secrets passphrase"
+msgstr ""
+
+msgid "Repeat the passphrase"
 msgstr ""
 
 msgid "Download archive"
@@ -11769,6 +11941,9 @@ msgstr ""
 msgid "Cancel import"
 msgstr ""
 
+msgid "Secrets passphrase"
+msgstr ""
+
 #, python-format
 msgid "Skip %(count)s invalid rows"
 msgstr ""
@@ -11798,6 +11973,12 @@ msgid "Invalid rows"
 msgstr ""
 
 msgid "Unresolved category mappings"
+msgstr ""
+
+msgid ""
+"This archive contains an encrypted secrets member. Enter its passphrase "
+"in the Apply import form to restore notification channels and provider "
+"keys."
 msgstr ""
 
 msgid "Deleted transactions restored"
@@ -14603,6 +14784,20 @@ msgstr ""
 #~ "%(count)s posted or skipped income or"
 #~ " tax occurrences stay as history; "
 #~ "only pending ones are removed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Recurring items, income sources, work "
+#~ "logs, calendars, and tax rules are "
+#~ "included. Notification channels are not "
+#~ "included."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The scheduled database backup failed "
+#~ "(code: %(code)s). Check the log, then"
+#~ " run Back up now in Instance "
+#~ "settings."
 #~ msgstr ""
 
 #~ msgid "Planned for %(name)s"

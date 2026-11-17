@@ -14,6 +14,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from assetboard.config import Settings
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.investments import AssetClass, Instrument
 from assetboard.db.repositories import (
@@ -935,8 +936,10 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del skip_invalid
+        del skip_invalid, secrets_passphrase, instance_settings
         plan = _plan(
             session,
             ctx,

@@ -17,6 +17,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from assetboard.config import Settings
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.repositories import ReferenceRateRepository, ReferenceRateValueRepository
 from assetboard.domain.import_csv import parse_date
@@ -195,8 +196,10 @@ class ReferenceRateValuesCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del base_currency, skip_invalid, batch
+        del base_currency, skip_invalid, batch, secrets_passphrase, instance_settings
         matches, skipped, _new_rates = _plan(session, ctx, parsed, out_of_time=lambda: False)
         rates = ReferenceRateRepository(session, ctx)
         values = ReferenceRateValueRepository(session, ctx)

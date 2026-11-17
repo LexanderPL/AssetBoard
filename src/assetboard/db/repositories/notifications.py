@@ -1,12 +1,66 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy.orm import Session
 
+from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.repositories.base import ScopedRepository
+
+
+@dataclass(frozen=True, slots=True)
+class AdminChannel:
+    """One enabled channel of an active instance administrator, for instance-wide notices."""
+
+    id: UUID
+    user_id: UUID
+    url_encrypted: str
+    user_locale: str | None
+    workspace_locale: str
+
+
+class InstanceNotificationReader:
+    """Channels instance-level notices may use: active administrators' own enabled channels.
+
+    Not a ``ScopedRepository``: the query spans workspaces on purpose. It returns only the
+    encrypted URL and locale, never a URL or a password, and callers cannot read another
+    member's channels through it.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def admin_channels(self) -> list[AdminChannel]:
+        statement = (
+            select(
+                NotificationChannel,
+                User.locale,
+                Workspace.locale,
+            )
+            .join(User, User.id == NotificationChannel.user_id)
+            .join(Workspace, Workspace.id == NotificationChannel.workspace_id)
+            .where(
+                User.is_instance_admin.is_(True),
+                User.is_active.is_(True),
+                User.is_demo.is_(False),
+                NotificationChannel.enabled.is_(True),
+            )
+            .order_by(NotificationChannel.id)
+        )
+        return [
+            AdminChannel(
+                id=channel.id,
+                user_id=channel.user_id,
+                url_encrypted=channel.url_encrypted,
+                user_locale=user_locale,
+                workspace_locale=workspace_locale,
+            )
+            for channel, user_locale, workspace_locale in self._session.execute(statement)
+        ]
 
 
 class NotificationChannelRepository(ScopedRepository[NotificationChannel]):

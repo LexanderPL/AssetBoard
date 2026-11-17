@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from decimal import Decimal
 from io import BytesIO
 from typing import Any
@@ -17,6 +17,7 @@ from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.investments import AssetClass, Instrument, InvestmentTransaction
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.notifications import NotificationChannel
 from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
@@ -24,6 +25,7 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.archive import parse_archive
+from assetboard.domain.archive_secrets import SECRETS_FILE
 from assetboard.domain.categories import name_key
 from assetboard.domain.import_upload import ParsedUpload, ParseTimeout
 from assetboard.domain.months import YearMonth
@@ -44,6 +46,7 @@ from assetboard.services.imports import (
     cleanup_expired_imports,
     report_message,
 )
+from assetboard.services.notifications import encrypt_url
 from tests.conftest import OwnerApp
 from tests.tenant.harness import context_for
 
@@ -172,7 +175,10 @@ class TrivialImportAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: object | None = None,
     ) -> dict[str, int]:
+        del secrets_passphrase, instance_settings
         self.applied = True
         categories = CategoryRepository(session, ctx)
         known = self._categories(session, ctx)
@@ -256,6 +262,72 @@ def _install(owner: OwnerApp, adapter: ImportAdapter | None = None) -> TrivialIm
     installed = adapter or TrivialImportAdapter()
     owner.app.state.import_adapters = ImportAdapterRegistry({"transactions_csv": installed})
     return installed  # type: ignore[return-value]
+
+
+def test_owner_can_include_an_encrypted_secrets_member(owner: OwnerApp) -> None:
+    settings = owner.app.state.settings
+    channel_id = uuid4()
+    with owner.db() as session, session.begin():
+        session.add(
+            NotificationChannel(
+                id=channel_id,
+                workspace_id=owner.home_id,
+                user_id=owner.admin_id,
+                name="Phone",
+                url_encrypted=encrypt_url(
+                    settings,
+                    channel_id,
+                    "discord://webhook/secret-token",
+                    owner.app.state.clock.now(),
+                ),
+                scheme="discord",
+                service_name="Discord",
+                enabled=True,
+                mode="digest",
+                digest_time=time(8, 0),
+                default_lead_days=3,
+            )
+        )
+    passphrase = "correct horse battery staple"
+    response = owner.post(
+        "/workspace/data/export",
+        data={
+            "include_secrets": "true",
+            "passphrase": passphrase,
+            "passphrase_confirm": passphrase,
+        },
+        token_from="/workspace/data",
+    )
+    assert response.status_code == 200
+    assert b"discord://webhook/secret-token" not in response.content
+    parsed, errors = parse_archive(response.content)
+    assert errors == () and parsed is not None
+    assert parsed.secrets is not None
+    with ZipFile(BytesIO(response.content)) as archive:
+        assert SECRETS_FILE in archive.namelist()
+
+    mismatch = owner.post(
+        "/workspace/data/export",
+        data={
+            "include_secrets": "true",
+            "passphrase": passphrase,
+            "passphrase_confirm": "different passphrase",
+        },
+        token_from="/workspace/data",
+    )
+    assert mismatch.status_code == 303
+    assert "export_error=passphrase" in mismatch.headers["location"]
+    short = owner.post(
+        "/workspace/data/export",
+        data={
+            "include_secrets": "true",
+            "passphrase": "short",
+            "passphrase_confirm": "short",
+        },
+        token_from="/workspace/data",
+    )
+    assert short.status_code == 303
+    assert "export_error=passphrase" in short.headers["location"]
 
 
 def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> None:
@@ -359,6 +431,10 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "fire_loan_settings",
             "fire_legacy_scenarios_skipped",
             "fire_plan_zeroed_fields",
+            "secrets_included",
+            "notification_channels_in_secrets",
+            "provider_settings_in_secrets",
+            "secrets_skipped",
         }
         assert "amount" not in event.data
 

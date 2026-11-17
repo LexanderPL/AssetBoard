@@ -1335,6 +1335,7 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
         "login_tickets": "short-lived password sign-in challenges for global users",
         "users": "global identities can belong to multiple workspaces",
         "workspaces": "tenant root defines rather than belongs to a workspace",
+        "backup_runs": "backups cover the whole installation, not a workspace",
     }
     mapped = Base.metadata.tables
     for table, model_table in mapped.items():

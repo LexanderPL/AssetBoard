@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -33,6 +34,7 @@ from assetboard.services.auth import (
     reset_user_password,
     reset_user_two_factor,
 )
+from assetboard.services.backups import RestoreError, restore_backup
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.demo import (
     DemoBuildError,
@@ -44,6 +46,28 @@ from assetboard.services.demo import (
 from assetboard.services.mail import Mailer, MailJob, SmtpMailer, send_now
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
+
+
+def _(message: str) -> str:
+    """Marks a CLI message for extraction; the CLI itself runs in English."""
+    return message
+
+
+RESTORE_WARNINGS = {
+    "secret_key_restored": _("The secret key stored next to the backup was restored to DATA_DIR."),
+    "secret_key_missing": _(
+        "No secret key is stored next to the backup: encrypted values only work with the key "
+        "this instance already uses."
+    ),
+    "secret_key_env": _(
+        "ASSETBOARD_SECRET_KEY is set, so the database was restored with the existing key; "
+        "make sure it is the key the backup was made with."
+    ),
+    "pre_restore_unverified": _(
+        "The previous database could not be verified; a raw copy was saved as the pre-restore "
+        "backup. Check it before relying on it."
+    ),
+}
 
 
 @app.command()
@@ -382,6 +406,63 @@ def mail_test(
         typer.echo(f"Sending failed: {error}", err=True)
         raise typer.Exit(code=1)
     typer.echo(f"Test email sent to {address}.")
+
+
+@app.command("restore")
+def restore(
+    file: Path = typer.Argument(  # noqa: B008
+        ..., help="Backup file written by the scheduled job or copied with the backup API."
+    ),
+    data_dir: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--data-dir",
+        help="Data directory holding assetboard.db and the secret key.",
+    ),
+    database_url: str | None = typer.Option(
+        None,
+        "--database-url",
+        help="SQLite database URL, instead of <data-dir>/assetboard.db.",
+    ),
+) -> None:
+    """Restore a SQLite backup after checking it and saving the current database first."""
+    overrides: dict[str, Any] = {}
+    if data_dir is not None:
+        overrides["data_dir"] = data_dir
+    if database_url is not None:
+        overrides["database_url"] = database_url
+    try:
+        settings = Settings(**overrides)
+        if database_url is None and data_dir is not None:
+            settings.database_url = f"sqlite:///{data_dir.expanduser() / 'assetboard.db'}"
+        if (
+            data_dir is None
+            and database_url is None
+            and "data_dir" not in settings.model_fields_set
+        ):
+            typer.echo(
+                _(
+                    "Refusing to restore into the default ./data directory: pass --data-dir, "
+                    "--database-url or ASSETBOARD_DATA_DIR so the live database is unambiguous."
+                ),
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        result = restore_backup(settings, file, Clock())
+    except RestoreError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    except (ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(_("Restored %(file)s into %(target)s.") % {"file": file, "target": result.target})
+    if result.migrated:
+        typer.echo(_("Schema migrations were applied to the restored database."))
+    if result.pre_restore is not None:
+        typer.echo(_("Pre-restore backup: %(path)s") % {"path": result.pre_restore})
+    for warning in result.warnings:
+        message = RESTORE_WARNINGS.get(warning)
+        if message is not None:
+            typer.echo(message)
 
 
 @app.command("check-migrations")

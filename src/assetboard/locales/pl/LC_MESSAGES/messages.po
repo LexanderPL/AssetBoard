@@ -61,6 +61,51 @@ msgstr "Coś poszło nie tak"
 msgid "An unexpected error occurred. Please try again."
 msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 
+msgid "The secret key stored next to the backup was restored to DATA_DIR."
+msgstr "Klucz tajny zapisany obok kopii zapasowej został przywrócony do DATA_DIR."
+
+msgid ""
+"No secret key is stored next to the backup: encrypted values only work "
+"with the key this instance already uses."
+msgstr ""
+"Obok kopii zapasowej nie ma klucza tajnego: zaszyfrowane wartości będą "
+"działać tylko z kluczem, którego ta instancja już używa."
+
+msgid ""
+"ASSETBOARD_SECRET_KEY is set, so the database was restored with the "
+"existing key; make sure it is the key the backup was made with."
+msgstr ""
+"Ustawiono ASSETBOARD_SECRET_KEY, więc bazę przywrócono z istniejącym "
+"kluczem; upewnij się, że to klucz, którym wykonano kopię zapasową."
+
+msgid ""
+"The previous database could not be verified; a raw copy was saved as the "
+"pre-restore backup. Check it before relying on it."
+msgstr ""
+"Nie udało się zweryfikować poprzedniej bazy danych; surowa kopia została "
+"zapisana jako kopia sprzed przywracania. Sprawdź ją, zanim na niej "
+"polegniesz."
+
+msgid ""
+"Refusing to restore into the default ./data directory: pass --data-dir, "
+"--database-url or ASSETBOARD_DATA_DIR so the live database is "
+"unambiguous."
+msgstr ""
+"Odmowa przywrócenia do domyślnego katalogu ./data: podaj --data-dir, "
+"--database-url lub ASSETBOARD_DATA_DIR, aby jednoznacznie wskazać aktywną"
+" bazę danych."
+
+#, python-format
+msgid "Restored %(file)s into %(target)s."
+msgstr "Przywrócono %(file)s do %(target)s."
+
+msgid "Schema migrations were applied to the restored database."
+msgstr "Do przywróconej bazy zastosowano migracje schematu."
+
+#, python-format
+msgid "Pre-restore backup: %(path)s"
+msgstr "Kopia zapasowa sprzed przywrócenia: %(path)s"
+
 msgid "Food"
 msgstr "Jedzenie"
 
@@ -1064,6 +1109,15 @@ msgstr "Otwarta rejestracja"
 msgid "Check for updates"
 msgstr "Sprawdzaj aktualizacje"
 
+msgid "Daily backups"
+msgstr "Kopie dzienne"
+
+msgid "Weekly backups"
+msgstr "Kopie tygodniowe"
+
+msgid "Monthly backups"
+msgstr "Kopie miesięczne"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -1757,6 +1811,13 @@ msgstr ""
 "Pozycje cykliczne, źródła przychodu, reguły podatkowe i kalendarze pracy "
 "są tylko przywracane; dzienniki pracy zostały scalone."
 
+msgid ""
+"The encrypted secrets member is restored only; it was ignored in this "
+"merge."
+msgstr ""
+"Zaszyfrowany element z sekretami służy tylko do przywracania; został "
+"pominięty w tym scalaniu."
+
 msgid "No income source with this name or id exists."
 msgstr "Nie istnieje źródło przychodu o tej nazwie lub identyfikatorze."
 
@@ -1789,6 +1850,9 @@ msgstr ""
 
 msgid "Enter work units as a non-negative number."
 msgstr "Podaj nieujemną liczbę jednostek pracy."
+
+msgid "The archive's encrypted secrets member is invalid."
+msgstr "Zaszyfrowany element archiwum z sekretami jest nieprawidłowy."
 
 msgid ""
 "This income source is not variable; work logs apply only to variable "
@@ -2435,6 +2499,19 @@ msgstr[1] "%(app)s · %(workspace)s: %(num)d przypomnienia"
 msgstr[2] "%(app)s · %(workspace)s: %(num)d przypomnień"
 
 #, python-format
+msgid "%(app)s: database backup failed"
+msgstr "%(app)s: kopia zapasowa bazy danych nie powiodła się"
+
+#, python-format
+msgid ""
+"The database backup failed (code: %(code)s). Check the log, then run Back"
+" up now in Instance settings."
+msgstr ""
+"Kopia zapasowa bazy danych nie powiodła się (kod: %(code)s). Sprawdź "
+"dziennik, a następnie uruchom „Utwórz kopię teraz” w ustawieniach "
+"instancji."
+
+#, python-format
 msgid "%(app)s · %(workspace)s: test"
 msgstr "%(app)s · %(workspace)s: test"
 
@@ -2637,6 +2714,15 @@ msgstr ""
 
 msgid "Choose a value for each setting."
 msgstr "Wybierz wartość każdego ustawienia."
+
+msgid "Backup created."
+msgstr "Utworzono kopię zapasową."
+
+msgid "The backup failed. Check the log for the reason."
+msgstr "Kopia zapasowa nie powiodła się. Sprawdź dziennik, aby poznać przyczynę."
+
+msgid "Backups are not available for this database type."
+msgstr "Kopie zapasowe nie są dostępne dla tego typu bazy danych."
 
 msgid "The demo workspace was rebuilt."
 msgstr "Obszar demonstracyjny został odtworzony."
@@ -5743,6 +5829,28 @@ msgstr "Tego archiwum nie można zaimportować do tego obszaru roboczego."
 msgid "Restore needs a complete workspace archive (a ZIP file)."
 msgstr "Przywracanie wymaga kompletnego archiwum obszaru roboczego (pliku ZIP)."
 
+msgid ""
+"Enter a passphrase of at least 12 characters to include secrets, and "
+"repeat it."
+msgstr ""
+"Podaj hasło do sekretów składające się z co najmniej 12 znaków i powtórz "
+"je."
+
+msgid "Only a workspace owner can include secrets in an archive."
+msgstr "Tylko właściciel obszaru roboczego może dołączyć sekrety do archiwum."
+
+msgid ""
+"This archive contains encrypted secrets. Enter its passphrase to restore "
+"them."
+msgstr ""
+"To archiwum zawiera zaszyfrowane sekrety. Podaj jego hasło, aby je "
+"przywrócić."
+
+msgid ""
+"The passphrase does not open this archive's secrets. Check it and try "
+"again."
+msgstr "To hasło nie otwiera sekretów archiwum. Sprawdź je i spróbuj ponownie."
+
 #, python-format
 msgid "Rollback was refused because these months are closed: %(months)s"
 msgstr "Nie można cofnąć importu, ponieważ zamknięte są miesiące: %(months)s"
@@ -6197,8 +6305,84 @@ msgstr ""
 "Raz dziennie pytaj GitHub o najnowsze wydanie. Domyślnie wyłączone; nic "
 "więcej nie jest wysyłane."
 
+msgid "Backup retention"
+msgstr "Przechowywanie kopii zapasowych"
+
+msgid ""
+"The newest backup of each day, week and month is kept. One file can count"
+" for several. Manual and pre-restore copies are never deleted "
+"automatically."
+msgstr ""
+"Zachowywana jest najnowsza kopia z każdego dnia, tygodnia i miesiąca. "
+"Jeden plik może liczyć się w kilku okresach. Kopie ręczne i sprzed "
+"przywrócenia nigdy nie są usuwane automatycznie."
+
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
+
+msgid "Backups"
+msgstr "Kopie zapasowe"
+
+msgid "Automatic backups are not available for an in-memory database."
+msgstr "Automatyczne kopie zapasowe nie są dostępne dla bazy danych w pamięci."
+
+msgid ""
+"Automatic backups are available for SQLite databases only. For "
+"PostgreSQL, use pg_dump and pg_restore."
+msgstr ""
+"Automatyczne kopie zapasowe są dostępne tylko dla baz SQLite. W przypadku"
+" PostgreSQL użyj pg_dump i pg_restore."
+
+msgid "Last backup"
+msgstr "Ostatnia kopia zapasowa"
+
+msgid "Never"
+msgstr "Nigdy"
+
+msgid "Last failure"
+msgstr "Ostatni błąd"
+
+msgid "None"
+msgstr "Brak"
+
+msgid "Next scheduled backup"
+msgstr "Następna zaplanowana kopia"
+
+msgid "Not scheduled"
+msgstr "Nie zaplanowano"
+
+msgid "Location"
+msgstr "Lokalizacja"
+
+msgid "Back up now"
+msgstr "Utwórz kopię teraz"
+
+msgid "Started"
+msgstr "Rozpoczęto"
+
+msgid "Size"
+msgstr "Rozmiar"
+
+msgid "Download"
+msgstr "Pobierz"
+
+msgid "Scheduled"
+msgstr "Zaplanowana"
+
+msgid "Manual"
+msgstr "Ręczna"
+
+msgid "Pre-restore"
+msgstr "Sprzed przywrócenia"
+
+msgid "Completed"
+msgstr "Ukończona"
+
+msgid "Running"
+msgstr "W toku"
+
+msgid "No backups yet."
+msgstr "Nie ma jeszcze kopii zapasowych."
 
 msgid "On: anyone who can reach this instance can try the shared demo workspace."
 msgstr ""
@@ -6207,9 +6391,6 @@ msgstr ""
 
 msgid "Last reset"
 msgstr "Ostatni reset"
-
-msgid "Never"
-msgstr "Nigdy"
 
 msgid "Result"
 msgstr "Wynik"
@@ -6226,9 +6407,6 @@ msgstr "Jeszcze brak"
 
 msgid "Next reset"
 msgstr "Następny reset"
-
-msgid "Not scheduled"
-msgstr "Nie zaplanowano"
 
 msgid ""
 "The demo workspace is not ready. Check the log and restart the "
@@ -8777,9 +8955,6 @@ msgstr ""
 "Pozostaw puste, aby nie naliczać podatku. Podatek naliczany jest od "
 "odsetek po odjęciu opłaty za wcześniejszy wykup."
 
-msgid "None"
-msgstr "Brak"
-
 msgid "Percent of face value"
 msgstr "Procent wartości nominalnej"
 
@@ -9397,9 +9572,6 @@ msgstr "Zapisz cele ryzyka"
 
 msgid "Chart scope"
 msgstr "Zakres wykresu"
-
-msgid "Manual"
-msgstr "Ręczna"
 
 msgid "Transaction"
 msgstr "Transakcja"
@@ -12826,10 +12998,40 @@ msgstr ""
 
 msgid ""
 "Recurring items, income sources, work logs, calendars, and tax rules are "
-"included. Notification channels are not included."
+"included. Notification channels and provider API keys are included only "
+"in the optional encrypted secrets member."
 msgstr ""
 "Pozycje cykliczne, źródła przychodu, dzienniki pracy, kalendarze i reguły"
-" podatkowe są uwzględnione. Kanały powiadomień nie są uwzględnione."
+" podatkowe są uwzględnione. Kanały powiadomień i klucze API dostawców są "
+"uwzględniane tylko w opcjonalnym zaszyfrowanym elemencie z sekretami."
+
+msgid ""
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels and provider API keys are not included in"
+" this download."
+msgstr ""
+"Pozycje cykliczne, źródła przychodu, dzienniki pracy, kalendarze i reguły"
+" podatkowe są uwzględnione. Kanały powiadomień i klucze API dostawców nie"
+" są uwzględnione w tym pobraniu."
+
+msgid "Secrets"
+msgstr "Sekrety"
+
+msgid "Include notification URLs and provider API keys"
+msgstr "Dołącz adresy powiadomień i klucze API dostawców"
+
+msgid ""
+"They are written to a separate encrypted member and need this passphrase "
+"to restore. Keep it somewhere safe; it cannot be recovered."
+msgstr ""
+"Są zapisywane w osobnym zaszyfrowanym elemencie i wymagają tego hasła do "
+"przywrócenia. Przechowuj je bezpiecznie; nie można go odzyskać."
+
+msgid "Archive secrets passphrase"
+msgstr "Hasło do sekretów archiwum"
+
+msgid "Repeat the passphrase"
+msgstr "Powtórz hasło"
 
 msgid "Download archive"
 msgstr "Pobierz archiwum"
@@ -12915,6 +13117,9 @@ msgstr "Pobierz plik CSV z błędami i pominiętymi wierszami"
 msgid "Cancel import"
 msgstr "Anuluj import"
 
+msgid "Secrets passphrase"
+msgstr "Hasło do sekretów"
+
 #, python-format
 msgid "Skip %(count)s invalid rows"
 msgstr "Pomiń nieprawidłowe wiersze: %(count)s"
@@ -12945,6 +13150,15 @@ msgstr "Nieprawidłowe wiersze"
 
 msgid "Unresolved category mappings"
 msgstr "Nierozwiązane mapowania kategorii"
+
+msgid ""
+"This archive contains an encrypted secrets member. Enter its passphrase "
+"in the Apply import form to restore notification channels and provider "
+"keys."
+msgstr ""
+"To archiwum zawiera zaszyfrowany element z sekretami. Podaj jego hasło w "
+"formularzu zastosowania importu, aby przywrócić kanały powiadomień i "
+"klucze dostawców."
 
 msgid "Deleted transactions restored"
 msgstr "Przywrócone usunięte transakcje"

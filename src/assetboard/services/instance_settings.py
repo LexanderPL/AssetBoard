@@ -25,6 +25,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.models.identity import InstanceSettings, User
+from assetboard.domain.backups import (
+    DEFAULT_DAILY_RETENTION,
+    DEFAULT_MONTHLY_RETENTION,
+    DEFAULT_WEEKLY_RETENTION,
+    validate_retention,
+)
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.auth import record_auth_event
 
@@ -39,6 +45,9 @@ class InstanceSettingsView:
     allow_workspace_creation: bool = DEFAULT_ALLOW_WORKSPACE_CREATION
     allow_registration: bool = DEFAULT_ALLOW_REGISTRATION
     check_for_updates: bool = DEFAULT_CHECK_FOR_UPDATES
+    backup_daily_retention: int = DEFAULT_DAILY_RETENTION
+    backup_weekly_retention: int = DEFAULT_WEEKLY_RETENTION
+    backup_monthly_retention: int = DEFAULT_MONTHLY_RETENTION
 
 
 def read_settings(session: Session, *, lock: bool = False) -> InstanceSettingsView:
@@ -51,6 +60,9 @@ def read_settings(session: Session, *, lock: bool = False) -> InstanceSettingsVi
         allow_workspace_creation=row.allow_workspace_creation,
         allow_registration=row.allow_registration,
         check_for_updates=row.check_for_updates,
+        backup_daily_retention=row.backup_daily_retention,
+        backup_weekly_retention=row.backup_weekly_retention,
+        backup_monthly_retention=row.backup_monthly_retention,
     )
 
 
@@ -91,6 +103,9 @@ def update_settings(
     allow_workspace_creation: bool,
     allow_registration: bool,
     check_for_updates: bool | None = None,
+    backup_daily_retention: int | None = None,
+    backup_weekly_retention: int | None = None,
+    backup_monthly_retention: int | None = None,
     settings: Settings,
     clock: Clock,
     host: str | None,
@@ -112,6 +127,9 @@ def update_settings(
             allow_workspace_creation=DEFAULT_ALLOW_WORKSPACE_CREATION,
             allow_registration=DEFAULT_ALLOW_REGISTRATION,
             check_for_updates=DEFAULT_CHECK_FOR_UPDATES,
+            backup_daily_retention=DEFAULT_DAILY_RETENTION,
+            backup_weekly_retention=DEFAULT_WEEKLY_RETENTION,
+            backup_monthly_retention=DEFAULT_MONTHLY_RETENTION,
         )
         session.add(row)
     # Turning registration on needs email; turning it off is always allowed.
@@ -119,6 +137,27 @@ def update_settings(
         blocker = registration_blocker(settings)
         if blocker is not None:
             return blocker
+    retention = {
+        "backup_daily_retention": (
+            validate_retention(backup_daily_retention)
+            if backup_daily_retention is not None
+            else None
+        ),
+        "backup_weekly_retention": (
+            validate_retention(backup_weekly_retention)
+            if backup_weekly_retention is not None
+            else None
+        ),
+        "backup_monthly_retention": (
+            validate_retention(backup_monthly_retention)
+            if backup_monthly_retention is not None
+            else None
+        ),
+    }
+    if all(value == 0 for value in retention.values() if value is not None) and all(
+        value is not None for value in retention.values()
+    ):
+        raise ValueError("at least one backup retention count must be positive")
     changed: dict[str, str | int | bool] = {}
     if row.allow_workspace_creation is not allow_workspace_creation:
         changed["allow_workspace_creation"] = allow_workspace_creation
@@ -126,6 +165,9 @@ def update_settings(
         changed["allow_registration"] = allow_registration
     if check_for_updates is not None and row.check_for_updates is not check_for_updates:
         changed["check_for_updates"] = check_for_updates
+    for name, value in retention.items():
+        if value is not None and getattr(row, name) != value:
+            changed[name] = value
     if not changed:
         return "unchanged"
     row.allow_workspace_creation = allow_workspace_creation
@@ -135,6 +177,9 @@ def update_settings(
         if not check_for_updates:
             row.latest_release_tag = None
             row.update_checked_at = None
+    for name, value in retention.items():
+        if value is not None:
+            setattr(row, name, value)
     row.updated_at = clock.now()
     row.updated_by_user_id = actor.id
     record_auth_event(

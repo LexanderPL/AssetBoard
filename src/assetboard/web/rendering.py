@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -14,7 +15,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.domain.navigation import DEFAULT_SIDEBAR, HOME_KEY
 from assetboard.i18n import gettext, translations_for
-from assetboard.i18n.dates import format_time
+from assetboard.i18n.dates import format_day, format_time
 from assetboard.i18n.numbers import format_money, format_price
 from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
@@ -73,6 +74,12 @@ class SidebarLink:
     current: bool
 
 
+def format_moment_utc(moment: datetime, locale: str) -> str:
+    """An instant as the locale writes a day and time, marked UTC (instance-wide events)."""
+    local = moment.astimezone(UTC)
+    return f"{format_day(local.date(), locale)} {format_time(local.strftime('%H:%M'), locale)} UTC"
+
+
 @lru_cache(maxsize=2)
 def templates_for(locale: str) -> Jinja2Templates:
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
@@ -85,6 +92,7 @@ def templates_for(locale: str) -> Jinja2Templates:
         scoped_url=scoped_url,
         uuid4=uuid4,
         csrf_token=csrf_token,
+        format_moment_utc=format_moment_utc,
         month_nav_links=month_nav_links,
         sidebar_links=sidebar_links,
         sidebar_labels=sidebar_labels(locale),

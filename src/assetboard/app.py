@@ -46,6 +46,7 @@ from assetboard.services.auth import (
     setup_is_open,
     setup_token_at_startup,
 )
+from assetboard.services.backups import sqlite_database_path
 from assetboard.services.context import (
     DemoRestricted,
     NoWorkspace,
@@ -77,6 +78,7 @@ from assetboard.web.account_routes import router as account_router
 from assetboard.web.admin_routes import router as admin_router
 from assetboard.web.audit_routes import router as audit_router
 from assetboard.web.auth_routes import router as auth_router
+from assetboard.web.backup_routes import router as backup_router
 from assetboard.web.category_routes import router as category_router
 from assetboard.web.context import load_workspace_nav
 from assetboard.web.dashboard_routes import router as dashboard_router
@@ -237,6 +239,7 @@ def create_app(
             notifier=lambda: app.state.notifier,
             release_source=lambda: app.state.release_source,
             provider_runtime=provider_runtime,
+            backup_enabled=sqlite_database_path(settings) is not None,
         )
         app.state.recurring_jobs = recurring_jobs
         try:
@@ -388,6 +391,7 @@ def create_app(
     app.include_router(fire_router)
     app.include_router(notification_router)
     app.include_router(auth_router)
+    app.include_router(backup_router)
     app.include_router(email_router)
     app.include_router(totp_router)
     app.include_router(account_router)
