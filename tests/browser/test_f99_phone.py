@@ -1,7 +1,8 @@
 """F9.9 in Chromium at 390 × 844: the Month summary fits without sideways scroll (and keeps
-Category, Plan, Actual and Difference visible and editable with a six-digit amount), the
-Transactions entry row has 44 px tap targets and no page overflow, Upcoming confirms and skips
-in one tap, and every main page stays within the phone viewport. No CSP violations."""
+Category, Plan and Actual visible and editable with a six-digit amount, with the Difference
+amount labelled under Actual), the Transactions entry row has 44 px tap targets and no page
+overflow, Upcoming confirms and skips in one tap, and every main page stays within the phone
+viewport. No CSP violations."""
 
 from __future__ import annotations
 

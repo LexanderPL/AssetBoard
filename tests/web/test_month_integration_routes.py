@@ -118,20 +118,29 @@ def test_phone_summary_markup_drops_currency_and_shortens_pending(rent) -> None:
     assert re.search(r"data-summary-currency>\(EUR\)<", summary)
     row = _summary_row(summary, category)
     assert re.search(r'class="max-sm:hidden tabular-nums" data-actual>€0.00<', row)
-    assert re.search(r'class="tabular-nums sm:hidden" data-actual-phone>0.00<', row)
-    # The fallback: Difference is not a phone column; its amount is a line under Actual,
-    # without the currency, beside the still-hidden desktop cell.
+    assert re.search(
+        r'class="tabular-nums sm:hidden" data-actual-phone aria-hidden="true">0\.00</span>'
+        r'<span class="sr-only sm:hidden">€0\.00</span>',
+        row,
+    )
+    # The fallback: Difference is not a phone column; its amount is a labelled line under
+    # Actual, without the currency, beside the still-hidden desktop cell. The visible "vs
+    # plan" and the screen-reader wording keep it distinct from the pending line without
+    # relying on colour.
     assert re.search(r'<th scope="col" class="w-36 [^"]*max-sm:hidden">Difference</th>', summary)
-    phone_difference = re.search(r"data-difference-phone>([^<]*)<", row)
-    assert phone_difference is not None
-    assert "€" not in phone_difference.group(1) and "100.00" in phone_difference.group(1)
+    assert re.search(
+        r'data-difference-phone><span class="font-medium" aria-hidden="true">vs plan</span> '
+        r'<span aria-hidden="true">\+?100\.00</span><span class="sr-only"> Difference: '
+        r"\+?€100\.00",
+        row,
+    )
     # The phone pending line is "+100.00"; the full "+ €100.00 pending" stays for screen
     # readers (and on wider screens).
     assert re.search(r'aria-hidden="true">\+100\.00</span>', row)
     assert re.search(r'<span class="sr-only"> \+ €100\.00 pending \(If everything', row)
     assert re.search(r"data-pending>\s*\+ €100\.00 pending", row)
-    # Phone sizing: a seven-digit planned input, one type step down, and a table that may use
-    # the fixed layout at phone width.
+    # Phone sizing: a seven-digit planned input, one type step down, and the responsive
+    # type/padding rules.
     assert 'size="7"' in row
     assert re.search(r"<table class=\"[^\"]*min-w-0[^\"]*max-sm:text-xs", summary)
     assert "max-sm:!py-1" in row
@@ -143,6 +152,8 @@ def test_viewers_see_expected_rows_without_confirm(rent) -> None:
     table = _expense_table(owner.client.get("/transactions/2026-03").text)
     assert f'data-pending-occurrence="{occurrences[2]}"' in table
     assert "Confirm" not in table and ">Delete</button>" not in table
+    upcoming = owner.client.get("/upcoming/2026-03").text
+    assert "data-phone-post" not in upcoming and "data-phone-skip" not in upcoming
 
 
 def test_a_repeating_expected_row_cannot_be_deleted(rent) -> None:

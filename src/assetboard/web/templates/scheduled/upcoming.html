@@ -154,8 +154,9 @@
       <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
         <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary btn-sm h-8 max-sm:hidden">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
         {# F9.9: on a phone the primary action posts the prefilled date and amount straight
-           away (one tap), with the same undo offer the dialog path has; the row menu keeps the
-           editable date and amount, reschedule and the rule. #}
+           away (one tap), with the same undo offer the dialog path has. The row menu still
+           edits the occurrence's due date and expected amount, reschedules it and opens the
+           rule; the posting date/transaction amount dialog stays available from sm up. #}
         <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="sm:hidden" data-phone-post>
           {{ csrf_input() }}
           <input type="hidden" name="day" value="{{ post_day.isoformat() }}">

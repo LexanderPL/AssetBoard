@@ -232,10 +232,18 @@
     }
 
     /* F9.9: every field and the Add button of a Transactions entry (or edit) row is a 44 px
-       touch target on a phone. The row scrolls inside its panel as before, but its controls
-       stay comfortably tappable. */
+       touch target on a phone, as are the edit row's Save/Cancel actions, the one-tap Undo
+       controls and the inline planned-value input. The row scrolls inside its panel as before,
+       but its controls stay comfortably tappable. */
     [data-ledger-row-form] .cell-input,
-    [data-ledger-row-form] .cell-button {
+    [data-ledger-row-form] .cell-button,
+    [data-ledger-row-form] [data-edit-save],
+    [data-ledger-row-form] [data-edit-cancel],
+    [data-plan-form] .cell-input,
+    [data-post-undo] button,
+    [data-upcoming-notice] button,
+    [data-toast-undo],
+    [data-undo] {
       min-height: 2.75rem;
     }
   }
