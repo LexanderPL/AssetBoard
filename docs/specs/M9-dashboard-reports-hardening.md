@@ -156,6 +156,15 @@ and the golden-archive regression tests for every released format version.
 - For PostgreSQL deployments (if configured later) the page explains using `pg_dump`; the feature is disabled gracefully.
 - Docs: `docs/backup.md` includes advice for volume snapshots and off-site copies.
 
+**Implementation notes (F9.4).** One scheduled copy runs per day at 03:30 UTC (rather than a
+separate daily/weekly/monthly file): retention keeps the newest scheduled copy of each of the
+configured number of days, ISO weeks and months, so one file can be the representative of
+several buckets. Manual and pre-restore copies are never pruned automatically. `BackupRun` is
+instance-level (no `workspace_id`), so tenant isolation and the demo builder do not apply; the
+table is documented as instance-level in `docs/architecture.md`. The backup directory also
+holds a `<name>.secret_key` sidecar when the key is stored in `DATA_DIR`, so an automatic
+restore keeps encrypted values readable; the download button serves the database file only.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

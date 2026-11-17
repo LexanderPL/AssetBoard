@@ -313,6 +313,12 @@ together: two-factor secrets in the database can only be decrypted with that key
 settings (Compose file or env file) too. The backup holds all your financial data and the key to
 parts of it: store it encrypted, and on another machine.
 
+AssetBoard also takes a scheduled online backup itself (daily at 03:30 UTC, retained as 7
+daily / 4 weekly / 6 monthly copies) and can download one or restore it with
+`assetboard restore`. See [Backups and restore](backup.md) for the settings page, retention,
+restore checks, volume snapshots and off-site advice; the manual methods below remain useful
+for other schedules and for complete copies that include the key.
+
 | Install | `DATA_DIR` |
 | --- | --- |
 | Docker Compose | `/data` in the named volume `assetboard-data` (Compose prefixes it with the project name) |
@@ -348,11 +354,13 @@ The database uses SQLite's write-ahead log: while the app runs, recent changes c
   container, a `vzdump` backup in **stop** mode (see the
   [Proxmox guide](install/proxmox-lxc.md#backups)).
 
-**Restoring:** stop the app, delete `assetboard.db-wal` and `assetboard.db-shm` if present, put
-the backed-up database in place as `assetboard.db` and the key as `secret_key`, owned by the
-app's user (`assetboard` for native installs, UID 10001 in the container) with mode 0600, and
-start the app. A backup from an older version is migrated at startup; a database written by a
-newer version than the one you start is refused (see
+**Restoring:** stop the app and use `assetboard restore <file>` (or, for a hand-made copy,
+delete `assetboard.db-wal` and `assetboard.db-shm` if present, put the backed-up database in
+place as `assetboard.db` and the key as `secret_key`, owned by the app's user (`assetboard` for
+native installs, UID 10001 in the container) with mode 0600). The command checks the file,
+refuses a newer schema and saves the current database before replacing it; see
+[Backups and restore](backup.md#restore-a-backup). A backup from an older version is migrated at
+startup; a database written by a newer version than the one you start is refused (see
 [Database schema state](#database-schema-state)).
 
 ## Reverse proxies

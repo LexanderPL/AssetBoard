@@ -28,6 +28,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
 from assetboard.db.models.identity import User
+from assetboard.domain.backups import validate_retention
 from assetboard.domain.identity import (
     InvalidDisplayName,
     InvalidEmail,
@@ -48,6 +49,7 @@ from assetboard.services.admin_users import (
     record_user_created,
 )
 from assetboard.services.auth import WebSession, argon2_hash, create_user_with_temporary_password
+from assetboard.services.backups import BackupPanel, build_panel
 from assetboard.services.demo_mode import (
     DemoStatus,
     delete_demo_instance,
@@ -56,6 +58,7 @@ from assetboard.services.demo_mode import (
     reset_demo_instance,
 )
 from assetboard.services.instance_settings import (
+    InstanceSettingsView,
     get_settings,
     registration_blocker,
     update_settings,
@@ -123,6 +126,11 @@ SETTINGS_RESULTS: dict[str, str] = {
     ),
 }
 SETTINGS_INVALID = _("Choose a value for each setting.")
+BACKUP_NOTICES = {
+    "created": _("Backup created."),
+    "failed": _("The backup failed. Check the log for the reason."),
+    "unavailable": _("Backups are not available for this database type."),
+}
 DEMO_RESET_DONE = _("The demo workspace was rebuilt.")
 DEMO_RESET_FAILED = _("The demo workspace could not be reset. The previous data was kept.")
 DEMO_DELETED = _("The demo workspace and its account were deleted.")
@@ -467,6 +475,7 @@ async def _settings_page(
     current: WebSession,
     *,
     wanted: tuple[bool, bool, bool] | None = None,
+    wanted_retention: tuple[int, int, int] | None = None,
     notice: str | None = None,
     error: str | None = None,
     status_code: int = 200,
@@ -481,6 +490,14 @@ async def _settings_page(
         stored.allow_registration,
         stored.check_for_updates,
     )
+    daily, weekly, monthly = wanted_retention or (
+        stored.backup_daily_retention,
+        stored.backup_weekly_retention,
+        stored.backup_monthly_retention,
+    )
+    panel: BackupPanel = await run_in_threadpool(
+        build_panel, state.session_factory, state.settings, state.clock
+    )
     blocker = registration_blocker(state.settings)
     response = render_template(
         request,
@@ -489,6 +506,10 @@ async def _settings_page(
             "allow_workspace_creation": allow_workspace_creation,
             "allow_registration": allow_registration,
             "check_for_updates": check_for_updates,
+            "backup_daily_retention": daily,
+            "backup_weekly_retention": weekly,
+            "backup_monthly_retention": monthly,
+            "backup_panel": panel,
             # Turning registration on is impossible; turning it off stays possible.
             "registration_locked": blocker is not None and not stored.allow_registration,
             "registration_blocker": _t(request, SETTINGS_RESULTS[blocker]) if blocker else None,
@@ -506,7 +527,36 @@ async def _settings_page(
 
 @router.get("/admin/settings", name="admin_settings")
 async def settings_form(request: Request) -> Response:
-    return await _settings_page(request, _require_admin(request))
+    notice_key = request.query_params.get("backup", "")
+    notice = _t(request, BACKUP_NOTICES[notice_key]) if notice_key in BACKUP_NOTICES else None
+    return await _settings_page(request, _require_admin(request), notice=notice)
+
+
+def _retention_values(
+    stored: InstanceSettingsView,
+    daily: str,
+    weekly: str,
+    monthly: str,
+) -> tuple[int, int, int] | None:
+    """Submitted retention counts; a blank field keeps the stored value (older forms)."""
+    current = (
+        stored.backup_daily_retention,
+        stored.backup_weekly_retention,
+        stored.backup_monthly_retention,
+    )
+    values: list[int] = []
+    for raw, fallback in zip((daily, weekly, monthly), current, strict=True):
+        if not raw.strip():
+            values.append(fallback)
+            continue
+        try:
+            values.append(validate_retention(int(raw, 10)))
+        except (TypeError, ValueError):
+            return None
+    if sum(values) == 0:
+        # Keeping no bucket at all would delete the backup that was just made.
+        return None
+    return values[0], values[1], values[2]
 
 
 @router.post("/admin/settings")
@@ -515,6 +565,9 @@ async def settings_submit(
     allow_workspace_creation: FormStr = "",
     allow_registration: FormStr = "",
     check_for_updates: FormStr = "",
+    backup_daily_retention: FormStr = "",
+    backup_weekly_retention: FormStr = "",
+    backup_monthly_retention: FormStr = "",
     confirm_password: FormStr = "",
 ) -> Response:
     current = _require_admin(request)
@@ -532,7 +585,18 @@ async def settings_submit(
         check_for_updates == "on",
     )
     state = _state(request)
-    was_checking = (await run_in_threadpool(get_settings, state.session_factory)).check_for_updates
+    stored = await run_in_threadpool(get_settings, state.session_factory)
+    retention = _retention_values(
+        stored,
+        backup_daily_retention,
+        backup_weekly_retention,
+        backup_monthly_retention,
+    )
+    if retention is None:
+        return await _settings_page(
+            request, current, wanted=wanted, error=_t(request, SETTINGS_INVALID), status_code=400
+        )
+    was_checking = stored.check_for_updates
 
     def apply(session: Session, actor: User, _method: ConfirmMethod) -> str:
         return update_settings(
@@ -541,6 +605,9 @@ async def settings_submit(
             allow_workspace_creation=wanted[0],
             allow_registration=wanted[1],
             check_for_updates=wanted[2],
+            backup_daily_retention=retention[0],
+            backup_weekly_retention=retention[1],
+            backup_monthly_retention=retention[2],
             settings=state.settings,
             clock=state.clock,
             host=client_host(request),
@@ -556,6 +623,7 @@ async def settings_submit(
             request,
             current,
             wanted=wanted,
+            wanted_retention=retention,
             error=refused.message,
             status_code=refused.status_code,
         )
@@ -565,6 +633,7 @@ async def settings_submit(
             request,
             current,
             wanted=wanted,
+            wanted_retention=retention,
             error=_t(request, SETTINGS_RESULTS[outcome.value]),
             status_code=400,
         )

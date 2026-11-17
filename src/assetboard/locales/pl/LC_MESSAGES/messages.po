@@ -61,6 +61,34 @@ msgstr "Coś poszło nie tak"
 msgid "An unexpected error occurred. Please try again."
 msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 
+msgid "The secret key stored next to the backup was restored to DATA_DIR."
+msgstr "Klucz tajny zapisany obok kopii zapasowej został przywrócony do DATA_DIR."
+
+msgid ""
+"No secret key is stored next to the backup: encrypted values only work "
+"with the key this instance already uses."
+msgstr ""
+"Obok kopii zapasowej nie ma klucza tajnego: zaszyfrowane wartości będą "
+"działać tylko z kluczem, którego ta instancja już używa."
+
+msgid ""
+"ASSETBOARD_SECRET_KEY is set, so the database was restored with the "
+"existing key; make sure it is the key the backup was made with."
+msgstr ""
+"Ustawiono ASSETBOARD_SECRET_KEY, więc bazę przywrócono z istniejącym "
+"kluczem; upewnij się, że to klucz, którym wykonano kopię zapasową."
+
+#, python-format
+msgid "Restored %(file)s into %(target)s."
+msgstr "Przywrócono %(file)s do %(target)s."
+
+msgid "Schema migrations were applied to the restored database."
+msgstr "Do przywróconej bazy zastosowano migracje schematu."
+
+#, python-format
+msgid "Pre-restore backup: %(path)s"
+msgstr "Kopia zapasowa sprzed przywrócenia: %(path)s"
+
 msgid "Food"
 msgstr "Jedzenie"
 
@@ -2435,6 +2463,19 @@ msgstr[1] "%(app)s · %(workspace)s: %(num)d przypomnienia"
 msgstr[2] "%(app)s · %(workspace)s: %(num)d przypomnień"
 
 #, python-format
+msgid "%(app)s: database backup failed"
+msgstr "%(app)s: kopia zapasowa bazy danych nie powiodła się"
+
+#, python-format
+msgid ""
+"The scheduled database backup failed (code: %(code)s). Check the log, "
+"then run Back up now in Instance settings."
+msgstr ""
+"Zaplanowana kopia zapasowa bazy danych nie powiodła się (kod: %(code)s). "
+"Sprawdź dziennik, a następnie uruchom „Utwórz kopię teraz” w ustawieniach"
+" instancji."
+
+#, python-format
 msgid "%(app)s · %(workspace)s: test"
 msgstr "%(app)s · %(workspace)s: test"
 
@@ -2637,6 +2678,15 @@ msgstr ""
 
 msgid "Choose a value for each setting."
 msgstr "Wybierz wartość każdego ustawienia."
+
+msgid "Backup created."
+msgstr "Utworzono kopię zapasową."
+
+msgid "The backup failed. Check the log for the reason."
+msgstr "Kopia zapasowa nie powiodła się. Sprawdź dziennik, aby poznać przyczynę."
+
+msgid "Backups are not available for this database type."
+msgstr "Kopie zapasowe nie są dostępne dla tego typu bazy danych."
 
 msgid "The demo workspace was rebuilt."
 msgstr "Obszar demonstracyjny został odtworzony."
@@ -6197,8 +6247,90 @@ msgstr ""
 "Raz dziennie pytaj GitHub o najnowsze wydanie. Domyślnie wyłączone; nic "
 "więcej nie jest wysyłane."
 
+msgid "Backup retention"
+msgstr "Przechowywanie kopii zapasowych"
+
+msgid ""
+"The newest backup of each day, week and month is kept. One file can count"
+" for several. Manual and pre-restore copies are never deleted "
+"automatically."
+msgstr ""
+"Zachowywana jest najnowsza kopia z każdego dnia, tygodnia i miesiąca. "
+"Jeden plik może liczyć się w kilku okresach. Kopie ręczne i sprzed "
+"przywrócenia nigdy nie są usuwane automatycznie."
+
+msgid "Daily backups"
+msgstr "Kopie dzienne"
+
+msgid "Weekly backups"
+msgstr "Kopie tygodniowe"
+
+msgid "Monthly backups"
+msgstr "Kopie miesięczne"
+
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
+
+msgid "Backups"
+msgstr "Kopie zapasowe"
+
+msgid ""
+"Automatic backups are available for SQLite databases only. For "
+"PostgreSQL, use pg_dump and pg_restore."
+msgstr ""
+"Automatyczne kopie zapasowe są dostępne tylko dla baz SQLite. W przypadku"
+" PostgreSQL użyj pg_dump i pg_restore."
+
+msgid "Last backup"
+msgstr "Ostatnia kopia zapasowa"
+
+msgid "Never"
+msgstr "Nigdy"
+
+msgid "Last failure"
+msgstr "Ostatni błąd"
+
+msgid "None"
+msgstr "Brak"
+
+msgid "Next scheduled backup"
+msgstr "Następna zaplanowana kopia"
+
+msgid "Not scheduled"
+msgstr "Nie zaplanowano"
+
+msgid "Location"
+msgstr "Lokalizacja"
+
+msgid "Back up now"
+msgstr "Utwórz kopię teraz"
+
+msgid "Started"
+msgstr "Rozpoczęto"
+
+msgid "Size"
+msgstr "Rozmiar"
+
+msgid "Download"
+msgstr "Pobierz"
+
+msgid "Scheduled"
+msgstr "Zaplanowana"
+
+msgid "Manual"
+msgstr "Ręczna"
+
+msgid "Pre-restore"
+msgstr "Sprzed przywrócenia"
+
+msgid "Completed"
+msgstr "Ukończona"
+
+msgid "Running"
+msgstr "W toku"
+
+msgid "No backups yet."
+msgstr "Nie ma jeszcze kopii zapasowych."
 
 msgid "On: anyone who can reach this instance can try the shared demo workspace."
 msgstr ""
@@ -6207,9 +6339,6 @@ msgstr ""
 
 msgid "Last reset"
 msgstr "Ostatni reset"
-
-msgid "Never"
-msgstr "Nigdy"
 
 msgid "Result"
 msgstr "Wynik"
@@ -6226,9 +6355,6 @@ msgstr "Jeszcze brak"
 
 msgid "Next reset"
 msgstr "Następny reset"
-
-msgid "Not scheduled"
-msgstr "Nie zaplanowano"
 
 msgid ""
 "The demo workspace is not ready. Check the log and restart the "
@@ -8777,9 +8903,6 @@ msgstr ""
 "Pozostaw puste, aby nie naliczać podatku. Podatek naliczany jest od "
 "odsetek po odjęciu opłaty za wcześniejszy wykup."
 
-msgid "None"
-msgstr "Brak"
-
 msgid "Percent of face value"
 msgstr "Procent wartości nominalnej"
 
@@ -9397,9 +9520,6 @@ msgstr "Zapisz cele ryzyka"
 
 msgid "Chart scope"
 msgstr "Zakres wykresu"
-
-msgid "Manual"
-msgstr "Ręczna"
 
 msgid "Transaction"
 msgstr "Transakcja"

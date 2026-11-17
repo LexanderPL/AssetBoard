@@ -58,6 +58,30 @@ msgstr ""
 msgid "An unexpected error occurred. Please try again."
 msgstr ""
 
+msgid "The secret key stored next to the backup was restored to DATA_DIR."
+msgstr ""
+
+msgid ""
+"No secret key is stored next to the backup: encrypted values only work "
+"with the key this instance already uses."
+msgstr ""
+
+msgid ""
+"ASSETBOARD_SECRET_KEY is set, so the database was restored with the "
+"existing key; make sure it is the key the backup was made with."
+msgstr ""
+
+#, python-format
+msgid "Restored %(file)s into %(target)s."
+msgstr ""
+
+msgid "Schema migrations were applied to the restored database."
+msgstr ""
+
+#, python-format
+msgid "Pre-restore backup: %(path)s"
+msgstr ""
+
 msgid "Food"
 msgstr ""
 
@@ -2326,6 +2350,16 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, python-format
+msgid "%(app)s: database backup failed"
+msgstr ""
+
+#, python-format
+msgid ""
+"The scheduled database backup failed (code: %(code)s). Check the log, "
+"then run Back up now in Instance settings."
+msgstr ""
+
+#, python-format
 msgid "%(app)s · %(workspace)s: test"
 msgstr ""
 
@@ -2496,6 +2530,15 @@ msgid ""
 msgstr ""
 
 msgid "Choose a value for each setting."
+msgstr ""
+
+msgid "Backup created."
+msgstr ""
+
+msgid "The backup failed. Check the log for the reason."
+msgstr ""
+
+msgid "Backups are not available for this database type."
 msgstr ""
 
 msgid "The demo workspace was rebuilt."
@@ -5721,16 +5764,90 @@ msgid ""
 "else is sent."
 msgstr ""
 
+msgid "Backup retention"
+msgstr ""
+
+msgid ""
+"The newest backup of each day, week and month is kept. One file can count"
+" for several. Manual and pre-restore copies are never deleted "
+"automatically."
+msgstr ""
+
+msgid "Daily backups"
+msgstr ""
+
+msgid "Weekly backups"
+msgstr ""
+
+msgid "Monthly backups"
+msgstr ""
+
 msgid "Save settings"
+msgstr ""
+
+msgid "Backups"
+msgstr ""
+
+msgid ""
+"Automatic backups are available for SQLite databases only. For "
+"PostgreSQL, use pg_dump and pg_restore."
+msgstr ""
+
+msgid "Last backup"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "Last failure"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Next scheduled backup"
+msgstr ""
+
+msgid "Not scheduled"
+msgstr ""
+
+msgid "Location"
+msgstr ""
+
+msgid "Back up now"
+msgstr ""
+
+msgid "Started"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Scheduled"
+msgstr ""
+
+msgid "Manual"
+msgstr ""
+
+msgid "Pre-restore"
+msgstr ""
+
+msgid "Completed"
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "No backups yet."
 msgstr ""
 
 msgid "On: anyone who can reach this instance can try the shared demo workspace."
 msgstr ""
 
 msgid "Last reset"
-msgstr ""
-
-msgid "Never"
 msgstr ""
 
 msgid "Result"
@@ -5747,9 +5864,6 @@ msgid "None yet"
 msgstr ""
 
 msgid "Next reset"
-msgstr ""
-
-msgid "Not scheduled"
 msgstr ""
 
 msgid ""
@@ -8015,9 +8129,6 @@ msgid ""
 "redemption fee."
 msgstr ""
 
-msgid "None"
-msgstr ""
-
 msgid "Percent of face value"
 msgstr ""
 
@@ -8563,9 +8674,6 @@ msgid "Save risk targets"
 msgstr ""
 
 msgid "Chart scope"
-msgstr ""
-
-msgid "Manual"
 msgstr ""
 
 msgid "Transaction"
