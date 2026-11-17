@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {# Home (F2.7/F9.1): the current month's dashboard. The shell only renders the ordered widget
    placeholders; each widget is a lazy HTMX fragment (web.dashboard_routes), so a slow module
-   never blocks the page. No inline script or style. #}
+   never blocks the page. The Customise link sits below the widgets, where it stays easy to
+   reach on a phone. No inline script or style. #}
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Home") }}{% endblock %}
-{% block header_actions %}
-<a href="{{ scoped_url(request, 'dashboard_customise') }}" class="btn" data-customise-link>{{ _("Customise") }}</a>
-{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
 <div class="space-y-6" data-home data-month="{{ home.month }}">
@@ -28,8 +26,11 @@
   <section class="panel p-4 sm:p-6" data-home-empty>
     <h2 class="text-base font-semibold">{{ _("Your Home is empty") }}</h2>
     <p class="mt-2 text-sm text-muted">{{ _("Choose the widgets you want to see.") }}</p>
-    <p class="mt-3"><a href="{{ scoped_url(request, 'dashboard_customise') }}" class="btn-primary">{{ _("Customise Home") }}</a></p>
   </section>
   {% endif %}
+  <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4" data-home-actions>
+    <p class="text-sm text-muted">{{ _("Choose which widgets appear on Home and in what order.") }}</p>
+    <a href="{{ scoped_url(request, 'dashboard_customise') }}" class="btn px-5 py-3" data-customise-link>{{ _("Customise") }}</a>
+  </div>
 </div>
 {% endblock %}

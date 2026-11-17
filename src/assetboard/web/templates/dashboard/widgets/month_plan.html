@@ -1,5 +1,5 @@
 {% from "months/_plan.html" import home_plan with context %}
 <section class="panel p-4 sm:p-6" data-home-widget="month-plan" aria-labelledby="widget-month-plan-heading">
-  <h2 id="widget-month-plan-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+  <h2 id="widget-month-plan-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
   {{ home_plan() }}
 </section>

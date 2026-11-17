@@ -16,7 +16,16 @@ from zoneinfo import ZoneInfo
 from fastapi import Request
 
 from assetboard.domain.charts import ChartBlock
-from assetboard.domain.dashboard import WIDGET_KEYS, complete_order, move_widget
+from assetboard.domain.dashboard import (
+    PORTFOLIO_RANGES,
+    UPCOMING_LIMIT_MAX,
+    UPCOMING_LIMIT_MIN,
+    WIDGET_KEYS,
+    clean_portfolio_range,
+    clean_upcoming_limit,
+    complete_order,
+    move_widget,
+)
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
@@ -35,9 +44,10 @@ from assetboard.services.loans import LoanPage, list_loans
 from assetboard.services.months import current_month, get_month
 from assetboard.services.networth_history import networth_history
 from assetboard.services.networth_summary import networth_summary
+from assetboard.services.performance import VALUE_RANGES, normalize_value_range, performance_page
 from assetboard.services.portfolio import portfolio_page
 from assetboard.services.portfolio_changes import ValueChange, portfolio_changes
-from assetboard.web.charts import build_class_donut, build_donut
+from assetboard.web.charts import build_class_donut, build_donut, build_performance_chart
 from assetboard.web.networth_history import build_trend_view
 from assetboard.web.networth_summary import build_summary_view
 from assetboard.web.plan import SummaryView, build_summary
@@ -51,6 +61,15 @@ ModuleUrl = Callable[[Request, Context], str]
 def _(message: str) -> str:
     """Marks a message for extraction; it is translated when rendered."""
     return message
+
+
+PORTFOLIO_RANGE_LABELS: dict[str, str] = {
+    "1m": _("1 month"),
+    "3m": _("3 months"),
+    "6m": _("6 months"),
+    "1y": _("1 year"),
+    "all": _("All time"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +135,27 @@ class CustomiseView:
     order_csv: str
     customised: bool
     selected_count: int
+    upcoming_limit: int
+    upcoming_limit_min: int
+    upcoming_limit_max: int
+    portfolio_range: str
+    portfolio_range_options: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PortfolioHistoryRow:
+    date: str
+    value: str
+    invested: str
+
+
+@dataclass(frozen=True, slots=True)
+class PortfolioHistoryView:
+    chart: dict[str, object] | None
+    rows: tuple[PortfolioHistoryRow, ...]
+    has_data: bool
+    range_label: str
+    incomplete_points: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,13 +266,16 @@ def build_month_plan(request: Request, ctx: Context) -> dict[str, object]:
 def build_upcoming(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
+    preferences = read_dashboard_preferences(factory, ctx)
+    limit = preferences.upcoming_limit
     days = occurrences.window_days(ctx, request.app.state.settings.upcoming_days)
     weeks = occurrences.upcoming(factory, ctx, days=days)
     items = sorted((o for w in weeks for o in w.occurrences), key=lambda o: o.due_date)
     return {
-        "upcoming": items[:10],
-        "upcoming_more": len(items) > 10,
+        "upcoming": items[:limit],
+        "upcoming_more": len(items) > limit,
         "upcoming_days": days,
+        "upcoming_limit": limit,
         "today": ctx.clock.today(ctx.workspace.timezone),
         "can_edit": has_role(ctx, Role.EDITOR),
         "format_day": format_day,
@@ -251,7 +294,33 @@ def build_net_worth(request: Request, ctx: Context) -> dict[str, object]:
 def build_portfolio(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
+    preferences = read_dashboard_preferences(factory, ctx)
     page = portfolio_page(factory, ctx)
+    history_page = performance_page(
+        factory,
+        ctx,
+        range_code=normalize_value_range(preferences.portfolio_range),
+        ranges=VALUE_RANGES,
+        with_periods=False,
+    )
+    chart = build_performance_chart(history_page, locale)
+    history = PortfolioHistoryView(
+        chart=chart,
+        rows=tuple(
+            PortfolioHistoryRow(
+                date=format_day(point.date, locale),
+                value="—" if point.incomplete else format_money(point.value, locale),
+                invested=("—" if point.incomplete else format_money(point.net_invested, locale)),
+            )
+            for point in history_page.chart
+        ),
+        has_data=chart is not None,
+        range_label=gettext(
+            PORTFOLIO_RANGE_LABELS[history_page.range_code],
+            locale,
+        ),
+        incomplete_points=history_page.incomplete_points,
+    )
     return {
         "page": page,
         "donut": build_class_donut(page, locale),
@@ -263,6 +332,8 @@ def build_portfolio(request: Request, ctx: Context) -> dict[str, object]:
             else None
         ),
         "has_data": bool(page.valuation.value.amount_minor or page.valuation.cost.amount_minor),
+        "history": history,
+        "has_history_data": history_page.first_date is not None,
     }
 
 
@@ -581,12 +652,24 @@ def customise_context(
     *,
     order: tuple[str, ...] | None = None,
     enabled: set[str] | None = None,
+    upcoming_limit: int | None = None,
+    portfolio_range: str | None = None,
 ) -> dict[str, object]:
-    """The Customise page: every known widget, enabled first in the draft order."""
+    """The Customise page: every known widget, widget settings and the draft order."""
     locale = request.state.locale
     preferences = read_dashboard_preferences(request.app.state.session_factory, ctx)
     draft = complete_order(order if order is not None else preferences.widgets, WIDGET_KEYS)
     checked = set(enabled if enabled is not None else preferences.widgets)
+    limit = (
+        clean_upcoming_limit(upcoming_limit)
+        if upcoming_limit is not None
+        else preferences.upcoming_limit
+    )
+    range_code = (
+        clean_portfolio_range(portfolio_range)
+        if portfolio_range is not None
+        else preferences.portfolio_range
+    )
     rows = []
     for index, key in enumerate(draft):
         widget = WIDGETS_BY_KEY[key]
@@ -606,6 +689,13 @@ def customise_context(
             order_csv=",".join(draft),
             customised=preferences.customised,
             selected_count=len(checked & set(WIDGET_KEYS)),
+            upcoming_limit=limit,
+            upcoming_limit_min=UPCOMING_LIMIT_MIN,
+            upcoming_limit_max=UPCOMING_LIMIT_MAX,
+            portfolio_range=range_code,
+            portfolio_range_options=tuple(
+                (code, gettext(PORTFOLIO_RANGE_LABELS[code], locale)) for code in PORTFOLIO_RANGES
+            ),
         )
     }
 
@@ -653,6 +743,8 @@ __all__ = [
     "MoverView",
     "PlannedImportView",
     "PortfolioChangesView",
+    "PortfolioHistoryRow",
+    "PortfolioHistoryView",
     "WIDGETS",
     "WIDGETS_BY_KEY",
     "Widget",

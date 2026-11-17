@@ -17,7 +17,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
 from assetboard.db.repositories import DashboardPreferenceRepository, ImportBatchRepository
-from assetboard.domain.dashboard import DEFAULT_WIDGET_KEYS, WIDGET_KEYS, clean_widgets
+from assetboard.domain.dashboard import (
+    DEFAULT_PORTFOLIO_RANGE,
+    DEFAULT_UPCOMING_LIMIT,
+    DEFAULT_WIDGET_KEYS,
+    WIDGET_KEYS,
+    clean_portfolio_range,
+    clean_upcoming_limit,
+    clean_widgets,
+)
 from assetboard.services.context import Context, Role, has_role, require_role, require_role_now
 from assetboard.services.income import missing_work_logs
 from assetboard.services.months import current_month
@@ -40,6 +48,8 @@ __all__ = [
 class DashboardPreferences:
     widgets: tuple[str, ...]
     customised: bool
+    upcoming_limit: int
+    portfolio_range: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,13 +97,22 @@ def read_dashboard_preferences(
     with factory() as session:
         row = DashboardPreferenceRepository(session, ctx).for_user(ctx.user.id)
         if row is None:
-            return DashboardPreferences(widgets=tuple(defaults), customised=False)
+            return DashboardPreferences(
+                widgets=tuple(defaults),
+                customised=False,
+                upcoming_limit=DEFAULT_UPCOMING_LIMIT,
+                portfolio_range=DEFAULT_PORTFOLIO_RANGE,
+            )
         stored = cast(object, row.widgets)
         if not isinstance(stored, list | tuple):
-            return DashboardPreferences(widgets=tuple(defaults), customised=True)
+            widgets = tuple(defaults)
+        else:
+            widgets = clean_widgets(cast("Sequence[object]", stored), known)
         return DashboardPreferences(
-            widgets=clean_widgets(cast("Sequence[object]", stored), known),
+            widgets=widgets,
             customised=True,
+            upcoming_limit=clean_upcoming_limit(cast(object, row.upcoming_limit)),
+            portfolio_range=clean_portfolio_range(cast(object, row.portfolio_range)),
         )
 
 
@@ -102,17 +121,23 @@ def save_dashboard_preferences(
     ctx: Context,
     widgets: list[str] | tuple[str, ...],
     *,
+    upcoming_limit: int = DEFAULT_UPCOMING_LIMIT,
+    portfolio_range: str = DEFAULT_PORTFOLIO_RANGE,
     known: tuple[str, ...] = WIDGET_KEYS,
 ) -> None:
-    """Store the enabled widgets in their chosen order; unknown keys are ignored."""
+    """Store the enabled widgets and widget settings; unknown keys are ignored."""
     require_role(ctx, Role.VIEWER)
     cleaned = clean_widgets(list(widgets), known)
+    limit = clean_upcoming_limit(upcoming_limit)
+    range_code = clean_portfolio_range(portfolio_range)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.VIEWER)
         DashboardPreferenceRepository(session, ctx).upsert(
             user_id=ctx.user.id,
             widgets=list(cleaned),
+            upcoming_limit=limit,
+            portfolio_range=range_code,
             customised_at=ctx.clock.now(),
         )
 

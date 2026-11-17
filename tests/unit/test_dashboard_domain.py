@@ -5,8 +5,15 @@ from __future__ import annotations
 import pytest
 
 from assetboard.domain.dashboard import (
+    DEFAULT_PORTFOLIO_RANGE,
+    DEFAULT_UPCOMING_LIMIT,
     DEFAULT_WIDGET_KEYS,
+    PORTFOLIO_RANGES,
+    UPCOMING_LIMIT_MAX,
+    UPCOMING_LIMIT_MIN,
     WIDGET_KEYS,
+    clean_portfolio_range,
+    clean_upcoming_limit,
     clean_widgets,
     complete_order,
     move_widget,
@@ -71,3 +78,32 @@ def test_selected_widgets_keeps_only_enabled_keys_in_order() -> None:
     assert selected_widgets(("a", "b", "c", "d"), {"b", "unknown"}, KNOWN) == ("b",)
     assert selected_widgets(("b", "a"), {"a", "b"}, KNOWN) == ("b", "a")
     assert selected_widgets((), set(), KNOWN) == ()
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [
+        (None, DEFAULT_UPCOMING_LIMIT),
+        ("", DEFAULT_UPCOMING_LIMIT),
+        ("not a number", DEFAULT_UPCOMING_LIMIT),
+        (True, DEFAULT_UPCOMING_LIMIT),
+        (-5, UPCOMING_LIMIT_MIN),
+        (0, UPCOMING_LIMIT_MIN),
+        ("1", 1),
+        ("12", 12),
+        (UPCOMING_LIMIT_MAX + 1, UPCOMING_LIMIT_MAX),
+        ("999", UPCOMING_LIMIT_MAX),
+    ],
+)
+def test_clean_upcoming_limit_parses_clamps_and_falls_back(stored: object, expected: int) -> None:
+    assert clean_upcoming_limit(stored) == expected
+
+
+@pytest.mark.parametrize("value", PORTFOLIO_RANGES)
+def test_every_portfolio_range_is_accepted(value: str) -> None:
+    assert clean_portfolio_range(value) == value
+
+
+@pytest.mark.parametrize("stored", [None, "", "2y", "1Y", 6, True])
+def test_clean_portfolio_range_falls_back_to_one_year(stored: object) -> None:
+    assert clean_portfolio_range(stored) == DEFAULT_PORTFOLIO_RANGE == "1y"

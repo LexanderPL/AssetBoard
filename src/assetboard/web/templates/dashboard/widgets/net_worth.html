@@ -1,6 +1,6 @@
 <section class="panel p-4 sm:p-6" data-home-widget="net-worth" aria-labelledby="widget-net-worth-heading">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="widget-net-worth-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+    <h2 id="widget-net-worth-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
     {% set net_class = "text-danger" if view.net_tone == "unfavourable" else "" %}
     <p class="text-xl font-semibold tabular-nums {{ net_class }}" data-net-worth-value>{{ view.net }}</p>
   </div>

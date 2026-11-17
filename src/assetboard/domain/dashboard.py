@@ -28,6 +28,13 @@ WIDGET_KEYS: tuple[str, ...] = (
 # Every shipped widget is on by default (F9.1: today's Home followed by each module's widget).
 DEFAULT_WIDGET_KEYS: tuple[str, ...] = WIDGET_KEYS
 
+# Per-widget Home settings added by the owner's 2026-11-17 polish request (F9.1).
+DEFAULT_UPCOMING_LIMIT = 10
+UPCOMING_LIMIT_MIN = 1
+UPCOMING_LIMIT_MAX = 50
+PORTFOLIO_RANGES: tuple[str, ...] = ("1m", "3m", "6m", "1y", "all")
+DEFAULT_PORTFOLIO_RANGE = "1y"
+
 _DIRECTIONS = frozenset({"up", "down"})
 
 
@@ -91,3 +98,24 @@ def selected_widgets(
         if key in enabled_set and key not in result:
             result.append(key)
     return tuple(result)
+
+
+def clean_upcoming_limit(value: object) -> int:
+    """A posted or stored limit inside the supported range; anything else is the default."""
+    if isinstance(value, bool):
+        return DEFAULT_UPCOMING_LIMIT
+    if isinstance(value, str):
+        try:
+            value = int(value)
+        except ValueError:
+            return DEFAULT_UPCOMING_LIMIT
+    if not isinstance(value, int):
+        return DEFAULT_UPCOMING_LIMIT
+    return min(max(value, UPCOMING_LIMIT_MIN), UPCOMING_LIMIT_MAX)
+
+
+def clean_portfolio_range(value: object) -> str:
+    """A posted or stored range code, or the default when it is not one of the choices."""
+    if isinstance(value, str) and value in PORTFOLIO_RANGES:
+        return value
+    return DEFAULT_PORTFOLIO_RANGE

@@ -6,18 +6,19 @@
    version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
    slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
    script or style. #}
-{% macro donut(d, label=None, compact=false, actions=none, inline_json=false, heading=none, link_url=none, link_label=none, widget_key=none) -%}
+{% macro donut(d, label=None, compact=false, actions=none, inline_json=false, heading=none, link_url=none, link_label=none, widget_key=none, canvas_size=none) -%}
 {% set wrapper_class = "min-w-0" if compact else "panel p-4 sm:p-6" %}
 {% set heading_class = "text-sm font-semibold" if compact else "text-base font-semibold" %}
 {% set total_class = "text-xs tabular-nums text-muted" if compact else "text-sm tabular-nums text-muted" %}
-{% set canvas_class = "mt-2 h-40 w-full" if compact else "mt-3 h-80 w-full" %}
+{% set chart_size = canvas_size or ("compact" if compact else "regular") %}
+{% set canvas_class = "mt-2 h-40 w-full" if chart_size == "compact" else "mt-3 h-80 w-full" %}
 {% set legend_class = "mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1.5 text-xs" if compact else "mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm" %}
 {% set table_wrap_class = "mt-2 relative overflow-x-auto" if compact else "mt-3 relative overflow-x-auto" %}
 {% set table_class = "sheet w-full text-xs" if compact else "sheet w-full text-sm" %}
 {% set chart_heading = heading or d.heading %}
 <section class="{{ wrapper_class }}" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}"{% if compact %} data-donut-compact{% endif %}{% if widget_key %} data-home-widget="{{ widget_key }}"{% endif %}>
   <div class="flex flex-wrap items-end justify-between gap-2">
-    <h2 id="chart-{{ d.key }}-heading" class="{{ heading_class }}">{% if link_url %}<a href="{{ link_url }}" class="underline underline-offset-2">{{ chart_heading }}</a>{% else %}{{ chart_heading }}{% endif %}</h2>
+    <h2 id="chart-{{ d.key }}-heading" class="{{ heading_class }}">{% if link_url %}<a href="{{ link_url }}" class="underline-offset-2 hover:underline">{{ chart_heading }}</a>{% else %}{{ chart_heading }}{% endif %}</h2>
     <div class="flex flex-wrap items-end justify-end gap-3">
       {% if actions %}{{ actions }}{% endif %}
       {% if link_url and link_label %}<a href="{{ link_url }}" class="text-sm font-medium text-primary-ink underline">{{ link_label }}</a>{% endif %}

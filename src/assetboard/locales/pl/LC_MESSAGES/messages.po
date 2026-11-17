@@ -2922,6 +2922,18 @@ msgstr "Klasy aktywów"
 msgid "Nothing is valued in the portfolio yet."
 msgstr "W portfelu nie ma jeszcze wycenionych pozycji."
 
+msgid "Incomplete: an instrument has no price or FX rate."
+msgstr "Niekompletne: instrument nie ma ceny lub kursu walutowego."
+
+msgid "Value"
+msgstr "Wartość"
+
+msgid "Invested capital"
+msgstr "Zainwestowany kapitał"
+
+msgid "Gain"
+msgstr "Zysk"
+
 msgid "The password is not correct."
 msgstr "Hasło jest nieprawidłowe."
 
@@ -2934,6 +2946,21 @@ msgid ""
 msgstr ""
 "Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
 "logowania z ostatnich 10 minut."
+
+msgid "1 month"
+msgstr "1 miesiąc"
+
+msgid "3 months"
+msgstr "3 miesiące"
+
+msgid "6 months"
+msgstr "6 miesięcy"
+
+msgid "1 year"
+msgstr "1 rok"
+
+msgid "All time"
+msgstr "Cały okres"
 
 msgid "Missing price"
 msgstr "Brak ceny"
@@ -4887,17 +4914,11 @@ msgstr "Wpis zapisano w miesiącu: %(month)s."
 msgid "Entry planned in %(month)s."
 msgstr "Wpis zaplanowano w miesiącu: %(month)s."
 
-msgid "1 year"
-msgstr "1 rok"
-
 msgid "3 years"
 msgstr "3 lata"
 
 msgid "5 years"
 msgstr "5 lat"
-
-msgid "All time"
-msgstr "Cały okres"
 
 #, python-format
 msgid "%(num)d item in another currency was not counted."
@@ -5218,26 +5239,8 @@ msgstr "To potwierdzenie wygasło. Zacznij od nowa, aby się zalogować."
 msgid "Year to date"
 msgstr "Od początku roku"
 
-msgid "1 month"
-msgstr "1 miesiąc"
-
-msgid "3 months"
-msgstr "3 miesiące"
-
 msgid "Whole portfolio"
 msgstr "Cały portfel"
-
-msgid "Incomplete: an instrument has no price or FX rate."
-msgstr "Niekompletne: instrument nie ma ceny lub kursu walutowego."
-
-msgid "Value"
-msgstr "Wartość"
-
-msgid "Invested capital"
-msgstr "Zainwestowany kapitał"
-
-msgid "Gain"
-msgstr "Zysk"
 
 msgid "Annualised XIRR"
 msgstr "Roczna stopa XIRR"
@@ -5993,9 +5996,6 @@ msgstr "Kontynuuj"
 msgid "Cancel"
 msgstr "Anuluj"
 
-msgid "Customise"
-msgstr "Dostosuj"
-
 #, python-format
 msgid "Loading %(widget)s…"
 msgstr "Ładowanie: %(widget)s…"
@@ -6013,8 +6013,13 @@ msgstr "Twoja strona główna jest pusta"
 msgid "Choose the widgets you want to see."
 msgstr "Wybierz widżety, które chcesz widzieć."
 
-msgid "Customise Home"
-msgstr "Dostosuj stronę główną"
+msgid "Choose which widgets appear on Home and in what order."
+msgstr ""
+"Wybierz, które widżety pojawiają się na stronie głównej i w jakiej "
+"kolejności."
+
+msgid "Customise"
+msgstr "Dostosuj"
 
 msgid "Link a sign-in method"
 msgstr "Powiąż metodę logowania"
@@ -6813,6 +6818,9 @@ msgstr "Usuń"
 msgid "Add category"
 msgstr "Dodaj kategorię"
 
+msgid "Customise Home"
+msgstr "Dostosuj stronę główną"
+
 msgid "Back to Home"
 msgstr "Wróć do strony głównej"
 
@@ -6827,19 +6835,18 @@ msgstr ""
 msgid "You are using the default layout."
 msgstr "Używasz domyślnego układu."
 
+msgid "Widget settings"
+msgstr "Ustawienia widżetów"
+
+msgid "Upcoming payments shown"
+msgstr "Liczba nadchodzących płatności"
+
 #, python-format
-msgid "Move %(widget)s up"
-msgstr "Przesuń %(widget)s w górę"
+msgid "Between %(min)d and %(max)d; the rest stay on the Upcoming page."
+msgstr "Od %(min)d do %(max)d; pozostałe pozostaną na stronie Nadchodzące."
 
-msgid "Move up"
-msgstr "Przesuń w górę"
-
-#, python-format
-msgid "Move %(widget)s down"
-msgstr "Przesuń %(widget)s w dół"
-
-msgid "Move down"
-msgstr "Przesuń w dół"
+msgid "Portfolio chart range"
+msgstr "Zakres wykresu portfela"
 
 #, python-format
 msgid "%(num)d widget selected"
@@ -6848,8 +6855,12 @@ msgstr[0] "%(num)d wybrany widżet"
 msgstr[1] "%(num)d wybrane widżety"
 msgstr[2] "%(num)d wybranych widżetów"
 
-msgid "Save Home"
-msgstr "Zapisz stronę główną"
+msgid ""
+"Without JavaScript, moving a widget rerenders this page with the new "
+"order; press Save to keep it."
+msgstr ""
+"Bez JavaScriptu przesunięcie widżetu ponownie wyświetli stronę w nowej "
+"kolejności; naciśnij Zapisz, aby ją zachować."
 
 msgid "No FIRE plan yet."
 msgstr "Nie ma jeszcze planu FIRE."
@@ -6922,6 +6933,49 @@ msgstr "Brak wartości. Dodaj pozycję i jej pierwszą wartość, aby zobaczyć 
 
 msgid "Set up net worth"
 msgstr "Skonfiguruj majątek netto"
+
+msgid "Value over time"
+msgstr "Wartość w czasie"
+
+#, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
+"lub kursu walutowego."
+msgstr[1] ""
+"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
+"ceny lub kursu walutowego."
+msgstr[2] ""
+"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
+"mają ceny lub kursu walutowego."
+
+msgid "Plotted data"
+msgstr "Dane wykresu"
+
+msgid "Portfolio value over time"
+msgstr "Wartość portfela w czasie"
+
+msgid ""
+"No value history in this range yet. Choose a longer range in Customise "
+"Home."
+msgstr ""
+"Brak historii wartości w tym zakresie. Wybierz dłuższy zakres w opcji "
+"Dostosuj stronę główną."
+
+msgid ""
+"No dated investment transactions yet. Add investment transactions and "
+"prices to see the value over time."
+msgstr ""
+"Brak transakcji inwestycyjnych z datą. Dodaj transakcje i ceny, aby "
+"zobaczyć wartość w czasie."
+
+msgid "Open the portfolio"
+msgstr "Otwórz portfel"
 
 msgid "No holdings are valued yet."
 msgstr "Żadne pozycje nie są jeszcze wycenione."
@@ -7211,9 +7265,6 @@ msgstr "Wartość netto w czasie"
 
 msgid "Amounts are nominal: each year's own money, not adjusted for inflation."
 msgstr "Kwoty są nominalne: pieniądze z danego roku, bez korekty o inflację."
-
-msgid "Plotted data"
-msgstr "Dane wykresu"
 
 msgid "Plotted net worth data"
 msgstr "Dane wykresu wartości netto"
@@ -15710,6 +15761,21 @@ msgstr "Usuń obszar roboczy…"
 #~ " zakończeniu dochodów są wyciszone; "
 #~ "wyczerpany wiersz jest oznaczony na "
 #~ "czerwono."
+
+#~ msgid "Move %(widget)s up"
+#~ msgstr "Przesuń %(widget)s w górę"
+
+#~ msgid "Move up"
+#~ msgstr "Przesuń w górę"
+
+#~ msgid "Move %(widget)s down"
+#~ msgstr "Przesuń %(widget)s w dół"
+
+#~ msgid "Move down"
+#~ msgstr "Przesuń w dół"
+
+#~ msgid "Save Home"
+#~ msgstr "Zapisz stronę główną"
 
 #~ msgid "Planned for %(name)s"
 #~ msgstr "Plan dla: %(name)s"

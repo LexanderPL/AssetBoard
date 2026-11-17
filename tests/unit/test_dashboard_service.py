@@ -181,6 +181,8 @@ def test_no_row_means_the_default_catalogue(team: WorkspaceDb) -> None:
         "fire",
         "missing-data",
     )
+    assert preferences.upcoming_limit == 10
+    assert preferences.portfolio_range == "1y"
 
 
 def test_a_later_widget_is_default_for_uncustomised_users_and_off_for_customised_ones(
@@ -202,25 +204,53 @@ def test_a_later_widget_is_default_for_uncustomised_users_and_off_for_customised
 def test_save_read_and_reset_are_per_user_and_workspace(team: WorkspaceDb) -> None:
     olga = _owner(team)
     vic = team.ctx("vic", "viewer")
-    save_dashboard_preferences(team.factory, olga, ["missing-data", "month-in-out", "unknown"])
+    save_dashboard_preferences(
+        team.factory,
+        olga,
+        ["missing-data", "month-in-out", "unknown"],
+        upcoming_limit=7,
+        portfolio_range="6m",
+    )
     saved = read_dashboard_preferences(team.factory, olga)
     assert saved.customised is True
     assert saved.widgets == ("missing-data", "month-in-out")
-    assert read_dashboard_preferences(team.factory, vic).customised is False
+    assert saved.upcoming_limit == 7
+    assert saved.portfolio_range == "6m"
+    defaults = read_dashboard_preferences(team.factory, vic)
+    assert defaults.customised is False
+    assert defaults.upcoming_limit == 10 and defaults.portfolio_range == "1y"
 
     second = team.add_workspace("Second")
     team.add_member("olga", "owner", workspace_id=second)
     second_ctx = team.ctx("olga", "owner", workspace_id=second)
     assert read_dashboard_preferences(team.factory, second_ctx).customised is False
-    save_dashboard_preferences(team.factory, second_ctx, ["loans"])
+    save_dashboard_preferences(team.factory, second_ctx, ["loans"], upcoming_limit=22)
     assert read_dashboard_preferences(team.factory, second_ctx).widgets == ("loans",)
+    assert read_dashboard_preferences(team.factory, second_ctx).upcoming_limit == 22
     assert read_dashboard_preferences(team.factory, olga).widgets == (
         "missing-data",
         "month-in-out",
     )
 
     reset_dashboard_preferences(team.factory, olga)
-    assert read_dashboard_preferences(team.factory, olga).customised is False
+    after_reset = read_dashboard_preferences(team.factory, olga)
+    assert after_reset.customised is False
+    assert after_reset.upcoming_limit == 10 and after_reset.portfolio_range == "1y"
+
+
+def test_saving_clamps_the_upcoming_limit_and_rejects_an_unknown_range(
+    team: WorkspaceDb,
+) -> None:
+    ctx = _owner(team)
+    save_dashboard_preferences(
+        team.factory, ctx, ["upcoming"], upcoming_limit=999, portfolio_range="2y"
+    )
+    stored = read_dashboard_preferences(team.factory, ctx)
+    assert stored.upcoming_limit == 50
+    assert stored.portfolio_range == "1y"
+
+    save_dashboard_preferences(team.factory, ctx, ["upcoming"], upcoming_limit=0)
+    assert read_dashboard_preferences(team.factory, ctx).upcoming_limit == 1
 
 
 def test_unknown_and_corrupt_stored_widgets_never_break_home(team: WorkspaceDb) -> None:

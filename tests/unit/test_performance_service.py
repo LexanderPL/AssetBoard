@@ -26,7 +26,9 @@ from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.performance import (
     DEFAULT_RANGE,
+    VALUE_RANGES,
     bond_observations,
+    normalize_value_range,
     performance_page,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -186,6 +188,43 @@ def test_short_ranges_use_daily_points(db: WorkspaceDb, team: WorkspaceDb) -> No
     assert page.chart
     assert (page.chart[1].date - page.chart[0].date).days == 1
     assert len(page.chart) >= 60
+
+
+def test_home_value_ranges_are_one_three_and_six_months(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _tx(db, ctx, instrument.id, day="2024-01-01")
+    _price(db, ctx, instrument.id, "2026-03-10", "110")
+    _fx(db, ctx, "2026-03-10", "0.92")
+
+    assert VALUE_RANGES == ("1m", "3m", "6m", "1y", "all")
+    assert normalize_value_range("6m") == "6m"
+    assert normalize_value_range("2y") == "1y"
+    starts = {
+        code: performance_page(
+            db.factory, ctx, range_code=code, ranges=VALUE_RANGES, with_periods=False
+        ).range_start
+        for code in VALUE_RANGES
+    }
+    assert starts["1m"] == date(2026, 2, 10)
+    assert starts["3m"] == date(2025, 12, 10)
+    assert starts["6m"] == date(2025, 9, 10)
+    assert starts["1y"] == date(2025, 3, 10)
+    assert starts["all"] == date(2023, 12, 31)
+
+
+def test_value_history_skips_the_period_maths(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _tx(db, ctx, instrument.id)
+    _price(db, ctx, instrument.id, "2026-03-10", "110")
+    _fx(db, ctx, "2026-03-10", "0.92")
+
+    page = performance_page(
+        db.factory, ctx, range_code="3m", ranges=VALUE_RANGES, with_periods=False
+    )
+    assert page.range_code == "3m" and page.chart
+    assert page.periods == ()
 
 
 def test_short_all_time_history_shows_the_period_return(db: WorkspaceDb, team: WorkspaceDb) -> None:

@@ -1,6 +1,6 @@
 <section class="panel p-4 sm:p-6" data-home-widget="loans" aria-labelledby="widget-loans-heading">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="widget-loans-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+    <h2 id="widget-loans-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
     {% if has_data %}<p class="text-xl font-semibold tabular-nums" data-loans-total>{{ total }}</p>{% endif %}
   </div>
   {% if has_data %}
