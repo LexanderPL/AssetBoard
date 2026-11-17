@@ -6097,7 +6097,7 @@ msgstr ""
 msgid "Imports waiting to be applied"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Open month"
 msgstr ""
 
