@@ -1080,6 +1080,15 @@ msgstr ""
 msgid "Check for updates"
 msgstr ""
 
+msgid "Daily backups"
+msgstr ""
+
+msgid "Weekly backups"
+msgstr ""
+
+msgid "Monthly backups"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -5797,15 +5806,6 @@ msgid ""
 "The newest backup of each day, week and month is kept. One file can count"
 " for several. Manual and pre-restore copies are never deleted "
 "automatically."
-msgstr ""
-
-msgid "Daily backups"
-msgstr ""
-
-msgid "Weekly backups"
-msgstr ""
-
-msgid "Monthly backups"
 msgstr ""
 
 msgid "Save settings"

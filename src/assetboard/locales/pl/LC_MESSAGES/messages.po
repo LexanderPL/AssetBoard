@@ -1092,6 +1092,15 @@ msgstr "Otwarta rejestracja"
 msgid "Check for updates"
 msgstr "Sprawdzaj aktualizacje"
 
+msgid "Daily backups"
+msgstr "Kopie dzienne"
+
+msgid "Weekly backups"
+msgstr "Kopie tygodniowe"
+
+msgid "Monthly backups"
+msgstr "Kopie miesięczne"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -6290,15 +6299,6 @@ msgstr ""
 "Zachowywana jest najnowsza kopia z każdego dnia, tygodnia i miesiąca. "
 "Jeden plik może liczyć się w kilku okresach. Kopie ręczne i sprzed "
 "przywrócenia nigdy nie są usuwane automatycznie."
-
-msgid "Daily backups"
-msgstr "Kopie dzienne"
-
-msgid "Weekly backups"
-msgstr "Kopie tygodniowe"
-
-msgid "Monthly backups"
-msgstr "Kopie miesięczne"
 
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
