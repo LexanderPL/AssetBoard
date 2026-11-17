@@ -14,6 +14,7 @@ from assetboard.i18n.numbers import (
     CURRENCY_HOME_LOCALES,
     format_amount_input,
     format_money,
+    format_money_plain,
     format_price,
     parse_amount,
 )
@@ -126,6 +127,26 @@ def test_every_home_locale_formats_its_currency(currency: str) -> None:
     text = format_money(Money(123456, currency), "en")
     assert re.search(r"\d", text) and not re.search(r"[A-Z]{3}[\d-]|\d[A-Z]{3}", text)
     assert format_money(Money(123456, currency), "pl") == text
+
+
+@pytest.mark.parametrize(
+    ("currency", "amount", "locale", "expected"),
+    [
+        ("EUR", 123456, "en", "1,234.56"),
+        ("EUR", 123456, "pl", "1\u00a0234,56"),
+        ("EUR", -123456, "en", "-1,234.56"),
+        ("PLN", 123450, "en", "1\u00a0234,50"),
+        ("USD", 123450, "pl", "1,234.50"),
+        ("CHF", 123450, "en", "1’234.50"),
+        ("JPY", 1234, "pl", "1,234"),
+        ("THB", 123450, "en", "1,234.50"),
+        ("THB", -123450, "pl", "-1\u00a0234,50"),
+    ],
+)
+def test_format_money_plain_keeps_the_native_style_without_the_currency(
+    currency: str, amount: int, locale: str, expected: str
+) -> None:
+    assert format_money_plain(Money(amount, currency), locale) == expected
 
 
 @pytest.mark.parametrize(

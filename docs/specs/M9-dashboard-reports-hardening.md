@@ -254,6 +254,17 @@ app installable instead.
 - **Browser tests at a 390 × 844 viewport assert that the page width does not exceed the
   viewport** on Home, Month, Transactions, History, Upcoming, Recurring and Income.
 
+**As built (2026-11-17):** with the demo data's longest category name and six-digit planned and
+actual amounts, the four columns do not fit at 390 px, so the documented fallback is used: below
+`sm`, Difference is a small coloured line under Actual (like the pending line) and the table
+keeps Category, Plan and Actual. The Summary heading shows the currency once and the table's
+amounts lose it below `sm`; the KPI and bar captions above the table keep their fully formatted
+amounts. The Transactions table keeps its existing in-panel horizontal scroll for the data
+columns, while the entry row's controls fit their cells and the page itself never scrolls
+sideways. On phones, Upcoming's primary action posts the prefilled date and amount in one tap
+(with the same Undo as the dialog) and Skip is a direct button; the editable dialog remains from
+`sm` up.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

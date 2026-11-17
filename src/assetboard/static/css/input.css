@@ -230,6 +230,14 @@
       height: 2.75rem;
       min-width: 2.75rem;
     }
+
+    /* F9.9: every field and the Add button of a Transactions entry (or edit) row is a 44 px
+       touch target on a phone. The row scrolls inside its panel as before, but its controls
+       stay comfortably tappable. */
+    [data-ledger-row-form] .cell-input,
+    [data-ledger-row-form] .cell-button {
+      min-height: 2.75rem;
+    }
   }
 
   /* A scroll container would clip an absolutely positioned menu, so inside a data sheet the

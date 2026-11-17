@@ -106,6 +106,37 @@ def test_expected_rows_sit_in_their_table_and_confirming_makes_them_real(rent) -
     assert _pending(row) is None and "If everything pending arrives" not in row
 
 
+def test_phone_summary_markup_drops_currency_and_shortens_pending(rent) -> None:
+    """F9.9: below sm the table shows plain amounts under a currency label, and "+ X pending"
+    shortens to "+X" while the screen-reader text keeps the full wording."""
+    owner, category, _occurrences = rent
+    _plan(owner, category, "100")
+    summary = _block(
+        owner.client.get("/m/2026-03").text, r'<section id="month-summary".*?</section>'
+    )
+    assert re.search(r"<h2 [^>]*>Summary</h2>", summary)
+    assert re.search(r"data-summary-currency>\(EUR\)<", summary)
+    row = _summary_row(summary, category)
+    assert re.search(r'class="max-sm:hidden tabular-nums" data-actual>€0.00<', row)
+    assert re.search(r'class="tabular-nums sm:hidden" data-actual-phone>0.00<', row)
+    # The fallback: Difference is not a phone column; its amount is a line under Actual,
+    # without the currency, beside the still-hidden desktop cell.
+    assert re.search(r'<th scope="col" class="w-36 [^"]*max-sm:hidden">Difference</th>', summary)
+    phone_difference = re.search(r"data-difference-phone>([^<]*)<", row)
+    assert phone_difference is not None
+    assert "€" not in phone_difference.group(1) and "100.00" in phone_difference.group(1)
+    # The phone pending line is "+100.00"; the full "+ €100.00 pending" stays for screen
+    # readers (and on wider screens).
+    assert re.search(r'aria-hidden="true">\+100\.00</span>', row)
+    assert re.search(r'<span class="sr-only"> \+ €100\.00 pending \(If everything', row)
+    assert re.search(r"data-pending>\s*\+ €100\.00 pending", row)
+    # Phone sizing: a seven-digit planned input, one type step down, and a table that may use
+    # the fixed layout at phone width.
+    assert 'size="7"' in row
+    assert re.search(r"<table class=\"[^\"]*min-w-0[^\"]*max-sm:text-xs", summary)
+    assert "max-sm:!py-1" in row
+
+
 def test_viewers_see_expected_rows_without_confirm(rent) -> None:
     owner, _category, occurrences = rent
     owner.set_admin_role("viewer")

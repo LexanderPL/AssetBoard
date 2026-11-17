@@ -13,15 +13,25 @@
 {% if text %}<span class="tabular-nums {{ tone_class[tone] }}">{{ text }}</span>{% if tone == "favourable" %}<span class="sr-only"> {{ _("(favourable)") }}</span>{% elif tone == "unfavourable" %}<span class="sr-only"> {{ _("(unfavourable)") }}</span>{% endif %}{% endif %}
 {%- endmacro %}
 
+{# F9.9 fallback: below sm the Difference column is hidden and the same amount sits as a small
+   coloured line under Actual (like the pending line); the desktop cell keeps its own column.
+   ``plain`` is the amount without the currency, shown on the phone. #}
+{% macro difference_phone(text, tone, plain="") -%}
+{% if text %}<span class="block text-xs font-normal {{ tone_class[tone] }} sm:hidden" data-difference-phone>{{ plain or text }}{% if tone == "favourable" %}<span class="sr-only"> {{ _("(favourable)") }}</span>{% elif tone == "unfavourable" %}<span class="sr-only"> {{ _("(unfavourable)") }}</span>{% endif %}</span>{% endif %}
+{%- endmacro %}
+
 {# The pending part of an actual (F3.5, "Plan and Actual"): a lighter line under the confirmed
    amount, only when something is pending. Its tooltip and screen-reader text give the forecast
    (actual + pending). ``over`` ("danger"/"success") adds the softer "over plan if everything
    pending arrives" hint. Everything marked data-pending is hidden by the pending toggle
-   (app.js). #}
-{% macro pending_line(pending, forecast, over="") -%}
+   (app.js). On phones the visible line shortens to "+amount" without the currency; its
+   screen-reader text keeps the full wording (F9.9). #}
+{% macro pending_line(pending, plain, forecast, over="") -%}
 {% if pending %}
 {% set if_all = _("If everything pending arrives: %(amount)s", amount=forecast) %}
-<span class="block text-xs font-normal text-muted" title="{{ if_all }}" data-pending>{{ _("+ %(amount)s pending", amount=pending) }}<span class="sr-only"> ({{ if_all }})</span></span>
+{% set full = _("+ %(amount)s pending", amount=pending) %}
+<span class="block text-xs font-normal text-muted max-sm:hidden" title="{{ if_all }}" data-pending>{{ full }}<span class="sr-only"> ({{ if_all }})</span></span>
+<span class="block text-xs font-normal text-muted sm:hidden" title="{{ if_all }}" data-pending data-pending-phone><span aria-hidden="true">+{{ plain }}</span><span class="sr-only"> {{ full }} ({{ if_all }})</span></span>
 {% if over %}<span class="block whitespace-normal text-xs font-normal {% if over == "danger" %}text-warning-strong{% else %}text-success-strong{% endif %}" data-pending data-pending-over>{{ _("Over plan if everything pending arrives") }}</span>{% endif %}
 {% endif %}
 {%- endmacro %}
@@ -33,9 +43,9 @@
    value has an empty planned field (a dash placeholder: "not set"), no difference and no
    tint. #}
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}"{% if r.over == "danger" %} class="bg-danger-tint" data-over-plan="expense"{% elif r.over == "success" %} class="bg-success-tint" data-over-plan="income"{% endif %}>
-  <th scope="row" class="py-1.5 pl-2 pr-2 text-left align-top font-normal">
+  <th scope="row" class="break-words py-1.5 pl-2 pr-2 text-left align-top font-normal max-sm:!py-1 max-sm:!pl-1 max-sm:!pr-1">
     {# F2.7: the category's entries are on the Transactions page, filtered (F2.4 part B). #}
-    {% set filter_href = scoped_url(request, 'transactions_month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}" title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline" data-plan-category>{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
+    {% set filter_href = scoped_url(request, 'transactions_month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex min-w-0 items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}" title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="min-w-0 rounded break-words underline-offset-2 hover:underline" data-plan-category>{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
   <td class="{% if r.editable %}cell-edit {% endif %}text-right align-top">
     {% if r.editable %}
@@ -43,29 +53,29 @@
     <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
       {{ csrf_input() }}
       <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
-      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="–" data-saved-value="{{ r.saved_value }}"{% if r.error %} aria-describedby="{{ row_id }}-error" aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
-             class="form-control cell-input text-right tabular-nums">
+      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" size="7" value="{{ r.value }}" placeholder="–" data-saved-value="{{ r.saved_value }}"{% if r.error %} aria-describedby="{{ row_id }}-error" aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
+             class="form-control cell-input text-right tabular-nums max-sm:px-1">
       {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-left text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>
     {% else %}
-    {% if r.display %}<span class="tabular-nums" data-planned>{{ r.display }}</span>{% else %}<span class="text-muted" data-planned><span aria-hidden="true">–</span><span class="sr-only">{{ _("No plan") }}</span></span>{% endif %}
+    {% if r.display %}<span class="max-sm:hidden tabular-nums" data-planned>{{ r.display }}</span><span class="tabular-nums sm:hidden" data-planned-phone>{{ r.display_plain }}</span>{% else %}<span class="text-muted" data-planned><span aria-hidden="true">–</span><span class="sr-only">{{ _("No plan") }}</span></span>{% endif %}
     {% endif %}
   </td>
   {% if plan_only %}
-  <td colspan="2" class="py-1.5 pr-2 text-right align-top text-xs text-muted" data-not-counted>{{ _("not counted") }}</td>
+  <td colspan="2" class="py-1.5 pr-2 text-right align-top text-xs text-muted max-sm:!py-1 max-sm:!pr-1" data-not-counted>{{ _("not counted") }}</td>
   {% else %}
-  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ r.actual }}</span>{{ pending_line(r.pending, r.forecast, r.pending_over) }}</td>
-  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top" data-difference>{{ difference(r.difference, r.tone) }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1" data-actual-cell><span class="max-sm:hidden tabular-nums" data-actual>{{ r.actual }}</span><span class="tabular-nums sm:hidden" data-actual-phone>{{ r.actual_plain }}</span>{{ pending_line(r.pending, r.pending_plain, r.forecast, r.pending_over) }}{{ difference_phone(r.difference, r.tone, r.difference_plain) }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1 max-sm:hidden" data-difference>{{ difference(r.difference, r.tone) }}</td>
   {% endif %}
 </tr>
 {%- endmacro %}
 
 {% macro totals_row(g, oob=false) -%}
 <tr id="summary-total-{{ g.key }}" class="font-semibold" data-summary-total="{{ g.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <th scope="row" class="py-2 pl-2 pr-2 text-left align-top">{{ _("Total") }}</th>
-  <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums">{{ g.totals.planned }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ g.totals.actual }}</span>{{ pending_line(g.totals.pending, g.totals.forecast) }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right align-top">{{ difference(g.totals.difference, g.totals.tone) }}</td>
+  <th scope="row" class="break-words py-2 pl-2 pr-2 text-left align-top max-sm:!py-1 max-sm:!pl-1 max-sm:!pr-1">{{ _("Total") }}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1"><span class="max-sm:hidden tabular-nums">{{ g.totals.planned }}</span><span class="tabular-nums sm:hidden">{{ g.totals.planned_plain }}</span></td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1" data-actual-cell><span class="max-sm:hidden tabular-nums" data-actual>{{ g.totals.actual }}</span><span class="tabular-nums sm:hidden" data-actual-phone>{{ g.totals.actual_plain }}</span>{{ pending_line(g.totals.pending, g.totals.pending_plain, g.totals.forecast) }}{{ difference_phone(g.totals.difference, g.totals.tone, g.totals.difference_plain) }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1 max-sm:hidden">{{ difference(g.totals.difference, g.totals.tone) }}</td>
 </tr>
 {%- endmacro %}
 
@@ -73,10 +83,10 @@
    the bars above. No difference: its groups' differences point different ways. #}
 {% macro block_total_row(b, oob=false) -%}
 <tr id="summary-total-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/50{% else %}border-success/50{% endif %} font-semibold" data-money-total="{{ b.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <th scope="row" class="py-2 pl-2 pr-2 text-left align-top">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
-  <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums">{{ b.totals.planned }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ b.totals.actual }}</span>{{ pending_line(b.totals.pending, b.totals.forecast) }}</td>
-  <td class="py-2 pr-2"></td>
+  <th scope="row" class="break-words py-2 pl-2 pr-2 text-left align-top max-sm:!py-1 max-sm:!pl-1 max-sm:!pr-1">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1"><span class="max-sm:hidden tabular-nums">{{ b.totals.planned }}</span><span class="tabular-nums sm:hidden">{{ b.totals.planned_plain }}</span></td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top max-sm:!py-1 max-sm:!pr-1" data-actual-cell><span class="max-sm:hidden tabular-nums" data-actual>{{ b.totals.actual }}</span><span class="tabular-nums sm:hidden" data-actual-phone>{{ b.totals.actual_plain }}</span>{{ pending_line(b.totals.pending, b.totals.pending_plain, b.totals.forecast) }}</td>
+  <td class="py-2 pr-2 max-sm:hidden max-sm:!py-1 max-sm:!pr-1"></td>
 </tr>
 {%- endmacro %}
 
