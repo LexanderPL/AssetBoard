@@ -142,7 +142,7 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
     rows = build_rows(inputs.stop_working_age)
     fire_index: int | None = None
     if inputs.rule is Rule.LASTS_TO_HORIZON:
-        last_candidate = min(inputs.stop_working_age, inputs.horizon_age - 1)
+        last_candidate = max(current_age, min(inputs.stop_working_age, inputs.horizon_age - 1))
         for stop_age in range(current_age, last_candidate + 1):
             candidate = build_rows(stop_age)
             fire_offset = stop_age - current_age
@@ -420,9 +420,9 @@ def test_horizon_rule_allows_the_year_before_the_horizon() -> None:
     assert result.rows[result.fire_index].income == _eur(100_000)
 
 
-def test_horizon_rule_has_no_candidate_when_income_stopped_before_today() -> None:
-    # The plan already has no base income and survives to the horizon, but the rule cannot
-    # declare FIRE after the configured income-stop age.
+def test_horizon_rule_tests_today_when_income_already_stopped() -> None:
+    # Base income already stopped, so today is the only candidate; a portfolio that lasts from
+    # today is independent now.
     result = project(
         replace(
             _HORIZON,
@@ -431,9 +431,9 @@ def test_horizon_rule_has_no_candidate_when_income_stopped_before_today() -> Non
         )
     )
     assert result.rows[-1].net_worth.amount_minor > 0
-    assert result.fire_index is None
-    assert result.fire_age is None
-    assert result.networth_at_fire is None
+    assert result.fire_age == 41
+    assert result.rows[0].is_fire
+    assert result.networth_at_fire is not None
     assert result.fire_number is None
     assert result.plan_progress_bp is None
 

@@ -23,9 +23,10 @@ earlier retirement age; otherwise future salary would make an early retirement l
 - The candidate is viable when its opening balance and every net worth from that row through the
   horizon are non-negative. Zero at the horizon counts as lasting. The first viable candidate is
   the FIRE row.
-- The cap is deliberate: the rule cannot declare FIRE after base income has already stopped, and
-  a plan that only survives by working past its configured income-stop age is not independent
-  under the plan as entered.
+- The cap is deliberate: the rule cannot choose an age later than the configured income-stop
+  age, and a plan that only survives by working past that age is not independent under the plan
+  as entered. If base income has already stopped, today is the only candidate; the rule then
+  tests whether the portfolio lasts from today.
 - The displayed projection still follows the configured income-stop age. The rule's counterfactual
   is visible only through the FIRE marker, FIRE age/year and years-to-FIRE metrics.
 - The rule has no rate-based FIRE number and no net-worth-target plan progress. Both are `None`

@@ -1374,8 +1374,9 @@ dependencies, projection math and loan math unchanged.
   payoff drops. The candidate's opening balance and every later net worth through the horizon
   must be non-negative; zero at the horizon counts as lasting.
 - The FIRE row is the candidate row in the normal projection. The displayed rows still use the
-  configured income-stop age. The rule cannot fire after base income has stopped or after the
-  horizon.
+  configured income-stop age. The rule cannot choose an age later than the configured
+  income-stop age or the horizon. If base income has already stopped, today is the only
+  candidate.
 - The rule has no rate-based FIRE number and no net-worth-target progress. Both metrics show
   as not defined with rule-specific explanations; net worth at FIRE remains visible.
 - **Returns cover expenses** remains the default for new plans. Existing plans keep their saved
@@ -1404,9 +1405,10 @@ tests. Keep loan math, money/rounding rules, the other rules and dependencies un
 
 - `Rule.LASTS_TO_HORIZON` is `lasts_to_horizon`; `project` builds the normal rows once and then
   runs a candidate simulation for the rule. `_horizon_fire_index` caps candidates at
-  `min(stop_working_age, horizon_age - 1)`, rebuilds the row series with the candidate stop age,
-  requires a non-negative opening balance at the candidate and non-negative net worth through
-  the horizon, and returns the first surviving candidate. The chosen row is marked `is_fire`.
+  `max(current age, min(stop_working_age, horizon_age - 1))`, rebuilds the row series with the
+  candidate stop age, requires a non-negative opening balance at the candidate and non-negative
+  net worth through the horizon, and returns the first surviving candidate. The chosen row is
+  marked `is_fire`; when base income already stopped, the current age is the candidate.
 - The candidate simulation keeps events, loans, rates and the configured amounts. The displayed
   table, depletion window and sustainability check still use the configured income-stop age.
 - `fire_number` and `plan_progress_bp` are `None` for the rule; `networth_at_fire` stays. The

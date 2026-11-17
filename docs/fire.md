@@ -280,8 +280,9 @@ the configured **Income stops at age**.
 - **Portfolio lasts to the horizon**: the earliest age at which stopping base income *at that
   age* leaves the portfolio non-negative in every year through the horizon. Zero at the horizon
   counts as lasting. The rule considers retiring at any age from today up to the earlier of
-  **Income stops at age** and the year before the horizon; it cannot declare FIRE after base
-  income has already stopped. Income and expense changes, saving overrides, loans and all other
+  **Income stops at age** and the year before the horizon; it cannot choose a retirement age
+  later than **Income stops at age**. If base income has already stopped, it tests whether the
+  portfolio lasts from today. Income and expense changes, saving overrides, loans and all other
   assumptions stay as entered. This rule deliberately allows spending principal and is not a
   perpetual-withdrawal or longevity guarantee. Like the rest of the plan it uses the entered
   constant rates, not a set of market paths, so the result is one illustrative projection.

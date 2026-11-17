@@ -716,12 +716,12 @@ def _horizon_fire_index(plan: _ProjectionPlan, currency: str, *, age: int) -> in
     """The earliest age where stopping base income still lasts through the horizon.
 
     Candidate ages stop at the earlier of the configured income-stop age and the year before the
-    horizon: the rule cannot declare FIRE after base income has already stopped or after the last
-    projected year. When the configured stop age is already behind the current age there is no
-    candidate at all. The check starts at the candidate's opening balance and requires every later
-    net worth to be non-negative; zero at the horizon counts as lasting.
+    horizon: the rule cannot choose a retirement age later than base income is configured to stop,
+    or after the last projected year. If base income has already stopped, today is the only
+    candidate. The check starts at the candidate's opening balance and requires every later net
+    worth to be non-negative; zero at the horizon counts as lasting.
     """
-    last_candidate = min(plan.stop_working_age, plan.horizon_age - 1)
+    last_candidate = max(age, min(plan.stop_working_age, plan.horizon_age - 1))
     for stop_age in range(age, last_candidate + 1):
         rows = _build_rows(plan, currency, stop_working_age=stop_age)
         fire_offset = stop_age - age
@@ -773,8 +773,8 @@ def project(inputs: ProjectionInputs) -> Projection:
     keeps every other series and event as entered; the displayed rows still follow the configured
     income-stop age. Every net worth from the candidate row through the horizon, and the opening
     balance at the candidate age, must be non-negative; zero at the horizon counts as lasting.
-    The rule cannot declare FIRE after base income has already stopped or after the last projected
-    year.
+    The rule cannot choose an age later than the configured income-stop age or the last projected
+    year; if base income has already stopped, the current age is the only candidate.
 
     ``fire_number`` is the FIRE row's nominal expenses divided by the rule's rate (the
     withdrawal rate, or the return above inflation when returns must cover expenses), rounded
