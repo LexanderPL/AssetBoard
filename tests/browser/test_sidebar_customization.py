@@ -1,0 +1,179 @@
+"""F9.12 in Chromium: the Profile customiser at 1440 px and 390 px, the desktop and mobile
+navigation reflecting the same saved order, click and keyboard moves, checkbox + save, reset,
+no horizontal overflow, and a JavaScript-disabled context that can still save and move."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+from playwright.sync_api import Page, expect, sync_playwright
+
+from assetboard.app import create_app
+from assetboard.config import Settings
+from assetboard.services.auth import run_initial_setup
+from tests.conftest import live_server
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
+    reason="Set ASSETBOARD_RUN_BROWSER_TESTS=1 to run the Chromium tests",
+)
+
+PASSWORD = "Correct Horse Battery!"
+NAV_KEYS = """() => Array.from(
+  document.querySelectorAll('nav[aria-label="Main navigation"] a.nav-link')
+).map((a) => a.getAttributeNames().find(
+  (name) => name.startsWith("data-") && name.endsWith("-link")
+).slice(5, -5))"""
+NO_OVERFLOW = "document.documentElement.scrollWidth <= window.innerWidth"
+
+
+def _app(tmp_path: Path):
+    app = create_app(
+        Settings(
+            _env_file=None,
+            data_dir=tmp_path,
+            database_url=f"sqlite:///{tmp_path / 'browser-sidebar.db'}",
+            secret_key="browser-sidebar-test-key",
+        )
+    )
+    return app
+
+
+def _setup(app) -> None:
+    run_initial_setup(
+        app.state.session_factory,
+        email="admin@example.com",
+        display_name="Browser Admin",
+        password=PASSWORD,
+        workspace_name="Browser Home",
+        settings=app.state.settings,
+        clock=app.state.clock,
+    )
+
+
+def _sign_in(page: Page, base: str) -> None:
+    page.goto(f"{base}/login", wait_until="networkidle")
+    page.get_by_label("Email").fill("admin@example.com")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in").click()
+    page.wait_for_url(f"{base}/")
+
+
+def _nav(page: Page) -> list[str]:
+    return page.evaluate(NAV_KEYS)
+
+
+def _open_menu(page: Page) -> None:
+    menu = page.locator("[data-sidebar-toggle]")
+    if menu.is_visible():
+        menu.click()
+        expect(page.locator("[data-home-link]")).to_be_visible()
+
+
+def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    with live_server(app) as base, sync_playwright() as playwright:
+        _setup(app)
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        _sign_in(page, base)
+
+        page.goto(f"{base}/account", wait_until="networkidle")
+        settings = page.locator("[data-sidebar-settings]")
+        expect(settings).to_be_visible()
+        expect(page.locator('[data-sidebar-item="home"] [data-sidebar-visible="home"]')
+               ).to_be_checked()  # fmt: skip
+        expect(page.locator('[data-sidebar-item="home"] [data-sidebar-visible="home"]')
+               ).to_be_disabled()  # fmt: skip
+
+        # Click "Move up" for Income at desktop width: the canonical order is saved as a
+        # custom order (Income above Recurring).
+        page.locator('[data-sidebar-move="income:up"]').click()
+        page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
+        expect(settings.locator('[role="status"]')).to_contain_text("Your sidebar is saved.")
+        assert _nav(page).index("income") < _nav(page).index("recurring")
+        assert page.evaluate(NO_OVERFLOW)
+
+        # Keyboard move at phone width: Income goes back down and the canonical list is
+        # stored as NULL again.
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(f"{base}/account", wait_until="networkidle")
+        move_down = page.locator('[data-sidebar-move="income:down"]')
+        move_down.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
+        page.goto(f"{base}/", wait_until="networkidle")
+        _open_menu(page)
+        assert _nav(page).index("income") > _nav(page).index("recurring")
+        assert page.evaluate(NO_OVERFLOW)
+
+        # Checkbox + save at phone width: History disappears from the mobile nav, while its
+        # address keeps working.
+        page.goto(f"{base}/account", wait_until="networkidle")
+        page.locator('[data-sidebar-visible="history"]').uncheck()
+        page.locator("[data-sidebar-save]").click()
+        page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
+        page.goto(f"{base}/", wait_until="networkidle")
+        _open_menu(page)
+        assert "history" not in _nav(page)
+        assert page.evaluate(NO_OVERFLOW)
+        page.goto(f"{base}/history", wait_until="networkidle")
+        expect(page.locator("h1")).to_be_visible()
+
+        # Reset at phone width: History is back, in the canonical order, in both navs.
+        page.goto(f"{base}/account", wait_until="networkidle")
+        page.locator("[data-sidebar-reset]").click()
+        page.wait_for_url(f"{base}/account?sidebar=reset#sidebar-settings")
+        expect(settings.locator('[role="status"]')).to_contain_text(
+            "Your sidebar is back to the default order."
+        )
+        page.goto(f"{base}/", wait_until="networkidle")
+        _open_menu(page)
+        assert _nav(page) == [
+            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "income", "net-worth", "investments", "loans", "fire",
+        ]  # fmt: skip
+        assert page.evaluate(NO_OVERFLOW)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.goto(f"{base}/", wait_until="networkidle")
+        assert _nav(page) == [
+            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "income", "net-worth", "investments", "loans", "fire",
+        ]  # fmt: skip
+        browser.close()
+
+
+def test_the_customiser_works_without_javascript(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    with live_server(app) as base, sync_playwright() as playwright:
+        _setup(app)
+        browser = playwright.chromium.launch()
+        context = browser.new_context(
+            java_script_enabled=False, viewport={"width": 390, "height": 844}
+        )
+        page = context.new_page()
+        _sign_in(page, base)
+
+        page.goto(f"{base}/account", wait_until="networkidle")
+        expect(page.locator("[data-sidebar-form]")).to_be_visible()
+        page.locator('[data-sidebar-move="loans:up"]').click()
+        page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
+        page.goto(f"{base}/", wait_until="networkidle")
+        # Without JavaScript the phone navigation stays unfolded.
+        expect(page.locator("[data-home-link]")).to_be_visible()
+        assert _nav(page).index("loans") < _nav(page).index("investments")
+        assert page.evaluate(NO_OVERFLOW)
+
+        page.goto(f"{base}/account", wait_until="networkidle")
+        page.locator("[data-sidebar-reset]").click()
+        page.wait_for_url(f"{base}/account?sidebar=reset#sidebar-settings")
+        page.goto(f"{base}/", wait_until="networkidle")
+        assert _nav(page) == [
+            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "income", "net-worth", "investments", "loans", "fire",
+        ]  # fmt: skip
+        assert page.evaluate(NO_OVERFLOW)
+        context.close()
+        browser.close()
