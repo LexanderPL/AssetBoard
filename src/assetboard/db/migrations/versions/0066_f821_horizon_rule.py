@@ -1,7 +1,7 @@
 """Add the horizon-based FIRE independence rule (F8.21)
 
-Revision ID: 0065_f821_horizon_rule
-Revises: 0064_f812_fire_loan_settings
+Revision ID: 0066_f821_horizon_rule
+Revises: 0065_f912_sidebar_items
 Create Date: 2026-11-17
 
 The FIRE plan reuses the ``rule`` string column and still stores no withdrawal rate for rules
@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "0065_f821_horizon_rule"
-down_revision = "0064_f812_fire_loan_settings"
+revision = "0066_f821_horizon_rule"
+down_revision = "0065_f912_sidebar_items"
 branch_labels = None
 depends_on = None
 

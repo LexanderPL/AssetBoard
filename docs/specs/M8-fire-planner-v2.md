@@ -1416,7 +1416,7 @@ tests. Keep loan math, money/rounding rules, the other rules and dependencies un
 - The wizard and editor list the rule after the two existing choices; **Returns cover expenses**
   stays first and selected by default. The existing JavaScript disables the withdrawal-rate field
   for any non-SWR rule, and the route parses no SWR for it.
-- Migration `0065_f821_horizon_rule` drops and recreates `ck_fire_scenarios_rule_valid` and
+- Migration `0066_f821_horizon_rule` drops and recreates `ck_fire_scenarios_rule_valid` and
   `ck_fire_scenarios_swr_valid`; downgrade converts horizon rows to `returns_cover_expenses`
   before restoring the old checks. `FORMAT_VERSION` is `2.2`; the archive reader accepts the new
   value and still reads 2.0/2.1 archives.

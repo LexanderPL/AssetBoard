@@ -674,7 +674,7 @@ def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypat
     assert not Path(calls[0][1].removeprefix("sqlite:///")).parent.exists()
 
 
-def test_0065_horizon_rule_constraint_accepts_the_new_value_and_downgrades(
+def test_0066_horizon_rule_constraint_accepts_the_new_value_and_downgrades(
     tmp_path: Path,
 ) -> None:
     settings = Settings(
@@ -710,7 +710,7 @@ def test_0065_horizon_rule_constraint_accepts_the_new_value_and_downgrades(
             connection.exec_driver_sql(
                 "UPDATE fire_scenarios SET swr_bp = 400 WHERE id = ?", (plan_id,)
             )
-        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        command.downgrade(alembic_config(settings), "0065_f912_sidebar_items")
         with engine.connect() as connection:
             row = connection.exec_driver_sql(
                 "SELECT rule, swr_bp FROM fire_scenarios WHERE id = ?", (plan_id,)
