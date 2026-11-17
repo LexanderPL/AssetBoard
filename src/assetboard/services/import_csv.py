@@ -20,6 +20,7 @@ from uuid import UUID, uuid5
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.session import sessionmaker
 
+from assetboard.config import Settings
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.repositories import (
     BudgetLineRepository,
@@ -648,8 +649,10 @@ class TransactionsCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del skip_invalid
+        del skip_invalid, secrets_passphrase, instance_settings
         today = ctx.clock.today(ctx.workspace.timezone)
         closed = MonthStateRepository(session, ctx).closed_months()
         rows, errors, skipped, sources, _, _, _ = _parse_transactions(
@@ -968,8 +971,10 @@ class BudgetLinesCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del skip_invalid
+        del skip_invalid, secrets_passphrase, instance_settings
         closed = MonthStateRepository(session, ctx).closed_months()
         categories = _snapshots(session, ctx)
         saved = _saved_mappings(session, ctx)
@@ -1342,8 +1347,10 @@ class CategoriesCsvAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
-        del base_currency, skip_invalid
+        del base_currency, skip_invalid, secrets_passphrase, instance_settings
         planned, errors, skipped, _, _ = self._plan(session, ctx, parsed)
         repository = CategoryRepository(session, ctx)
         next_orders: dict[str, int] = {}

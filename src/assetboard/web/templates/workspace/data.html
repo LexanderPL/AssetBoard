@@ -5,12 +5,30 @@
 {% if notice %}
 <p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-import-notice>{{ notice }}</p>
 {% endif %}
+{% if export_error %}
+<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ export_error }}</p>
+{% endif %}
 <section class="panel max-w-2xl p-6">
   <h2 class="text-lg font-semibold">{{ _("Download workspace archive") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Save this workspace’s ledger, including categories, planned values, transactions, and month status.") }}</p>
-  <p class="mt-2 text-sm text-muted">{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels are not included.") }}</p>
-  <form method="post" action="{{ scoped_url(request, 'workspace_data_export') }}" class="mt-5">
+  <p class="mt-2 text-sm text-muted">{% if is_owner %}{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels and provider API keys are included only in the optional encrypted secrets member.") }}{% else %}{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels and provider API keys are not included in this download.") }}{% endif %}</p>
+  <form method="post" action="{{ scoped_url(request, 'workspace_data_export') }}" class="mt-5 space-y-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    {% if is_owner %}
+    <fieldset class="space-y-2 rounded-xl border border-line p-4">
+      <legend class="px-1 text-sm font-medium">{{ _("Secrets") }}</legend>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="include_secrets" value="true" class="mt-1">
+        <span>{{ _("Include notification URLs and provider API keys") }}<span class="block text-xs text-muted">{{ _("They are written to a separate encrypted member and need this passphrase to restore. Keep it somewhere safe; it cannot be recovered.") }}</span></span>
+      </label>
+      <label class="block text-sm">{{ _("Archive secrets passphrase") }}
+        <input type="password" name="passphrase" autocomplete="new-password" minlength="12" class="form-control mt-1 w-full px-3 py-2">
+      </label>
+      <label class="block text-sm">{{ _("Repeat the passphrase") }}
+        <input type="password" name="passphrase_confirm" autocomplete="new-password" minlength="12" class="form-control mt-1 w-full px-3 py-2">
+      </label>
+    </fieldset>
+    {% endif %}
     <button type="submit" class="btn-primary">{{ _("Download archive") }}</button>
   </form>
 </section>
@@ -85,8 +103,11 @@
         </form>
         {% endif %}
         {% if batch.source in available_import_sources and batch.status == 'planned' %}
-        <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=batch.id) }}" class="flex items-center gap-2">
+        <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=batch.id) }}" class="flex flex-wrap items-center gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          {% if batch.mode == 'restore' and batch.report and batch.report.secrets_present %}
+          <label class="text-sm">{{ _("Secrets passphrase") }}<input type="password" name="secrets_passphrase" autocomplete="current-password" class="form-control ml-2 px-2 py-1"></label>
+          {% endif %}
           {% if batch.mode == 'merge' and batch.report.counts.invalid|default(0) > 0 %}<label><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=batch.report.counts.invalid) }}</label>{% endif %}
           <button type="submit" class="underline disabled:opacity-50" {% if batch.report.refused or batch.report.counts.mapping_invalid|default(0) > 0 or (batch.mode == 'restore' and batch.report.counts.invalid|default(0) > 0) %}disabled{% endif %}>{{ _("Apply import") }}</button>
         </form>
@@ -117,6 +138,9 @@
   {% if selected_batch.mode == 'restore' %}
   <div class="mt-6">
     <h3 class="font-semibold">{{ _("Restore plan") }}</h3>
+    {% if selected_batch.report.secrets_present %}
+    <p class="mt-2 text-sm text-muted">{{ _("This archive contains an encrypted secrets member. Enter its passphrase in the Apply import form to restore notification channels and provider keys.") }}</p>
+    {% endif %}
     <dl class="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
       <div><dt class="text-muted">{{ _("Categories") }}</dt><dd>{{ selected_batch.report.counts.categories_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Transactions") }}</dt><dd>{{ selected_batch.report.counts.transactions_created|default(0) }}</dd></div>
@@ -215,6 +239,11 @@
   <div class="mt-6">
     <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=selected_batch.id) }}" class="mt-4 space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      {% if selected_batch.mode == 'restore' and selected_batch.report.secrets_present %}
+      <label class="block text-sm">{{ _("Secrets passphrase") }}
+        <input type="password" name="secrets_passphrase" autocomplete="current-password" class="form-control mt-1 w-full px-3 py-2">
+      </label>
+      {% endif %}
       {% if selected_batch.report.mapping %}
       {% set mapping = selected_batch.report.mapping %}
       <h3 class="font-semibold">{{ _("Category mapping") }}</h3>

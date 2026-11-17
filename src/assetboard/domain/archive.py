@@ -16,6 +16,11 @@ from decimal import Decimal, InvalidOperation
 from typing import cast
 from uuid import UUID, uuid4
 
+from assetboard.domain.archive_secrets import (
+    SECRETS_FILE,
+    SecretsEnvelope,
+    parse_secrets_envelope,
+)
 from assetboard.domain.bonds import (
     MAX_ANNUAL_RATE_BP,
     MAX_SERIES_CODE_LENGTH,
@@ -77,7 +82,7 @@ from assetboard.domain.taxes import PaymentTiming, TaxBase, TaxKind
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "2.3"
+FORMAT_VERSION = "2.4"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -564,7 +569,7 @@ M3_CSV_FILES = (
 )
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
-KNOWN_FILES = frozenset(REQUIRED_FILES) | frozenset(LEGACY_FIRE_CSV_FILES)
+KNOWN_FILES = frozenset(REQUIRED_FILES) | frozenset(LEGACY_FIRE_CSV_FILES) | {SECRETS_FILE}
 LINK_TYPES = frozenset({"portfolio_asset_class", "portfolio_holding", "loan_balance"})
 SNAPSHOT_SOURCES = frozenset({"auto", "manual", "backfill"})
 
@@ -1188,6 +1193,7 @@ class ParsedArchive:
     files: dict[str, bytes]
     rows: ArchiveRows
     warnings: tuple[ArchiveError, ...] = ()
+    secrets: SecretsEnvelope | None = None
 
 
 def csv_bytes(filename: str, rows: tuple[object, ...]) -> bytes:
@@ -1303,9 +1309,10 @@ def manifest_bytes(
 ) -> bytes:
     """Build a manifest with a checksum and data-row count for every member."""
     listed: list[dict[str, object]] = []
-    for path in FILE_ORDER:
+    paths = (*FILE_ORDER, SECRETS_FILE) if SECRETS_FILE in files else FILE_ORDER
+    for path in paths:
         data = files[path]
-        row_count = None if path == "workspace.json" else _csv_data_rows(data)
+        row_count = _csv_data_rows(data) if path.endswith(".csv") else None
         listed.append(
             {
                 "path": path,
@@ -1362,8 +1369,9 @@ def zip_bytes(files: dict[str, bytes], *, exported_at: datetime) -> bytes:
     year = max(1980, min(stamp.year, 2107))
     zip_time = (year, stamp.month, stamp.day, stamp.hour, stamp.minute, stamp.second // 2 * 2)
     output = io.BytesIO()
+    names = (*REQUIRED_FILES, SECRETS_FILE) if SECRETS_FILE in files else REQUIRED_FILES
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name in REQUIRED_FILES:
+        for name in names:
             info = zipfile.ZipInfo(name, zip_time)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 0
@@ -1378,8 +1386,11 @@ def write_archive(
     app_version: str,
     exported_at: datetime,
     base_currency: str,
+    secrets: bytes | None = None,
 ) -> bytes:
     files = build_files(rows)
+    if secrets is not None:
+        files[SECRETS_FILE] = secrets
     files["manifest.json"] = manifest_bytes(
         files,
         app_name=app_name,
@@ -1500,6 +1511,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         or "manifest.json" in expected
         or not set(required) - {"manifest.json"} <= set(expected)
         or not set(expected) <= set(files)
+        or (SECRETS_FILE in files and SECRETS_FILE not in expected)
     ):
         return None, (ArchiveError("manifest.json", "invalid file list"),)
     errors: list[ArchiveError] = []
@@ -1526,6 +1538,12 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         return None, tuple(errors)
     if data_rows > MAX_DATA_ROWS:
         return None, (ArchiveError("archive", "too many data rows"),)
+    secrets: SecretsEnvelope | None = None
+    if SECRETS_FILE in files:
+        try:
+            secrets = parse_secrets_envelope(files[SECRETS_FILE])
+        except ValueError:
+            return None, (ArchiveError(SECRETS_FILE, "invalid secrets envelope"),)
     try:
         workspace = _string_keyed_object(json.loads(files["workspace.json"]))
     except (ValueError, RecursionError):
@@ -1583,7 +1601,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
     )
     if errors:
         return None, tuple(errors)
-    return ParsedArchive(manifest, files, parsed, tuple(warnings)), ()
+    return ParsedArchive(manifest, files, parsed, tuple(warnings), secrets), ()
 
 
 def _valid_upcoming_days(value: object) -> bool:

@@ -416,10 +416,12 @@ use.
 - Version handling per ADR-0016: an archive of a newer **major** format version is refused
   ("made by a newer version of the app"); a newer **minor** version imports with a warning
   listing the ignored files and columns; older majors pass through the reader's upgrade
-  functions (none exist for 1.x).
-- Round-trip test: synthetic workspace → export → restore into an empty workspace in the same
-  database → export again gives byte-identical data files (`manifest.json` differs only in
-  `exported_at` and the app version).
+  functions (none exist for 1.x). Format 2.4 (F9.3) adds the optional encrypted
+  `secrets.json.enc` member; a 2.4 archive without it stays valid, and an older reader lists it
+  as an unknown member.
+- Round-trip test: synthetic workspace → export → restore into an empty workspace → export
+  again gives byte-identical data files (`manifest.json` differs only in `exported_at` and the
+  app version). F9.3 runs this over the full demo builder in a fresh database.
 
 **Agent prompt**
 ```

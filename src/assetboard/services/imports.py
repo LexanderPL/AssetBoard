@@ -39,6 +39,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
+from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.income import WorkLog
@@ -57,6 +58,7 @@ from assetboard.db.models.networth import (
     NetWorthItem,
     NetWorthSnapshot,
 )
+from assetboard.db.models.notifications import NotificationChannel
 from assetboard.db.models.prices import FxRate, PricePoint, PriceSourceConfig
 from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
@@ -91,6 +93,7 @@ from assetboard.db.repositories import (
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     NotFound,
+    NotificationChannelRepository,
     PricePointRepository,
     PriceSourceConfigRepository,
     ReferenceRateRepository,
@@ -250,6 +253,9 @@ REPORT_MESSAGES: dict[str, str] = {
         "Recurring items, income sources, tax rules and work calendars are restored only; "
         "work logs were merged."
     ),
+    "secrets_restore_only": _(
+        "The encrypted secrets member is restored only; it was ignored in this merge."
+    ),
     "income_source_not_found": _("No income source with this name or id exists."),
     "income_source_ambiguous": _(
         "More than one income source has this name; add the income_source_id column to choose one."
@@ -264,6 +270,7 @@ REPORT_MESSAGES: dict[str, str] = {
         "This month's income was already received; its work log cannot be changed by an import."
     ),
     "invalid_units": _("Enter work units as a non-negative number."),
+    "invalid_secrets_envelope": _("The archive's encrypted secrets member is invalid."),
     "income_source_not_variable": _(
         "This income source is not variable; work logs apply only to variable income."
     ),
@@ -529,6 +536,7 @@ _PARSER_CODES: dict[str, str] = {
     "checksum mismatch": "checksum_mismatch",
     "byte count mismatch": "byte_count_mismatch",
     "row count mismatch": "row_count_mismatch",
+    "invalid secrets envelope": "invalid_secrets_envelope",
     "invalid delimiter option": "invalid_delimiter",
     "duplicate column name": "duplicate_column",
     "only part of a full restore": "partial_restore",
@@ -773,6 +781,14 @@ class ImportRestoreRollbackBlocked(ImportError):
         self.reasons = reasons
 
 
+class ImportSecretsPassphraseRequired(ImportError):
+    """The archive has an encrypted secrets member and no passphrase was supplied."""
+
+
+class ImportSecretsPassphraseInvalid(ImportError):
+    """The supplied passphrase does not open the archive's secrets member."""
+
+
 class ImportRollbackOversell(ImportError):
     """Removing an investment import's rows would leave an oversold history."""
 
@@ -829,6 +845,8 @@ class ImportAdapter:
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
         raise NotImplementedError
 
@@ -1271,6 +1289,8 @@ def apply_import(
     *,
     skip_invalid: bool = False,
     options: Mapping[str, object] | None = None,
+    secrets_passphrase: str | None = None,
+    instance_settings: Settings | None = None,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
     stored_path = _upload_path(data_dir, ctx.workspace.id, batch_id)
@@ -1284,6 +1304,8 @@ def apply_import(
             adapters=adapters,
             skip_invalid=skip_invalid,
             options=options,
+            secrets_passphrase=secrets_passphrase,
+            instance_settings=instance_settings,
         )
 
     result = run_immediate(factory, apply)
@@ -1311,6 +1333,8 @@ def _apply_import_in_session(
     adapters: ImportAdapterRegistry,
     skip_invalid: bool = False,
     options: Mapping[str, object] | None = None,
+    secrets_passphrase: str | None = None,
+    instance_settings: Settings | None = None,
 ) -> dict[str, Any]:
     """``apply_import``'s write body, shared with the demo builder.
 
@@ -1389,6 +1413,8 @@ def _apply_import_in_session(
         parsed,
         base_currency=base_currency,
         skip_invalid=skip_invalid,
+        secrets_passphrase=secrets_passphrase,
+        instance_settings=instance_settings,
     )
     # Keep the applied report on the batch even when the caller (the demo builder) created the
     # batch directly instead of going through plan_import, so the data page still shows it.
@@ -1687,6 +1713,7 @@ class _RestoreRollbackPlan:
     m3_rows: dict[str, tuple[Any, ...]]
     reasons: tuple[str, ...]
     settings: dict[str, object]
+    notification_channels: tuple[NotificationChannel, ...] = ()
 
     def counts(self) -> dict[str, int]:
         return {
@@ -1711,6 +1738,7 @@ class _RestoreRollbackPlan:
             **{key: len(rows) for key, rows in self.fire_rows.items()},
             **{key: len(rows) for key, rows in self.m3_rows.items()},
             "m3_rows_deleted": sum(len(rows) for rows in self.m3_rows.values()),
+            "notification_channels": len(self.notification_channels),
         }
 
 
@@ -1928,6 +1956,18 @@ def _restore_rollback_plan(
         if any(row.updated_at > applied_at for row in rows):
             reasons.add("restore_rows_changed")
         m3_rows[key] = rows
+    raw_secret_channels = (batch.report or {}).get("restored_secret_channel_ids")
+    expected_channels: set[UUID] = set()
+    if isinstance(raw_secret_channels, list):
+        for value in cast("list[object]", raw_secret_channels):
+            with contextlib.suppress(ValueError, AttributeError):
+                expected_channels.add(UUID(str(value)))
+    all_channels = NotificationChannelRepository(session, ctx).list()
+    notification_channels = tuple(row for row in all_channels if row.id in expected_channels)
+    if len(notification_channels) != len(expected_channels):
+        reasons.add("restore_rows_added")
+    if any(row.updated_at > applied_at for row in notification_channels):
+        reasons.add("restore_rows_changed")
     month_values: list[YearMonth] = []
     for raw in cast("list[object]", raw_months or []):
         try:
@@ -1957,6 +1997,7 @@ def _restore_rollback_plan(
         fire_rows=fire_rows,
         m3_rows=m3_rows,
         reasons=tuple(sorted(reasons)),
+        notification_channels=notification_channels,
         settings=workspace_settings,
     )
 
@@ -1966,6 +2007,10 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
+    channels = NotificationChannelRepository(session, ctx)
+    for channel in plan.notification_channels:
+        channels.delete(channel)
+    session.flush()
     for key in (
         "scheduled_occurrences",
         "scheduled_items",
@@ -2088,6 +2133,7 @@ def _rollback_restore(
             "loans_deleted": len(plan.loan_rows.get("loans", ())),
             "loan_rows_deleted": sum(len(rows) for rows in plan.loan_rows.values()),
             "m3_rows_deleted": sum(len(rows) for rows in plan.m3_rows.values()),
+            "notification_channels_deleted": len(plan.notification_channels),
             "fire_scenarios_deleted": len(plan.fire_rows.get("fire_scenarios", ())),
             "fire_events_deleted": len(plan.fire_rows.get("fire_events", ())),
             "fire_rows_deleted": sum(len(rows) for rows in plan.fire_rows.values()),

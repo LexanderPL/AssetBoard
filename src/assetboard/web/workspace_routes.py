@@ -29,6 +29,7 @@ from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace, restore_available
+from assetboard.services.archive_secrets import InvalidPassphrase
 from assetboard.services.context import (
     DemoRestricted,
     Role,
@@ -47,6 +48,8 @@ from assetboard.services.imports import (
     ImportRestoreRollbackBlocked,
     ImportRestoreUnavailable,
     ImportRollbackOversell,
+    ImportSecretsPassphraseInvalid,
+    ImportSecretsPassphraseRequired,
     ImportUnavailable,
     apply_import,
     cancel_import,
@@ -146,6 +149,16 @@ IMPORT_RESTORE_NOT_EMPTY = _(
     "Restore is available only in an empty workspace (the untouched suggested categories are fine)."
 )
 IMPORT_RESTORE_NOT_ARCHIVE = _("Restore needs a complete workspace archive (a ZIP file).")
+EXPORT_SECRETS_PASSPHRASE = _(
+    "Enter a passphrase of at least 12 characters to include secrets, and repeat it."
+)
+EXPORT_SECRETS_OWNER = _("Only a workspace owner can include secrets in an archive.")
+IMPORT_SECRETS_PASSPHRASE_REQUIRED = _(
+    "This archive contains encrypted secrets. Enter its passphrase to restore them."
+)
+IMPORT_SECRETS_PASSPHRASE_INVALID = _(
+    "The passphrase does not open this archive's secrets. Check it and try again."
+)
 ROLLBACK_CLOSED_MONTH = _("Rollback was refused because these months are closed: %(months)s")
 ROLLBACK_RESTORE_CHANGED = _(
     "Rollback was refused because the workspace changed after the restore: %(reasons)s"
@@ -356,6 +369,9 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
             "import_batches": batches,
             "selected_batch": selected,
             "notice": _import_notice(request),
+            "export_error": _t(request, EXPORT_SECRETS_PASSPHRASE)
+            if request.query_params.get("export_error") == "passphrase"
+            else None,
             "available_import_sources": request.app.state.import_adapters.sources,
             "import_message": partial(report_message, locale=request.state.locale),
             "mapping_categories": await run_in_threadpool(
@@ -486,7 +502,9 @@ async def workspace_data_import_apply(
     batch = await run_in_threadpool(
         get_import_batch, request.app.state.session_factory, ctx, identifier
     )
-    options = _mapping_options_from_form(await request.form(), batch.report if batch else None)
+    form = await request.form()
+    secrets_passphrase = str(form.get("secrets_passphrase", ""))
+    options = _mapping_options_from_form(form, batch.report if batch else None)
     try:
         await run_in_threadpool(
             apply_import,
@@ -497,6 +515,8 @@ async def workspace_data_import_apply(
             request.app.state.import_adapters,
             skip_invalid=skip_invalid,
             options=options or None,
+            secrets_passphrase=secrets_passphrase or None,
+            instance_settings=request.app.state.settings,
         )
     except ImportMappingInvalid:
         return RedirectResponse(
@@ -510,6 +530,14 @@ async def workspace_data_import_apply(
         raise HTTPException(status_code=409, detail=_t(request, IMPORT_REFUSED)) from None
     except ImportRestoreUnavailable:
         raise HTTPException(status_code=409, detail=_t(request, IMPORT_RESTORE_NOT_EMPTY)) from None
+    except ImportSecretsPassphraseRequired:
+        raise HTTPException(
+            status_code=409, detail=_t(request, IMPORT_SECRETS_PASSPHRASE_REQUIRED)
+        ) from None
+    except ImportSecretsPassphraseInvalid:
+        raise HTTPException(
+            status_code=409, detail=_t(request, IMPORT_SECRETS_PASSPHRASE_INVALID)
+        ) from None
     except ImportError as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
@@ -669,8 +697,33 @@ async def workspace_data_import_rollback(
 
 
 @router.post("/workspace/data/export", name="workspace_data_export")
-async def workspace_data_export(request: Request, ctx: CurrentContext) -> Response:
-    archive = await run_in_threadpool(export_workspace, request.app.state.session_factory, ctx)
+async def workspace_data_export(
+    request: Request,
+    ctx: CurrentContext,
+    include_secrets: Annotated[str, Form()] = "",
+    passphrase: Annotated[str, Form()] = "",
+    passphrase_confirm: Annotated[str, Form()] = "",
+) -> Response:
+    wants_secrets = include_secrets == "true"
+    if wants_secrets and ctx.role is not Role.OWNER:
+        raise HTTPException(status_code=403, detail=_t(request, EXPORT_SECRETS_OWNER))
+    if wants_secrets and (not passphrase.strip() or passphrase != passphrase_confirm):
+        return RedirectResponse(
+            f"{request.url_for('workspace_data').path}?export_error=passphrase", status_code=303
+        )
+    try:
+        archive = await run_in_threadpool(
+            export_workspace,
+            request.app.state.session_factory,
+            ctx,
+            include_secrets=wants_secrets,
+            passphrase=passphrase if wants_secrets else None,
+            settings=request.app.state.settings if wants_secrets else None,
+        )
+    except InvalidPassphrase:
+        return RedirectResponse(
+            f"{request.url_for('workspace_data').path}?export_error=passphrase", status_code=303
+        )
     spool = SpooledTemporaryFile(max_size=EXPORT_SPOOL_BYTES)  # noqa: SIM115
     try:
         await run_in_threadpool(spool.write, archive.content)

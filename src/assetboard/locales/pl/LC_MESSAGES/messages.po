@@ -1757,6 +1757,13 @@ msgstr ""
 "Pozycje cykliczne, źródła przychodu, reguły podatkowe i kalendarze pracy "
 "są tylko przywracane; dzienniki pracy zostały scalone."
 
+msgid ""
+"The encrypted secrets member is restored only; it was ignored in this "
+"merge."
+msgstr ""
+"Zaszyfrowany element z sekretami służy tylko do przywracania; został "
+"pominięty w tym scalaniu."
+
 msgid "No income source with this name or id exists."
 msgstr "Nie istnieje źródło przychodu o tej nazwie lub identyfikatorze."
 
@@ -1789,6 +1796,9 @@ msgstr ""
 
 msgid "Enter work units as a non-negative number."
 msgstr "Podaj nieujemną liczbę jednostek pracy."
+
+msgid "The archive's encrypted secrets member is invalid."
+msgstr "Zaszyfrowany element archiwum z sekretami jest nieprawidłowy."
 
 msgid ""
 "This income source is not variable; work logs apply only to variable "
@@ -5742,6 +5752,28 @@ msgstr "Tego archiwum nie można zaimportować do tego obszaru roboczego."
 
 msgid "Restore needs a complete workspace archive (a ZIP file)."
 msgstr "Przywracanie wymaga kompletnego archiwum obszaru roboczego (pliku ZIP)."
+
+msgid ""
+"Enter a passphrase of at least 12 characters to include secrets, and "
+"repeat it."
+msgstr ""
+"Podaj hasło do sekretów składające się z co najmniej 12 znaków i powtórz "
+"je."
+
+msgid "Only a workspace owner can include secrets in an archive."
+msgstr "Tylko właściciel obszaru roboczego może dołączyć sekrety do archiwum."
+
+msgid ""
+"This archive contains encrypted secrets. Enter its passphrase to restore "
+"them."
+msgstr ""
+"To archiwum zawiera zaszyfrowane sekrety. Podaj jego hasło, aby je "
+"przywrócić."
+
+msgid ""
+"The passphrase does not open this archive's secrets. Check it and try "
+"again."
+msgstr "To hasło nie otwiera sekretów archiwum. Sprawdź je i spróbuj ponownie."
 
 #, python-format
 msgid "Rollback was refused because these months are closed: %(months)s"
@@ -12819,10 +12851,40 @@ msgstr ""
 
 msgid ""
 "Recurring items, income sources, work logs, calendars, and tax rules are "
-"included. Notification channels are not included."
+"included. Notification channels and provider API keys are included only "
+"in the optional encrypted secrets member."
 msgstr ""
 "Pozycje cykliczne, źródła przychodu, dzienniki pracy, kalendarze i reguły"
-" podatkowe są uwzględnione. Kanały powiadomień nie są uwzględnione."
+" podatkowe są uwzględnione. Kanały powiadomień i klucze API dostawców są "
+"uwzględniane tylko w opcjonalnym zaszyfrowanym elemencie z sekretami."
+
+msgid ""
+"Recurring items, income sources, work logs, calendars, and tax rules are "
+"included. Notification channels and provider API keys are not included in"
+" this download."
+msgstr ""
+"Pozycje cykliczne, źródła przychodu, dzienniki pracy, kalendarze i reguły"
+" podatkowe są uwzględnione. Kanały powiadomień i klucze API dostawców nie"
+" są uwzględnione w tym pobraniu."
+
+msgid "Secrets"
+msgstr "Sekrety"
+
+msgid "Include notification URLs and provider API keys"
+msgstr "Dołącz adresy powiadomień i klucze API dostawców"
+
+msgid ""
+"They are written to a separate encrypted member and need this passphrase "
+"to restore. Keep it somewhere safe; it cannot be recovered."
+msgstr ""
+"Są zapisywane w osobnym zaszyfrowanym elemencie i wymagają tego hasła do "
+"przywrócenia. Przechowuj je bezpiecznie; nie można go odzyskać."
+
+msgid "Archive secrets passphrase"
+msgstr "Hasło do sekretów archiwum"
+
+msgid "Repeat the passphrase"
+msgstr "Powtórz hasło"
 
 msgid "Download archive"
 msgstr "Pobierz archiwum"
@@ -12908,6 +12970,9 @@ msgstr "Pobierz plik CSV z błędami i pominiętymi wierszami"
 msgid "Cancel import"
 msgstr "Anuluj import"
 
+msgid "Secrets passphrase"
+msgstr "Hasło do sekretów"
+
 #, python-format
 msgid "Skip %(count)s invalid rows"
 msgstr "Pomiń nieprawidłowe wiersze: %(count)s"
@@ -12938,6 +13003,15 @@ msgstr "Nieprawidłowe wiersze"
 
 msgid "Unresolved category mappings"
 msgstr "Nierozwiązane mapowania kategorii"
+
+msgid ""
+"This archive contains an encrypted secrets member. Enter its passphrase "
+"in the Apply import form to restore notification channels and provider "
+"keys."
+msgstr ""
+"To archiwum zawiera zaszyfrowany element z sekretami. Podaj jego hasło w "
+"formularzu zastosowania importu, aby przywrócić kanały powiadomień i "
+"klucze dostawców."
 
 msgid "Deleted transactions restored"
 msgstr "Przywrócone usunięte transakcje"
