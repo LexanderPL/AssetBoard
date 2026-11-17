@@ -2388,6 +2388,12 @@ msgstr ""
 "To Twój ostatni sposób logowania, więc nie można go usunąć. Najpierw "
 "powiąż inną metodę logowania albo ustaw hasło."
 
+msgid "Your sidebar is saved."
+msgstr "Pasek boczny został zapisany."
+
+msgid "Your sidebar is back to the default order."
+msgstr "Pasek boczny wrócił do domyślnej kolejności."
+
 msgid "Browser language"
 msgstr "Język przeglądarki"
 
@@ -5048,6 +5054,24 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Home"
+msgstr "Strona główna"
+
+msgid "History"
+msgstr "Historia"
+
+msgid "Upcoming"
+msgstr "Nadchodzące"
+
+msgid "Recurring"
+msgstr "Cykliczne"
+
+msgid "Loans"
+msgstr "Kredyty"
+
+msgid "FIRE projection"
+msgstr "Prognoza FIRE"
+
 msgid "on Monday"
 msgstr "w poniedziałek"
 
@@ -5574,20 +5598,11 @@ msgstr ""
 " albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
 "podany poniżej i potwierdź ponownie."
 
-msgid "Home"
-msgstr "Strona główna"
-
 msgid "Menu"
 msgstr "Menu"
 
 msgid "Main navigation"
 msgstr "Menu główne"
-
-msgid "History"
-msgstr "Historia"
-
-msgid "Upcoming"
-msgstr "Nadchodzące"
 
 #, python-format
 msgid "%(num)d overdue occurrence"
@@ -5595,15 +5610,6 @@ msgid_plural "%(num)d overdue occurrences"
 msgstr[0] "%(num)d zaległe wystąpienie"
 msgstr[1] "%(num)d zaległe wystąpienia"
 msgstr[2] "%(num)d zaległych wystąpień"
-
-msgid "Recurring"
-msgstr "Cykliczne"
-
-msgid "Loans"
-msgstr "Kredyty"
-
-msgid "FIRE projection"
-msgstr "Prognoza FIRE"
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -5752,6 +5758,35 @@ msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
 
 msgid "Use the saved theme on this device"
 msgstr "Użyj zapisanego motywu na tym urządzeniu"
+
+msgid "Sidebar"
+msgstr "Pasek boczny"
+
+msgid ""
+"Choose which pages appear in the sidebar and in which order. Some pages "
+"appear only where the workspace enables the feature, such as Taxes."
+msgstr ""
+"Wybierz, które strony pojawiają się na pasku bocznym i w jakiej kolejności. "
+"Niektóre strony pojawiają się tylko wtedy, gdy obszar roboczy włączy daną "
+"funkcję, np. Podatki."
+
+msgid "Only shown when Taxes is turned on in the workspace settings."
+msgstr ""
+"Widoczne tylko wtedy, gdy w ustawieniach obszaru roboczego włączono Podatki."
+
+msgid "Always shown"
+msgstr "Zawsze widoczna"
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr "Przesuń %(name)s w górę"
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr "Przesuń %(name)s w dół"
+
+msgid "Reset to default"
+msgstr "Przywróć domyślne"
 
 msgid "Notifications"
 msgstr "Powiadomienia"
@@ -6364,14 +6399,6 @@ msgstr "Przywróć"
 
 msgid "Edit"
 msgstr "Edytuj"
-
-#, python-format
-msgid "Move %(name)s up"
-msgstr "Przesuń %(name)s w górę"
-
-#, python-format
-msgid "Move %(name)s down"
-msgstr "Przesuń %(name)s w dół"
 
 msgid "Archive"
 msgstr "Archiwizuj"

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 from fastapi import Request
@@ -11,12 +12,65 @@ from starlette.responses import HTMLResponse
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import InvalidMonth, YearMonth
-from assetboard.i18n import translations_for
+from assetboard.domain.navigation import DEFAULT_SIDEBAR, HOME_KEY
+from assetboard.i18n import gettext, translations_for
 from assetboard.i18n.dates import format_time
 from assetboard.i18n.numbers import format_money, format_price
 from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
+if TYPE_CHECKING:
+    from assetboard.services.context import WorkspaceNav
+
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
+
+
+def _(message: str) -> str:
+    """Marks a message for extraction; the templates translate it at render time."""
+    return message
+
+
+# The stable labels and glyphs of the sidebar destinations (F9.12); the profile customiser uses
+# the same labels, so a destination is named identically in both places.
+SIDEBAR_LABELS: dict[str, str] = {
+    "home": _("Home"),
+    "month": _("Month"),
+    "transactions": _("Transactions"),
+    "history": _("History"),
+    "upcoming": _("Upcoming"),
+    "recurring": _("Recurring"),
+    "income": _("Income"),
+    "taxes": _("Taxes"),
+    "net_worth": _("Net worth"),
+    "investments": _("Investments"),
+    "loans": _("Loans"),
+    "fire": _("FIRE projection"),
+}
+SIDEBAR_GLYPHS: dict[str, str] = {
+    "home": "⌂",
+    "month": "◷",
+    "transactions": "≡",
+    "history": "⌕",
+    "upcoming": "◔",
+    "recurring": "↻",
+    "income": "¤",
+    "taxes": "%",
+    "net_worth": "◇",
+    "investments": "↗",
+    "loans": "▤",
+    "fire": "✦",
+}
+
+
+def sidebar_labels(locale: str) -> dict[str, str]:
+    """The sidebar labels in ``locale`` (the profile customiser shows the same names)."""
+    return {key: gettext(message, locale) for key, message in SIDEBAR_LABELS.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class SidebarLink:
+    key: str
+    href: str
+    current: bool
 
 
 @lru_cache(maxsize=2)
@@ -32,6 +86,9 @@ def templates_for(locale: str) -> Jinja2Templates:
         uuid4=uuid4,
         csrf_token=csrf_token,
         month_nav_links=month_nav_links,
+        sidebar_links=sidebar_links,
+        sidebar_labels=sidebar_labels(locale),
+        sidebar_glyphs=SIDEBAR_GLYPHS,
     )
     return templates
 
@@ -69,6 +126,73 @@ def month_nav_links(request: Request) -> tuple[str, str]:
         scoped_url(request, "month", month=str(month)),
         scoped_url(request, "transactions_month", month=str(month)),
     )
+
+
+def sidebar_links(request: Request, nav: WorkspaceNav | None) -> tuple[SidebarLink, ...]:
+    """The visible destinations in the user's saved order, with their href and current state.
+
+    Home is always present. Without a workspace context only Home is shown (the account, admin
+    and audit pages of a user with no membership). Taxes appears only when the workspace enables
+    the feature; a hidden destination remains reachable by its address.
+    """
+    path = request.url.path
+    items = nav.sidebar if nav is not None else DEFAULT_SIDEBAR
+    month_href, transactions_href = ("", "")
+    if nav is not None:
+        month_href, transactions_href = month_nav_links(request)
+    taxes_enabled = nav is not None and nav.current.taxes_enabled
+    links: list[SidebarLink] = []
+    for item in items:
+        key = item.key
+        if key == HOME_KEY:
+            href = scoped_url(request, "home")
+            links.append(SidebarLink(key, href, path == href))
+            continue
+        if nav is None or not item.visible:
+            continue
+        if key == "taxes" and not taxes_enabled:
+            continue
+        if key == "month":
+            base = scoped_url(request, "month_current")
+            current = path == base or path.startswith(base + "/")
+            href = month_href
+        elif key == "transactions":
+            base = scoped_url(request, "transactions")
+            current = path == base or path.startswith(base + "/")
+            href = transactions_href
+        elif key == "history":
+            href = scoped_url(request, "history")
+            current = path == href or path.startswith(href + "/")
+        elif key == "upcoming":
+            href = scoped_url(request, "scheduled_upcoming")
+            current = path.endswith("/upcoming")
+        elif key == "recurring":
+            href = scoped_url(request, "scheduled_items")
+            current = "/recurring" in path
+        elif key == "income":
+            href = scoped_url(request, "income_sources")
+            current = path == href or path.startswith(href + "/")
+        elif key == "taxes":
+            href = scoped_url(request, "tax_rules")
+            current = "/taxes" in path
+        elif key == "net_worth":
+            href = scoped_url(request, "networth_summary")
+            base = scoped_url(request, "networth")
+            current = path == base or path.startswith(base + "/")
+        elif key == "investments":
+            href = scoped_url(request, "investments_portfolio")
+            base = scoped_url(request, "investments")
+            current = path == base or path.startswith(base + "/")
+        elif key == "loans":
+            href = scoped_url(request, "loans")
+            current = path == href or path.startswith(href + "/")
+        elif key == "fire":
+            href = scoped_url(request, "fire_scenarios")
+            current = path == href or path.startswith(href + "/")
+        else:  # unknown keys never reach the template (normalize_sidebar drops them)
+            continue
+        links.append(SidebarLink(key, href, current))
+    return tuple(links)
 
 
 def static_url(request: Request, path: str) -> str:

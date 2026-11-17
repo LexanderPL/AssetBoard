@@ -2295,6 +2295,12 @@ msgid ""
 "sign-in method or set a password first."
 msgstr ""
 
+msgid "Your sidebar is saved."
+msgstr ""
+
+msgid "Your sidebar is back to the default order."
+msgstr ""
+
 msgid "Browser language"
 msgstr ""
 
@@ -4699,6 +4705,24 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Home"
+msgstr ""
+
+msgid "History"
+msgstr ""
+
+msgid "Upcoming"
+msgstr ""
+
+msgid "Recurring"
+msgstr ""
+
+msgid "Loans"
+msgstr ""
+
+msgid "FIRE projection"
+msgstr ""
+
 msgid "on Monday"
 msgstr ""
 
@@ -5171,19 +5195,10 @@ msgid ""
 " named below and confirm again."
 msgstr ""
 
-msgid "Home"
-msgstr ""
-
 msgid "Menu"
 msgstr ""
 
 msgid "Main navigation"
-msgstr ""
-
-msgid "History"
-msgstr ""
-
-msgid "Upcoming"
 msgstr ""
 
 #, python-format
@@ -5191,15 +5206,6 @@ msgid "%(num)d overdue occurrence"
 msgid_plural "%(num)d overdue occurrences"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Recurring"
-msgstr ""
-
-msgid "Loans"
-msgstr ""
-
-msgid "FIRE projection"
-msgstr ""
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -5339,6 +5345,31 @@ msgid "The dark-mode button changes the theme on one device only."
 msgstr ""
 
 msgid "Use the saved theme on this device"
+msgstr ""
+
+msgid "Sidebar"
+msgstr ""
+
+msgid ""
+"Choose which pages appear in the sidebar and in which order. Some pages "
+"appear only where the workspace enables the feature, such as Taxes."
+msgstr ""
+
+msgid "Only shown when Taxes is turned on in the workspace settings."
+msgstr ""
+
+msgid "Always shown"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr ""
+
+msgid "Reset to default"
 msgstr ""
 
 msgid "Notifications"
@@ -5891,14 +5922,6 @@ msgid "Restore"
 msgstr ""
 
 msgid "Edit"
-msgstr ""
-
-#, python-format
-msgid "Move %(name)s up"
-msgstr ""
-
-#, python-format
-msgid "Move %(name)s down"
 msgstr ""
 
 msgid "Archive"
