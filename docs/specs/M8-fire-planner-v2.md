@@ -1421,9 +1421,9 @@ tests. Keep loan math, money/rounding rules, the other rules and dependencies un
 - Unit tests cover both golden/oracle paths, the exact candidate boundary, zero at the horizon,
   the stop-age cap, the counterfactual path and validation; the property suite samples the new
   rule; sensitivity reuses the base projection. Web tests cover the selector default, saving
-  without an SWR, the metrics notes and the archive round-trip. The browser wizard checks the
-  selection and the inactive rate field. `docs/fire.md`, `docs/archive-format.md`, the overview
-  range and ADR-0027 were updated.
+  without an SWR and the metrics notes; the archive round-trip is covered in the FIRE archive
+  tests. The browser wizard checks the selection and the inactive rate field. `docs/fire.md`,
+  `docs/archive-format.md`, the overview range and ADR-0027 were updated.
 
 ---
 
