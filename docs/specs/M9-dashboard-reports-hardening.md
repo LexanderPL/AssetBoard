@@ -188,6 +188,13 @@ instance-level (no `workspace_id`), so tenant isolation and the demo builder do 
 table is documented as instance-level in `docs/architecture.md`. The backup directory also
 holds a `<name>.secret_key` sidecar when the key is stored in `DATA_DIR`, so an automatic
 restore keeps encrypted values readable; the download button serves the database file only.
+The source is validated as a complete AssetBoard database before copying, so a missing or
+empty database cannot produce a "successful" empty backup. Backup writers share a lock (thread
+and file), which keeps concurrent manual runs from colliding; the daily tick skips a copy made
+within the previous hour to avoid a startup/cron duplicate. A damaged live database still gets
+a raw pre-restore copy before a restore, so recovery is never blocked by its own safety net,
+and the CLI refuses the default relative `./data` target unless `--data-dir`,
+`--database-url` or `ASSETBOARD_DATA_DIR` names the live instance.
 
 **Agent prompt**
 ```

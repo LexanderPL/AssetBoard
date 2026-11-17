@@ -71,6 +71,17 @@ msgid ""
 "existing key; make sure it is the key the backup was made with."
 msgstr ""
 
+msgid ""
+"The previous database could not be verified; a raw copy was saved as the "
+"pre-restore backup. Check it before relying on it."
+msgstr ""
+
+msgid ""
+"Refusing to restore into the default ./data directory: pass --data-dir, "
+"--database-url or ASSETBOARD_DATA_DIR so the live database is "
+"unambiguous."
+msgstr ""
+
 #, python-format
 msgid "Restored %(file)s into %(target)s."
 msgstr ""
@@ -2372,8 +2383,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"The scheduled database backup failed (code: %(code)s). Check the log, "
-"then run Back up now in Instance settings."
+"The database backup failed (code: %(code)s). Check the log, then run Back"
+" up now in Instance settings."
 msgstr ""
 
 #, python-format
@@ -5812,6 +5823,9 @@ msgid "Save settings"
 msgstr ""
 
 msgid "Backups"
+msgstr ""
+
+msgid "Automatic backups are not available for an in-memory database."
 msgstr ""
 
 msgid ""
@@ -14770,5 +14784,12 @@ msgstr ""
 #~ "logs, calendars, and tax rules are "
 #~ "included. Notification channels are not "
 #~ "included."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The scheduled database backup failed "
+#~ "(code: %(code)s). Check the log, then"
+#~ " run Back up now in Instance "
+#~ "settings."
 #~ msgstr ""
 

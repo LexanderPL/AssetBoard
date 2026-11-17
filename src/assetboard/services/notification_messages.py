@@ -79,7 +79,7 @@ def backup_failure_message(*, locale: str, code: str) -> tuple[str, str]:
     title = gettext(_("%(app)s: database backup failed"), locale) % {"app": APP_NAME}
     body = gettext(
         _(
-            "The scheduled database backup failed (code: %(code)s). Check the log, then run "
+            "The database backup failed (code: %(code)s). Check the log, then run "
             "Back up now in Instance settings."
         ),
         locale,

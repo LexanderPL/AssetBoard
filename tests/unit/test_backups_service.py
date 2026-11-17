@@ -8,6 +8,7 @@ import sqlite3
 import threading
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import time as day_time
@@ -28,9 +29,13 @@ from assetboard.db.migrate import alembic_config, schema_state, upgrade_database
 from assetboard.db.models.backups import BackupRun
 from assetboard.db.models.identity import ExternalIdentity, User, Workspace
 from assetboard.db.models.notifications import NotificationChannel
+from assetboard.db.repositories import InstanceNotificationReader
 from assetboard.domain.backups import RetentionPolicy
 from assetboard.services.backups import (
     ERROR_COPY_FAILED,
+    ERROR_DATABASE_MISSING,
+    ERROR_NOT_ASSETBOARD,
+    ERROR_SECRET_KEY,
     BackupError,
     BackupUnavailable,
     RestoreError,
@@ -40,6 +45,7 @@ from assetboard.services.backups import (
     inspect_backup,
     prune_scheduled_backups,
     restore_backup,
+    run_scheduled_backup,
     scheduled_backup_due,
     sqlite_database_path,
     verify_database,
@@ -484,3 +490,254 @@ def test_inspection_rejects_a_file_without_alembic_metadata(env: Env, tmp_path: 
     with sqlite3.connect(empty) as connection:
         connection.execute("CREATE TABLE users (id TEXT)")
     assert inspect_backup(empty, env.settings).state == "unknown"
+
+
+def test_backup_copies_the_key_generated_at_startup(env: Env) -> None:
+    assert env.settings.secret_key is None
+    key = env.settings.ensure_secret_key()
+    # ensure_secret_key() assigns the generated key, so model_fields_set claims the key is
+    # configured; the sidecar decision must look at the file instead.
+    assert "secret_key" in env.settings.model_fields_set
+    result = create_backup(env.factory, env.settings, env.clock, origin="manual")
+    sidecar = result.path.with_name(result.path.name + ".secret_key")
+    assert sidecar.read_text(encoding="utf-8") == key
+
+
+def test_a_stale_key_file_does_not_replace_a_configured_key(env: Env) -> None:
+    (env.settings.data_dir / "secret_key").write_text("stale-key", encoding="utf-8")
+    env.settings.secret_key = "configured-key"
+    result = create_backup(env.factory, env.settings, env.clock, origin="manual")
+    assert not result.path.with_name(result.path.name + ".secret_key").exists()
+
+
+def test_backup_refuses_missing_empty_and_schema_less_sources(env: Env, tmp_path: Path) -> None:
+    missing = tmp_path / "missing.db"
+    empty = tmp_path / "empty.db"
+    empty.write_bytes(b"")
+    schema_less = tmp_path / "schema-less.db"
+    with sqlite3.connect(schema_less) as connection:
+        connection.execute("CREATE TABLE unrelated (id TEXT)")
+    for path, code in (
+        (missing, ERROR_DATABASE_MISSING),
+        (empty, ERROR_DATABASE_MISSING),
+        (schema_less, ERROR_NOT_ASSETBOARD),
+    ):
+        settings = Settings(
+            _env_file=None,
+            data_dir=env.settings.data_dir,
+            database_url=f"sqlite:///{path}",
+        )
+        with pytest.raises(BackupError) as error:
+            create_backup(env.factory, settings, env.clock, origin="manual")
+        assert error.value.code == code
+    assert not missing.exists()
+    assert empty.stat().st_size == 0
+    with env.factory() as session:
+        assert session.scalars(select(BackupRun)).all() == []
+    assert not list((env.settings.data_dir / "backups").glob("assetboard-*.db"))
+
+
+def test_secret_key_copy_failure_fails_the_backup(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (env.settings.data_dir / "secret_key").write_text("stored-key", encoding="utf-8")
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("assetboard.services.backups.shutil.copyfile", fail)
+    with pytest.raises(BackupError) as error:
+        create_backup(env.factory, env.settings, env.clock, origin="manual")
+    assert error.value.code == ERROR_SECRET_KEY
+    with env.factory() as session:
+        run = session.scalars(select(BackupRun)).one()
+        assert (run.status, run.error, run.path) == ("failed", ERROR_SECRET_KEY, None)
+    assert not list((env.settings.data_dir / "backups").glob("assetboard-manual-*.db"))
+
+
+def test_concurrent_backups_do_not_collide(env: Env) -> None:
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(
+            pool.map(
+                lambda _index: create_backup(env.factory, env.settings, env.clock, origin="manual"),
+                range(4),
+            )
+        )
+    names = {result.path.name for result in results}
+    assert len(names) == 4
+    assert all(result.path.is_file() for result in results)
+    with env.factory() as session:
+        assert {run.path for run in session.scalars(select(BackupRun))} == names
+
+
+def test_stale_temporary_files_are_removed(env: Env) -> None:
+    directory = env.settings.data_dir / "backups"
+    directory.mkdir()
+    old = directory / ".backup-crashed.db.tmp"
+    old.write_bytes(b"leftover")
+    long_ago = (env.clock.now() - timedelta(days=2)).timestamp()
+    os.utime(old, (long_ago, long_ago))
+    fresh = directory / ".backup-running.db.tmp"
+    fresh.write_bytes(b"another process")
+    create_backup(env.factory, env.settings, env.clock, origin="manual")
+    assert not old.exists()
+    assert fresh.exists()
+
+
+def test_panel_finds_last_success_and_failure_beyond_the_recent_rows(env: Env) -> None:
+    now = env.clock.now()
+    with env.factory.begin() as session:
+        session.add(
+            BackupRun(
+                id=uuid4(),
+                started_at=now - timedelta(days=30),
+                finished_at=now - timedelta(days=30),
+                status="ok",
+                origin="scheduled",
+                path="old-success.db",
+                size_bytes=8,
+            )
+        )
+        for index in range(12):
+            session.add(
+                BackupRun(
+                    id=uuid4(),
+                    started_at=now - timedelta(minutes=index),
+                    finished_at=now - timedelta(minutes=index),
+                    status="failed",
+                    origin="scheduled",
+                    error="copy_failed",
+                )
+            )
+    panel = build_panel(env.factory, env.settings, env.clock)
+    assert panel.last_success is not None
+    assert panel.last_success.started_at == now - timedelta(days=30)
+    assert panel.last_failure is not None
+    assert panel.last_failure.started_at == now
+    assert len(panel.runs) == 10
+
+
+def test_all_zero_retention_is_replaced_by_the_defaults(env: Env) -> None:
+    directory = env.settings.data_dir / "backups"
+    directory.mkdir()
+    (directory / "only.db").write_bytes(b"database")
+    now = env.clock.now()
+    with env.factory.begin() as session:
+        session.add(
+            BackupRun(
+                id=uuid4(),
+                started_at=now,
+                finished_at=now,
+                status="ok",
+                origin="scheduled",
+                path="only.db",
+                size_bytes=8,
+            )
+        )
+    removed = prune_scheduled_backups(env.factory, env.settings, now, RetentionPolicy(0, 0, 0))
+    assert removed == ()
+    assert (directory / "only.db").is_file()
+
+
+def test_force_skips_a_scheduled_copy_from_the_last_hour(env: Env) -> None:
+    first = run_scheduled_backup(env.factory, env.settings, env.clock, None, force=True)
+    assert first is not None
+    soon = FixedClock("2026-03-01T12:30:00+00:00")
+    assert run_scheduled_backup(env.factory, env.settings, soon, None, force=True) is None
+    later = FixedClock("2026-03-01T13:01:00+00:00")
+    assert run_scheduled_backup(env.factory, env.settings, later, None, force=True) is not None
+
+
+def test_instance_notification_reader_returns_only_active_admin_channels(env: Env) -> None:
+    now = env.clock.now()
+    with env.factory.begin() as session:
+        active = _user(session, "active-admin@example.com")
+        active.is_instance_admin = True
+        inactive = _user(session, "inactive-admin@example.com")
+        inactive.is_instance_admin = True
+        inactive.is_active = False
+        demo = _user(session, "demo-admin@example.com")
+        demo.is_instance_admin = True
+        demo.is_demo = True
+        member = _user(session, "member@example.com")
+        workspace = _workspace(session)
+        keep = _channel(session, env.settings, active, workspace, now)
+        _channel(session, env.settings, inactive, workspace, now)
+        _channel(session, env.settings, demo, workspace, now)
+        _channel(session, env.settings, member, workspace, now)
+        disabled = _channel(session, env.settings, active, workspace, now)
+        disabled.enabled = False
+    with env.factory() as session:
+        channels = InstanceNotificationReader(session).admin_channels()
+    assert [channel.id for channel in channels] == [keep.id]
+
+
+def test_restore_recovers_a_corrupt_live_database(env: Env) -> None:
+    with env.factory.begin() as session:
+        _user(session, "backup-source@example.com")
+    backup = create_backup(env.factory, env.settings, env.clock, origin="manual")
+    env.engine.dispose()
+    corrupt = b"this is not a SQLite database"
+    env.database.write_bytes(corrupt)
+    result = restore_backup(env.settings, backup.path, env.clock)
+    assert result.pre_restore is not None
+    assert result.pre_restore.read_bytes() == corrupt
+    assert "pre_restore_unverified" in result.warnings
+    with sqlite3.connect(env.database) as connection:
+        assert connection.execute("SELECT email FROM users").fetchone()[0] == (
+            "backup-source@example.com"
+        )
+
+
+def test_restore_migration_failure_puts_the_live_database_back(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env.engine.dispose()
+    command.downgrade(alembic_config(env.settings), "0068_f38_work_logs_import")
+    with env.factory.begin() as session:
+        _user(session, "older@example.com")
+    backup = create_backup(env.factory, env.settings, env.clock, origin="manual")
+    assert inspect_backup(backup.path, env.settings).state == "older"
+    env.engine.dispose()
+    upgrade_database(env.settings)
+    with env.factory.begin() as session:
+        for existing in session.scalars(select(User)):
+            session.delete(existing)
+        session.flush()
+        _user(session, "current@example.com")
+    env.engine.dispose()
+
+    def fail(_settings: Settings) -> None:
+        raise RuntimeError("migration failed")
+
+    monkeypatch.setattr("assetboard.services.backups.upgrade_database", fail)
+    with pytest.raises(RestoreError) as error:
+        restore_backup(env.settings, backup.path, env.clock)
+    assert error.value.code == "migration_failed"
+    with env.factory() as session:
+        assert set(session.scalars(select(User.email))) == {"current@example.com"}
+        pre = session.scalars(select(BackupRun).where(BackupRun.origin == "pre_restore")).one()
+        assert (env.settings.data_dir / "backups" / (pre.path or "")).is_file()
+
+
+def test_a_deleted_scheduled_file_does_not_suppress_the_next_backup(env: Env) -> None:
+    directory = env.settings.data_dir / "backups"
+    directory.mkdir()
+    path = directory / "recent.db"
+    path.write_bytes(b"database")
+    now = env.clock.now()
+    with env.factory.begin() as session:
+        session.add(
+            BackupRun(
+                id=uuid4(),
+                started_at=now - timedelta(hours=1),
+                finished_at=now - timedelta(hours=1),
+                status="ok",
+                origin="scheduled",
+                path=path.name,
+                size_bytes=8,
+            )
+        )
+    assert scheduled_backup_due(env.factory, env.clock) is False
+    path.unlink()
+    assert scheduled_backup_due(env.factory, env.clock, settings=env.settings) is True

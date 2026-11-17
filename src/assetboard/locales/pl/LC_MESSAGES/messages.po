@@ -78,6 +78,23 @@ msgstr ""
 "Ustawiono ASSETBOARD_SECRET_KEY, więc bazę przywrócono z istniejącym "
 "kluczem; upewnij się, że to klucz, którym wykonano kopię zapasową."
 
+msgid ""
+"The previous database could not be verified; a raw copy was saved as the "
+"pre-restore backup. Check it before relying on it."
+msgstr ""
+"Nie udało się zweryfikować poprzedniej bazy danych; surowa kopia została "
+"zapisana jako kopia sprzed przywracania. Sprawdź ją, zanim na niej "
+"polegniesz."
+
+msgid ""
+"Refusing to restore into the default ./data directory: pass --data-dir, "
+"--database-url or ASSETBOARD_DATA_DIR so the live database is "
+"unambiguous."
+msgstr ""
+"Odmowa przywrócenia do domyślnego katalogu ./data: podaj --data-dir, "
+"--database-url lub ASSETBOARD_DATA_DIR, aby jednoznacznie wskazać aktywną"
+" bazę danych."
+
 #, python-format
 msgid "Restored %(file)s into %(target)s."
 msgstr "Przywrócono %(file)s do %(target)s."
@@ -2487,12 +2504,12 @@ msgstr "%(app)s: kopia zapasowa bazy danych nie powiodła się"
 
 #, python-format
 msgid ""
-"The scheduled database backup failed (code: %(code)s). Check the log, "
-"then run Back up now in Instance settings."
+"The database backup failed (code: %(code)s). Check the log, then run Back"
+" up now in Instance settings."
 msgstr ""
-"Zaplanowana kopia zapasowa bazy danych nie powiodła się (kod: %(code)s). "
-"Sprawdź dziennik, a następnie uruchom „Utwórz kopię teraz” w ustawieniach"
-" instancji."
+"Kopia zapasowa bazy danych nie powiodła się (kod: %(code)s). Sprawdź "
+"dziennik, a następnie uruchom „Utwórz kopię teraz” w ustawieniach "
+"instancji."
 
 #, python-format
 msgid "%(app)s · %(workspace)s: test"
@@ -6305,6 +6322,9 @@ msgstr "Zapisz ustawienia"
 
 msgid "Backups"
 msgstr "Kopie zapasowe"
+
+msgid "Automatic backups are not available for an in-memory database."
+msgstr "Automatyczne kopie zapasowe nie są dostępne dla bazy danych w pamięci."
 
 msgid ""
 "Automatic backups are available for SQLite databases only. For "

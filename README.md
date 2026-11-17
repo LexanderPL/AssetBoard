@@ -65,6 +65,7 @@ make check
 - [Investments](docs/investments.md): asset classes, instruments and allocation weights.
 - [Loans](docs/loans.md): mortgage and loan terms, rates, costs, overpayments and reference rates.
 - [FIRE planner](docs/fire.md): independence scenarios, assumptions, contribution overrides and events.
+- [Backups and restore](docs/backup.md): scheduled copies, retention, restore checks, volume snapshots and off-site advice.
 - [Workspace settings](docs/workspace-settings.md): name, base currency, time zone and formats.
 
 ## Roadmap

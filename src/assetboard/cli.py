@@ -63,6 +63,10 @@ RESTORE_WARNINGS = {
         "ASSETBOARD_SECRET_KEY is set, so the database was restored with the existing key; "
         "make sure it is the key the backup was made with."
     ),
+    "pre_restore_unverified": _(
+        "The previous database could not be verified; a raw copy was saved as the pre-restore "
+        "backup. Check it before relying on it."
+    ),
 }
 
 
@@ -409,10 +413,40 @@ def restore(
     file: Path = typer.Argument(  # noqa: B008
         ..., help="Backup file written by the scheduled job or copied with the backup API."
     ),
+    data_dir: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--data-dir",
+        help="Data directory holding assetboard.db and the secret key.",
+    ),
+    database_url: str | None = typer.Option(
+        None,
+        "--database-url",
+        help="SQLite database URL, instead of <data-dir>/assetboard.db.",
+    ),
 ) -> None:
     """Restore a SQLite backup after checking it and saving the current database first."""
+    overrides: dict[str, Any] = {}
+    if data_dir is not None:
+        overrides["data_dir"] = data_dir
+    if database_url is not None:
+        overrides["database_url"] = database_url
     try:
-        settings = Settings()
+        settings = Settings(**overrides)
+        if database_url is None and data_dir is not None:
+            settings.database_url = f"sqlite:///{data_dir.expanduser() / 'assetboard.db'}"
+        if (
+            data_dir is None
+            and database_url is None
+            and "data_dir" not in settings.model_fields_set
+        ):
+            typer.echo(
+                _(
+                    "Refusing to restore into the default ./data directory: pass --data-dir, "
+                    "--database-url or ASSETBOARD_DATA_DIR so the live database is unambiguous."
+                ),
+                err=True,
+            )
+            raise typer.Exit(code=1)
         result = restore_backup(settings, file, Clock())
     except RestoreError as exc:
         typer.echo(str(exc), err=True)

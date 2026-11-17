@@ -346,7 +346,7 @@ The database uses SQLite's write-ahead log: while the app runs, recent changes c
   docker compose -f compose.example.yaml exec assetboard python -c \
     'import sqlite3; d = sqlite3.connect("/data/backup.db"); sqlite3.connect("/data/assetboard.db").backup(d); d.close()'
   docker compose -f compose.example.yaml cp assetboard:/data/backup.db ./assetboard-backup.db
-  docker compose -f compose.example.yaml cp assetboard:/data/secret_key ./assetboard-backup.secret_key
+  docker compose -f compose.example.yaml cp assetboard:/data/secret_key ./assetboard-backup.db.secret_key
   docker compose -f compose.example.yaml exec assetboard rm /data/backup.db
   ```
 
@@ -357,11 +357,13 @@ The database uses SQLite's write-ahead log: while the app runs, recent changes c
 **Restoring:** stop the app and use `assetboard restore <file>` (or, for a hand-made copy,
 delete `assetboard.db-wal` and `assetboard.db-shm` if present, put the backed-up database in
 place as `assetboard.db` and the key as `secret_key`, owned by the app's user (`assetboard` for
-native installs, UID 10001 in the container) with mode 0600). The command checks the file,
-refuses a newer schema and saves the current database before replacing it; see
-[Backups and restore](backup.md#restore-a-backup). A backup from an older version is migrated at
-startup; a database written by a newer version than the one you start is refused (see
-[Database schema state](#database-schema-state)).
+native installs, UID 10001 in the container) with mode 0600). On a native install run the
+command with the service's environment through `systemd-run`, and pass
+`--data-dir /var/lib/assetboard`, so it cannot target a `./data` directory in your shell; see
+[Backups and restore](backup.md#restore-a-backup). The command checks the file, refuses a newer
+schema and saves the current database before replacing it. A backup from an older version is
+migrated at startup; a database written by a newer version than the one you start is refused
+(see [Database schema state](#database-schema-state)).
 
 ## Reverse proxies
 

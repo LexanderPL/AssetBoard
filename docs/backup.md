@@ -21,8 +21,10 @@ Two things are stored together:
   notification URLs and price-provider credentials. Without it those values cannot be read
   after a restore.
 
-If `ASSETBOARD_SECRET_KEY` (or a `*_FILE` setting) supplies the key, the job does not copy it:
-keep the environment or secret file in your own configuration backup.
+If `ASSETBOARD_SECRET_KEY` (or a `*_FILE` setting) supplies a key that differs from
+`<DATA_DIR>/secret_key`, the job does not copy the file: keep the environment or secret file in
+your own configuration backup. A copy failure is recorded as a failed backup rather than a
+success without a readable key.
 
 Settings such as `BASE_URL`, SMTP credentials, OIDC client secrets and `TRUSTED_PROXIES` are
 environment or configuration values, not database rows. Back them up separately.
@@ -31,7 +33,8 @@ environment or configuration values, not database rows. Back them up separately.
 
 - One scheduled copy a day at **03:30 UTC**.
 - The job starts the first time the application runs and then daily. A restart makes a backup
-  if the last successful scheduled one is at least 24 hours old.
+  if the last successful scheduled one is at least 24 hours old; the daily tick skips a copy
+  made within the previous hour, so a restart around 03:30 does not make two backups.
 - `ASSETBOARD_SCHEDULER_ENABLED=false` turns off every scheduled job, including backups.
   "Back up now" still works.
 - Failures are recorded on Instance settings and sent to every enabled notification channel of
@@ -72,6 +75,10 @@ Instance administrators open **User menu → Instance settings**:
 The page lists the ten most recent attempts. A failed attempt shows its short error code; the
 log has the exception class and stack trace.
 
+Instance administrators can download every successful copy, and that file contains **all
+workspaces** on the instance. Instance administration is therefore a whole-database privilege,
+not a per-workspace one; give it only to people who may see every workspace's financial data.
+
 ## Restore a backup
 
 A restore replaces the whole database. **Stop the application first**; a running instance has
@@ -80,12 +87,24 @@ restored file.
 
 ### Native install
 
+Run the command with the service's environment and data directory, not from a shell whose
+working directory happens to contain a `data/` folder:
+
 ```bash
 sudo systemctl stop assetboard
-sudo -u assetboard /opt/assetboard/current/bin/assetboard restore \
+sudo systemd-run --quiet --wait --pty --collect \
+  -p User=assetboard -p Group=assetboard \
+  -p EnvironmentFile=/etc/assetboard/assetboard.env \
+  -E ASSETBOARD_ENV=prod -E ASSETBOARD_DATA_DIR=/var/lib/assetboard \
+  /opt/assetboard/current/bin/assetboard restore \
+    --data-dir /var/lib/assetboard \
     /var/lib/assetboard/backups/assetboard-20261117T033000Z.db
 sudo systemctl start assetboard
 ```
+
+`assetboard restore` refuses to run against the default relative `./data` directory when
+neither `--data-dir`/`--database-url` nor `ASSETBOARD_DATA_DIR` is given, so a forgotten
+environment cannot silently create and "restore" into a new database beside your shell.
 
 ### Container
 
@@ -120,11 +139,15 @@ Before touching the live database, `assetboard restore`:
    - **newer or unknown** – refused, because an older application cannot safely read a newer
      schema;
 5. makes an automatic **pre-restore backup** in `<DATA_DIR>/backups/` (origin
-   “pre-restore”), with the secret key sidecar, before replacing anything.
+   “pre-restore”), with the secret key sidecar, before replacing anything. If the current
+   database is too damaged for SQLite's online copy or its integrity check, a raw file copy is
+   kept instead and the command warns that the copy is unverified; a damaged database
+   therefore never blocks its own recovery.
 
 If the schema migration fails after the copy, the pre-restore backup is put back and the
-command exits with an error. The pre-restore copy is also listed on Instance settings and is
-never pruned automatically.
+command exits with an error. The pre-restore copy is recorded on Instance settings after a
+successful restore, or after the original database is put back when migrations fail (when the
+history can still be written); it is never pruned automatically.
 
 If `<backup>.secret_key` exists and the instance key comes from `<DATA_DIR>/secret_key`, the
 key is restored too. If the key comes from the environment, the existing environment value is
@@ -175,8 +198,9 @@ Follow the 3-2-1 rule: at least three copies, on two kinds of media, with one of
 - Keep the configuration (Compose file, environment file, systemd unit, reverse-proxy config)
   and the secret key outside the data disk too.
 
-The application makes no network connections for backups. Copying them off the machine is your
-responsibility and is never automated.
+The application makes no network connections for the backup copies themselves. Backup failure
+notifications use the notification channels you configured (Apprise), and copying backups off
+the machine is your responsibility and is never automated.
 
 ## PostgreSQL
 

@@ -124,3 +124,34 @@ def test_restore_refuses_postgresql_gracefully(
     assert "SQLite" in result.output
     assert "pg_restore" in result.output
     assert "secret" not in result.output  # never echo the database URL
+
+
+def test_restore_refuses_the_default_relative_data_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(f"{ENV_PREFIX}_DATA_DIR", raising=False)
+    monkeypatch.delenv(f"{ENV_PREFIX}_DATABASE_URL", raising=False)
+    backup = tmp_path / "backup.db"
+    backup.write_bytes(b"not used")
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(cli.app, ["restore", str(backup)])
+    assert result.exit_code == 1
+    assert "--data-dir" in result.output
+    assert not (tmp_path / "data").exists()
+
+
+def test_restore_accepts_an_explicit_data_dir(tmp_path: Path) -> None:
+    _env, settings, backup = _prepare(tmp_path)
+    database = settings.data_dir / "assetboard.db"
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute("UPDATE users SET display_name = 'Changed'")
+        connection.commit()
+    finally:
+        connection.close()
+    result = CliRunner().invoke(
+        cli.app,
+        ["restore", "--data-dir", str(settings.data_dir), str(backup)],
+    )
+    assert result.exit_code == 0, result.output
+    assert _display_name(database) == "Restore Test"

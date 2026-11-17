@@ -16,12 +16,20 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from urllib.parse import unquote
 from uuid import UUID, uuid4
+
+try:  # pragma: no cover - the deployment targets Linux, the fallback keeps tests portable
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 
 from alembic.script import ScriptDirectory
 from sqlalchemy import select
@@ -66,8 +74,16 @@ ERROR_DATABASE_MISSING = "database_missing"
 ERROR_COPY_FAILED = "copy_failed"
 ERROR_INTEGRITY_FAILED = "integrity_failed"
 ERROR_NOT_SQLITE = "not_sqlite"
+ERROR_NOT_ASSETBOARD = "not_assetboard"
+ERROR_SECRET_KEY = "secret_key_copy_failed"
 ERROR_STORAGE = "storage_error"
 ORIGINS = ("scheduled", "manual", "pre_restore")
+# A second scheduled attempt within this window is a duplicate (startup catch-up plus the
+# daily cron, or two workers starting together), not a retry after a failure.
+SCHEDULED_DEDUPLICATION = timedelta(hours=1)
+# A crashed process leaves a full database copy behind as ``.backup-*.db.tmp``.
+STALE_TEMPORARY_AGE = timedelta(days=1)
+_scheduled_lock = threading.Lock()
 _PREFIXES = {
     "scheduled": "assetboard",
     "manual": "assetboard-manual",
@@ -146,6 +162,14 @@ class RestoreResult:
     warnings: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _PreRestore:
+    path: Path
+    started: datetime
+    finished: datetime
+    unverified: bool
+
+
 # Database location and files
 
 
@@ -181,6 +205,28 @@ def _ensure_backup_directory(settings: Settings) -> Path:
     return directory
 
 
+@contextmanager
+def _backup_lock(directory: Path) -> Generator[None]:
+    """Serialize backup writers across threads and processes.
+
+    Two ``Back up now`` clicks in the same second used to pick the same file name; the loser
+    then deleted the other run's copy. The lock lives beside the backups and covers naming,
+    copying, the secret-key sidecar and cleanup. Deployment targets are Unix; without
+    ``fcntl`` the lock degrades to no locking rather than refusing to back up.
+    """
+    descriptor = os.open(directory / ".backup.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        if fcntl is not None:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            if fcntl is not None:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
 def _new_backup_filename(directory: Path, moment: datetime, origin: str) -> Path:
     prefix = _PREFIXES[origin]
     base = f"{prefix}-{moment.astimezone(UTC).strftime('%Y%m%dT%H%M%SZ')}.db"
@@ -190,6 +236,26 @@ def _new_backup_filename(directory: Path, moment: datetime, origin: str) -> Path
         candidate = directory / f"{base[:-3]}-{counter}.db"
         counter += 1
     return candidate
+
+
+def _safe_unlink(path: Path) -> None:
+    """Remove a file without letting a cleanup error hide the original failure."""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning("backup_cleanup_failed exception_type=%s", type(exc).__name__)
+
+
+def _cleanup_stale_temporary_files(directory: Path, now: datetime) -> None:
+    cutoff = now.timestamp() - STALE_TEMPORARY_AGE.total_seconds()
+    for pattern in (".backup-*.db.tmp*", ".pre-restore-*.db.tmp*", ".secret_key.*.tmp"):
+        for path in directory.glob(pattern):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    _safe_unlink(path)
+                    _remove_sqlite_sidecars(path)
+            except OSError:
+                continue
 
 
 def _sidecar(path: Path) -> Path:
@@ -257,13 +323,25 @@ def _copy_database(source: Path, destination: Path) -> None:
 def _copy_secret_key(settings: Settings, backup_path: Path) -> None:
     """Keep the key stored in DATA_DIR next to the copy, so the backup can encrypt/decrypt.
 
-    A key supplied through ``ASSETBOARD_SECRET_KEY`` or a file setting is never copied: the
-    operator already keeps it outside the data directory.
+    The decision is made from the stored file, not from ``settings.model_fields_set``: startup
+    calls ``ensure_secret_key()``, which assigns the generated key to ``secret_key`` and would
+    otherwise make every running instance look as if the key came from the environment.
+
+    A key that differs from the stored file was supplied through ``ASSETBOARD_SECRET_KEY`` or
+    a ``*_FILE`` setting; it is never copied because the operator already keeps it outside the
+    data directory. A copy failure fails the whole backup: a database whose encrypted values
+    cannot be read is not a usable disaster-recovery copy.
     """
-    if "secret_key" in settings.model_fields_set:
-        return
     key_file = settings.data_dir / "secret_key"
-    if not key_file.is_file():
+    try:
+        stored = key_file.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise BackupError(ERROR_SECRET_KEY) from exc
+    if not stored:
+        raise BackupError(ERROR_SECRET_KEY)
+    if settings.secret_key is not None and settings.secret_key.strip() != stored:
         return
     destination = _sidecar(backup_path)
     temporary = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
@@ -272,9 +350,26 @@ def _copy_secret_key(settings: Settings, backup_path: Path) -> None:
         os.chmod(temporary, 0o600)
         _fsync_file(temporary)
         os.replace(temporary, destination)
+        _fsync_directory(destination.parent)
     except OSError as exc:
-        logger.warning("backup_secret_key_copy_failed exception_type=%s", type(exc).__name__)
-        temporary.unlink(missing_ok=True)
+        _safe_unlink(temporary)
+        raise BackupError(ERROR_SECRET_KEY) from exc
+
+
+def _validate_source(source: Path) -> None:
+    """Refuse a source that cannot be a complete AssetBoard database before copying it.
+
+    ``sqlite3.connect`` creates a missing file, so without this check a lost database produced
+    a small, valid-looking, table-less "backup" that retention later treated as the newest
+    good copy.
+    """
+    try:
+        if not source.is_file() or source.stat().st_size == 0:
+            raise BackupError(ERROR_DATABASE_MISSING)
+    except OSError as exc:
+        raise BackupError(ERROR_DATABASE_MISSING) from exc
+    if not read_sqlite_revisions(source):
+        raise BackupError(ERROR_NOT_ASSETBOARD)
 
 
 # Run history
@@ -384,28 +479,43 @@ def create_backup(
     source = sqlite_database_path(settings)
     if source is None:
         raise BackupUnavailable(ERROR_NOT_SQLITE)
+    try:
+        _validate_source(source)
+    except BackupError as exc:
+        # Do not start a run row first: writing to a missing database would create an empty
+        # file there, which is exactly the failure this check exists to prevent.
+        logger.error(
+            "backup_failed origin=%s code=%s exception_type=%s",
+            origin,
+            exc.code,
+            type(exc).__name__,
+        )
+        _notify_failure(factory, settings, notifier, exc.code)
+        raise
     run_id, started = _start_run(factory, clock, origin)
     temporary: Path | None = None
     destination: Path | None = None
     try:
         directory = _ensure_backup_directory(settings)
-        destination = _new_backup_filename(directory, started, origin)
-        # ``mkstemp`` creates the file and returns an open descriptor; close it before SQLite
-        # opens the same path itself.
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=".backup-", suffix=".db.tmp", dir=directory
-        )
-        os.close(descriptor)
-        temporary = Path(temporary_name)
-        os.chmod(temporary, 0o600)
-        _copy_database(source, temporary)
-        verify_database(temporary)
-        _fsync_file(temporary)
-        os.replace(temporary, destination)
-        _remove_sqlite_sidecars(temporary)
-        _fsync_directory(directory)
-        size_bytes = destination.stat().st_size
-        _copy_secret_key(settings, destination)
+        _cleanup_stale_temporary_files(directory, started)
+        with _backup_lock(directory):
+            destination = _new_backup_filename(directory, started, origin)
+            # ``mkstemp`` creates the file and returns an open descriptor; close it before
+            # SQLite opens the same path itself.
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=".backup-", suffix=".db.tmp", dir=directory
+            )
+            os.close(descriptor)
+            temporary = Path(temporary_name)
+            os.chmod(temporary, 0o600)
+            _copy_database(source, temporary)
+            verify_database(temporary)
+            _fsync_file(temporary)
+            os.replace(temporary, destination)
+            _remove_sqlite_sidecars(temporary)
+            _fsync_directory(directory)
+            size_bytes = destination.stat().st_size
+            _copy_secret_key(settings, destination)
         _finish_run(
             factory,
             run_id,
@@ -424,11 +534,11 @@ def create_backup(
     except Exception as exc:
         code = _error_code(exc)
         if temporary is not None:
-            temporary.unlink(missing_ok=True)
+            _safe_unlink(temporary)
             _remove_sqlite_sidecars(temporary)
         if destination is not None:
-            destination.unlink(missing_ok=True)
-            _sidecar(destination).unlink(missing_ok=True)
+            _safe_unlink(destination)
+            _safe_unlink(_sidecar(destination))
         _finish_run(factory, run_id, clock, status="failed", error=code)
         logger.error(
             "backup_failed origin=%s code=%s exception_type=%s",
@@ -452,8 +562,14 @@ def prune_scheduled_backups(
     """Delete scheduled copies outside the retention policy, with their run rows.
 
     A ``running`` row older than two hours was interrupted (a crash or a restart): it is closed
-    as failed so the settings page never shows it as in progress forever.
+    as failed so the settings page never shows it as in progress forever. An all-zero policy is
+    refused here even if it reached the database by hand: deleting the copy just made would
+    leave the instance without a safety net, so the defaults apply instead.
     """
+    if policy.daily == 0 and policy.weekly == 0 and policy.monthly == 0:
+        logger.warning("backup_retention_all_zero: using the default policy")
+        policy = RetentionPolicy()
+    _cleanup_stale_temporary_files(backup_directory(settings), now)
     stale_before = now - timedelta(hours=2)
     with factory.begin() as session:
         for run in session.scalars(
@@ -524,15 +640,29 @@ def prune_scheduled_backups(
     return tuple(removed)
 
 
-def scheduled_backup_due(factory: sessionmaker[Session], clock: Clock) -> bool:
+def scheduled_backup_due(
+    factory: sessionmaker[Session],
+    clock: Clock,
+    *,
+    interval: timedelta = timedelta(hours=24),
+    settings: Settings | None = None,
+) -> bool:
     with factory() as session:
-        last = session.scalars(
-            select(BackupRun.started_at)
+        last = session.execute(
+            select(BackupRun.started_at, BackupRun.path)
             .where(BackupRun.origin == SCHEDULED, BackupRun.status == "ok")
             .order_by(BackupRun.started_at.desc())
             .limit(1)
         ).first()
-    return backup_due(last, clock.now())
+    if last is None:
+        return True
+    started, filename = last
+    if settings is not None and (
+        not filename or not (backup_directory(settings) / filename).is_file()
+    ):
+        # A row whose file an operator deleted must not suppress the next copy.
+        return True
+    return backup_due(started, clock.now(), interval=interval)
 
 
 def run_scheduled_backup(
@@ -546,22 +676,30 @@ def run_scheduled_backup(
     """The daily job and the startup catch-up: one backup, then retention.
 
     ``force`` is the daily cron tick; without it (startup) a backup is made only when the last
-    successful scheduled one is a day old or older.
+    successful scheduled one is a day old or older. Both paths also skip a copy taken within
+    the last hour: a restart just before 03:30 used to run the catch-up and the cron back to
+    back, and two app workers could start together. A failed run does not suppress the retry.
     """
-    if not force and not scheduled_backup_due(factory, clock):
+    if not _scheduled_lock.acquire(blocking=False):
         return None
     try:
-        result = create_backup(factory, settings, clock, origin="scheduled", notifier=notifier)
-    except BackupError:
-        return None
-    stored = get_settings(factory)
-    policy = RetentionPolicy(
-        stored.backup_daily_retention,
-        stored.backup_weekly_retention,
-        stored.backup_monthly_retention,
-    )
-    prune_scheduled_backups(factory, settings, clock.now(), policy)
-    return result
+        interval = SCHEDULED_DEDUPLICATION if force else timedelta(hours=24)
+        if not scheduled_backup_due(factory, clock, interval=interval, settings=settings):
+            return None
+        try:
+            result = create_backup(factory, settings, clock, origin="scheduled", notifier=notifier)
+        except BackupError:
+            return None
+        stored = get_settings(factory)
+        policy = RetentionPolicy(
+            stored.backup_daily_retention,
+            stored.backup_weekly_retention,
+            stored.backup_monthly_retention,
+        )
+        prune_scheduled_backups(factory, settings, clock.now(), policy)
+        return result
+    finally:
+        _scheduled_lock.release()
 
 
 # Presentation
@@ -629,9 +767,23 @@ def build_panel(factory: sessionmaker[Session], settings: Settings, clock: Clock
                 .limit(RECENT_RUNS)
             )
         )
+        # Separate queries: ten failures must not hide the last success, and ten successes must
+        # not hide the last failure.
+        last_ok = session.scalars(
+            select(BackupRun)
+            .where(BackupRun.status == "ok")
+            .order_by(BackupRun.started_at.desc(), BackupRun.id.desc())
+            .limit(1)
+        ).first()
+        last_failed = session.scalars(
+            select(BackupRun)
+            .where(BackupRun.status == "failed")
+            .order_by(BackupRun.started_at.desc(), BackupRun.id.desc())
+            .limit(1)
+        ).first()
     views = tuple(_run_view(run, directory) for run in rows)
-    last_success = next((view for view in views if view.status == "ok"), None)
-    last_failure = next((view for view in views if view.status == "failed"), None)
+    last_success = _run_view(last_ok, directory) if last_ok is not None else None
+    last_failure = _run_view(last_failed, directory) if last_failed is not None else None
     return BackupPanel(
         available=True,
         reason=None,
@@ -701,12 +853,13 @@ def _write_secret_key(settings: Settings, key: bytes) -> None:
             os.fsync(stream.fileno())
         os.chmod(temporary, 0o600)
         os.replace(temporary, destination)
+        _fsync_directory(settings.data_dir)
     finally:
         temporary.unlink(missing_ok=True)
 
 
 def _copy_file_atomically(source: Path, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
     )
@@ -723,35 +876,51 @@ def _copy_file_atomically(source: Path, destination: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _make_pre_restore_backup(
-    settings: Settings, source: Path, clock: Clock
-) -> tuple[Path, datetime, datetime] | None:
+def _make_pre_restore_backup(settings: Settings, source: Path, clock: Clock) -> _PreRestore | None:
+    """Copy the current database before a restore, even when it is already damaged.
+
+    A corrupt live database is the most common reason to restore. The online copy and its
+    integrity check are used when they work; otherwise a raw file copy is kept so the operator
+    still has the exact previous state (and can roll back to it), and the caller reports the
+    copy as unverified. Without the raw fallback a damaged database blocked its own recovery.
+    """
     if not source.is_file():
         return None
     directory = _ensure_backup_directory(settings)
     started = clock.now()
-    destination = _new_backup_filename(directory, started, "pre_restore")
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=".pre-restore-", suffix=".db.tmp", dir=directory
-    )
-    os.close(descriptor)
-    temporary = Path(temporary_name)
-    os.chmod(temporary, 0o600)
-    try:
-        _copy_database(source, temporary)
-        verify_database(temporary)
-        _fsync_file(temporary)
-        os.replace(temporary, destination)
-        _remove_sqlite_sidecars(temporary)
-        _fsync_directory(directory)
-        _copy_secret_key(settings, destination)
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        _remove_sqlite_sidecars(temporary)
-        destination.unlink(missing_ok=True)
-        _sidecar(destination).unlink(missing_ok=True)
-        raise
-    return destination, started, clock.now()
+    _cleanup_stale_temporary_files(directory, started)
+    with _backup_lock(directory):
+        destination = _new_backup_filename(directory, started, "pre_restore")
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".pre-restore-", suffix=".db.tmp", dir=directory
+        )
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        os.chmod(temporary, 0o600)
+        unverified = False
+        try:
+            try:
+                _copy_database(source, temporary)
+                verify_database(temporary)
+            except BackupError:
+                logger.warning("pre_restore_copy_unverified")
+                unverified = True
+                _safe_unlink(temporary)
+                _remove_sqlite_sidecars(temporary)
+                shutil.copyfile(source, temporary)
+                os.chmod(temporary, 0o600)
+            _fsync_file(temporary)
+            os.replace(temporary, destination)
+            _remove_sqlite_sidecars(temporary)
+            _fsync_directory(directory)
+            _copy_secret_key(settings, destination)
+        except Exception:
+            _safe_unlink(temporary)
+            _remove_sqlite_sidecars(temporary)
+            _safe_unlink(destination)
+            _safe_unlink(_sidecar(destination))
+            raise
+    return _PreRestore(destination, started, clock.now(), unverified)
 
 
 def _record_pre_restore(
@@ -784,15 +953,27 @@ def _record_pre_restore(
         engine.dispose()
 
 
-def _rollback(settings: Settings, target: Path, pre_restore: Path | None) -> None:
+def _rollback(settings: Settings, target: Path, pre_restore: Path | None) -> bool:
+    """Put the previous database back; ``False`` when it could not be done."""
     try:
         if pre_restore is not None:
             _copy_file_atomically(pre_restore, target)
         else:
             target.unlink(missing_ok=True)
             _remove_sqlite_sidecars(target)
+        return True
     except Exception as exc:  # noqa: BLE001 - reported with the migration failure below
         logger.error("restore_rollback_failed exception_type=%s", type(exc).__name__)
+        return False
+
+
+def _rollback_message(pre_restore: _PreRestore | None) -> str:
+    if pre_restore is None:
+        return "schema migrations failed; the copied database was removed"
+    return (
+        f"schema migrations failed and the original database could not be put back; "
+        f"the pre-restore copy is at {pre_restore.path}"
+    )
 
 
 def restore_backup(
@@ -848,6 +1029,7 @@ def restore_backup(
             "schema_unknown",
             "the file is not a complete database from this application",
         )
+    pre_restore: _PreRestore | None = None
     if target.is_file() and target.stat().st_size:
         try:
             pre_restore = _make_pre_restore_backup(settings, target, clock)
@@ -856,8 +1038,6 @@ def restore_backup(
                 "pre_restore_failed",
                 "could not create the pre-restore backup; the database was not changed",
             ) from exc
-    else:
-        pre_restore = None
     try:
         _copy_file_atomically(source, target)
     except OSError as exc:
@@ -867,13 +1047,23 @@ def restore_backup(
         try:
             upgrade_database(settings)
         except Exception as exc:
-            _rollback(settings, target, pre_restore[0] if pre_restore else None)
+            rolled_back = _rollback(settings, target, pre_restore.path if pre_restore else None)
+            if rolled_back and pre_restore is not None:
+                _record_pre_restore(
+                    settings, pre_restore.path, pre_restore.started, pre_restore.finished
+                )
             raise RestoreError(
                 "migration_failed",
-                "schema migrations failed; the pre-restore backup was put back",
+                (
+                    "schema migrations failed; the pre-restore backup was put back"
+                    if rolled_back
+                    else _rollback_message(pre_restore)
+                ),
             ) from exc
         migrated = True
     warnings: list[str] = []
+    if pre_restore is not None and pre_restore.unverified:
+        warnings.append("pre_restore_unverified")
     key_sidecar = _sidecar(source)
     if key_sidecar.is_file():
         if "secret_key" in settings.model_fields_set:
@@ -882,19 +1072,26 @@ def restore_backup(
             try:
                 _write_secret_key(settings, key_sidecar.read_bytes())
             except OSError as exc:
-                _rollback(settings, target, pre_restore[0] if pre_restore else None)
-                raise RestoreError(
-                    "key_failed",
-                    "the secret key could not be restored; the pre-restore backup was put back",
-                ) from exc
+                rolled_back = _rollback(settings, target, pre_restore.path if pre_restore else None)
+                if rolled_back and pre_restore is not None:
+                    _record_pre_restore(
+                        settings, pre_restore.path, pre_restore.started, pre_restore.finished
+                    )
+                if rolled_back:
+                    message = (
+                        "the secret key could not be restored; the pre-restore backup was put back"
+                    )
+                else:
+                    message = _rollback_message(pre_restore)
+                raise RestoreError("key_failed", message) from exc
             warnings.append("secret_key_restored")
     else:
         warnings.append("secret_key_missing")
     if pre_restore is not None:
-        _record_pre_restore(settings, pre_restore[0], pre_restore[1], pre_restore[2])
+        _record_pre_restore(settings, pre_restore.path, pre_restore.started, pre_restore.finished)
     return RestoreResult(
         target=target,
-        pre_restore=pre_restore[0] if pre_restore else None,
+        pre_restore=pre_restore.path if pre_restore else None,
         migrated=migrated,
         warnings=tuple(warnings),
     )
