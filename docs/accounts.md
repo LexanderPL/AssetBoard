@@ -105,8 +105,9 @@ A CLI password reset does not remove your second factor.
 - **Sidebar** (the Sidebar panel): choose which pages appear in the main sidebar and in which
   order. The arrow buttons reorder the list in place; press **Save sidebar** (next to **Reset
   to default**) to apply the order and visibility, and only then does the page reload. "Reset
-  to default" restores the canonical order with every page shown. The choice belongs to your account, so it follows you across
-  workspaces; Home always stays first and shown. Hiding a page only removes its link: the page
+  to default" restores the canonical order with every page shown. The choice belongs to your
+  account, so it follows you across workspaces; Home always stays first and shown. Hiding a
+  page only removes its link: the page
   remains reachable by its address, and it is not a permission change. A page whose feature the
   workspace has not enabled, such as Taxes, stays hidden there whatever your choice. Without
   JavaScript, moving a page saves the new order immediately.
