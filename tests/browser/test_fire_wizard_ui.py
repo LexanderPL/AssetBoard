@@ -217,6 +217,15 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
             assert abs(horizon_box["width"] - stop_box["width"]) <= 1
             assert birth_box["width"] > horizon_box["width"] * 1.5
             assert abs(birth_box["x"] - horizon_box["x"]) <= 1
+            # Below the sm breakpoint the age pair stacks and the step still fits the phone.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.wait_for_timeout(200)
+            _no_page_overflow(page)
+            mobile_horizon = page.get_by_label("Horizon age").bounding_box()
+            mobile_stop = page.get_by_label("Income stops at age").bounding_box()
+            assert mobile_horizon is not None and mobile_stop is not None
+            assert mobile_stop["y"] > mobile_horizon["y"]
+            page.set_viewport_size({"width": 1440, "height": 900})
             page.get_by_label("Birth year").fill("1985")
             page.get_by_label("Horizon age").fill("90")
             page.get_by_label("Income stops at age").fill("55")
