@@ -21,7 +21,6 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.domain.categories import PALETTE
-from assetboard.domain.charts import share_tenths
 from assetboard.domain.instruments import RISK_TIER_LABELS, RISK_TIER_SUBTITLES
 from assetboard.domain.money import Money
 from assetboard.domain.risk import (
@@ -43,7 +42,7 @@ from assetboard.services.investments import apply_suggested_risk_tiers
 from assetboard.services.portfolio import ALL_SCOPE, PortfolioPage, portfolio_page
 from assetboard.services.price_sources import provider_enabled
 from assetboard.services.risk import PortfolioRisk, save_risk_policy
-from assetboard.web.charts import DonutSlice, DonutView
+from assetboard.web.charts import DonutSlice, DonutView, build_class_donut
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template, scoped_url
@@ -385,7 +384,7 @@ def build_view(
         year=page.today.year,
         excluded=valuation.excluded,
         scope_options=tuple(options),
-        class_donut=_class_donut(page, locale),
+        class_donut=build_class_donut(page, locale),
         donut=_donut(page, locale),
         risk=_risk_view(
             page,
@@ -393,41 +392,6 @@ def build_view(
             form_values=risk_form_values,
             errors=risk_errors,
         ),
-    )
-
-
-def _class_donut(page: PortfolioPage, locale: str) -> DonutView:
-    """The look-through value of every asset class with a positive value, plus Unallocated."""
-    totals = {total.asset_class_id: total for total in page.valuation.classes}
-    total_minor = page.valuation.value.amount_minor
-    slices: list[DonutSlice] = []
-    for row in page.class_rows:
-        class_id = row.asset_class.id if row.asset_class is not None else None
-        total = totals.get(class_id)
-        if total is None or total.value.amount_minor <= 0:
-            continue
-        if row.asset_class is None:
-            name, color = gettext(UNALLOCATED, locale), None
-        else:
-            name, color = row.asset_class.name, row.asset_class.color
-        slices.append(
-            DonutSlice(
-                name=name,
-                color=color,
-                amount_minor=total.value.amount_minor,
-                amount=format_money(total.value, locale),
-                share=format_rate_tenths(
-                    share_tenths(total.value.amount_minor, total_minor), locale
-                ),
-            )
-        )
-    return DonutView(
-        key="portfolio-classes",
-        heading=gettext(_("Asset classes"), locale),
-        empty=gettext(_("Nothing is valued in the portfolio yet."), locale),
-        currency=page.currency,
-        total=format_money(page.valuation.value, locale),
-        slices=tuple(slices),
     )
 
 

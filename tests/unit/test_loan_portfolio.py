@@ -120,10 +120,21 @@ def test_active_paid_off_and_archived_rows(team: WorkspaceDb) -> None:
     assert paid.monthly_installment == _money(0)
     assert paid.percent_repaid_bp == 10_000
     assert paid.next_payment_date is None
+    assert paid.payoff_date == date(2026, 1, 1)
+    assert active[active_id].figures.payoff_date is not None
 
     assert page.summary.total_remaining == active[active_id].figures.remaining_principal
     assert page.summary.total_monthly == active[active_id].figures.monthly_installment
     assert page.summary.weighted_average_rate_bp == 550
+
+
+def test_the_dashboard_can_skip_archived_loans(team: WorkspaceDb) -> None:
+    active_id = _loan(team, name="Active loan")
+    archived_id = _loan(team, name="Archived loan")
+    loans.archive_loan(team.factory, team.ctx("owner", "owner"), archived_id)
+    page = loans.list_loans(team.factory, team.ctx("owner", "owner"), include_archived=False)
+    assert {row.loan.id for row in page.active} == {active_id}
+    assert page.archived == ()
 
 
 def test_portfolio_totals_and_balance_weighted_average_rate(team: WorkspaceDb) -> None:
@@ -189,6 +200,7 @@ def test_a_broken_schedule_is_skipped_with_a_count(team: WorkspaceDb) -> None:
     assert broken.figures.monthly_installment is None
     assert broken.figures.percent_repaid_bp is None
     assert broken.figures.next_payment_date is None
+    assert broken.figures.payoff_date is None
     assert broken.figures.due_next_30_days == _money(0)
 
     good = rows[good_id]

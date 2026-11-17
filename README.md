@@ -54,6 +54,7 @@ make check
 
 ## User guides
 
+- [Home dashboard](docs/dashboard.md): the widget catalogue, defaults and how to customise Home.
 - [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
 - [Categories](docs/categories.md): expense and income categories, savings and transfers.
 - [Months](docs/months.md): moving between months, closing and reopening a month.

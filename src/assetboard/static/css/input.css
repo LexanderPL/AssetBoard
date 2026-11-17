@@ -404,3 +404,34 @@ dialog.popup[data-dialog-modal][open] {
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
 }
+
+/* Home widget placeholders (F9.1). Kept outside Tailwind's layers because
+   ``data-widget-failed`` is added by app.js at runtime, so the utility scanner never sees it. */
+[data-widget-loading] {
+  display: none;
+}
+
+[data-widget-fallback] {
+  display: block;
+}
+
+[data-widget-error-text] {
+  display: none;
+}
+
+.js [data-widget-loading] {
+  display: block;
+}
+
+.js [data-widget-fallback] {
+  display: none;
+}
+
+.js [data-widget-failed] [data-widget-loading] {
+  display: none;
+}
+
+.js [data-widget-failed] [data-widget-fallback],
+.js [data-widget-failed] [data-widget-error-text] {
+  display: block;
+}

@@ -124,7 +124,7 @@ def test_root_renders_translatable_shell_and_local_assets(signed_in: TestClient)
 
     assert response.status_code == 200
     assert '<html lang="pl" class="h-full">' in response.text
-    assert "Wydatki według kategorii" in response.text  # F2.7: the Home dashboard
+    assert "Ten miesiąc: wydatki według kategorii" in response.text  # F9.1: Home shell
     assert '"allowEval":false' in response.text
     assert '"allowScriptTags":false' in response.text
     assert '"includeIndicatorStyles":false' in response.text

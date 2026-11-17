@@ -426,6 +426,22 @@ document.addEventListener("click", (event) => {
   if (!inside) dialog.close();
 });
 
+// A lazy Home widget that fails keeps its shell: hide the loading line and show the
+// module link instead of leaving an aria-busy placeholder behind.
+function markFailedWidget(event) {
+  // htmx retargets an error response to the toast container, so detail.target is not the
+  // widget; detail.elt is the element that made the request.
+  const trigger = event.detail?.elt ?? event.target;
+  if (!(trigger instanceof Element)) return;
+  const widget = trigger.closest("[data-widget]");
+  if (!widget) return;
+  widget.removeAttribute("aria-busy");
+  widget.setAttribute("data-widget-failed", "");
+}
+for (const eventName of ["htmx:responseError", "htmx:sendError", "htmx:timeout"]) {
+  document.addEventListener(eventName, markFailedWidget);
+}
+
 // HTMX requests carry the CSRF token in a header; plain forms use their hidden input.
 document.addEventListener("htmx:configRequest", (event) => {
   const meta = document.querySelector('meta[name="csrf-token"]');

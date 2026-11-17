@@ -203,6 +203,7 @@ class LoanListFigures:
     monthly_installment: Money | None
     percent_repaid_bp: int | None
     next_payment_date: date | None
+    payoff_date: date | None
     due_next_30_days: Money
     current_rate_bp: int | None
     paid_off: bool
@@ -887,11 +888,14 @@ def _portfolio_summary(rows: tuple[LoanListRow, ...], currency: str) -> LoanPort
     )
 
 
-def list_loans(factory: sessionmaker[Session], ctx: Context) -> LoanPage:
+def list_loans(
+    factory: sessionmaker[Session], ctx: Context, *, include_archived: bool = True
+) -> LoanPage:
+    """The loan list, or only its active rows when a caller does not need archived loans."""
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
-        rows = LoanRepository(session, ctx).ordered()
+        rows = LoanRepository(session, ctx).ordered(include_archived=include_archived)
         views = [
             _load_loan_view(session, ctx, row, today)
             for row in rows

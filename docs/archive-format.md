@@ -987,8 +987,10 @@ include/ignore choice for a loan is user intent, not derived data, so it is stor
 `fire_loan_settings.csv`.
 
 The profile's `birth_year`, `life_expectancy` and `sidebar_items` are user data, not workspace
-data, so they are not archived. `investment_cost_basis` and `risk_target_policy` are workspace
-settings and live in `workspace.json`.
+data, so they are not archived. Dashboard widget layouts (`DashboardPreference`) are per-user
+interface state, not financial data; a restore starts from the default Home catalogue.
+`investment_cost_basis` and `risk_target_policy` are workspace settings and live in
+`workspace.json`.
 
 Net-worth, investment, loan and FIRE files are restore-only in a full archive merge: they are
 ignored and listed once as a warning (`networth_restore_only`, `investment_restore_only`,

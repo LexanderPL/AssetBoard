@@ -1,0 +1,42 @@
+<section class="panel p-4 sm:p-6" data-home-widget="missing-data" aria-labelledby="widget-missing-data-heading">
+  <h2 id="widget-missing-data-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+  {% if view.empty %}
+  <p class="mt-3 text-sm text-muted" data-empty>{{ _("Nothing needs attention.") }}</p>
+  {% else %}
+  <div class="mt-3 grid gap-4 lg:grid-cols-3">
+    {% if view.stale_prices %}
+    <section data-missing-prices>
+      <h3 class="text-sm font-semibold">{{ _("Prices and FX") }}</h3>
+      <ul class="mt-2 space-y-1 text-sm">
+        {% for item in view.stale_prices %}
+        <li class="flex flex-wrap justify-between gap-2"><span>{{ item.kind_label }} · {{ item.name }}</span><span class="text-muted">{{ item.as_of }}</span></li>
+        {% endfor %}
+      </ul>
+      <p class="mt-2 text-sm"><a href="{{ portfolio_url }}" class="font-medium text-primary-ink underline">{{ _("Prices and FX") }}</a></p>
+    </section>
+    {% endif %}
+    {% if view.missing_work_logs %}
+    <section data-missing-work-logs>
+      <h3 class="text-sm font-semibold">{{ _("Missing work logs") }}</h3>
+      <ul class="mt-2 space-y-1 text-sm">
+        {% for item in view.missing_work_logs %}
+        <li><a href="{{ item.url }}" class="font-medium text-primary-ink underline">{{ item.name }}</a> <span class="text-muted">· {{ item.month }}</span></li>
+        {% endfor %}
+      </ul>
+      <p class="mt-2 text-sm"><a href="{{ income_url }}" class="font-medium text-primary-ink underline">{{ _("Income") }}</a></p>
+    </section>
+    {% endif %}
+    {% if view.planned_imports %}
+    <section data-missing-imports>
+      <h3 class="text-sm font-semibold">{{ _("Imports waiting to be applied") }}</h3>
+      <ul class="mt-2 space-y-1 text-sm">
+        {% for item in view.planned_imports %}
+        <li class="flex flex-wrap justify-between gap-2"><span class="break-all">{{ item.filename }}</span><span class="text-muted">{{ item.created_at }}</span></li>
+        {% endfor %}
+      </ul>
+      {% if imports_url %}<p class="mt-2 text-sm"><a href="{{ imports_url }}" class="font-medium text-primary-ink underline">{{ _("Export and import") }}</a></p>{% endif %}
+    </section>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>

@@ -1,0 +1,15 @@
+{% from "macros/charts.html" import donut as chart_donut with context %}
+<section class="panel p-4 sm:p-6" data-home-widget="portfolio" aria-labelledby="widget-portfolio-heading">
+  <h2 id="widget-portfolio-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline underline-offset-2">{{ widget_title }}</a></h2>
+  {% if has_data %}
+  <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
+    <div><dt class="text-xs text-muted">{{ _("Value") }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums" data-portfolio-value>{{ value }}</dd></div>
+    {% set gain_class = "text-danger" if page.valuation.gain.amount_minor < 0 else ("text-success-strong" if page.valuation.gain.amount_minor > 0 else "") %}
+    <div><dt class="text-xs text-muted">{{ _("Gain") }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums {{ gain_class }}" data-portfolio-gain>{{ gain }}{% if gain_pct %} <span class="text-sm font-normal text-muted">({{ gain_pct }})</span>{% endif %}</dd></div>
+  </dl>
+  {{ chart_donut(donut, compact=true, inline_json=true) }}
+  {% else %}
+  <p class="mt-3 text-sm text-muted" data-empty>{{ _("No holdings are valued yet.") }}</p>
+  <p class="mt-2 text-sm"><a href="{{ module_url }}" class="font-medium text-primary-ink underline">{{ _("Set up investments") }}</a></p>
+  {% endif %}
+</section>

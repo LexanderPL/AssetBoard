@@ -274,6 +274,7 @@ def list_figures(view: loans.LoanView, today: date) -> loans.LoanListFigures:
             monthly_installment=None,
             percent_repaid_bp=None,
             next_payment_date=None,
+            payoff_date=None,
             due_next_30_days=Money(0, view.currency),
             current_rate_bp=view.current_rate_bp,
             paid_off=False,
@@ -293,6 +294,7 @@ def list_figures(view: loans.LoanView, today: date) -> loans.LoanListFigures:
         monthly_installment=summary.next_installment or Money(0, view.currency),
         percent_repaid_bp=max(0, min(10_000, summary.percent_repaid_bp)),
         next_payment_date=summary.next_payment_date,
+        payoff_date=summary.payoff_date,
         due_next_30_days=Money(due, view.currency),
         current_rate_bp=view.current_rate_bp,
         paid_off=(

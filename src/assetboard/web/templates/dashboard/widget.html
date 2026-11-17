@@ -1,0 +1,5 @@
+{# The outer wrapper of a lazy Home widget. It keeps the shell's id, data-widget and grid span
+   when HTMX replaces the placeholder; the widget template inside owns the panel. #}
+<section id="widget-{{ widget_key }}" class="min-w-0{% if widget_width == 'full' %} lg:col-span-2{% endif %}" data-widget="{{ widget_key }}">
+  {% include widget_template %}
+</section>

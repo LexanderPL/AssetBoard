@@ -58,6 +58,7 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    DashboardPreferenceRepository,
     ForeignWorkspace,
     FxRateRepository,
     ImportBatchRepository,
@@ -369,6 +370,41 @@ def test_membership_queries_stay_in_their_workspace(
     added = in_a.add_member(user_id=newcomer.id, role="editor")
     assert added.workspace_id == ctx_a.workspace.id
     assert in_b.for_user(newcomer.id) is None
+
+
+def test_dashboard_preference_queries_stay_in_their_workspace(
+    db_session: Session,
+    two_workspaces: tuple[Any, Any],
+    fixed_clock: FixedClock,
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    a = _member(db_session, ctx_a.workspace.id, "dash-a@example.com", "owner")
+    b = _member(db_session, ctx_b.workspace.id, "dash-b@example.com", "owner")
+    c = _member(db_session, ctx_a.workspace.id, "dash-c@example.com", "viewer")
+    in_a = DashboardPreferenceRepository(db_session, ctx_a)
+    in_b = DashboardPreferenceRepository(db_session, ctx_b)
+
+    pref_a = in_a.upsert(
+        user_id=a.user_id, widgets=["month-in-out"], customised_at=fixed_clock.now()
+    )
+    pref_b = in_b.upsert(user_id=b.user_id, widgets=["upcoming"], customised_at=fixed_clock.now())
+    assert in_a.for_user(a.user_id) is pref_a
+    assert in_a.for_user(b.user_id) is None
+    assert in_b.for_user(a.user_id) is None
+    assert in_b.for_user(b.user_id) is pref_b
+
+    pref_c = in_a.upsert(user_id=c.user_id, widgets=["loans"], customised_at=fixed_clock.now())
+    assert in_a.for_user(a.user_id) is pref_a
+    assert in_a.for_user(c.user_id) is pref_c
+    assert in_a.for_user(c.user_id).widgets == ["loans"]  # type: ignore[union-attr]
+
+    updated = in_a.upsert(user_id=a.user_id, widgets=["fire"], customised_at=fixed_clock.now())
+    assert updated is pref_a and updated.widgets == ["fire"]
+    assert in_b.for_user(b.user_id).widgets == ["upcoming"]  # type: ignore[union-attr]
+
+    assert in_a.delete_for_user(a.user_id) == 1
+    assert in_a.for_user(a.user_id) is None
+    assert in_b.for_user(b.user_id) is pref_b
 
 
 def test_audit_record_writes_into_its_own_workspace(

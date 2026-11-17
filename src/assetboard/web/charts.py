@@ -13,9 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from assetboard.domain.charts import ChartBlock, category_breakdown
+from assetboard.domain.charts import ChartBlock, category_breakdown, share_tenths
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money, format_rate_tenths
+from assetboard.services.portfolio import PortfolioPage
 from assetboard.services.summary import SummaryData
 
 PortfolioDonutKey = Literal["portfolio", "portfolio-classes"]
@@ -36,6 +37,7 @@ EMPTY: dict[ChartBlock, str] = {
     "income": _("No income yet this month"),
 }
 OTHER = _("Other")
+UNALLOCATED = _("Unallocated")
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,5 +104,43 @@ def build_donut(data: SummaryData, block: ChartBlock, locale: str) -> DonutView:
         empty=gettext(EMPTY[block], locale),
         currency=summary.currency,
         total=format_money(summary.block(block).actual, locale),
+        slices=tuple(slices),
+    )
+
+
+def build_class_donut(page: PortfolioPage, locale: str) -> DonutView:
+    """The look-through value of every asset class with a positive value, plus Unallocated.
+
+    Shared by the portfolio page and the Home mini-donut: both use the same F6.6 valuation.
+    """
+    totals = {total.asset_class_id: total for total in page.valuation.classes}
+    total_minor = page.valuation.value.amount_minor
+    slices: list[DonutSlice] = []
+    for row in page.class_rows:
+        class_id = row.asset_class.id if row.asset_class is not None else None
+        total = totals.get(class_id)
+        if total is None or total.value.amount_minor <= 0:
+            continue
+        if row.asset_class is None:
+            name, color = gettext(UNALLOCATED, locale), None
+        else:
+            name, color = row.asset_class.name, row.asset_class.color
+        slices.append(
+            DonutSlice(
+                name=name,
+                color=color,
+                amount_minor=total.value.amount_minor,
+                amount=format_money(total.value, locale),
+                share=format_rate_tenths(
+                    share_tenths(total.value.amount_minor, total_minor), locale
+                ),
+            )
+        )
+    return DonutView(
+        key="portfolio-classes",
+        heading=gettext(_("Asset classes"), locale),
+        empty=gettext(_("Nothing is valued in the portfolio yet."), locale),
+        currency=page.currency,
+        total=format_money(page.valuation.value, locale),
         slices=tuple(slices),
     )
