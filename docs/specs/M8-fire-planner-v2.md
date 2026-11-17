@@ -360,7 +360,7 @@ inflated. The ignored-loan choice is persisted per plan and archived in format 2
 
 ---
 
-## 9. Archive format (planned 2.1)
+## 9. Archive format (planned 2.2)
 
 The archive extension is updated in the same feature that reshapes the model, so the archive
 never describes a model that no longer exists.
@@ -370,6 +370,8 @@ never describes a model that no longer exists.
   header-only when no plan) and `fire_events.csv`. No `fire_contributions.csv`,
   `fire_expense_exclusions.csv` or `fire_scenarios.csv`. A 2.0 archive still reads with every
   loan included.
+- Format **2.2** adds `lasts_to_horizon` to the `fire_plan.csv` rule values. A 2.1 archive still
+  reads with the two older rules; the new rule stores a blank `swr_bp`.
 - The plan row contains birth year, stop/horizon ages, rates, rule/SWR, manual amounts,
   currency and `needs_review`. Suggested values, loan schedules and projection results are
   derived and not archived; the plan's ignored-loan choices are user intent and are stored in
@@ -1357,6 +1359,74 @@ dependencies, projection math and loan math unchanged.
   `docs/investments.md` and the overview range were updated. No model, migration, archive,
   dependency or projection/loan-math change.
 
+### F8.21 — Optional horizon-based independence rule
+
+**Acceptance**
+
+- Add `lasts_to_horizon` as a third `Rule`. It is stored in the existing `fire_scenarios.rule`
+  column with `swr_bp = NULL`; no new column or table. The database `rule_valid`/`swr_valid`
+  check constraints and a reversible migration accept it.
+- The rule finds the earliest candidate age from the current age through the earlier of
+  **Income stops at age** and **horizon age − 1** where retiring survives. The candidate
+  simulation stops **base income at that candidate age**, not at the configured income-stop
+  age, and keeps every other series and event as entered: income/expense changes, saving
+  overrides, cash events, inflation/return/income growth and included/ignored loans with their
+  payoff drops. The candidate's opening balance and every later net worth through the horizon
+  must be non-negative; zero at the horizon counts as lasting.
+- The FIRE row is the candidate row in the normal projection. The displayed rows still use the
+  configured income-stop age. The rule cannot choose an age later than the configured
+  income-stop age or the horizon. If base income has already stopped, today is the only
+  candidate.
+- The rule has no rate-based FIRE number and no net-worth-target progress. Both metrics show
+  as not defined with rule-specific explanations; net worth at FIRE remains visible.
+- **Returns cover expenses** remains the default for new plans. Existing plans keep their saved
+  rule unless the user selects another; selecting the horizon rule and saving stores
+  `swr_bp = NULL` and the server ignores a posted withdrawal rate for it.
+- Archive format **2.2** accepts the new rule value and keeps 2.0/2.1 readable. The `pl`
+  catalog is complete with no fuzzy entries.
+- No change to loan math, money/rounding rules, the other independence rules or dependencies.
+- Tests cover the earliest viable age, zero at the horizon, the stop-age cap, the candidate
+  income-stop assumption (not the full plan path), never-fire, undefined FIRE
+  number/progress, validation, the golden/oracle path, sensitivity, save/persistence, archive
+  round-trip, migration constraints and a browser selection with CSP and 390/1440 widths.
+
+**Agent prompt**
+
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F8.21 from docs/specs/M8-fire-planner-v2.md: add the optional Portfolio lasts to the
+horizon independence rule, simulate stopping base income at each candidate FIRE age up to the
+configured income-stop age, keep the rule off by default, explain why the FIRE number and plan
+progress are not defined for it, and update the DB constraints, archive 2.2, docs, i18n and
+tests. Keep loan math, money/rounding rules, the other rules and dependencies unchanged.
+```
+
+### As built (M8.F8.21)
+
+- `Rule.LASTS_TO_HORIZON` is `lasts_to_horizon`; `project` builds the normal rows once and then
+  runs a candidate simulation for the rule. `_horizon_fire_index` caps candidates at
+  `max(current age, min(stop_working_age, horizon_age - 1))`, rebuilds the row series with the
+  candidate stop age, requires a non-negative opening balance at the candidate and non-negative
+  net worth through the horizon, and returns the first surviving candidate. The chosen row is
+  marked `is_fire`; when base income already stopped, the current age is the candidate.
+- The candidate simulation keeps events, loans, rates and the configured amounts. The displayed
+  table, depletion window and sustainability check still use the configured income-stop age.
+- `fire_number` and `plan_progress_bp` are `None` for the rule; `networth_at_fire` stays. The
+  metrics cards use rule-specific help and not-defined notes in `_metrics.html`.
+- The wizard and editor list the rule after the two existing choices; **Returns cover expenses**
+  stays first and selected by default. The existing JavaScript disables the withdrawal-rate field
+  for any non-SWR rule, and the route parses no SWR for it.
+- Migration `0066_f821_horizon_rule` drops and recreates `ck_fire_scenarios_rule_valid` and
+  `ck_fire_scenarios_swr_valid`; downgrade converts horizon rows to `returns_cover_expenses`
+  before restoring the old checks. `FORMAT_VERSION` is `2.2`; the archive reader accepts the new
+  value and still reads 2.0/2.1 archives.
+- Unit tests cover both golden/oracle paths, the exact candidate boundary, zero at the horizon,
+  the stop-age cap, the counterfactual path and validation; the property suite samples the new
+  rule; sensitivity reuses the base projection. Web tests cover the selector default, saving
+  without an SWR and the metrics notes; the archive round-trip is covered in the FIRE archive
+  tests. The browser wizard checks the selection and the inactive rate field. `docs/fire.md`,
+  `docs/archive-format.md`, the overview range and ADR-0027 were updated.
+
 ---
 
 ## 12. Cross-cutting requirements
@@ -1372,7 +1442,7 @@ dependencies, projection math and loan math unchanged.
   the tenant suite; cross-workspace IDs are 404, not empty.
 - **Empty states:** no plan, no events, no loans, no suggestions and blocked suggestions all
   have explicit copy and never show a fake zero.
-- **Archive:** format 2.1 as in §9, with 2.0 and 1.8 compatibility and golden fixtures.
+- **Archive:** format 2.2 as in §9, with 2.0/2.1 and 1.8 compatibility and golden fixtures.
 - **Docs:** every feature updates `docs/fire.md`, the spec's as-built section, and the
   archive docs where relevant. User docs never mention the spreadsheet.
 - **Accessibility:** wizard steps, view/edit controls, archived-event sections, loan
@@ -1397,6 +1467,7 @@ dependencies, projection math and loan math unchanged.
 11. F8.18 — FIRE display and input polish.
 12. F8.19 — FIRE real-return coverage and model corrections.
 13. F8.20 — FIRE wizard and risk table polish.
+14. F8.21 — optional horizon-based independence rule.
 
 No feature starts until the owner approves this spec and the spec PR is merged. After that,
 each feature is implemented on its own branch and merged only after its own green gate and

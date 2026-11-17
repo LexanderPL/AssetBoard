@@ -2301,7 +2301,7 @@ def test_newer_major_archive_is_refused_and_newer_minor_warns(
     assert major["errors"][0]["code"] == "newer_major_version"
     assert major["counts"]["invalid"] == 1
 
-    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.2"), ctx=ctx)
+    minor_batch = _upload(db, data_dir, _with_version(_archive(_rows()), "2.3"), ctx=ctx)
     minor = _plan(db, data_dir, minor_batch, ctx=ctx)
     assert minor["counts"]["invalid"] == 0
     assert any(warning["code"] == "newer_minor_version" for warning in minor["warnings"])

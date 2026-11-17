@@ -229,6 +229,7 @@ FIELD_STEPS: dict[str, int] = {
 RULE_LABELS = {
     Rule.RETURNS_COVER_EXPENSES.value: _("Returns cover expenses"),
     Rule.SWR.value: _("Withdrawal rate"),
+    Rule.LASTS_TO_HORIZON.value: _("Portfolio lasts to the horizon"),
 }
 
 # F8.17: the editor accordion opens the section that owns a save error. Adjustment-row errors

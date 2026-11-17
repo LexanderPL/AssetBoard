@@ -1,5 +1,6 @@
 {% from "fire/_macros.html" import hint with context %}
 {% set projection = results.projection %}
+{% set horizon_rule = projection.inputs.rule == "lasts_to_horizon" %}
 {% set progress_bp = projection.plan_progress_bp %}
 {% if progress_bp is not none %}
   {% set capped_bp = [[progress_bp, 0]|max, 10000]|min %}
@@ -19,9 +20,9 @@
       <dd class="mt-1 text-lg font-semibold tabular-nums" data-fire-years-value>{% if projection.years_to_fire is not none %}{{ projection.years_to_fire }}{% else %}—{% endif %}</dd>
     </div>
     <div class="border border-line bg-surface p-4" data-fire-number data-fire-number-value="{{ projection.fire_number.amount_minor if projection.fire_number is not none else '' }}" data-fire-number-year="{{ projection.fire_year if projection.fire_year is not none else '' }}">
-      <dt class="text-xs font-medium text-muted">{{ _("FIRE number") }} {{ hint(_("The nominal expenses in the FIRE year divided by the rate the independence rule uses: the withdrawal rate, or the return above inflation when returns must cover expenses. This is the portfolio the plan needs in that year.")) }}</dt>
+      <dt class="text-xs font-medium text-muted">{{ _("FIRE number") }} {% if horizon_rule %}{{ hint(_("Not used by Portfolio lasts to the horizon: that rule tests the portfolio through the horizon rather than a rate-based target.")) }}{% else %}{{ hint(_("The nominal expenses in the FIRE year divided by the rate the independence rule uses: the withdrawal rate, or the return above inflation when returns must cover expenses. This is the portfolio the plan needs in that year.")) }}{% endif %}</dt>
       <dd class="mt-1 text-lg font-semibold tabular-nums">{% if projection.fire_number is not none %}{{ format_money(projection.fire_number, locale) }} <span class="text-sm font-normal text-muted">({{ projection.fire_year }})</span>{% else %}—{% endif %}</dd>
-      {% if projection.fire_age is not none and projection.fire_number is none %}<p class="mt-1 text-xs text-muted" data-fire-number-note>{{ _("Not defined: the plan's return above inflation is not positive.") }}</p>{% endif %}
+      {% if projection.fire_age is not none and projection.fire_number is none %}<p class="mt-1 text-xs text-muted" data-fire-number-note>{% if horizon_rule %}{{ _("Not defined for this rule: it does not use a withdrawal rate.") }}{% else %}{{ _("Not defined: the plan's return above inflation is not positive.") }}{% endif %}</p>{% endif %}
     </div>
     {% set sustainability_class = "border border-line bg-danger-soft" if projection.depletion_age is not none else "border border-line bg-surface" %}
     <div class="{{ sustainability_class }} p-4" data-fire-sustainability>
@@ -41,7 +42,7 @@
   <section class="panel mt-4 p-4 sm:p-6" aria-labelledby="plan-progress-heading" data-fire-progress="plan" data-progress-bp="{{ progress_bp if progress_bp is not none else '' }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
-        <h2 id="plan-progress-heading" class="text-base font-semibold">{{ _("Plan progress") }} {{ hint(_("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.")) }}</h2>
+        <h2 id="plan-progress-heading" class="text-base font-semibold">{{ _("Plan progress") }} {% if horizon_rule %}{{ hint(_("Not used by Portfolio lasts to the horizon: the rule has no net-worth target at FIRE.")) }}{% else %}{{ hint(_("Starting portfolio divided by the projected nominal net worth at FIRE. 100%% means the plan has reached its FIRE net-worth target.")) }}{% endif %}</h2>
         <p class="mt-1 text-3xl font-semibold tabular-nums" data-fire-progress-label>{% if progress_bp is none %}—{% else %}{{ format_rate_short(progress_bp, locale) }}{% endif %}</p>
       </div>
     </div>
@@ -56,7 +57,7 @@
       {% endif %}
     </svg>
     {% if progress_bp is none %}
-    <p class="mt-1 text-sm text-muted" data-fire-progress-note>{% if projection.fire_age is none %}{{ _("Not defined: this plan does not reach FIRE.") }}{% else %}{{ _("Not defined: net worth at FIRE is not positive.") }}{% endif %}</p>
+    <p class="mt-1 text-sm text-muted" data-fire-progress-note>{% if projection.fire_age is none %}{{ _("Not defined: this plan does not reach FIRE.") }}{% elif horizon_rule %}{{ _("Not defined for this rule: it does not use a net-worth target.") }}{% else %}{{ _("Not defined: net worth at FIRE is not positive.") }}{% endif %}</p>
     {% endif %}
   </section>
 </section>

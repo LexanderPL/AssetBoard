@@ -52,7 +52,7 @@
       </div>
       <div class="mt-4 grid gap-4 sm:grid-cols-2" data-fire-swr-row>
         <div class="grid gap-1" data-fire-field="rule">
-          {{ field_label("rule", _("Independence rule"), _("Returns cover expenses compares the portfolio's return above inflation with the year's expenses, preserving real capital. Withdrawal rate uses the rate below.")) }}
+          {{ field_label("rule", _("Independence rule"), _("Returns cover expenses compares the portfolio's return above inflation with the year's expenses, preserving real capital. Withdrawal rate uses the rate below. Portfolio lasts to the horizon assumes base income stops at the candidate FIRE age and checks that the portfolio is not depleted before the horizon.")) }}
           <select id="rule" name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule", "rule-hint") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
           {{ field_error(error_field, "rule", error) }}
         </div>

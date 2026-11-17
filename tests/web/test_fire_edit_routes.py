@@ -1694,6 +1694,25 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert "onclick=" not in text
 
 
+def test_the_horizon_rule_saves_without_a_withdrawal_rate(owner) -> None:
+    plan_id = create_plan(owner)
+    page = owner.client.get("/fire/edit").text
+    assert '<option value="lasts_to_horizon">Portfolio lasts to the horizon</option>' in page
+    response = owner.post(
+        "/fire/edit",
+        _form(rule="lasts_to_horizon", swr="4"),
+        token_from="/fire/edit",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        row = session.get_one(FireScenario, plan_id)
+        assert row.rule == "lasts_to_horizon"
+        assert row.swr_bp is None
+    page = owner.client.get("/fire/edit").text
+    assert '<option value="lasts_to_horizon" selected>' in field_html(page, "rule")
+    assert _input_value(page, "swr") == "4"
+
+
 def test_the_edit_form_shows_the_illustrative_withdrawal_rate_when_none_is_stored(owner) -> None:
     plan_id = create_plan(owner, rule="returns_cover_expenses", swr="4")
     with owner.db() as session:

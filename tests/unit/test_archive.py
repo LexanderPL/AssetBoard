@@ -54,7 +54,8 @@ from assetboard.domain.archive import (
 )
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v2.1.zip"
+GOLDEN = FIXTURES / "workspace-archive-v2.2.zip"
+GOLDEN_V2_1 = FIXTURES / "workspace-archive-v2.1.zip"
 GOLDEN_V2_0 = FIXTURES / "workspace-archive-v2.0.zip"
 GOLDEN_V1_8 = FIXTURES / "workspace-archive-v1.8.zip"
 GOLDEN_V1_7 = FIXTURES / "workspace-archive-v1.7.zip"
@@ -555,6 +556,17 @@ def test_archive_matches_golden_and_is_deterministic() -> None:
     assert _archive() == _archive()
 
 
+def test_released_v2_1_archive_still_reads() -> None:
+    parsed, errors = parse_archive(GOLDEN_V2_1.read_bytes())
+    assert errors == ()
+    assert parsed is not None
+    assert parsed.manifest["format_version"] == "2.1"
+    assert parsed.rows.fire_plan is not None
+    assert parsed.rows.fire_plan.rule == "swr"
+    assert parsed.rows.fire_plan.swr_bp == 400
+    assert [row.included for row in parsed.rows.fire_loan_settings] == ["false"]
+
+
 def test_released_v1_0_archive_still_reads_without_the_1_1_keys() -> None:
     parsed, errors = parse_archive(GOLDEN_V1_0.read_bytes())
     assert errors == ()
@@ -905,12 +917,12 @@ def test_reader_accepts_reordered_columns_bom_defaults_and_future_minor() -> Non
     files["categories.csv"] = (
         "\ufeffname,id,kind,future\nFood,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,expense,x\n"
     ).encode()
-    parsed, errors = parse_archive(_rewrite(files, format_version="2.2", future=True))
+    parsed, errors = parse_archive(_rewrite(files, format_version="2.3", future=True))
     assert not errors and parsed is not None
     assert parsed.rows.categories[0].treatment == "regular"
     assert parsed.rows.categories[0].sort_order == 0
     assert sorted(w.message for w in parsed.warnings) == [
-        "newer minor version: 2.2",
+        "newer minor version: 2.3",
         "unknown column: future",
         "unknown key: future",
     ]
