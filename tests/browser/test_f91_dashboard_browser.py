@@ -248,7 +248,8 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             nojs_page.locator("#customise-upcoming-limit").fill("4")
             nojs_page.locator("#customise-upcoming-limit").press("Enter")
             nojs_page.wait_for_url(f"{base}/?saved=1")
-            assert _stored_preferences(app).upcoming_limit == 4
+            saved_by_enter = _stored_preferences(app)
+            assert saved_by_enter is not None and saved_by_enter.upcoming_limit == 4
             nojs_page.locator("[data-customise-link]").click()
             nojs_page.wait_for_url(re.compile(r"/dashboard/customise$"))
             nojs_page.locator("#customise-upcoming").uncheck()

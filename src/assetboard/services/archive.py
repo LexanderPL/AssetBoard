@@ -15,6 +15,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard import branding
+from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.investments import AssetClass
 from assetboard.db.models.ledger import Category
@@ -116,6 +117,11 @@ from assetboard.domain.networth import ASSET_SEEDS as NETWORTH_ASSET_SEEDS
 from assetboard.domain.networth import LIABILITY_SEED as NETWORTH_LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
+from assetboard.services.archive_secrets import (
+    collect_archive_secrets,
+    encrypt_archive_secrets,
+    validate_passphrase,
+)
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.fire_linked import linked_inputs_in_session
@@ -160,8 +166,15 @@ ARCHIVE_INCLUDED_MODELS = frozenset(
         "InstallmentPlan",
         "FireScenario",
         "FireEvent",
+        "FireLoanSetting",
     }
 )
+ARCHIVE_SECRET_MODELS = {
+    "NotificationChannel": (
+        "Apprise URLs are secrets; exported only when the owner includes the encrypted "
+        "secrets member"
+    ),
+}
 ARCHIVE_EXCLUDED_MODELS = {
     "Membership": "workspace membership is instance access control",
     "Invitation": "invitations are not financial workspace data",
@@ -173,7 +186,6 @@ ARCHIVE_EXCLUDED_MODELS = {
     "DashboardPreference": (
         "the Home widget layout is a per-user interface preference, not financial data"
     ),
-    "NotificationChannel": "notification URLs contain secrets (F9.3)",
     "NotificationLog": "notification delivery history is not portable",
     "ProviderError": "provider error logs are operational and not portable",
 }
@@ -634,12 +646,32 @@ class WorkspaceArchive:
     filename: str
 
 
-def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceArchive:
-    """Export the complete ledger and record a content-free audit event."""
+def export_workspace(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    include_secrets: bool = False,
+    passphrase: str | None = None,
+    settings: Settings | None = None,
+) -> WorkspaceArchive:
+    """Export the complete ledger and record a content-free audit event.
+
+    ``include_secrets`` is owner-only and requires a passphrase; the encrypted member is built
+    after the database transaction commits so its key derivation does not hold the write lock.
+    """
+    if include_secrets:
+        require_role(ctx, Role.OWNER)
+        if settings is None:
+            raise ValueError("instance settings are required for secrets")
+        passphrase = validate_passphrase(passphrase)
+    else:
+        passphrase = None
+    if include_secrets:
+        assert settings is not None
     require_role(ctx, Role.EDITOR)
 
-    def export(session: Session) -> tuple[ArchiveRows, datetime, str]:
-        require_role_now(session, ctx, Role.EDITOR)
+    def export(session: Session) -> tuple[ArchiveRows, datetime, str, dict[str, object] | None]:
+        require_role_now(session, ctx, Role.OWNER if include_secrets else Role.EDITOR)
         workspace_repository = CurrentWorkspaceRepository(session, ctx)
         # Ledger writers take this workspace lock too, keeping the files mutually consistent.
         workspace_repository.lock(exclusive=True)
@@ -1811,6 +1843,10 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 "tolerance_bp": policy.tolerance_bp,
             }
         exported_at = ctx.clock.now().astimezone(UTC)
+        secrets_payload = None
+        if include_secrets:
+            assert settings is not None
+            secrets_payload = collect_archive_secrets(session, ctx, settings)
         rows = ArchiveRows(
             workspace=workspace_values,
             categories=category_rows,
@@ -1906,6 +1942,20 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             # A linked legacy input whose value cannot be resolved is exported as 0 and its
             # field is named here, so it is never a silent zero (see docs/archive-format.md).
             "fire_plan_zeroed_fields": ", ".join(sorted(fire_zeroed_fields)),
+            "secrets_included": 1 if secrets_payload is not None else 0,
+            "notification_channels_in_secrets": (
+                len(cast("list[object]", secrets_payload["notification_channels"]))
+                if secrets_payload is not None
+                else 0
+            ),
+            "provider_settings_in_secrets": (
+                len(cast("list[object]", secrets_payload["provider_settings"]))
+                if secrets_payload is not None
+                else 0
+            ),
+            "secrets_skipped": (
+                int(cast("int", secrets_payload["skipped"])) if secrets_payload is not None else 0
+            ),
         }
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
@@ -1916,9 +1966,14 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             data=counts,
         )
         slug = re.sub(r"[^a-z0-9]+", "-", workspace.name.lower()).strip("-") or "workspace"
-        return rows, exported_at, slug
+        return rows, exported_at, slug, secrets_payload
 
-    rows, exported_at, slug = run_immediate(factory, export)
+    rows, exported_at, slug, secrets_payload = run_immediate(factory, export)
+    secrets_bytes = (
+        encrypt_archive_secrets(passphrase, secrets_payload, now=exported_at)
+        if secrets_payload is not None and passphrase is not None
+        else None
+    )
     # Compress after commit: the rows are a consistent snapshot, and on SQLite the immediate
     # transaction blocks every writer of the instance while it is open.
     archive = write_archive(
@@ -1927,6 +1982,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
         app_version=version("assetboard"),
         exported_at=exported_at,
         base_currency=str(rows.workspace["base_currency"]),
+        secrets=secrets_bytes,
     )
     filename = f"{branding.CLI_NAME}-{slug}-{exported_at.strftime('%Y%m%d-%H%M%S')}Z.zip"
     return WorkspaceArchive(content=archive, filename=filename)

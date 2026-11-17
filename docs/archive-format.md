@@ -1,4 +1,4 @@
-# Workspace archive format (v2.3)
+# Workspace archive format (v2.4)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -52,11 +52,13 @@ assetboard-home-20261018-143000Z.zip
 ├── installment_plans.csv
 ├── fire_plan.csv
 ├── fire_events.csv
-└── fire_loan_settings.csv
+├── fire_loan_settings.csv
+└── secrets.json.enc          (optional, format 2.4+)
 ```
 
-All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
-when it has only its header row. The file name prefix is the app's command-line name.
+All members sit at the root of the ZIP (no folders). Every data file is required in a current
+archive, even when it has only its header row; `secrets.json.enc` is optional and appears only
+when the owner includes secrets. The file name prefix is the app's command-line name.
 
 ## Common rules
 
@@ -116,16 +118,18 @@ every loan included, and a 2.1 archive requires the new file (header only when e
 recurring, income, tax and work files below and the optional `source` and
 `scheduled_occurrence_id` columns of `transactions.csv`; a 2.2 archive reads with none of those
 files and with every transaction treated as `import` (or `investment` for a restored dividend).
-A 2.3 archive requires every new file (header only when empty). Loan schedules and projections
-are not archived and are recomputed from the restored terms. Golden archives of every released
-version are in `tests/fixtures/`.
+A 2.3 archive requires every new file (header only when empty). Format 2.4 (additive): adds the
+optional passphrase-encrypted `secrets.json.enc` member. A 2.4 archive without it restores
+normally with no notification channels or provider keys; an older reader ignores it as an
+unknown member. Loan schedules and projections are not archived and are recomputed from the
+restored terms. Golden archives of every released version are in `tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "2.3",
+  "format_version": "2.4",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -143,6 +147,33 @@ version are in `tests/fixtures/`.
 `sha256` is the lowercase hex digest of the member's bytes (shortened above). `rows` excludes
 the header and is `null` for JSON files. The reader checks every checksum, byte count and row
 count.
+
+## `secrets.json.enc` (optional, format 2.4+)
+
+The optional encrypted member is written only when the owner ticks **Include notification URLs
+and provider API keys** and supplies a passphrase of at least 12 characters. It is a JSON
+envelope, itself not secret:
+
+```json
+{
+  "format": "assetboard-workspace-secrets",
+  "version": 1,
+  "cipher": "fernet",
+  "kdf": {"name": "pbkdf2-sha256", "iterations": 600000, "salt": "<base64 16 bytes>"},
+  "data": "<Fernet token>"
+}
+```
+
+`data` decrypts with a key derived from the passphrase and salt to a compact JSON payload:
+`notification_channels` (the exporting owner's channels: name, Apprise URL, scheme, service
+name, enabled, mode, digest time, lead days and notification switches) and
+`provider_settings` (provider key and its plain settings, including the API key). The member is listed in the manifest and checksummed like
+every other file.
+
+Restore needs the passphrase; a missing or wrong passphrase leaves the workspace untouched.
+Notification-channel ownership is not archived: restored channels belong to the restoring
+owner. Provider settings are re-encrypted with the target instance's secret key. A merge
+ignores the member and reports `secrets_restore_only`.
 
 ## `workspace.json` (restore only)
 
@@ -827,10 +858,12 @@ id,base_currency,quote_currency,date,rate,source
 | `daily_call_budget` | yes | integer 1–100 000 |
 | `fx_backfilled` | no | compact JSON object of currency → date; the one-off FX backfill marker |
 
-Provider API keys and other encrypted settings are **never** exported (F9.3). On restore a
-keyless provider (NBP, ECB, CoinGecko) keeps its saved enabled state. A provider that requires a
-key (EODHD, GoldAPI) is restored **disabled** and the restore report says to re-enter the API key
-and enable it; leaving it enabled would only log `missing_api_key` on every scheduled run.
+Provider API keys and other encrypted settings are never in this plain CSV. They are optional in
+the encrypted `secrets.json.enc` member. On restore a keyless provider (NBP, ECB, CoinGecko)
+keeps its saved enabled state. A provider that requires a key (EODHD, GoldAPI) is restored
+**disabled** when the archive has no secrets member (or the entry is missing), and the report
+says to re-enter the API key and enable it. With the member and its passphrase, the key and the
+archived enabled state are restored.
 
 ```csv
 id,provider_key,enabled,daily_call_budget,fx_backfilled
@@ -1194,11 +1227,12 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 2.3)
+## Not in the archive (format 2.4)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
-mappings, and who created or closed what. Notification channels are never exported, because
-their URLs can contain secrets. Provider error logs are operational and not portable. FIRE
+mappings, and who created or closed what. Notification channels are exported only inside the
+optional encrypted `secrets.json.enc` member, because their URLs are secrets; notification
+delivery logs stay out. Provider error logs are operational and not portable. FIRE
 projections, sensitivity grids and loan schedules are derived data: they are recomputed from
 the archived inputs and are never stored in the archive. The plan's include/ignore choice for a
 loan is user intent, not derived data, so it is stored in `fire_loan_settings.csv`.
@@ -1212,8 +1246,8 @@ the default Home catalogue.
 
 Net-worth, investment, loan, FIRE and recurring/income/tax/work-calendar files are restore-only
 in a full archive merge: they are ignored and listed once as a warning (`networth_restore_only`,
-`investment_restore_only`, `loan_restore_only`, `fire_restore_only` and
-`recurring_restore_only`). A legacy 1.8 archive's four FIRE files are covered by the same
+`investment_restore_only`, `loan_restore_only`, `fire_restore_only`,
+`recurring_restore_only` and `secrets_restore_only`). A legacy 1.8 archive's four FIRE files are covered by the same
 `fire_restore_only` warning. A lone `item_valuations.csv`, a lone
 `investment_transactions.csv`, a lone `reference_rate_values.csv` and a lone `work_logs.csv`
 can be merged. The other loan, FIRE and recurring files are refused as standalone uploads

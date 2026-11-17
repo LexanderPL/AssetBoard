@@ -17,7 +17,7 @@ import json
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -25,12 +25,14 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from assetboard.config import Settings
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.income import IncomeSource
 from assetboard.db.models.investments import AssetClass, RiskTargetPolicy
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
+from assetboard.db.models.prices import PriceSourceConfig
 from assetboard.db.repositories import (
     AssetClassRepository,
     AuditEventRepository,
@@ -62,6 +64,7 @@ from assetboard.db.repositories import (
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
+    NotificationChannelRepository,
     PricePointRepository,
     PriceSourceConfigRepository,
     ReferenceRateRepository,
@@ -104,6 +107,7 @@ from assetboard.domain.income import pay_date
 from assetboard.domain.ledger_csv import plain_amount
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.months import YearMonth
+from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.providers import PROVIDERS
 from assetboard.domain.text import text_key
 from assetboard.domain.transactions import EntryError, description_key
@@ -113,6 +117,10 @@ from assetboard.services.archive import (
     suggested_networth_categories_to_remove,
     workspace_is_empty,
 )
+from assetboard.services.archive_secrets import (
+    InvalidPassphrase,
+    decrypt_archive_secrets,
+)
 from assetboard.services.context import Context
 from assetboard.services.import_dedupe import (
     IncomingBudgetLine,
@@ -121,8 +129,20 @@ from assetboard.services.import_dedupe import (
     match_transactions,
 )
 from assetboard.services.import_income import create_work_log, record_work_log_rollback
-from assetboard.services.imports import ImportAdapter, ImportRestoreUnavailable
+from assetboard.services.imports import (
+    ImportAdapter,
+    ImportRestoreUnavailable,
+    ImportSecretsPassphraseInvalid,
+    ImportSecretsPassphraseRequired,
+)
 from assetboard.services.imports import ImportError as ImportServiceError
+from assetboard.services.notifications import (
+    MAX_CHANNELS_PER_MEMBER,
+    MAX_URL_LENGTH,
+    encrypt_url,
+    url_scheme,
+)
+from assetboard.services.price_sources import encrypt_provider_settings
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 from assetboard.services.workspaces import MAX_WORKSPACE_NAME_LENGTH
 
@@ -207,6 +227,10 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "income_source_tax_rules_created": 0,
         "work_logs_created": 0,
         "work_days_created": 0,
+        "secrets_included": 0,
+        "notification_channels_created": 0,
+        "provider_keys_restored": 0,
+        "secrets_skipped": 0,
         **values,
     }
 
@@ -223,6 +247,7 @@ def _empty_report(**values: object) -> dict[str, Any]:
         "skipped": [],
         "errors": [],
         "refused": False,
+        "secrets_present": False,
     }
     report.update(values)
     return report
@@ -1610,6 +1635,8 @@ def _merge(
         warnings.append(_entry("fire_restore_only", file="archive"))
     if any(name in archive.files for name in M3_CSV_FILES if name != "work_logs.csv"):
         warnings.append(_entry("recurring_restore_only", file="archive"))
+    if archive.secrets is not None:
+        warnings.append(_entry("secrets_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1622,6 +1649,7 @@ def _merge(
         errors=errors,
         archive_closed_months=archive_closed,
         settings_diff=settings_diff,
+        secrets_present=archive.secrets is not None,
     )
     return report, {
         "created": tx_created,
@@ -1760,6 +1788,7 @@ def _restore_report(
         1 for row in archive.rows.fire_loan_settings if row.included == "false"
     )
     counts["invalid"] = len(errors)
+    counts["secrets_included"] = 1 if archive.secrets is not None else 0
     asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
         _entry(
@@ -1771,13 +1800,14 @@ def _restore_report(
         for line, row in enumerate(archive.rows.networth_items, start=2)
         if _link_target_missing(row, asset_class_ids, instrument_ids)
     ]
-    warnings.extend(
-        _provider_key_warning(row.provider_key, line)
-        for line, row in enumerate(archive.rows.price_source_configs, start=2)
-        if row.enabled == "true"
-        and (definition := PROVIDERS.get(row.provider_key)) is not None
-        and definition.requires_key
-    )
+    if archive.secrets is None:
+        warnings.extend(
+            _provider_key_warning(row.provider_key, line)
+            for line, row in enumerate(archive.rows.price_source_configs, start=2)
+            if row.enabled == "true"
+            and (definition := PROVIDERS.get(row.provider_key)) is not None
+            and definition.requires_key
+        )
     ledger_ids = {UUID(row.id) for row in archive.rows.transactions}
     warnings.extend(
         _entry(
@@ -1795,6 +1825,7 @@ def _restore_report(
         warnings=warnings,
         restore_months=[row.month for row in archive.rows.months],
         archive_closed_months=sorted(row.month for row in archive.rows.months if row.closed_at),
+        secrets_present=archive.secrets is not None,
         suggested_categories_removed=[category.name for category in removed],
         suggested_networth_categories_removed=[category.name for category in removed_networth],
         suggested_asset_classes_removed=[asset_class.name for asset_class in removed_assets],
@@ -2886,6 +2917,169 @@ def _restore_investments(
     )
 
 
+def _restore_secrets(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    settings: Settings | None,
+    passphrase: str | None,
+    restore_now: datetime,
+) -> dict[str, int]:
+    """Restore notification channels and provider keys from the encrypted member."""
+    if archive.secrets is None:
+        return {
+            "notification_channels_created": 0,
+            "provider_keys_restored": 0,
+            "secrets_skipped": 0,
+        }
+    if settings is None:
+        raise ImportServiceError("instance settings are missing")
+    if not passphrase:
+        raise ImportSecretsPassphraseRequired
+    try:
+        payload = decrypt_archive_secrets(passphrase, archive.secrets)
+    except InvalidPassphrase:
+        raise ImportSecretsPassphraseInvalid from None
+    raw_channels = payload.get("notification_channels", [])
+    raw_providers = payload.get("provider_settings", [])
+    if not isinstance(raw_channels, list) or not isinstance(raw_providers, list):
+        raise ImportServiceError("the archive's secrets payload is invalid")
+
+    channels = NotificationChannelRepository(session, ctx)
+    channel_ids: set[UUID] = set()
+    created_channel_ids: list[str] = []
+    created_channels = 0
+    skipped = 0
+    existing_channels = len(channels.for_user(ctx.user.id))
+    for value in cast("list[object]", raw_channels):
+        if not isinstance(value, dict):
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        row = cast("dict[object, object]", value)
+        raw_id = row.get("id")
+        name = row.get("name")
+        url = row.get("url")
+        mode = row.get("mode")
+        digest_text = row.get("digest_time")
+        if (
+            not isinstance(raw_id, str)
+            or not isinstance(name, str)
+            or not isinstance(url, str)
+            or mode not in {"digest", "per_item"}
+            or not isinstance(digest_text, str)
+        ):
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        try:
+            channel_id = UUID(raw_id)
+            digest_time = time.fromisoformat(digest_text)
+        except ValueError:
+            raise ImportServiceError("the archive's secrets payload is invalid") from None
+        if (
+            not name
+            or len(name) > 100
+            or not url
+            or len(url) > MAX_URL_LENGTH
+            or any(char.isspace() for char in url)
+            or url_scheme(url) not in settings.notification_schemes
+            or existing_channels + created_channels >= MAX_CHANNELS_PER_MEMBER
+        ):
+            skipped += 1
+            continue
+        lead = row.get("default_lead_days", 3)
+        if type(lead) is not int or not 0 <= lead <= MAX_LEAD_DAYS:
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        flags: dict[str, bool] = {}
+        for key, default in (
+            ("enabled", True),
+            ("notify_due_soon", True),
+            ("notify_overdue", True),
+            ("notify_work_logs", True),
+            ("include_amounts", False),
+        ):
+            flag = row.get(key, default)
+            if type(flag) is not bool:
+                raise ImportServiceError("the archive's secrets payload is invalid")
+            flags[key] = flag
+        if channel_id in channel_ids:
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        channel_ids.add(channel_id)
+        new_id = uuid4()
+        channels.create(
+            id=new_id,
+            user_id=ctx.user.id,
+            name=name,
+            url_encrypted=encrypt_url(settings, new_id, url, restore_now),
+            scheme=url_scheme(url),
+            service_name=str(row.get("service_name") or url_scheme(url))[:100],
+            mode=mode,
+            digest_time=digest_time.replace(second=0, microsecond=0, tzinfo=None),
+            default_lead_days=lead,
+            **flags,
+            created_at=restore_now,
+            updated_at=restore_now,
+        )
+        created_channel_ids.append(str(new_id))
+        created_channels += 1
+    batch.report = {
+        **(batch.report or {}),
+        "restored_secret_channel_ids": created_channel_ids,
+    }
+
+    configs = PriceSourceConfigRepository(session, ctx).list()
+    archived_configs = {UUID(row.id): row for row in archive.rows.price_source_configs}
+    configs_by_lineage: dict[UUID, PriceSourceConfig] = {}
+    for config in configs:
+        if config.import_key and config.import_key.startswith("id:"):
+            with contextlib.suppress(ValueError):
+                configs_by_lineage[UUID(config.import_key[3:])] = config
+    restored_keys = 0
+    for value in cast("list[object]", raw_providers):
+        if not isinstance(value, dict):
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        row = cast("dict[object, object]", value)
+        raw_id = row.get("id")
+        provider_key = row.get("provider_key")
+        settings_values = row.get("settings")
+        if (
+            not isinstance(raw_id, str)
+            or not isinstance(provider_key, str)
+            or not isinstance(settings_values, dict)
+        ):
+            raise ImportServiceError("the archive's secrets payload is invalid")
+        parsed = {
+            str(key): item
+            for key, item in cast("dict[object, object]", settings_values).items()
+            if isinstance(key, str) and isinstance(item, str)
+        }
+        if not parsed:
+            continue
+        try:
+            config = configs_by_lineage.get(UUID(raw_id))
+        except ValueError:
+            raise ImportServiceError("the archive's secrets payload is invalid") from None
+        if config is None or config.provider_key != provider_key:
+            skipped += 1
+            continue
+        config.settings_encrypted = encrypt_provider_settings(
+            settings,
+            config.id,
+            config.provider_key,
+            parsed,
+            restore_now,
+        )
+        archived = archived_configs.get(UUID(raw_id))
+        if archived is not None:
+            config.enabled = archived.enabled == "true"
+        restored_keys += 1
+    session.flush()
+    return {
+        "notification_channels_created": created_channels,
+        "provider_keys_restored": restored_keys,
+        "secrets_skipped": skipped,
+    }
+
+
 def _policy_values(row: RiskTargetPolicy) -> dict[str, object]:
     return {
         "mode": row.mode,
@@ -2945,6 +3139,9 @@ def _apply_restore(
     ctx: Context,
     batch: ImportBatch,
     parsed: ParsedUpload,
+    *,
+    secrets_passphrase: str | None = None,
+    instance_settings: Settings | None = None,
 ) -> dict[str, int]:
     archive = _archive(parsed)
     if not workspace_is_empty(session, ctx):
@@ -3092,6 +3289,15 @@ def _apply_restore(
     investment_counts["risk_policy_restored"] = _apply_restore_risk_policy(
         session, ctx, batch, archive, restore_now=restore_now
     )
+    secret_counts = _restore_secrets(
+        session,
+        ctx,
+        batch,
+        archive,
+        settings=instance_settings,
+        passphrase=secrets_passphrase,
+        restore_now=restore_now,
+    )
     linked_items = _resolve_networth_links(
         session,
         ctx,
@@ -3130,6 +3336,10 @@ def _apply_restore(
             "income_source_tax_rules": len(archive.rows.income_source_tax_rules),
             "work_logs": len(archive.rows.work_logs),
             "work_days": len(archive.rows.work_days),
+            "secrets_included": 1 if archive.secrets is not None else 0,
+            "notification_channels_created": secret_counts["notification_channels_created"],
+            "provider_keys_restored": secret_counts["provider_keys_restored"],
+            "secrets_skipped": secret_counts["secrets_skipped"],
             "networth_categories": len(archive.rows.networth_categories),
             "networth_items": len(archive.rows.networth_items),
             "item_valuations": len(archive.rows.item_valuations),
@@ -3181,6 +3391,9 @@ def _apply_restore(
         "income_source_tax_rules_created": len(archive.rows.income_source_tax_rules),
         "work_logs_created": len(archive.rows.work_logs),
         "work_days_created": len(archive.rows.work_days),
+        "notification_channels_created": secret_counts["notification_channels_created"],
+        "provider_keys_restored": secret_counts["provider_keys_restored"],
+        "secrets_skipped": secret_counts["secrets_skipped"],
         "deleted_transactions": deleted,
         "suggested_categories_removed": len(removed),
         "suggested_networth_categories_removed": len(removed_networth),
@@ -3193,6 +3406,7 @@ def _apply_restore(
         **loan_counts,
         **investment_counts,
         **fire_counts,
+        **secret_counts,
     }
 
 
@@ -3231,10 +3445,19 @@ class ArchiveImportAdapter(ImportAdapter):
         *,
         base_currency: str,
         skip_invalid: bool,
+        secrets_passphrase: str | None = None,
+        instance_settings: Settings | None = None,
     ) -> dict[str, int]:
         del skip_invalid
         if batch.mode == "restore":
-            return _apply_restore(session, ctx, batch, parsed)
+            return _apply_restore(
+                session,
+                ctx,
+                batch,
+                parsed,
+                secrets_passphrase=secrets_passphrase,
+                instance_settings=instance_settings,
+            )
         _report, counts = _merge(
             session,
             ctx,

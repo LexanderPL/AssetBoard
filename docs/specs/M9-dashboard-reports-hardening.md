@@ -158,6 +158,30 @@ passphrase-encrypted secrets member, the full round-trip test over the demo buil
 and the golden-archive regression tests for every released format version.
 ```
 
+
+**As built (format 2.4):**
+- `tests/unit/test_archive_coverage.py` asserts every workspace-owned model is in
+  `ARCHIVE_INCLUDED_MODELS`, `ARCHIVE_SECRET_MODELS` or `ARCHIVE_EXCLUDED_MODELS`, with no
+  overlap and a non-empty reason for every exclusion. `FireLoanSetting` was the missing model
+  found while adding the test. Notification channels are conditional secrets; notification
+  logs, provider error logs, audit history, imports/mappings, membership data and per-user UI
+  preferences stay excluded with documented reasons in `docs/archive-format.md`.
+- The optional `secrets.json.enc` member is written only when an owner ticks **Include
+  notification URLs and provider API keys** and supplies a passphrase of at least 12 characters.
+  It is a compact JSON envelope (PBKDF2-HMAC-SHA256, 600 000 iterations, 16-byte salt, Fernet)
+  listed in the manifest and checksummed. The payload holds the exporting owner's
+  notification-channel configuration and provider settings including API keys; other members'
+  channels stay private. No new dependency was added: both primitives come
+  from the already-vendored `cryptography` package.
+- Restore decrypts the member at apply time, after the plan has shown `secrets_present`.
+  Notification channels are restored for the restoring owner (per-user ownership is not
+  archived) and provider settings are re-encrypted with the target instance secret. A missing
+  or wrong passphrase raises a translated 409 and the whole restore transaction rolls back, so
+  the workspace stays empty. Merge ignores the member and reports `secrets_restore_only`.
+- A full demo-builder round trip into a fresh database now compares every required data file
+  byte-for-byte (the manifest is excluded because `exported_at` and the app version differ).
+  The parameterized golden-archive test restores every fixture from 1.0 through 2.4.
+
 ---
 
 ## F9.4 Backups and restore
@@ -168,6 +192,22 @@ and the golden-archive regression tests for every released format version.
 - Restore procedure documented and **tested** (CLI `assetboard restore <file>` with integrity check, schema-version check, and automatic pre-restore backup).
 - For PostgreSQL deployments (if configured later) the page explains using `pg_dump`; the feature is disabled gracefully.
 - Docs: `docs/backup.md` includes advice for volume snapshots and off-site copies.
+
+**Implementation notes (F9.4).** One scheduled copy runs per day at 03:30 UTC (rather than a
+separate daily/weekly/monthly file): retention keeps the newest scheduled copy of each of the
+configured number of days, ISO weeks and months, so one file can be the representative of
+several buckets. Manual and pre-restore copies are never pruned automatically. `BackupRun` is
+instance-level (no `workspace_id`), so tenant isolation and the demo builder do not apply; the
+table is documented as instance-level in `docs/architecture.md`. The backup directory also
+holds a `<name>.secret_key` sidecar when the key is stored in `DATA_DIR`, so an automatic
+restore keeps encrypted values readable; the download button serves the database file only.
+The source is validated as a complete AssetBoard database before copying, so a missing or
+empty database cannot produce a "successful" empty backup. Backup writers share a lock (thread
+and file), which keeps concurrent manual runs from colliding; the daily tick skips a copy made
+within the previous hour to avoid a startup/cron duplicate. A damaged live database still gets
+a raw pre-restore copy before a restore, so recovery is never blocked by its own safety net,
+and the CLI refuses the default relative `./data` target unless `--data-dir`,
+`--database-url` or `ASSETBOARD_DATA_DIR` names the live instance.
 
 **Agent prompt**
 ```

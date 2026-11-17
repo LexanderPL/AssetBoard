@@ -1,7 +1,7 @@
 """Home widget settings: upcoming limit and portfolio chart range (F9.1)
 
-Revision ID: 0069_f91_home_preferences
-Revises: 0068_f38_work_logs_import
+Revision ID: 0070_f91_home_preferences
+Revises: 0069_f94_backups
 Create Date: 2026-11-17
 
 The owner's polish request adds two per-user settings to the existing row. No row still means
@@ -22,8 +22,8 @@ from assetboard.domain.dashboard import (
     UPCOMING_LIMIT_MIN,
 )
 
-revision = "0069_f91_home_preferences"
-down_revision = "0068_f38_work_logs_import"
+revision = "0070_f91_home_preferences"
+down_revision = "0069_f94_backups"
 branch_labels = None
 depends_on = None
 

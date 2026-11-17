@@ -40,6 +40,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "asset_classes",
         "audit_events",
+        "backup_runs",
         "bond_terms",
         "auth_throttles",
         "budget_lines",
@@ -2635,7 +2636,7 @@ def test_0067_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> N
         engine.dispose()
 
 
-def test_0069_home_widget_settings_migration_backfills_and_reverses(tmp_path: Path) -> None:
+def test_0070_home_widget_settings_migration_backfills_and_reverses(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
         data_dir=tmp_path,
@@ -2716,6 +2717,51 @@ def test_0065_f912_sidebar_items_migration_is_reversible(tmp_path: Path) -> None
         command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
         downgraded = {column["name"] for column in inspect(engine).get_columns("users")}
         assert "sidebar_items" not in downgraded
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0069_f94_backups_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'backups.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0068_f38_work_logs_import")
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "backup_runs" not in set(inspect(engine).get_table_names())
+        command.upgrade(alembic_config(settings), "0069_f94_backups")
+        inspector = inspect(engine)
+        assert "backup_runs" in set(inspector.get_table_names())
+        columns = {column["name"] for column in inspector.get_columns("instance_settings")}
+        assert {
+            "backup_daily_retention",
+            "backup_weekly_retention",
+            "backup_monthly_retention",
+        } <= columns
+        with engine.connect() as connection:
+            defaults = connection.exec_driver_sql(
+                "SELECT backup_daily_retention, backup_weekly_retention, "
+                "backup_monthly_retention FROM instance_settings WHERE id = 1"
+            ).one()
+        assert tuple(defaults) == (7, 4, 6)
+
+        command.downgrade(alembic_config(settings), "0068_f38_work_logs_import")
+        inspector = inspect(engine)
+        assert "backup_runs" not in set(inspector.get_table_names())
+        columns = {column["name"] for column in inspector.get_columns("instance_settings")}
+        assert (
+            not {
+                "backup_daily_retention",
+                "backup_weekly_retention",
+                "backup_monthly_retention",
+            }
+            & columns
+        )
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)
