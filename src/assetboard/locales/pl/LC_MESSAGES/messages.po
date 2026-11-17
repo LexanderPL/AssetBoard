@@ -5836,12 +5836,14 @@ msgid "Sidebar"
 msgstr "Pasek boczny"
 
 msgid ""
-"Choose which pages appear in the sidebar and in which order. Some pages "
-"appear only where the workspace enables the feature, such as Taxes."
+"Choose which pages appear in the sidebar and in which order. Press Save "
+"sidebar to apply your changes. Some pages appear only where the workspace"
+" enables the feature, such as Taxes."
 msgstr ""
 "Wybierz, które strony pojawiają się na pasku bocznym i w jakiej "
-"kolejności. Niektóre strony pojawiają się tylko wtedy, gdy obszar roboczy"
-" włączy daną funkcję, np. Podatki."
+"kolejności. Naciśnij Zapisz pasek, aby zastosować zmiany. Niektóre strony"
+" pojawiają się tylko wtedy, gdy obszar roboczy włączy daną funkcję, np. "
+"Podatki."
 
 msgid "Only shown when Taxes is turned on in the workspace settings."
 msgstr ""
@@ -5860,10 +5862,13 @@ msgid "Move %(name)s down"
 msgstr "Przesuń %(name)s w dół"
 
 msgid "Save sidebar"
-msgstr "Zapisz pasek boczny"
+msgstr "Zapisz pasek"
 
 msgid "Reset to default"
 msgstr "Przywróć domyślne"
+
+msgid "Without JavaScript, moving a page saves the new order immediately."
+msgstr "Bez JavaScriptu przesunięcie strony od razu zapisuje nową kolejność."
 
 msgid "Notifications"
 msgstr "Powiadomienia"

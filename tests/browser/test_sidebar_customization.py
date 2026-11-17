@@ -1,6 +1,7 @@
-"""F9.12 in Chromium: the Profile customiser at 1440 px and 390 px, the desktop and mobile
-navigation reflecting the same saved order, click and keyboard moves, checkbox + save, reset,
-no horizontal overflow, and a JavaScript-disabled context that can still save and move."""
+"""F9.12 in Chromium: the Profile customiser at 1440 px and 390 px, arrows reordering rows in
+place without saving, the Save button persisting the order, the desktop and mobile navigation
+reflecting the saved order, checkbox + save, reset, one action row, no horizontal overflow, and
+a JavaScript-disabled fallback that still saves and moves."""
 
 from __future__ import annotations
 
@@ -9,9 +10,11 @@ from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.identity import User
 from assetboard.services.auth import run_initial_setup
 from tests.conftest import live_server
 
@@ -27,6 +30,9 @@ NAV_KEYS = """() => Array.from(
   (name) => name.startsWith("data-") && name.endsWith("-link")
 ).slice(5, -5))"""
 NO_OVERFLOW = "document.documentElement.scrollWidth <= window.innerWidth"
+FORM_KEYS = """() => Array.from(
+  document.querySelectorAll('[data-sidebar-list] > [data-sidebar-item]')
+).map((row) => row.dataset.sidebarItem)"""
 
 
 def _app(tmp_path: Path):
@@ -65,6 +71,18 @@ def _nav(page: Page) -> list[str]:
     return page.evaluate(NAV_KEYS)
 
 
+def _form_keys(page: Page) -> list[str]:
+    return page.evaluate(FORM_KEYS)
+
+
+def _actions_are_inline(page: Page) -> None:
+    save = page.locator("[data-sidebar-save]").bounding_box()
+    reset = page.locator("[data-sidebar-reset]").bounding_box()
+    assert save is not None and reset is not None
+    assert abs(save["y"] - reset["y"]) <= 1, (save, reset)
+    assert save["x"] < reset["x"], (save, reset)
+
+
 def _open_menu(page: Page) -> None:
     menu = page.locator("[data-sidebar-toggle]")
     if menu.is_visible():
@@ -88,22 +106,35 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         expect(page.locator('[data-sidebar-item="home"] [data-sidebar-visible="home"]')
                ).to_be_disabled()  # fmt: skip
         expect(page.locator("[data-sidebar-save]")).to_have_text("Save sidebar")
+        assert page.locator("[data-sidebar-nojs-note]").count() == 0
+        _actions_are_inline(page)
 
-        # Click "Move up" for Income at desktop width: the canonical order is saved as a
-        # custom order (Income above Recurring).
+        # Click "Move up" for Income at desktop width: the row moves in place, the page does
+        # not reload and nothing is saved until Save sidebar is pressed.
         page.locator('[data-sidebar-move="income:up"]').click()
+        assert page.url == f"{base}/account"
+        assert _form_keys(page).index("income") < _form_keys(page).index("recurring")
+        assert _nav(page).index("income") > _nav(page).index("recurring")
+        assert page.locator("[data-sidebar-notice]").count() == 0
+        assert page.evaluate(NO_OVERFLOW)
+        page.locator("[data-sidebar-save]").click()
         page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
         expect(settings.locator('[role="status"]')).to_contain_text("Your sidebar is saved.")
         assert _nav(page).index("income") < _nav(page).index("recurring")
         assert page.evaluate(NO_OVERFLOW)
+        _actions_are_inline(page)
 
-        # Keyboard move at phone width: Income goes back down and the canonical list is
-        # stored as NULL again.
+        # Keyboard move at phone width: Income goes back down in place, then Save persists
+        # the canonical list again.
         page.set_viewport_size({"width": 390, "height": 844})
         page.goto(f"{base}/account", wait_until="networkidle")
         move_down = page.locator('[data-sidebar-move="income:down"]')
         move_down.focus()
         page.keyboard.press("Enter")
+        assert page.url == f"{base}/account"
+        assert _form_keys(page).index("income") > _form_keys(page).index("recurring")
+        _actions_are_inline(page)
+        page.locator("[data-sidebar-save]").click()
         page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
         page.goto(f"{base}/", wait_until="networkidle")
         _open_menu(page)
@@ -143,6 +174,16 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
             "home", "month", "transactions", "history", "upcoming", "recurring",
             "income", "net-worth", "investments", "loans", "fire",
         ]  # fmt: skip
+
+        # Polish labels are longer: the two actions still share one row at phone width.
+        with app.state.session_factory() as session, session.begin():
+            user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+            user.locale = "pl"
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(f"{base}/account", wait_until="networkidle")
+        expect(page.locator("[data-sidebar-save]")).to_have_text("Zapisz pasek")
+        _actions_are_inline(page)
+        assert page.evaluate(NO_OVERFLOW)
         browser.close()
 
 
@@ -159,6 +200,11 @@ def test_the_customiser_works_without_javascript(tmp_path: Path) -> None:
 
         page.goto(f"{base}/account", wait_until="networkidle")
         expect(page.locator("[data-sidebar-form]")).to_be_visible()
+        expect(page.locator("[data-sidebar-nojs-note]")).to_contain_text(
+            "Without JavaScript, moving a page saves the new order immediately."
+        )
+        # Fallback: without JavaScript the arrow is still a submit button, so it applies the
+        # move on the server and reloads. With JavaScript the move stays local until Save.
         page.locator('[data-sidebar-move="loans:up"]').click()
         page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
         page.goto(f"{base}/", wait_until="networkidle")

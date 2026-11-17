@@ -105,6 +105,20 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
         assert f'name="item" value="{key}"' in row(settings, key)
     assert "data-sidebar-save" in settings and "data-sidebar-reset" in settings
     assert "data-sidebar-taxes-note" in row(settings, "taxes")
+    assert "data-sidebar-list" in settings
+
+
+def test_the_sidebar_actions_share_one_row_and_reset_submits_its_own_route(
+    owner: OwnerApp,
+) -> None:
+    settings = panel(owner.client.get("/account").text)
+    actions = re.search(r"<div [^>]*data-sidebar-actions.*?</div>", settings, re.DOTALL)
+    assert actions is not None
+    markup = actions.group(0)
+    assert "data-sidebar-save" in markup and "data-sidebar-reset" in markup
+    assert 'formaction="/account/sidebar/reset"' in markup
+    # Reset is not a second form below Save: it submits the one sidebar form to its route.
+    assert settings.count("account/sidebar/reset") == 1
 
 
 def test_the_sidebar_save_button_is_distinct_from_the_profile_save_button(owner: OwnerApp) -> None:

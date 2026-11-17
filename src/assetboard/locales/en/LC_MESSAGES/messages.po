@@ -2569,15 +2569,6 @@ msgstr ""
 msgid "No income yet this month"
 msgstr ""
 
-msgid "Unallocated"
-msgstr ""
-
-msgid "Asset classes"
-msgstr ""
-
-msgid "Nothing is valued in the portfolio yet."
-msgstr ""
-
 msgid "The password is not correct."
 msgstr ""
 
@@ -2587,87 +2578,6 @@ msgstr ""
 msgid ""
 "Sign in again to confirm this change: without a password, it needs a "
 "sign-in from the last 10 minutes."
-msgstr ""
-
-msgid "Missing price"
-msgstr ""
-
-msgid "Missing FX rate"
-msgstr ""
-
-msgid "Stale price"
-msgstr ""
-
-msgid "Stale FX rate"
-msgstr ""
-
-msgid "This month: in vs out"
-msgstr ""
-
-msgid "The current month's income, spending and what is left."
-msgstr ""
-
-msgid "This month: expenses by category"
-msgstr ""
-
-msgid "Where this month's spending went."
-msgstr ""
-
-msgid "This month: income by category"
-msgstr ""
-
-msgid "Where this month's income came from."
-msgstr ""
-
-msgid "This month: planned vs actual"
-msgstr ""
-
-msgid "Spending and income against the plan, with the savings rate and forecast."
-msgstr ""
-
-msgid "Upcoming payments"
-msgstr ""
-
-msgid "Overdue items and payments due in the Upcoming window."
-msgstr ""
-
-msgid "The current value and its 12-month trend."
-msgstr ""
-
-msgid "Portfolio"
-msgstr ""
-
-msgid "The portfolio value, gain and allocation."
-msgstr ""
-
-msgid "Portfolio changes"
-msgstr ""
-
-msgid "Changes since yesterday and this month, with the largest movers."
-msgstr ""
-
-msgid "Loans"
-msgstr ""
-
-msgid "Remaining principal, payoff dates and how much is repaid."
-msgstr ""
-
-msgid "FIRE"
-msgstr ""
-
-msgid "Plan progress and the age at which the plan reaches independence."
-msgstr ""
-
-msgid "Missing data"
-msgstr ""
-
-msgid "Stale prices, missing work logs and imports waiting to be applied."
-msgstr ""
-
-msgid "Home saved."
-msgstr ""
-
-msgid "Home reset to the default widgets."
 msgstr ""
 
 msgid "Check your inbox"
@@ -2723,6 +2633,9 @@ msgid "After the plan's last year"
 msgstr ""
 
 msgid "Saving override in the current year"
+msgstr ""
+
+msgid "FIRE"
 msgstr ""
 
 #, python-format
@@ -3092,6 +3005,9 @@ msgid "About you"
 msgstr ""
 
 msgid "Income and expenses"
+msgstr ""
+
+msgid "Portfolio"
 msgstr ""
 
 msgid "Assumptions and review"
@@ -4701,6 +4617,9 @@ msgstr ""
 msgid "Transfers are not counted in the plan: this category takes none."
 msgstr ""
 
+msgid "Unallocated"
+msgstr ""
+
 msgid "Risk targets saved."
 msgstr ""
 
@@ -4714,6 +4633,12 @@ msgid "The fixed targets must total exactly 100%."
 msgstr ""
 
 msgid "Set your birth year in Profile before using age-based targets."
+msgstr ""
+
+msgid "Asset classes"
+msgstr ""
+
+msgid "Nothing is valued in the portfolio yet."
 msgstr ""
 
 msgid "Holdings by instrument"
@@ -4793,6 +4718,9 @@ msgid "Upcoming"
 msgstr ""
 
 msgid "Recurring"
+msgstr ""
+
+msgid "Loans"
 msgstr ""
 
 msgid "FIRE projection"
@@ -5337,27 +5265,29 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-msgid "Customise"
+msgid "This month"
+msgstr ""
+
+msgid "All upcoming items"
+msgstr ""
+
+msgid "Estimate"
+msgstr ""
+
+msgid "Mark paid or received"
+msgstr ""
+
+msgid "Save transaction"
+msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+msgid "More items are waiting on the Upcoming page."
 msgstr ""
 
 #, python-format
-msgid "Loading %(widget)s…"
-msgstr ""
-
-msgid "This widget could not load. Open it instead."
-msgstr ""
-
-#, python-format
-msgid "Open %(widget)s"
-msgstr ""
-
-msgid "Your Home is empty"
-msgstr ""
-
-msgid "Choose the widgets you want to see."
-msgstr ""
-
-msgid "Customise Home"
+msgid "Nothing is overdue or due in the next %(days)d days."
 msgstr ""
 
 msgid "Link a sign-in method"
@@ -5424,8 +5354,9 @@ msgid "Sidebar"
 msgstr ""
 
 msgid ""
-"Choose which pages appear in the sidebar and in which order. Some pages "
-"appear only where the workspace enables the feature, such as Taxes."
+"Choose which pages appear in the sidebar and in which order. Press Save "
+"sidebar to apply your changes. Some pages appear only where the workspace"
+" enables the feature, such as Taxes."
 msgstr ""
 
 msgid "Only shown when Taxes is turned on in the workspace settings."
@@ -5446,6 +5377,9 @@ msgid "Save sidebar"
 msgstr ""
 
 msgid "Reset to default"
+msgstr ""
+
+msgid "Without JavaScript, moving a page saves the new order immediately."
 msgstr ""
 
 msgid "Notifications"
@@ -6013,157 +5947,6 @@ msgstr ""
 msgid "Add category"
 msgstr ""
 
-msgid "Back to Home"
-msgstr ""
-
-msgid ""
-"Choose the widgets you want on Home and their order. New widgets added in"
-" a later release appear here, but stay off until you choose them."
-msgstr ""
-
-msgid "You are using the default layout."
-msgstr ""
-
-#, python-format
-msgid "Move %(widget)s up"
-msgstr ""
-
-msgid "Move up"
-msgstr ""
-
-#, python-format
-msgid "Move %(widget)s down"
-msgstr ""
-
-msgid "Move down"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d widget selected"
-msgid_plural "%(num)d widgets selected"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Save Home"
-msgstr ""
-
-msgid "No FIRE plan yet."
-msgstr ""
-
-msgid "Set up FIRE"
-msgstr ""
-
-msgid "The plan cannot be projected right now."
-msgstr ""
-
-msgid "Review the plan"
-msgstr ""
-
-msgid "Plan progress"
-msgstr ""
-
-msgid "FIRE age"
-msgstr ""
-
-#, python-format
-msgid "Payoff %(date)s"
-msgstr ""
-
-#, python-format
-msgid "%(rate)s repaid"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d more loan"
-msgid_plural "%(num)d more loans"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "No active loans yet."
-msgstr ""
-
-msgid "Set up loans"
-msgstr ""
-
-msgid "Nothing needs attention."
-msgstr ""
-
-msgid "Prices and FX"
-msgstr ""
-
-msgid "Missing work logs"
-msgstr ""
-
-msgid "Imports waiting to be applied"
-msgstr ""
-
-#, fuzzy
-msgid "Open month"
-msgstr ""
-
-msgid "Add an expense category and an entry to see this chart."
-msgstr ""
-
-msgid "Add an income category and an entry to see this chart."
-msgstr ""
-
-msgid "Monthly values"
-msgstr ""
-
-msgid "No values are counted for this range."
-msgstr ""
-
-msgid "No values yet. Add an item and its first value to see the trend."
-msgstr ""
-
-msgid "Set up net worth"
-msgstr ""
-
-msgid "No holdings are valued yet."
-msgstr ""
-
-msgid "Set up investments"
-msgstr ""
-
-#, python-format
-msgid "Since yesterday (%(date)s)"
-msgstr ""
-
-#, python-format
-msgid "Since %(date)s"
-msgstr ""
-
-msgid "Largest movers"
-msgstr ""
-
-msgid "No holding changed since yesterday."
-msgstr ""
-
-msgid "No portfolio history yet. Add investment transactions and prices."
-msgstr ""
-
-msgid "All upcoming items"
-msgstr ""
-
-msgid "Estimate"
-msgstr ""
-
-msgid "Mark paid or received"
-msgstr ""
-
-msgid "Save transaction"
-msgstr ""
-
-msgid "Skip"
-msgstr ""
-
-msgid "More items are waiting on the Upcoming page."
-msgstr ""
-
-#, python-format
-msgid "Nothing is overdue or due in the next %(days)d days."
-msgstr ""
-
 msgid "Hello,"
 msgstr ""
 
@@ -6570,6 +6353,9 @@ msgid ""
 "inflation."
 msgstr ""
 
+msgid "FIRE age"
+msgstr ""
+
 msgid ""
 "The age at which the plan first meets its independence rule. The year is "
 "shown beside it."
@@ -6625,6 +6411,9 @@ msgid "The portfolio lasts to the horizon."
 msgstr ""
 
 msgid "Not checked: no years after income stops fall inside the horizon."
+msgstr ""
+
+msgid "Plan progress"
 msgstr ""
 
 msgid ""
@@ -8311,6 +8100,12 @@ msgstr ""
 msgid "No %(currency)s FX rate: not included in the totals."
 msgstr ""
 
+msgid "Stale price"
+msgstr ""
+
+msgid "Stale FX rate"
+msgstr ""
+
 msgid "Bond terms needed"
 msgstr ""
 
@@ -8949,6 +8744,10 @@ msgstr ""
 
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
+msgstr ""
+
+#, python-format
+msgid "Payoff %(date)s"
 msgstr ""
 
 #, python-format
@@ -10461,14 +10260,14 @@ msgstr ""
 msgid "Earned"
 msgstr ""
 
+#, python-format
+msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
+msgstr ""
+
 msgid "Spent"
 msgstr ""
 
 msgid "Left"
-msgstr ""
-
-#, python-format
-msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
 msgstr ""
 
 #, python-format
@@ -10889,12 +10688,18 @@ msgid ""
 "ends use your value history, linked items and prices; today is live."
 msgstr ""
 
+msgid "Monthly values"
+msgstr ""
+
 msgid "Breakdown"
 msgstr ""
 
 msgid ""
 "No values are counted for this range. The warnings below explain any "
 "items that were not counted."
+msgstr ""
+
+msgid "No values yet. Add an item and its first value to see the trend."
 msgstr ""
 
 msgid "New channel"
@@ -11228,6 +11033,9 @@ msgid "Choose valid recurrence dates to see the preview."
 msgstr ""
 
 msgid "No more occurrences match this rule."
+msgstr ""
+
+msgid "Upcoming payments"
 msgstr ""
 
 msgid "Occurrence marked paid or received."
@@ -14412,6 +14220,10 @@ msgstr ""
 #~ " below."
 #~ msgstr ""
 
-#~ msgid "This month"
+#~ msgid ""
+#~ "Choose which pages appear in the "
+#~ "sidebar and in which order. Some "
+#~ "pages appear only where the workspace"
+#~ " enables the feature, such as Taxes."
 #~ msgstr ""
 
