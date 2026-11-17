@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2](https://github.com/LexanderPL/AssetBoard/compare/v0.8.1...v0.8.2) (2026-11-17)
+
+
+### Features
+
+* **archive:** add encrypted secrets and archive completeness (F9.3) ([#382](https://github.com/LexanderPL/AssetBoard/issues/382)) ([3396af9](https://github.com/LexanderPL/AssetBoard/commit/3396af9baf1dabe2f91e9e15d0d2516796367bbc))
+* **backups:** scheduled SQLite backups and restore (F9.4) ([#381](https://github.com/LexanderPL/AssetBoard/issues/381)) ([e184b9f](https://github.com/LexanderPL/AssetBoard/commit/e184b9f70057e13c07c444abcb0288d871c40c40))
+* **dashboard:** polish Home widgets and Customise (F9.1) ([#383](https://github.com/LexanderPL/AssetBoard/issues/383)) ([671673b](https://github.com/LexanderPL/AssetBoard/commit/671673b65868f5f9883673f93772a8f94fad9ca5))
+* **ui:** fit the summary and entry rows on a phone (F9.9) ([#384](https://github.com/LexanderPL/AssetBoard/issues/384)) ([94cb8d0](https://github.com/LexanderPL/AssetBoard/commit/94cb8d095fcae8fa6dcb8d1d400e907b54797218))
+
 ## [0.8.1](https://github.com/LexanderPL/AssetBoard/compare/v0.8.0...v0.8.1) (2026-11-17)
 
 
