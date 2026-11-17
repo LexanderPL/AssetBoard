@@ -5788,6 +5788,9 @@ msgstr "Przesuń %(name)s w dół"
 msgid "Reset to default"
 msgstr "Przywróć domyślne"
 
+msgid "Save sidebar"
+msgstr "Zapisz pasek boczny"
+
 msgid "Notifications"
 msgstr "Powiadomienia"
 

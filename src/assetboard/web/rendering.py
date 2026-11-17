@@ -189,8 +189,10 @@ def sidebar_links(request: Request, nav: WorkspaceNav | None) -> tuple[SidebarLi
         elif key == "fire":
             href = scoped_url(request, "fire_scenarios")
             current = path == href or path.startswith(href + "/")
-        else:  # unknown keys never reach the template (normalize_sidebar drops them)
-            continue
+        else:
+            # Stored unknown keys never reach this loop (normalize_sidebar drops them); a new
+            # canonical key without an href/current rule fails loudly instead of disappearing.
+            raise KeyError(f"sidebar destination {key!r} has no link rule")
         links.append(SidebarLink(key, href, current))
     return tuple(links)
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from datetime import date
 
+import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select, update
 
@@ -12,7 +14,14 @@ from assetboard.clock import FixedClock
 from assetboard.db.models.identity import Membership, User, Workspace
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.scheduled import ScheduledOccurrence
-from assetboard.domain.navigation import CANONICAL_KEYS
+from assetboard.domain.navigation import CANONICAL_KEYS, DEFAULT_SIDEBAR, SidebarItem
+from assetboard.services.context import Role, WorkspaceNav, WorkspaceRef
+from assetboard.web.rendering import (
+    SIDEBAR_GLYPHS,
+    SIDEBAR_LABELS,
+    sidebar_labels,
+    sidebar_links,
+)
 from tests.conftest import OwnerApp, WebHarness
 
 DEFAULT_ORDER = list(CANONICAL_KEYS)
@@ -96,6 +105,15 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
         assert f'name="item" value="{key}"' in row(settings, key)
     assert "data-sidebar-save" in settings and "data-sidebar-reset" in settings
     assert "data-sidebar-taxes-note" in row(settings, "taxes")
+
+
+def test_the_sidebar_save_button_is_distinct_from_the_profile_save_button(owner: OwnerApp) -> None:
+    page = owner.client.get("/account").text
+    # Both panels are on the same page: the profile form's Save and the sidebar's own button
+    # must not share an accessible name.
+    assert '<button type="submit" class="btn-primary">Save</button>' in page
+    assert "data-sidebar-save>Save sidebar</button>" in page
+    assert "data-sidebar-save>Save<" not in page
 
 
 def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
@@ -250,12 +268,80 @@ def test_the_customiser_works_for_viewers(owner: OwnerApp) -> None:
     assert saved(owner) is not None
 
 
+def test_the_saved_sidebar_follows_the_user_across_workspaces(owner: OwnerApp) -> None:
+    order = ["home", "loans", *[key for key in DEFAULT_ORDER if key not in {"home", "loans"}]]
+    visible = [key for key in order if key != "history"]
+    assert post_sidebar(owner, order=order, visible=visible).status_code == 303
+    second = owner.add_workspace("Second")
+    owner.join(owner.admin_id, second, "owner")
+    switched = owner.post("/workspace/switch", {"workspace_id": str(second)})
+    assert switched.status_code == 303
+    # The preference belongs to the user, not to the workspace they are in.
+    assert nav_hooks(owner.client.get("/").text) == [
+        "home", "loans", "month", "transactions", "upcoming", "recurring",
+        "income", "net-worth", "investments", "fire",
+    ]  # fmt: skip
+    assert panel_keys(owner.client.get("/account").text) == order
+    assert saved(owner) == [{"key": key, "visible": key != "history"} for key in order]
+
+
+def _request_for(owner: OwnerApp) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "app": owner.app,
+            "method": "GET",
+            "path": "/",
+            "root_path": "",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "query_string": b"",
+            "headers": [],
+        }
+    )
+
+
+def _nav(owner: OwnerApp, *, sidebar: tuple[SidebarItem, ...] = DEFAULT_SIDEBAR) -> WorkspaceNav:
+    return WorkspaceNav(
+        current=WorkspaceRef(
+            id=owner.home_id,
+            name="Home",
+            base_currency="EUR",
+            locale="en",
+            timezone="UTC",
+            country_code=None,
+            taxes_enabled=True,
+        ),
+        role=Role.OWNER,
+        choices=(),
+        sidebar=sidebar,
+    )
+
+
+def test_every_canonical_key_has_a_label_glyph_and_link_rule(owner: OwnerApp) -> None:
+    assert set(SIDEBAR_LABELS) == set(CANONICAL_KEYS)
+    assert set(SIDEBAR_GLYPHS) == set(CANONICAL_KEYS)
+    assert set(sidebar_labels("en")) == set(CANONICAL_KEYS)
+    # With Taxes enabled every canonical key must reach the sidebar builder, so a destination
+    # added to CANONICAL_KEYS without an href/current rule fails here instead of disappearing.
+    assert [link.key for link in sidebar_links(_request_for(owner), _nav(owner))] == list(
+        CANONICAL_KEYS
+    )
+
+
+def test_a_canonical_key_without_a_link_rule_fails_loudly(owner: OwnerApp) -> None:
+    nav = _nav(owner, sidebar=(SidebarItem("future_destination", True),))
+    with pytest.raises(KeyError, match="future_destination"):
+        sidebar_links(_request_for(owner), nav)
+
+
 def test_polish_labels(owner: OwnerApp) -> None:
     page = owner.client.get("/account", headers={"Accept-Language": "pl"}).text
     settings = panel(page)
     assert "Pasek boczny" in settings
     assert "Zawsze widoczna" in settings
     assert "Miesiąc" in settings
+    assert "Zapisz pasek boczny" in settings
 
 
 def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:

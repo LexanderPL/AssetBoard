@@ -87,6 +87,7 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
                ).to_be_checked()  # fmt: skip
         expect(page.locator('[data-sidebar-item="home"] [data-sidebar-visible="home"]')
                ).to_be_disabled()  # fmt: skip
+        expect(page.locator("[data-sidebar-save]")).to_have_text("Save sidebar")
 
         # Click "Move up" for Income at desktop width: the canonical order is saved as a
         # custom order (Income above Recurring).

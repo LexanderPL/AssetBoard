@@ -5372,6 +5372,9 @@ msgstr ""
 msgid "Reset to default"
 msgstr ""
 
+msgid "Save sidebar"
+msgstr ""
+
 msgid "Notifications"
 msgstr ""
 

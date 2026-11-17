@@ -159,6 +159,12 @@ def test_the_demo_user_is_refused_before_anything_is_written(
     db: WorkspaceDb, operation: str
 ) -> None:
     user_id = add_demo_user(db)
+    # A sentinel preference that a late refusal would overwrite.
+    sentinel = [{"key": "loans", "visible": False}]
+    with db.factory.begin() as session:
+        user = session.get(User, user_id)
+        assert user is not None
+        user.sidebar_items = sentinel
     with pytest.raises(DemoRestricted):
         if operation == "save":
             save_sidebar(
@@ -169,7 +175,7 @@ def test_the_demo_user_is_refused_before_anything_is_written(
             )
         else:
             reset_sidebar(db.factory, user_id=user_id)
-    assert stored(db, user_id) is None
+    assert stored(db, user_id) == sentinel
 
 
 def test_serialised_sidebar_is_json_ready(db: WorkspaceDb) -> None:

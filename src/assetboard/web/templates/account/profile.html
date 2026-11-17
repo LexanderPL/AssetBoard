@@ -73,7 +73,7 @@
         </li>
         {% endfor %}
       </ul>
-      <button type="submit" class="btn-primary mt-4" data-sidebar-save>{{ _("Save") }}</button>
+      <button type="submit" class="btn-primary mt-4" data-sidebar-save>{{ _("Save sidebar") }}</button>
     </form>
     <form method="post" action="{{ scoped_url(request, 'account_sidebar_reset') }}" class="mt-3">
       {{ csrf_input() }}
