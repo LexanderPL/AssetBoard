@@ -401,6 +401,22 @@ def test_horizon_rule_does_not_consider_retiring_at_the_horizon() -> None:
     assert result.fire_age is None
 
 
+def test_horizon_rule_allows_the_year_before_the_horizon() -> None:
+    # Retiring at 42 fails; retiring at 43 (the last candidate, one year before the horizon)
+    # succeeds because the salary at 42 is still paid. The candidate bound is inclusive.
+    result = _assert_matches_oracle(
+        _edge(
+            rule=Rule.LASTS_TO_HORIZON,
+            horizon_age=44,
+            stop_working_age=90,
+            start_income=_eur(100_000),
+            start_expenses=_eur(10_000),
+            start_portfolio=_eur(0),
+        )
+    )
+    assert result.fire_age == 43
+
+
 def test_horizon_rule_has_no_candidate_when_income_stopped_before_today() -> None:
     # The plan already has no base income and survives to the horizon, but the rule cannot
     # declare FIRE after the configured income-stop age.
