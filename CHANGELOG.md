@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.11](https://github.com/LexanderPL/AssetBoard/compare/v0.7.10...v0.7.11) (2026-11-17)
+
+
+### Features
+
+* **account:** personal sidebar customization (F9.12) ([#374](https://github.com/LexanderPL/AssetBoard/issues/374)) ([f88894d](https://github.com/LexanderPL/AssetBoard/commit/f88894df81205f3a88f7f22242f97f448f59548e))
+* **ui:** align the FIRE wizard and polish portfolio tables (F8.20) ([#372](https://github.com/LexanderPL/AssetBoard/issues/372)) ([47bac94](https://github.com/LexanderPL/AssetBoard/commit/47bac94e75787107ef65c96b0f0697a0dbf94a86))
+
 ## [0.7.10](https://github.com/LexanderPL/AssetBoard/compare/v0.7.9...v0.7.10) (2026-11-16)
 
 
