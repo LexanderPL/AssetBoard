@@ -19,6 +19,7 @@ from assetboard.clock import Clock
 from assetboard.db.models.identity import UserSession
 from assetboard.db.repositories.scheduled import ScheduledOccurrenceRepository
 from assetboard.db.repositories.user_memberships import UserMembershipReader
+from assetboard.domain.navigation import DEFAULT_SIDEBAR, SidebarItem, normalize_sidebar
 
 if TYPE_CHECKING:
     from assetboard.services.auth import WebSession
@@ -211,6 +212,8 @@ class WorkspaceNav:
     # The account may create another workspace (instance setting, or an administrator).
     can_create_workspace: bool = False
     overdue_count: int = 0
+    # F9.12: the personal sidebar order and visibility, normalised from the session.
+    sidebar: tuple[SidebarItem, ...] = DEFAULT_SIDEBAR
 
     @property
     def can_switch(self) -> bool:
@@ -218,7 +221,11 @@ class WorkspaceNav:
 
 
 def workspace_nav(
-    session: Session, ctx: Context, *, can_create_workspace: bool = False
+    session: Session,
+    ctx: Context,
+    *,
+    can_create_workspace: bool = False,
+    sidebar_items: object = None,
 ) -> WorkspaceNav:
     """The user's own memberships (one query), for the switcher on workspace pages."""
     memberships = UserMembershipReader(session, ctx.user.id).memberships()
@@ -234,6 +241,7 @@ def workspace_nav(
         overdue_count=ScheduledOccurrenceRepository(session, ctx).overdue_count(
             ctx.clock.today(ctx.workspace.timezone)
         ),
+        sidebar=normalize_sidebar(sidebar_items),
     )
 
 

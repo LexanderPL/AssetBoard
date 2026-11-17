@@ -2519,6 +2519,33 @@ def test_0064_fire_loan_settings_migration_is_reversible(tmp_path: Path) -> None
         command.downgrade(alembic_config(settings), "0063_f88_one_fire_plan")
         assert "fire_loan_settings" not in set(inspect(engine).get_table_names())
         command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        assert "fire_loan_settings" in set(inspect(engine).get_table_names())
+        upgrade_database(settings)
         assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0065_f912_sidebar_items_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'sidebar_items.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        columns = {column["name"] for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" not in columns
+        command.upgrade(alembic_config(settings), "0065_f912_sidebar_items")
+        upgraded = {column["name"]: column for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" in upgraded
+        assert upgraded["sidebar_items"]["nullable"] is True
+        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        downgraded = {column["name"] for column in inspect(engine).get_columns("users")}
+        assert "sidebar_items" not in downgraded
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
     finally:
         engine.dispose()

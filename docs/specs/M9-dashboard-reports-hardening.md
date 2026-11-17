@@ -449,6 +449,97 @@ service-layer restrictions, the banner, the daily reset job and the admin panel.
 
 ---
 
+## F9.12 Sidebar customization
+
+**Added by the owner (2026-11-17).** Every member can choose which pages the main sidebar shows
+and in which order, for their own account. It is navigation only: a hidden page stays reachable
+by its address, and no permission, report or feature gate changes. The preference is per user,
+not per workspace, so switching workspaces keeps the same order; pages a workspace does not
+enable (today Taxes) are still hidden by that feature gate.
+
+**Acceptance**
+- The canonical keys, in the current sidebar order, are `home`, `month`, `transactions`,
+  `history`, `upcoming`, `recurring`, `income`, `taxes`, `net_worth`, `investments`, `loans`,
+  `fire`. A frozen `SidebarItem(key, visible)` and `DEFAULT_SIDEBAR` (all visible, canonical
+  order) live in the pure `domain/navigation.py`.
+- `normalize_sidebar(raw)` accepts only a list of mappings with a known string `key` and a
+  boolean `visible`; unknown keys and malformed entries are ignored, a duplicated key keeps its
+  first entry, Home is forced first and visible, and missing known keys are appended visible in
+  canonical order. It never raises on bad stored data. `move_sidebar(items, key, direction)`
+  moves one place up or down; Home, boundaries and unknown keys are no-ops.
+  `serialize_sidebar(items)` returns the JSON-ready `{"key", "visible"}` list.
+- `User.sidebar_items` is nullable JSON (`users.sidebar_items`; migration
+  `0065_f912_sidebar_items`, reversible). `NULL` is "never customised": canonical order, every
+  destination visible. Saving the canonical list stores `NULL` again; Reset stores `NULL`.
+  A destination added in a later release therefore appears at its canonical position for
+  never-customised users and appended visible for customised users.
+- `WebSession.sidebar_items` carries the stored value from the same user row already loaded for
+  the session (no extra query). `WorkspaceNav.sidebar` holds the normalised tuple;
+  `workspace_nav(..., sidebar_items=None)` normalises it, and `web.context.current_context`
+  passes the session's value. `UserRef`, `Context`, tenant isolation, archive, demo seeding and
+  permissions are unchanged: `users` is not workspace-owned.
+- **Profile customiser.** `/account` has a Sidebar panel below "Your details", available to
+  every role and even without a workspace. It is one ordered list of every key: a hidden
+  `item` field in displayed order, a `visible` checkbox whose value is the key, the translated
+  label, and Move up / Move down buttons. Home is first, checked and disabled, labelled
+  "Always shown", with no move buttons; the first non-Home Up and the last Down are disabled.
+  Hidden rows stay in place, muted. The Taxes row explains that it appears only where the
+  workspace enables Taxes. Help text says some pages depend on the workspace feature. Demo
+  sessions see the existing "Not available in the demo workspace." read-only state. Stable
+  hooks: `data-sidebar-settings`, `data-sidebar-item`, `data-sidebar-save`,
+  `data-sidebar-reset`, `data-sidebar-move`.
+- **Routes.** `POST /account/sidebar` (`account_sidebar`) and
+  `POST /account/sidebar/reset` (`account_sidebar_reset`), both CSRF-protected by the account
+  router. A successful save or reset redirects (303) to
+  `scoped_url(request, "account") + "?sidebar=saved#sidebar-settings"` (or `reset`), and
+  `GET /account` shows the translated status inside the Sidebar panel (`role="status"`), not
+  the OIDC notice; unknown values are ignored. A demo session is refused by the service with
+  `DemoRestricted` (403) before any write. The services are `services/navigation.py`
+  (`save_sidebar`, `reset_sidebar`): normalise the posted order, apply
+  `<key>:up`/`<key>:down` if valid, then write the ORM attribute in `run_immediate`; malformed
+  or unknown move values are ignored.
+- **Rendering.** `base.html` renders one loop over request-aware links built from
+  `WorkspaceNav.sidebar`; desktop and mobile share it. The existing hooks, glyphs, order,
+  `aria-current` rules, Upcoming overdue badge and `ngettext` text are preserved. Home always
+  appears; without a workspace Context only Home appears; Taxes appears only when
+  `WorkspaceNav.current.taxes_enabled`. All URL logic stays in `web/rendering.py` (no duplicate
+  helpers, no circular import). Hidden destinations remain reachable by URL.
+- **Docs and i18n.** This section, `docs/accounts.md`, the profile help and all new strings in
+  gettext; Polish is complete without fuzzy or empty entries.
+- **Tests.** Domain rules (default, custom order/visibility, hidden position, Home forced,
+  unknown/duplicate/missing keys, malformed fallback, move boundaries/Home, serialise
+  round-trip, property invariants); service (NULL default, custom save, canonical save stores
+  NULL, reset, per-user isolation, demo refusal before writing, malformed move ignored); web
+  (panel state, save/move/reset with CSRF, hidden link absent but URL 200, current marker and
+  overdue badge after reorder, Taxes gate and saved position, no-workspace profile, Polish
+  labels, demo read-only/403, unknown and missing stored keys); browser (1440 px and 390 px,
+  click and keyboard move, checkbox + save, reset, both navs same order, no horizontal
+  overflow, and a JavaScript-disabled context that can save and move).
+- No new runtime dependency. No link or control is added to Workspace settings → Menu, and the
+  user menu/workspace switcher is unchanged.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F9.12 from docs/specs/M9-dashboard-reports-hardening.md: the pure sidebar model,
+User.sidebar_items and the reversible migration, the session/workspace-nav plumbing, the
+Profile customiser with save/move/reset, the shared request-aware sidebar loop, docs and
+tests. It is navigation only: no permission, archive, demo-seed or tenant-registry change.
+No new runtime dependency.
+```
+
+**As built (2026-11-17).** Implemented as specified above: `domain/navigation.py`,
+`services/navigation.py`, migration `0065_f912_sidebar_items`, `User.sidebar_items`,
+`WebSession.sidebar_items`, `WorkspaceNav.sidebar`, `sidebar_links`/`sidebar_labels` in
+`web/rendering.py`, the Profile panel, both account routes, and `tests/unit/test_navigation_*`
+plus `tests/web/test_sidebar_routes.py` and `tests/browser/test_sidebar_customization.py`.
+The panel's submit button reads "Save sidebar", so it is distinct from the profile form's own
+"Save" button on the same page. A test keeps `SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link
+rules in step with `CANONICAL_KEYS`, and an unhandled canonical key raises instead of silently
+disappearing. No follow-ups beyond the existing feature gate for Taxes.
+
+---
+
 ## F9.8 Release v1.0
 
 **Acceptance**
