@@ -152,7 +152,17 @@
       </div>
       {% if can_edit %}
       <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
-        <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary btn-sm h-8">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+        <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary btn-sm h-8 max-sm:hidden">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+        {# F9.9: on a phone the primary action posts the prefilled date and amount straight
+           away (one tap), with the same undo offer the dialog path has. The row menu still
+           edits the occurrence's due date and expected amount, reschedules it and opens the
+           rule; the posting date/transaction amount dialog stays available from sm up. #}
+        <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="sm:hidden" data-phone-post>
+          {{ csrf_input() }}
+          <input type="hidden" name="day" value="{{ post_day.isoformat() }}">
+          <input type="hidden" name="amount" value="{{ amount_input(occurrence.expected) }}">
+          <button type="submit" class="btn-primary btn-sm">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></button>
+        </form>
         {% call row_menu(occurrence.label, key=occurrence.id|string) %}
           {% if occurrence.one_time %}
           {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}
@@ -165,6 +175,12 @@
           {% if occurrence.scheduled_item_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}">{{ _("Edit rule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% elif occurrence.income_source_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}">{{ _("Edit income") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% endif %}
           {% endif %}
         {% endcall %}
+        {% if not occurrence.one_time %}
+        <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}" class="sm:hidden" data-phone-skip>
+          {{ csrf_input() }}
+          <button type="submit" class="btn-sm">{{ _("Skip") }}<span class="sr-only"> {{ occurrence.label }}</span></button>
+        </form>
+        {% endif %}
       </div>
       {% endif %}
     </div>

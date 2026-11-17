@@ -38,7 +38,12 @@ from assetboard.domain.summary import (
 )
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month_after_from
-from assetboard.i18n.numbers import format_amount_input, format_money, format_rate_tenths
+from assetboard.i18n.numbers import (
+    format_amount_input,
+    format_money,
+    format_money_plain,
+    format_rate_tenths,
+)
 from assetboard.services.budget import CopyResult, PlanCategory, get_plan
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
@@ -117,6 +122,12 @@ class PlanRowView:
     difference: str = ""
     tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference); "" without
     has_plan: bool = False  # a planned value above 0
+    # The same amounts without the currency, for the phone layout (F9.9): the summary's
+    # heading names the currency once and the narrow cells show only the number.
+    display_plain: str = ""
+    actual_plain: str = ""
+    pending_plain: str = ""
+    difference_plain: str = ""
     # Actual above plan: "danger" for an expense category, "success" for an income one (the
     # row's background tint); "" otherwise, and for the other groups.
     over: str = ""
@@ -133,6 +144,10 @@ class TotalsView:
     forecast: str
     difference: str  # "" when no category of the group has a planned value
     tone: str
+    planned_plain: str = ""
+    actual_plain: str = ""
+    pending_plain: str = ""
+    difference_plain: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +244,7 @@ class SummaryView:
     sort: str = "actual"
     filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
     future: bool = False  # a future month: the flow bar is a projection ("Expected spent ...")
+    currency: str = ""  # the summary's currency (the phone heading names it once)
     source: SummaryData | None = field(default=None, compare=False, repr=False)  # the donuts
 
     def row(self, category_id: UUID) -> PlanRowView | None:
@@ -255,6 +271,12 @@ def _signed(amount: Money, locale: str) -> str:
     return f"+{text}" if amount.amount_minor > 0 else text
 
 
+def _signed_plain(amount: Money, locale: str) -> str:
+    """The same difference without the currency (the phone layout, F9.9)."""
+    text = format_money_plain(amount, locale)
+    return f"+{text}" if amount.amount_minor > 0 else text
+
+
 def _width(part: int, whole: int) -> int:
     return part * 100 // whole if whole > 0 else 0
 
@@ -262,6 +284,11 @@ def _width(part: int, whole: int) -> int:
 def _pending(amount: Money, locale: str) -> str:
     """A pending amount for display; "" when nothing is pending."""
     return format_money(amount, locale) if amount.amount_minor > 0 else ""
+
+
+def _pending_plain(amount: Money, locale: str) -> str:
+    """The pending amount without its currency (the phone layout, F9.9)."""
+    return format_money_plain(amount, locale) if amount.amount_minor > 0 else ""
 
 
 def _bar(key: str, planned: Money, actual: Money, expected: Money, locale: str) -> BarView:
@@ -305,6 +332,9 @@ def _block_totals(planned: Money, actual: Money, expected: Money, locale: str) -
         forecast=format_money(forecast, locale),
         difference="",
         tone="",
+        planned_plain=format_money_plain(planned, locale),
+        actual_plain=format_money_plain(actual, locale),
+        pending_plain=_pending_plain(expected, locale),
     )
 
 
@@ -421,6 +451,9 @@ def build_summary(
             value=value,
             saved_value=saved,
             display=format_money(planned, locale) if planned is not None and has_line else "",
+            display_plain=format_money_plain(planned, locale)
+            if planned is not None and has_line
+            else "",
             error=error,
             focus=focus,
             **extra,
@@ -433,7 +466,15 @@ def build_summary(
         forecast = format_money(r.forecast, locale)
         if r.planned.amount_minor <= 0:
             # No planned value (owner, 2026-11-01): no difference, tint or "over plan" hint.
-            return row_view(category, r.planned, actual=actual, pending=pending, forecast=forecast)
+            return row_view(
+                category,
+                r.planned,
+                actual=actual,
+                actual_plain=format_money_plain(r.actual, locale),
+                pending=pending,
+                pending_plain=_pending_plain(r.expected, locale),
+                forecast=forecast,
+            )
         tint = OVER_PLAN_TINT.get(key, "")
         over = r.actual.amount_minor > r.planned.amount_minor
         pending_over = (
@@ -445,9 +486,12 @@ def build_summary(
             category,
             r.planned,
             actual=actual,
+            actual_plain=format_money_plain(r.actual, locale),
             pending=pending,
+            pending_plain=_pending_plain(r.expected, locale),
             forecast=forecast,
             difference=_signed(r.difference, locale),
+            difference_plain=_signed_plain(r.difference, locale),
             tone=_tone(r.difference),
             over=tint if over else "",
             pending_over=tint if pending_over else "",
@@ -468,6 +512,10 @@ def build_summary(
             forecast=format_money(block.forecast, locale),
             difference=_signed(difference, locale) if planned_rows else "",
             tone=_tone(difference) if planned_rows else "",
+            planned_plain=format_money_plain(block.planned, locale),
+            actual_plain=format_money_plain(block.actual, locale),
+            pending_plain=_pending_plain(block.expected, locale),
+            difference_plain=_signed_plain(difference, locale) if planned_rows else "",
         )
         heading = gettext(GROUP_HEADINGS[block.key], locale)
         groups.append(PlanGroupView(block.key, heading, rows, totals))
@@ -540,6 +588,7 @@ def build_summary(
         sort=sort,
         filter_id=str(filter_id) if filter_id is not None else "",
         future=view.is_future,
+        currency=summary.currency,
         source=data,
     )
 

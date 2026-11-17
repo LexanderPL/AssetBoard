@@ -11773,6 +11773,13 @@ msgstr "(korzystnie)"
 msgid "(unfavourable)"
 msgstr "(niekorzystnie)"
 
+msgid "vs plan"
+msgstr "wobec planu"
+
+#, python-format
+msgid "Difference: %(amount)s"
+msgstr "Różnica: %(amount)s"
+
 #, python-format
 msgid "If everything pending arrives: %(amount)s"
 msgstr "Jeśli wszystko oczekujące wpłynie: %(amount)s"
@@ -11789,8 +11796,8 @@ msgid "Show only the entries of %(name)s"
 msgstr "Pokaż tylko wpisy: %(name)s"
 
 #, python-format
-msgid "Planned for %(name)s"
-msgstr "Plan dla: %(name)s"
+msgid "Planned for %(name)s in %(currency)s"
+msgstr "Plan dla %(name)s w %(currency)s"
 
 msgid "No plan"
 msgstr "Brak planu"
@@ -15769,4 +15776,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Save Home"
 #~ msgstr "Zapisz stronę główną"
+
+#~ msgid "Planned for %(name)s"
+#~ msgstr "Plan dla: %(name)s"
 

@@ -8,6 +8,7 @@ from babel.core import UnknownLocaleError
 from babel.numbers import (
     UnknownCurrencyError,
     format_currency,
+    format_decimal,
     format_percent,
     get_decimal_symbol,
     get_group_symbol,
@@ -198,6 +199,31 @@ def format_amount_input(money: Money, locale: str) -> str:
     decimal_symbol = get_decimal_symbol(_normalize_number_locale(locale))
     text = format(money.to_decimal(), "f")
     return text.replace(".", decimal_symbol)
+
+
+def format_money_plain(money: Money, locale: str) -> str:
+    """The amount without its currency symbol, in the same native style as ``format_money``.
+
+    Phones show this under a heading that names the currency once (F9.9), so the narrow
+    amount columns keep their numbers and lose only the symbol (``1 234,56``, ``1,234.56``).
+    """
+    normalized_locale = _normalize_number_locale(CURRENCY_HOME_LOCALES.get(money.currency, locale))
+    text = format_decimal(
+        money.to_decimal(),
+        locale=normalized_locale,
+        decimal_quantization=False,
+    )
+    # Babel's format_decimal drops trailing zeros; the table shows the currency's minor unit,
+    # like format_money does, so "1 234,5" becomes "1 234,50".
+    minor_unit = minor_unit_for(money.currency)
+    decimal = get_decimal_symbol(normalized_locale)
+    if minor_unit:
+        if decimal in text:
+            fraction = text.rsplit(decimal, 1)[1]
+            text += "0" * max(0, minor_unit - len(fraction))
+        else:
+            text += decimal + "0" * minor_unit
+    return text
 
 
 def format_quantity_input(value: Decimal, locale: str) -> str:

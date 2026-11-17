@@ -10715,6 +10715,13 @@ msgstr ""
 msgid "(unfavourable)"
 msgstr ""
 
+msgid "vs plan"
+msgstr ""
+
+#, python-format
+msgid "Difference: %(amount)s"
+msgstr ""
+
 #, python-format
 msgid "If everything pending arrives: %(amount)s"
 msgstr ""
@@ -10731,7 +10738,7 @@ msgid "Show only the entries of %(name)s"
 msgstr ""
 
 #, python-format
-msgid "Planned for %(name)s"
+msgid "Planned for %(name)s in %(currency)s"
 msgstr ""
 
 msgid "No plan"
@@ -14842,5 +14849,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Save Home"
+#~ msgstr ""
+
+#~ msgid "Planned for %(name)s"
 #~ msgstr ""
 

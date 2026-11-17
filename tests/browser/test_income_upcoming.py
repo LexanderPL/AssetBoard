@@ -1,9 +1,10 @@
 """Income log editing, one-time payments and Skip in Chromium (UI batch 3): a payment row's
 inline Edit opens focused, Escape cancels and restores the logged units, Save changes them; the
 Log form prefills a month that has a log and says "Update"; Upcoming adds a one-time payment;
-at 390 px its filters start collapsed and its first row has one primary action and a dialog
-whose date starts at today; a recurring expected row in the month ledger is skipped (greyed out,
-with Undo) and comes back, its Skip button lined up with Confirm. No CSP violations.
+at 390 px its filters start collapsed, its first row posts the prefilled payment in one tap, and
+the editable dialog (from sm up) starts at today; a recurring expected row in the month ledger
+is skipped (greyed out, with Undo) and comes back, its Skip button lined up with Confirm. No CSP
+violations.
 
 With ``ASSETBOARD_SHOTS_DIR`` set, screenshots of the three places are saved in light and
 dark."""
@@ -230,30 +231,31 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             assert article_box["y"] >= 0 and article_box["y"] < 844, article_box
             assert article_box["y"] + min(article_box["height"], 120) <= 844, article_box
             actions = article.locator("[data-occurrence-actions]")
-            primary = actions.locator(":scope > a.btn-primary")
             menu_summary = actions.locator(":scope > details[data-row-menu] summary")
-            expect(primary).to_have_count(1)
             expect(actions.locator(":scope > details[data-row-menu]")).to_have_count(1)
-            primary_box = primary.bounding_box()
+            # F9.9: at a phone width the primary action is a one-tap post form; the dialog
+            # link is hidden until sm.
+            phone_post = actions.locator("[data-phone-post] button")
+            expect(phone_post).to_be_visible()
+            expect(actions.locator(":scope > a.btn-primary")).to_be_hidden()
+            post_box = phone_post.bounding_box()
+            assert post_box is not None and post_box["height"] >= 43.5, post_box
             menu_box = menu_summary.bounding_box()
-            assert primary_box is not None and menu_box is not None
-            assert abs(primary_box["height"] - menu_box["height"]) <= 1, (
-                primary_box,
-                menu_box,
-            )
+            assert menu_box is not None and menu_box["height"] >= 43.5, menu_box
             assert (
-                primary.evaluate("el => getComputedStyle(el).backgroundColor") == "rgb(2, 119, 189)"
+                phone_post.evaluate("el => getComputedStyle(el).backgroundColor")
+                == "rgb(2, 119, 189)"
             )
-            expect(
-                actions.locator(
-                    ":scope > a:visible, :scope > button:visible, :scope > form:visible"
-                )
-            ).to_have_count(1)
-            expect(actions.locator("button:visible")).to_have_count(0)
             occurrence_id = article.get_attribute("data-occurrence")
             assert occurrence_id
-            actions.locator(":scope > a.btn-primary").click()
+
+            # Wider screens keep the prefilled, editable dialog; it opens at today for a
+            # future occurrence and closes with Escape, a backdrop click and Cancel.
+            page.set_viewport_size({"width": 1280, "height": 900})
+            primary = actions.locator(":scope > a.btn-primary")
+            expect(primary).to_be_visible()
             paid_dialog = page.locator("dialog[data-dialog-modal][open]")
+            primary.click()
             expect(paid_dialog).to_be_visible()
             expect(paid_dialog.locator(f"#post-day-{occurrence_id}")).to_have_value(
                 today.isoformat()
@@ -261,15 +263,14 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             expect(paid_dialog.locator(f"#post-amount-{occurrence_id}")).to_be_visible()
             page.keyboard.press("Escape")
             expect(paid_dialog).to_be_hidden()
-            actions.locator(":scope > a.btn-primary").click()
+            primary.click()
             expect(paid_dialog).to_be_visible()
             page.mouse.click(2, 2)
             expect(paid_dialog).to_be_hidden()
-            actions.locator(":scope > a.btn-primary").click()
+            primary.click()
             expect(paid_dialog).to_be_visible()
             paid_dialog.get_by_role("link", name="Cancel").click()
             expect(paid_dialog).to_be_hidden()
-            page.set_viewport_size({"width": 1280, "height": 900})
 
             # The income is expected next month: Skip it in that month's ledger, then Undo.
             month_path = f"/transactions/{following[0]:04d}-{following[1]:02d}"

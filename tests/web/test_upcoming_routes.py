@@ -119,9 +119,11 @@ def test_mark_paid_dialog_is_a_modal_and_starts_at_today(owner):
     assert '<details class="panel" data-filter-disclosure open>' not in page
     card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
     assert card is not None
-    # One primary action and the overflow menu; the other actions are menu items.
-    assert card.group(0).count('class="btn-primary btn-sm h-8"') == 1
+    # One primary action and the overflow menu; the other actions are menu items. F9.9 adds a
+    # phone-only one-tap form with the same prefilled date and amount (and a direct Skip).
+    assert card.group(0).count('class="btn-primary btn-sm h-8 max-sm:hidden"') == 1
     assert f'data-dialog-open="paid-{occurrence_id}-dialog"' in card.group(0)
+    assert "data-phone-post" in card.group(0) and "data-phone-skip" in card.group(0)
     assert "data-row-menu" in card.group(0)
     assert 'class="row-menu-item"' in card.group(0)
     assert "Reschedule" in card.group(0) and "Edit amount" in card.group(0)
