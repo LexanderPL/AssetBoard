@@ -34,15 +34,20 @@ plans), fixed and variable rate segments, cost components, planned overpayments,
 checkpoints and saved loan scenarios. The FIRE planner is included too: one plan and its
 adjustments. Recurring items and their occurrences, income sources, work logs and calendars, and
 tax rules and their rate history are included as well. Schedules and projections are not
-archived; they are recomputed from those terms. Notification channels and delivery logs are
-never exported, because channel URLs can contain secrets; provider API keys are not exported
-either.
+archived; they are recomputed from those terms. Delivery logs are never exported. Notification
+channel URLs and provider API keys are secrets: they stay out of the archive unless the owner
+ticks **Include notification URLs and provider API keys** and supplies a passphrase of at least
+12 characters. The member carries the exporting owner's own notification channels; other
+members' channels stay private. They then live in the separate `secrets.json.enc` member, encrypted with
+PBKDF2-HMAC-SHA256 and Fernet. Keep that passphrase safe: without it the member cannot be
+restored, and it cannot be recovered from the archive.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
 and the number of rows of each kind, without descriptions or amounts.
 
-Keep the ZIP intact for a future restore. The archive is unencrypted and contains your financial
-history, including deleted entries, so store it privately. CSV text is kept exactly, including
+Keep the ZIP intact for a future restore. The ledger and configuration files are unencrypted
+and contain your financial history, including deleted entries, so store it privately. Only the
+optional `secrets.json.enc` member is encrypted, and only with the passphrase you choose. CSV text is kept exactly, including
 values that begin with spreadsheet formula characters (`=`, `+`, `-`, `@`); inspect the files as
 text, or turn off formula execution before opening them in a spreadsheet.
 
@@ -118,10 +123,15 @@ archive carries its target (1.4 archives do). A link whose target is not in the 
 including every portfolio link in a 1.3 archive — becomes a manual item without a value and is
 listed with `link_target_missing`.
 
-Provider settings never include API keys. A keyless provider (NBP, ECB, CoinGecko) keeps its
-saved enabled state. A provider that needs a key (EODHD, GoldAPI) is restored **disabled**, and
-the report says to re-enter the API key and enable it; leaving it enabled would only fail on
-every scheduled refresh. The daily call budget and the one-off backfill markers are kept.
+Provider settings without the encrypted member never include API keys. A keyless provider (NBP,
+ECB, CoinGecko) keeps its saved enabled state. A provider that needs a key (EODHD, GoldAPI) is
+restored **disabled**, and the report says to re-enter the API key and enable it; leaving it
+enabled would only fail on every scheduled refresh. The daily call budget and the one-off
+backfill markers are kept. When the archive carries `secrets.json.enc`, enter its passphrase in
+the **Apply import** form: the API keys and notification channels are restored and re-encrypted
+with this instance's secret key. A missing or wrong passphrase refuses the whole restore and
+leaves the workspace empty. Restored notification channels belong to the restoring owner,
+because per-user ownership is not archived.
 
 A restore needs a completely valid archive: any error blocks it, and nothing is written. The
 **Restore plan** lists what will be written, the suggested categories that will be removed, the
@@ -141,8 +151,9 @@ recurring items, occurrences, income sources, tax rules and work calendars are l
 information but never applied; a 1.2+ archive lists its net-worth files once with a restore-only
 warning, a 1.4 archive lists its investment files once with the same kind of warning, a 1.5+
 archive lists its loan files once with `loan_restore_only`, a 1.8+ archive lists its FIRE files
-once with `fire_restore_only`, and a 2.3 archive lists the recurring files once with
-`recurring_restore_only` (a legacy 1.8 archive's four FIRE files use the same warning). The
+once with `fire_restore_only`, a 2.3 archive lists the recurring files once with
+`recurring_restore_only`, and a 2.4 archive with `secrets.json.enc` lists it once with
+`secrets_restore_only` (a legacy 1.8 archive's four FIRE files use the same warning). The
 settings diff also reports the investment cost basis and risk targets when they differ. The
 archive's base currency must match the workspace's; otherwise the whole archive is refused.
 Existing net-worth, investment, FIRE and recurring data is left untouched. To merge a valuation
