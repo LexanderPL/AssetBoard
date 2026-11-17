@@ -510,10 +510,17 @@ enable (today Taxes) are still hidden by that feature gate.
   label, and Move up / Move down buttons. Home is first, checked and disabled, labelled
   "Always shown", with no move buttons; the first non-Home Up and the last Down are disabled.
   Hidden rows stay in place, muted. The Taxes row explains that it appears only where the
-  workspace enables Taxes. Help text says some pages depend on the workspace feature. Demo
-  sessions see the existing "Not available in the demo workspace." read-only state. Stable
-  hooks: `data-sidebar-settings`, `data-sidebar-item`, `data-sidebar-save`,
-  `data-sidebar-reset`, `data-sidebar-move`.
+  workspace enables Taxes. Help text says some pages depend on the workspace feature and that
+  Save sidebar applies the changes. Demo sessions see the existing "Not available in the demo
+  workspace." read-only state.
+  With JavaScript, the arrows move the row in place and never submit: the page does not reload
+  and nothing is stored until **Save sidebar** is pressed. Save sidebar and Reset to default
+  share one action row; Reset submits the same form to its own route with `formaction`, so it
+  is not a second form below Save. Without JavaScript the arrows stay submit buttons and the
+  server applies the move immediately; a `data-sidebar-nojs-note` note says so and the script
+  removes it when the local reorder is available. Stable hooks:
+  `data-sidebar-settings`, `data-sidebar-list`, `data-sidebar-item`, `data-sidebar-actions`,
+  `data-sidebar-save`, `data-sidebar-reset`, `data-sidebar-move`.
 - **Routes.** `POST /account/sidebar` (`account_sidebar`) and
   `POST /account/sidebar/reset` (`account_sidebar_reset`), both CSRF-protected by the account
   router. A successful save or reset redirects (303) to
@@ -522,8 +529,9 @@ enable (today Taxes) are still hidden by that feature gate.
   the OIDC notice; unknown values are ignored. A demo session is refused by the service with
   `DemoRestricted` (403) before any write. The services are `services/navigation.py`
   (`save_sidebar`, `reset_sidebar`): normalise the posted order, apply
-  `<key>:up`/`<key>:down` if valid, then write the ORM attribute in `run_immediate`; malformed
-  or unknown move values are ignored.
+  `<key>:up`/`<key>:down` if present (the no-JavaScript fallback), then write the ORM attribute
+  in `run_immediate`; malformed or unknown move values are ignored. A normal JavaScript save
+  posts the row order in the `item` fields and has no `move` value.
 - **Rendering.** `base.html` renders one loop over request-aware links built from
   `WorkspaceNav.sidebar`; desktop and mobile share it. The existing hooks, glyphs, order,
   `aria-current` rules, Upcoming overdue badge and `ngettext` text are preserved. Home always
@@ -539,8 +547,9 @@ enable (today Taxes) are still hidden by that feature gate.
   (panel state, save/move/reset with CSRF, hidden link absent but URL 200, current marker and
   overdue badge after reorder, Taxes gate and saved position, no-workspace profile, Polish
   labels, demo read-only/403, unknown and missing stored keys); browser (1440 px and 390 px,
-  click and keyboard move, checkbox + save, reset, both navs same order, no horizontal
-  overflow, and a JavaScript-disabled context that can save and move).
+  arrow click and keyboard move reorder in place with no navigation, Save sidebar persists,
+  Save and Reset share one visual row, checkbox + save, reset, both navs same order, no
+  horizontal overflow, and a JavaScript-disabled context that can still save and move).
 - No new runtime dependency. No link or control is added to Workspace settings → Menu, and the
   user menu/workspace switcher is unchanged.
 
@@ -560,9 +569,13 @@ No new runtime dependency.
 `web/rendering.py`, the Profile panel, both account routes, and `tests/unit/test_navigation_*`
 plus `tests/web/test_sidebar_routes.py` and `tests/browser/test_sidebar_customization.py`.
 The panel's submit button reads "Save sidebar", so it is distinct from the profile form's own
-"Save" button on the same page. A test keeps `SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link
-rules in step with `CANONICAL_KEYS`, and an unhandled canonical key raises instead of silently
-disappearing. No follow-ups beyond the existing feature gate for Taxes.
+"Save" button on the same page, and it shares one action row with "Reset to default". With
+JavaScript (`static/js/sidebar.js`), the arrows move the list rows in place, without navigation
+or a write; only Save sidebar stores the order. Without JavaScript the arrows remain submit
+buttons and apply the move on the server, as the `data-sidebar-nojs-note` note says. A test keeps
+`SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link rules in step with `CANONICAL_KEYS`, and an
+unhandled canonical key raises instead of silently disappearing. No follow-ups beyond the
+existing feature gate for Taxes.
 
 ---
 
