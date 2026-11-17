@@ -8,7 +8,7 @@
 <section class="panel max-w-2xl p-6">
   <h2 class="text-lg font-semibold">{{ _("Download workspace archive") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Save this workspace’s ledger, including categories, planned values, transactions, and month status.") }}</p>
-  <p class="mt-2 text-sm text-muted">{{ _("Recurring items, income sources, work logs, tax rules, and notifications are not included in this archive version.") }}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels are not included.") }}</p>
   <form method="post" action="{{ scoped_url(request, 'workspace_data_export') }}" class="mt-5">
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
     <button type="submit" class="btn-primary">{{ _("Download archive") }}</button>
@@ -24,12 +24,12 @@
       <legend class="text-sm font-medium">{{ _("Mode") }}</legend>
       <label class="flex items-start gap-2 text-sm">
         <input type="radio" name="mode" value="merge" checked class="mt-1">
-        <span>{{ _("Merge data into this workspace") }}<span class="block text-xs text-muted">{{ _("Categories, transactions, and planned values; settings and closed months are not applied.") }}</span></span>
+        <span>{{ _("Merge data into this workspace") }}<span class="block text-xs text-muted">{{ _("Categories, transactions, planned values, and work logs; settings and closed months are not applied.") }}</span></span>
       </label>
       {% if is_owner %}
       <label class="flex items-start gap-2 text-sm {% if not can_restore %}opacity-60{% endif %}">
         <input type="radio" name="mode" value="restore" class="mt-1"{% if not can_restore %} disabled{% endif %}>
-        <span>{{ _("Restore into this workspace") }}<span class="block text-xs text-muted">{% if can_restore %}{{ _("Replaces settings, categories, transactions, planned values, and month states. Only for an empty workspace.") }}{% else %}{{ _("Available only in an empty workspace. The untouched suggested categories are fine.") }}{% endif %}</span></span>
+        <span>{{ _("Restore into this workspace") }}<span class="block text-xs text-muted">{% if can_restore %}{{ _("Replaces settings, categories, transactions, planned values, month states, net worth, investments, loans, FIRE, recurring items, income, tax rules, and work logs. Only for an empty workspace.") }}{% else %}{{ _("Available only in an empty workspace. The untouched suggested categories are fine.") }}{% endif %}</span></span>
       </label>
       {% else %}
       <input type="hidden" name="mode" value="merge">
@@ -123,6 +123,13 @@
       <div><dt class="text-muted">{{ _("Deleted transactions restored") }}</dt><dd>{{ selected_batch.report.counts.deleted_transactions|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Planned values") }}</dt><dd>{{ selected_batch.report.counts.budget_lines_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Month states") }}</dt><dd>{{ selected_batch.report.counts.months_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Recurring items") }}</dt><dd>{{ selected_batch.report.counts.scheduled_items_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Occurrences") }}</dt><dd>{{ selected_batch.report.counts.scheduled_occurrences_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Income sources") }}</dt><dd>{{ selected_batch.report.counts.income_sources_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Tax rules") }}</dt><dd>{{ selected_batch.report.counts.tax_rules_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Tax rate versions") }}</dt><dd>{{ selected_batch.report.counts.tax_rule_versions_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Work logs") }}</dt><dd>{{ selected_batch.report.counts.work_logs_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Work days") }}</dt><dd>{{ selected_batch.report.counts.work_days_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Net-worth categories") }}</dt><dd>{{ selected_batch.report.counts.networth_categories_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Net-worth items") }}</dt><dd>{{ selected_batch.report.counts.networth_items_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Item valuations") }}</dt><dd>{{ selected_batch.report.counts.item_valuations_created|default(0) }}</dd></div>

@@ -249,7 +249,7 @@ def test_2_0_round_trip_keeps_plan_events_and_projection(db: WorkspaceDb, data_d
     content = export_workspace(db.factory, ctx).content
     parsed, errors = parse_archive(content)
     assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == "2.2"
+    assert parsed.manifest["format_version"] == "2.3"
     assert _data_files(original)["fire_plan.csv"] == _data_files(content)["fire_plan.csv"]
     assert _data_files(original)["fire_events.csv"] == _data_files(content)["fire_events.csv"]
 

@@ -73,6 +73,8 @@ from assetboard.domain.archive import (
     FireLoanSettingRow,
     FirePlanRow,
     FxRateRow,
+    IncomeSourceRow,
+    IncomeSourceTaxRuleRow,
     InstallmentPlanRow,
     InstrumentAllocationRow,
     InstrumentRow,
@@ -95,7 +97,13 @@ from assetboard.domain.archive import (
     ReferenceRateRow,
     ReferenceRateValueRow,
     RiskTargetPolicyRow,
+    ScheduledItemRow,
+    ScheduledOccurrenceRow,
+    TaxRuleRow,
+    TaxRuleVersionRow,
     TransactionRow,
+    WorkDayRow,
+    WorkLogRow,
     decimal_text,
     lineage_id,
     timestamp_text,
@@ -118,6 +126,14 @@ ARCHIVE_INCLUDED_MODELS = frozenset(
         "BudgetLine",
         "Transaction",
         "MonthState",
+        "ScheduledItem",
+        "ScheduledOccurrence",
+        "IncomeSource",
+        "IncomeSourceTaxRule",
+        "WorkLog",
+        "WorkDay",
+        "TaxRule",
+        "TaxRuleVersion",
         "NetWorthCategory",
         "NetWorthItem",
         "ItemValuation",
@@ -157,16 +173,8 @@ ARCHIVE_EXCLUDED_MODELS = {
     "DashboardPreference": (
         "the Home widget layout is a per-user interface preference, not financial data"
     ),
-    "ScheduledItem": "recurring rules require the F3.8 archive extension",
-    "ScheduledOccurrence": "occurrence links require the F3.8 archive extension",
-    "IncomeSource": "income sources require the F3.8 archive extension",
-    "IncomeSourceTaxRule": "income tax links require the F3.8 archive extension",
-    "WorkLog": "work logs require the F3.8 archive extension",
-    "WorkDay": "work calendars require the F3.8 archive extension",
-    "TaxRule": "tax rules require the F3.8 archive extension",
-    "TaxRuleVersion": "tax history requires the F3.8 archive extension",
-    "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
-    "NotificationLog": "notification delivery history is not portable (F3.8)",
+    "NotificationChannel": "notification URLs contain secrets (F9.3)",
+    "NotificationLog": "notification delivery history is not portable",
     "ProviderError": "provider error logs are operational and not portable",
 }
 
@@ -689,25 +697,6 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             key=lambda row: (row.date, row.created_at, row.id),
         )
         transaction_lineage = {row.id: lineage_id(row.id, row.import_key) for row in transactions}
-        transaction_rows = tuple(
-            TransactionRow(
-                date=row.date.isoformat(),
-                direction=row.direction,
-                amount=plain_amount(row.amount_minor, row.currency),
-                currency=row.currency,
-                category=categories_by_id[row.category_id].name,
-                description=row.description,
-                category_id=str(
-                    lineage_id(
-                        categories_by_id[row.category_id].id,
-                        categories_by_id[row.category_id].import_key,
-                    )
-                ),
-                id=str(lineage_id(row.id, row.import_key)),
-                deleted_at=timestamp_text(row.deleted_at),
-            )
-            for row in transactions
-        )
         month_rows = tuple(
             MonthRow(
                 month=row.month.strftime("%Y-%m"),
@@ -773,6 +762,336 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
         loan_rank = {row.id: index for index, row in enumerate(loans)}
         loans_by_id = {row.id: row for row in loans}
         loan_lineage = {row.id: row.id for row in loans}
+        category_lineage = {
+            category.id: lineage_id(category.id, category.import_key) for category in categories
+        }
+
+        tax_rules = sorted(
+            TaxRuleRepository(session, ctx).ordered(),
+            key=lambda row: (row.name, row.archived_at is not None, str(row.id)),
+        )
+        tax_rule_rank = {row.id: index for index, row in enumerate(tax_rules)}
+        tax_rules_by_id = {row.id: row for row in tax_rules}
+        tax_rule_rows = tuple(
+            TaxRuleRow(
+                id=str(row.id),
+                name=row.name,
+                kind=row.kind,
+                base=row.base,
+                payment_day=row.payment_day,
+                payment_timing=row.payment_timing,
+                payment_category_id=(
+                    str(category_lineage[row.payment_category_id])
+                    if row.payment_category_id is not None
+                    and row.payment_category_id in category_lineage
+                    else None
+                ),
+                payment_category=(
+                    categories_by_id[row.payment_category_id].name
+                    if row.payment_category_id is not None
+                    and row.payment_category_id in categories_by_id
+                    else ""
+                ),
+                notes=row.notes,
+                archived_at=timestamp_text(row.archived_at),
+            )
+            for row in tax_rules
+        )
+        tax_versions = sorted(
+            TaxRuleVersionRepository(session, ctx).all_for_rules(),
+            key=lambda row: (
+                tax_rule_rank.get(row.tax_rule_id, len(tax_rules)),
+                row.effective_from,
+                str(row.id),
+            ),
+        )
+        tax_rule_version_rows = tuple(
+            TaxRuleVersionRow(
+                id=str(row.id),
+                tax_rule_id=str(row.tax_rule_id),
+                tax_rule=tax_rules_by_id[row.tax_rule_id].name,
+                effective_from=row.effective_from.isoformat(),
+                mode=row.mode,
+                rate_bp=row.rate_bp,
+                fixed_amount=(
+                    plain_amount(row.fixed_minor, workspace.base_currency)
+                    if row.fixed_minor is not None
+                    else ""
+                ),
+            )
+            for row in tax_versions
+        )
+        income_sources = sorted(
+            IncomeSourceRepository(session, ctx).ordered(),
+            key=lambda row: (row.name, row.archived_at is not None, str(row.id)),
+        )
+        income_source_rank = {row.id: index for index, row in enumerate(income_sources)}
+        income_sources_by_id = {row.id: row for row in income_sources}
+        income_source_rows = tuple(
+            IncomeSourceRow(
+                id=str(row.id),
+                name=row.name,
+                kind=row.kind,
+                category_id=str(category_lineage[row.category_id]),
+                category=categories_by_id[row.category_id].name,
+                currency=row.currency,
+                fixed_amount=(
+                    plain_amount(row.fixed_minor, row.currency)
+                    if row.fixed_minor is not None
+                    else ""
+                ),
+                rate=(
+                    plain_amount(row.rate_minor, row.currency) if row.rate_minor is not None else ""
+                ),
+                unit_label=row.unit_label,
+                pay_day=row.pay_day,
+                pay_lag_months=row.pay_lag_months,
+                expected_mode=row.expected_mode,
+                expected_units=(
+                    decimal_text(row.expected_units) if row.expected_units is not None else ""
+                ),
+                average_months=row.average_months,
+                active_from=row.active_from.isoformat(),
+                active_to=row.active_to.isoformat() if row.active_to else None,
+                archived_at=timestamp_text(row.archived_at),
+            )
+            for row in income_sources
+        )
+        attachments = sorted(
+            (
+                attachment
+                for source in income_sources
+                for attachment in IncomeSourceTaxRuleRepository(session, ctx).for_source(source.id)
+            ),
+            key=lambda row: (
+                income_source_rank[row.income_source_id],
+                row.sort_order,
+                str(row.id),
+            ),
+        )
+        income_source_tax_rule_rows = tuple(
+            IncomeSourceTaxRuleRow(
+                id=str(row.id),
+                income_source_id=str(row.income_source_id),
+                income_source=income_sources_by_id[row.income_source_id].name,
+                tax_rule_id=str(row.tax_rule_id),
+                tax_rule=tax_rules_by_id[row.tax_rule_id].name,
+                sort_order=row.sort_order,
+                generate_payment="true" if row.generate_payment else "false",
+                payment_category_id=(
+                    str(category_lineage[row.payment_category_id])
+                    if row.payment_category_id is not None
+                    and row.payment_category_id in category_lineage
+                    else None
+                ),
+                payment_category=(
+                    categories_by_id[row.payment_category_id].name
+                    if row.payment_category_id is not None
+                    and row.payment_category_id in categories_by_id
+                    else ""
+                ),
+                due_day=row.due_day,
+                due_month_offset=row.due_month_offset,
+            )
+            for row in attachments
+        )
+        work_logs = sorted(
+            (
+                log
+                for source in income_sources
+                for log in WorkLogRepository(session, ctx).for_source(source.id)
+            ),
+            key=lambda row: (income_source_rank[row.income_source_id], row.work_month, str(row.id)),
+        )
+        work_log_rows = tuple(
+            WorkLogRow(
+                id=str(row.id),
+                income_source_id=str(row.income_source_id),
+                income_source=income_sources_by_id[row.income_source_id].name,
+                work_month=row.work_month.strftime("%Y-%m"),
+                units=decimal_text(row.units),
+                derived_from_days="true" if row.derived_from_days else "false",
+            )
+            for row in work_logs
+        )
+        work_days = sorted(
+            (
+                day
+                for source in income_sources
+                for day in WorkDayRepository(session, ctx).for_month(
+                    source.id, date(1900, 1, 1), date(2199, 12, 31)
+                )
+            ),
+            key=lambda row: (income_source_rank[row.income_source_id], row.work_date, str(row.id)),
+        )
+        work_day_rows = tuple(
+            WorkDayRow(
+                id=str(row.id),
+                income_source_id=str(row.income_source_id),
+                income_source=income_sources_by_id[row.income_source_id].name,
+                work_date=row.work_date.isoformat(),
+                units=decimal_text(row.units),
+            )
+            for row in work_days
+        )
+        scheduled_items = sorted(
+            ScheduledItemRepository(session, ctx).ordered(),
+            key=lambda row: (row.name, row.archived_at is not None, str(row.id)),
+        )
+        scheduled_items_by_id = {row.id: row for row in scheduled_items}
+        scheduled_item_rows = tuple(
+            ScheduledItemRow(
+                id=str(row.id),
+                name=row.name,
+                direction=row.direction,
+                category_id=str(category_lineage[row.category_id]),
+                category=categories_by_id[row.category_id].name,
+                loan_id=(
+                    str(loan_lineage[row.loan_id])
+                    if row.loan_id is not None and row.loan_id in loan_lineage
+                    else None
+                ),
+                loan=(
+                    loans_by_id[row.loan_id].name
+                    if row.loan_id is not None and row.loan_id in loans_by_id
+                    else ""
+                ),
+                amount_mode=row.amount_mode,
+                amount=plain_amount(row.amount_minor, row.currency),
+                currency=row.currency,
+                start_date=row.start_date.isoformat(),
+                end_date=row.end_date.isoformat() if row.end_date else None,
+                max_count=row.max_count,
+                freq=row.freq,
+                interval=row.interval,
+                weekdays=json.dumps(sorted(set(row.weekdays)), separators=(",", ":")),
+                month_day=row.month_day,
+                month=row.month,
+                weekend_policy=row.weekend_policy,
+                notes=row.notes,
+                auto_post="true" if row.auto_post else "false",
+                is_tax="true" if row.is_tax else "false",
+                reminder_lead_days=row.reminder_lead_days,
+                paused_at=timestamp_text(row.paused_at),
+                archived_at=timestamp_text(row.archived_at),
+            )
+            for row in scheduled_items
+        )
+        occurrences = sorted(
+            [
+                occurrence
+                for item in scheduled_items
+                for occurrence in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            ]
+            + [
+                occurrence
+                for source in income_sources
+                for occurrence in ScheduledOccurrenceRepository(session, ctx).for_income_source(
+                    source.id
+                )
+            ],
+            key=lambda row: (
+                row.parent_occurrence_id is not None,
+                row.due_date,
+                row.created_at,
+                str(row.id),
+            ),
+        )
+        # A tax occurrence hangs off an income occurrence, so it is collected through its parent.
+        parent_ids = {row.id for row in occurrences}
+        children = [
+            occurrence
+            for parent_id in parent_ids
+            for occurrence in ScheduledOccurrenceRepository(session, ctx).children(parent_id)
+        ]
+        occurrences = sorted(
+            {row.id: row for row in (*occurrences, *children)}.values(),
+            key=lambda row: (
+                row.parent_occurrence_id is not None,
+                row.due_date,
+                row.created_at,
+                str(row.id),
+            ),
+        )
+        occurrence_rows = tuple(
+            ScheduledOccurrenceRow(
+                id=str(row.id),
+                scheduled_item_id=(
+                    str(row.scheduled_item_id) if row.scheduled_item_id is not None else None
+                ),
+                scheduled_item=(
+                    scheduled_items_by_id[row.scheduled_item_id].name
+                    if row.scheduled_item_id is not None
+                    and row.scheduled_item_id in scheduled_items_by_id
+                    else ""
+                ),
+                income_source_id=(
+                    str(row.income_source_id) if row.income_source_id is not None else None
+                ),
+                income_source=(
+                    income_sources_by_id[row.income_source_id].name
+                    if row.income_source_id is not None
+                    and row.income_source_id in income_sources_by_id
+                    else ""
+                ),
+                work_month=row.work_month.strftime("%Y-%m") if row.work_month else None,
+                parent_occurrence_id=(
+                    str(row.parent_occurrence_id) if row.parent_occurrence_id is not None else None
+                ),
+                income_source_tax_rule_id=(
+                    str(row.income_source_tax_rule_id)
+                    if row.income_source_tax_rule_id is not None
+                    else None
+                ),
+                direction=row.direction,
+                category_id=str(category_lineage[row.category_id]),
+                category=categories_by_id[row.category_id].name,
+                nominal_date=row.nominal_date.isoformat(),
+                due_date=row.due_date.isoformat(),
+                expected=plain_amount(row.expected_minor, row.currency),
+                currency=row.currency,
+                amount_state=row.amount_state,
+                status=row.status,
+                generated_by=row.generated_by,
+                transaction_id=(
+                    str(transaction_lineage[row.transaction_id])
+                    if row.transaction_id is not None and row.transaction_id in transaction_lineage
+                    else None
+                ),
+                previous_transaction_id=(
+                    str(transaction_lineage[row.previous_transaction_id])
+                    if row.previous_transaction_id is not None
+                    and row.previous_transaction_id in transaction_lineage
+                    else None
+                ),
+                rescheduled_at=timestamp_text(row.rescheduled_at),
+                amount_overridden="true" if row.amount_overridden else "false",
+                label=row.label,
+            )
+            for row in occurrences
+        )
+        occurrence_by_transaction: dict[UUID, str] = {}
+        for row in occurrence_rows:
+            if row.transaction_id:
+                occurrence_by_transaction.setdefault(UUID(row.transaction_id), row.id)
+        transaction_rows = tuple(
+            TransactionRow(
+                date=row.date.isoformat(),
+                direction=row.direction,
+                amount=plain_amount(row.amount_minor, row.currency),
+                currency=row.currency,
+                category=categories_by_id[row.category_id].name,
+                description=row.description,
+                category_id=str(category_lineage[row.category_id]),
+                id=str(lineage_id(row.id, row.import_key)),
+                deleted_at=timestamp_text(row.deleted_at),
+                source=row.source,
+                scheduled_occurrence_id=occurrence_by_transaction.get(
+                    lineage_id(row.id, row.import_key)
+                ),
+            )
+            for row in transactions
+        )
         networth_items_by_id = {item.id: item for item in networth_items}
         networth_item_rank = {item.id: position for position, item in enumerate(networth_items)}
         networth_item_rows = tuple(
@@ -1498,6 +1817,14 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             budget_lines=budget_rows,
             transactions=transaction_rows,
             months=month_rows,
+            scheduled_items=scheduled_item_rows,
+            scheduled_occurrences=occurrence_rows,
+            income_sources=income_source_rows,
+            tax_rules=tax_rule_rows,
+            tax_rule_versions=tax_rule_version_rows,
+            income_source_tax_rules=income_source_tax_rule_rows,
+            work_logs=work_log_rows,
+            work_days=work_day_rows,
             networth_categories=networth_category_rows,
             networth_items=networth_item_rows,
             item_valuations=item_valuation_rows,
@@ -1541,6 +1868,14 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "budget_lines": len(budget_rows),
             "transactions": len(transaction_rows),
             "months": len(month_rows),
+            "scheduled_items": len(scheduled_item_rows),
+            "scheduled_occurrences": len(occurrence_rows),
+            "income_sources": len(income_source_rows),
+            "tax_rules": len(tax_rule_rows),
+            "tax_rule_versions": len(tax_rule_version_rows),
+            "income_source_tax_rules": len(income_source_tax_rule_rows),
+            "work_logs": len(work_log_rows),
+            "work_days": len(work_day_rows),
             "networth_categories": len(networth_category_rows),
             "networth_items": len(networth_item_rows),
             "item_valuations": len(item_valuation_rows),

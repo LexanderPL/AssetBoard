@@ -1418,8 +1418,8 @@ tests. Keep loan math, money/rounding rules, the other rules and dependencies un
   for any non-SWR rule, and the route parses no SWR for it.
 - Migration `0066_f821_horizon_rule` drops and recreates `ck_fire_scenarios_rule_valid` and
   `ck_fire_scenarios_swr_valid`; downgrade converts horizon rows to `returns_cover_expenses`
-  before restoring the old checks. `FORMAT_VERSION` is `2.2`; the archive reader accepts the new
-  value and still reads 2.0/2.1 archives.
+  before restoring the old checks. `FORMAT_VERSION` is `2.3`; the archive reader accepts the new
+  value and still reads 2.0/2.1/2.2 archives.
 - Unit tests cover both golden/oracle paths, the exact candidate boundary, zero at the horizon,
   the stop-age cap, the counterfactual path and validation; the property suite samples the new
   rule; sensitivity reuses the base projection. Web tests cover the selector default, saving

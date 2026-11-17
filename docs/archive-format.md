@@ -1,4 +1,4 @@
-# Workspace archive format (v2.2)
+# Workspace archive format (v2.3)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -19,6 +19,14 @@ assetboard-home-20261018-143000Z.zip
 ├── budget_lines.csv
 ├── transactions.csv
 ├── months.csv
+├── scheduled_items.csv
+├── scheduled_occurrences.csv
+├── income_sources.csv
+├── tax_rules.csv
+├── tax_rule_versions.csv
+├── income_source_tax_rules.csv
+├── work_logs.csv
+├── work_days.csv
 ├── networth_categories.csv
 ├── networth_items.csv
 ├── item_valuations.csv
@@ -104,16 +112,20 @@ files with `fire_plan.csv` and the new `fire_events.csv`. Format 2.1 (additive):
 `fire_loan_settings.csv` with the FIRE plan's ignored-loan choices; a 2.0 archive reads with
 every loan included, and a 2.1 archive requires the new file (header only when empty). Format
 2.2 (additive): `fire_plan.csv` accepts the additional `lasts_to_horizon` independence rule; a
-2.1 archive reads with only the two older rule values. Loan schedules and projections are not
-archived and are recomputed from the restored terms. Golden archives of every released version
-are in `tests/fixtures/`.
+2.1 archive reads with only the two older rule values. Format 2.3 (additive): adds the eight
+recurring, income, tax and work files below and the optional `source` and
+`scheduled_occurrence_id` columns of `transactions.csv`; a 2.2 archive reads with none of those
+files and with every transaction treated as `import` (or `investment` for a restored dividend).
+A 2.3 archive requires every new file (header only when empty). Loan schedules and projections
+are not archived and are recomputed from the restored terms. Golden archives of every released
+version are in `tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "2.2",
+  "format_version": "2.3",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -222,6 +234,8 @@ d1c9e7a0-3b2f-4a8e-b6c5-0e9f8d7c6b55,expense,Car,regular,#a35d3b,2,2025-12-31T18
 | `description` | no | at most 200 characters; whitespace is collapsed, control characters are refused |
 | `category_id` | no (always set in an archive) | UUID from `categories.csv`; needed because archived categories may share a name. Ignored in a lone CSV, which maps by `category` name |
 | `id` | no | UUID (lineage id; enables exact dedupe) |
+| `source` | no (2.3) | `manual` \| `recurring` \| `recurring_auto` \| `import` \| `investment`; absent = `import` |
+| `scheduled_occurrence_id` | no (2.3) | UUID of the posted `scheduled_occurrences.csv` row; derived on export and informational on restore |
 | `deleted_at` | no | timestamp; set = soft-deleted (restored as deleted; skipped in merge) |
 
 Export order: date, then entry order (`created_at`, id). The transactions page's CSV export
@@ -231,10 +245,10 @@ workspace's time zone is skipped and listed with `future_date`.
 Archive example:
 
 ```csv
-date,direction,amount,currency,category,description,category_id,id,deleted_at
-2026-09-01,income,3400.00,EUR,Salary,September salary,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,0b6e2f1a-4c3d-4e5f-8a9b-1c2d3e4f5a01,
-2026-09-02,expense,50.00,EUR,Food,Groceries,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02,
-2026-09-02,expense,4.20,EUR,Food,"Bakery, rolls",2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a03,2026-09-03T07:12:44Z
+date,direction,amount,currency,category,description,category_id,id,source,scheduled_occurrence_id,deleted_at
+2026-09-01,income,3400.00,EUR,Salary,September salary,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,0b6e2f1a-4c3d-4e5f-8a9b-1c2d3e4f5a01,manual,,
+2026-09-02,expense,50.00,EUR,Food,Groceries,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02,import,,
+2026-09-02,expense,4.20,EUR,Food,"Bakery, rolls",2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a03,recurring,,2026-09-03T07:12:44Z
 ```
 
 Hand-made file with the minimal columns (the template download; the two identical rows are both
@@ -280,6 +294,212 @@ Hand-made file with the minimal columns (the template download):
 month,kind,category,planned
 2026-09,expense,Food,550.00
 2026-09,income,Salary,3000.00
+```
+
+## `scheduled_items.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `name` | yes | at most 200 characters |
+| `direction` | yes | `expense` \| `income`; equals the category's kind |
+| `category_id` | yes | category id from `categories.csv` |
+| `category` | yes | category name (must match `category_id`) |
+| `loan_id` | no | loan id; only with `amount_mode=from_loan` |
+| `loan` | no | loan name (must match `loan_id`) |
+| `amount_mode` | yes | `fixed` \| `estimate` \| `from_loan` |
+| `amount` | yes | decimal ≥ 0; 0 only for `from_loan` |
+| `currency` | yes | the workspace's base currency |
+| `start_date` | yes | `YYYY-MM-DD`; inclusive |
+| `end_date` | no | `YYYY-MM-DD`; inclusive, not before `start_date` |
+| `max_count` | no | positive integer |
+| `freq` | yes | `once` \| `weekly` \| `monthly` \| `yearly` |
+| `interval` | yes | integer ≥ 1 |
+| `weekdays` | yes | JSON array of integers 0–6 (Monday = 0); required for weekly |
+| `month_day` | yes | `1`–`31`, `-1` (last day), `first_working_day` or `last_working_day`; a yearly item uses 1–31 |
+| `month` | yes | 1–12 for yearly items, otherwise ignored |
+| `weekend_policy` | yes | `none` \| `previous_working_day` \| `next_working_day` |
+| `notes` | no | at most 200 characters |
+| `auto_post` | yes | `true` \| `false` |
+| `is_tax` | yes | `true` \| `false`: the item is listed on the Taxes page too |
+| `reminder_lead_days` | no | 0–60 |
+| `paused_at` | no | timestamp; set = paused |
+| `archived_at` | no | timestamp; set = archived |
+
+Export order: name, archived, id.
+
+```csv
+id,name,direction,category_id,category,loan_id,loan,amount_mode,amount,currency,start_date,end_date,max_count,freq,interval,weekdays,month_day,month,weekend_policy,notes,auto_post,is_tax,reminder_lead_days,paused_at,archived_at
+6d7e8f90-a1b2-43c4-95f6-e7f8091a2b3c,Rent,expense,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,,,fixed,1000.00,EUR,2026-09-01,,,monthly,1,[],1,1,none,On the first,false,false,3,,
+```
+
+## `scheduled_occurrences.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free; parents restore before children) |
+| `scheduled_item_id` | for rule/manual rows | item id from `scheduled_items.csv` |
+| `scheduled_item` | for rule/manual rows | item name (must match `scheduled_item_id`) |
+| `income_source_id` | for income rows | source id from `income_sources.csv` |
+| `income_source` | for income rows | source name (must match `income_source_id`) |
+| `work_month` | for income rows | `YYYY-MM`; unique per source |
+| `parent_occurrence_id` | for tax rows | the income occurrence the tax payments hang from |
+| `income_source_tax_rule_id` | for tax rows | the attachment that produced the payment |
+| `direction` | yes | `expense` \| `income`; equals the category's kind |
+| `category_id` | yes | category id from `categories.csv` |
+| `category` | yes | category name (must match `category_id`) |
+| `nominal_date` | yes | `YYYY-MM-DD` |
+| `due_date` | yes | `YYYY-MM-DD` |
+| `expected` | yes | decimal ≥ 0 |
+| `currency` | yes | the workspace's base currency |
+| `amount_state` | yes | `estimated` \| `confirmed` |
+| `status` | yes | `pending` \| `posted` \| `skipped`; posted requires a transaction |
+| `generated_by` | yes | `rule` \| `manual` \| `income` \| `tax` |
+| `transaction_id` | no | transaction id from `transactions.csv`; set when posted |
+| `previous_transaction_id` | no | the transaction it was last posted as |
+| `rescheduled_at` | no | timestamp |
+| `amount_overridden` | yes | `true` \| `false` |
+| `label` | yes | at most 200 characters |
+
+Export order: parents before tax children, then due date, entry order, id.
+
+```csv
+id,scheduled_item_id,scheduled_item,income_source_id,income_source,work_month,parent_occurrence_id,income_source_tax_rule_id,direction,category_id,category,nominal_date,due_date,expected,currency,amount_state,status,generated_by,transaction_id,previous_transaction_id,rescheduled_at,amount_overridden,label
+7e8f90a1-b2c3-44d5-86a7-f8091a2b3c4d,6d7e8f90-a1b2-43c4-95f6-e7f8091a2b3c,Rent,,,,,,expense,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,2026-09-01,2026-09-01,1000.00,EUR,confirmed,pending,rule,,,,false,Rent
+8f90a1b2-c3d4-45e6-97b8-091a2b3c4d5e,,,2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8,Clients,2026-09,,,income,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,Salary,2026-10-10,2026-10-10,1250.00,EUR,estimated,pending,income,,,,false,"Clients, September"
+90a1b2c3-d4e5-46f7-a8c9-1a2b3c4d5e6f,,,,,,8f90a1b2-c3d4-45e6-97b8-091a2b3c4d5e,3a4b5c6d-7e8f-4091-82c3-b4c5d6e7f809,expense,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,2026-10-20,2026-10-20,287.50,EUR,confirmed,pending,tax,,,,false,VAT on Clients
+```
+
+## `income_sources.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `name` | yes | at most 200 characters |
+| `kind` | yes | `fixed` \| `variable` |
+| `category_id` | yes | an income category id |
+| `category` | yes | category name (must match `category_id`) |
+| `currency` | yes | the workspace's base currency |
+| `fixed_amount` | for fixed | decimal > 0 |
+| `rate` | for variable | decimal > 0, per unit |
+| `unit_label` | yes | at most 40 characters |
+| `pay_day` | yes | 1–31 |
+| `pay_lag_months` | yes | 0–24 |
+| `expected_mode` | yes | `working_days` \| `fixed` \| `average` \| `manual` |
+| `expected_units` | no | decimal ≥ 0 |
+| `average_months` | yes | 1–24 |
+| `active_from` | yes | first day of a month |
+| `active_to` | no | first day of a month, not before `active_from` |
+| `archived_at` | no | timestamp; set = archived |
+
+```csv
+id,name,kind,category_id,category,currency,fixed_amount,rate,unit_label,pay_day,pay_lag_months,expected_mode,expected_units,average_months,active_from,active_to,archived_at
+2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8,Clients,variable,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,Salary,EUR,,100.00,day,10,1,manual,,3,2026-01-01,,
+```
+
+## `tax_rules.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `name` | yes | at most 200 characters |
+| `kind` | yes | `added` \| `self_paid` \| `payer_withheld` |
+| `base` | yes | `net` \| `gross`; an added tax uses `net` |
+| `payment_day` | yes | 1–31 |
+| `payment_timing` | yes | `next_month` \| `same_month` \| `after_quarter` |
+| `payment_category_id` | no | category id from `categories.csv` |
+| `payment_category` | no | category name (must match `payment_category_id`) |
+| `notes` | no | at most 200 characters |
+| `archived_at` | no | timestamp; set = archived |
+
+```csv
+id,name,kind,base,payment_day,payment_timing,payment_category_id,payment_category,notes,archived_at
+0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6,VAT,added,net,20,next_month,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,Quarterly,
+```
+
+## `tax_rule_versions.csv` (restore only, format 2.3+)
+
+Append-only rate history. Each row is unique per rule and effective date.
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `tax_rule_id` | yes | rule id from `tax_rules.csv` |
+| `tax_rule` | yes | rule name (must match `tax_rule_id`) |
+| `effective_from` | yes | `YYYY-MM-DD` |
+| `mode` | yes | `percent` \| `fixed` |
+| `rate_bp` | for percent | integer 0 or more |
+| `fixed_amount` | for fixed | decimal ≥ 0 in the workspace currency |
+
+```csv
+id,tax_rule_id,tax_rule,effective_from,mode,rate_bp,fixed_amount
+1e2f3a4b-5c6d-4e7f-90a1-92a3b4c5d6e7,0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6,VAT,2026-01-01,percent,2300,
+```
+
+## `income_source_tax_rules.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `income_source_id` | yes | source id from `income_sources.csv` |
+| `income_source` | yes | source name (must match `income_source_id`) |
+| `tax_rule_id` | yes | rule id from `tax_rules.csv` |
+| `tax_rule` | yes | rule name (must match `tax_rule_id`) |
+| `sort_order` | yes | integer ≥ 0; unique per source |
+| `generate_payment` | yes | `true` \| `false` |
+| `payment_category_id` | no | category id overriding the rule's default |
+| `payment_category` | no | category name (must match `payment_category_id`) |
+| `due_day` | no | 1–31; overrides the rule's payment day |
+| `due_month_offset` | no | 0–24; overrides the rule's payment timing |
+
+The pair `(income_source_id, tax_rule_id)` is unique.
+
+```csv
+id,income_source_id,income_source,tax_rule_id,tax_rule,sort_order,generate_payment,payment_category_id,payment_category,due_day,due_month_offset
+3a4b5c6d-7e8f-4091-82c3-b4c5d6e7f809,2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8,Clients,0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6,VAT,0,true,,,20,1
+```
+
+## `work_logs.csv` (merge or restore, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `income_source_id` | yes | source id from `income_sources.csv` |
+| `income_source` | yes | source name (must match `income_source_id`) |
+| `work_month` | yes | `YYYY-MM`; unique per source |
+| `units` | yes | decimal ≥ 0 |
+| `derived_from_days` | yes | `true` when the month is the sum of `work_days.csv` |
+
+A lone `work_logs.csv` can be merged by income source name. A month that already has a log is
+never overwritten: an identical row is a duplicate, a different one a conflict, and both are
+listed. A closed month or a received month is skipped. A merged log is stored as directly
+entered (`derived_from_days=false`) because its work-day rows are restore-only.
+
+```csv
+id,income_source_id,income_source,work_month,units,derived_from_days
+4b5c6d7e-8f90-41a2-93d4-c5d6e7f8091a,2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8,Clients,2026-09,12.5,false
+```
+
+Hand-made file with the minimal columns:
+
+```csv
+income_source,work_month,units
+Clients,2026-09,12.5
+```
+
+## `work_days.csv` (restore only, format 2.3+)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (preserved when free) |
+| `income_source_id` | yes | source id from `income_sources.csv` |
+| `income_source` | yes | source name (must match `income_source_id`) |
+| `work_date` | yes | `YYYY-MM-DD`; unique per source |
+| `units` | yes | decimal > 0 and ≤ 24 |
+
+```csv
+id,income_source_id,income_source,work_date,units
+5c6d7e8f-90a1-42b3-84e5-d6e7f8091a2b,2f3a4b5c-6d7e-4f80-91b2-a3b4c5d6e7f8,Clients,2026-09-02,1
 ```
 
 ## `networth_categories.csv` (restore only)
@@ -974,17 +1194,14 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 2.2)
+## Not in the archive (format 2.3)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
-mappings, and who created or closed what. Recurring items, income sources, work logs and
-calendars, and tax rules are added by a later archive extension as new files (a minor version);
-until then, a restore requires a workspace without them. Notification channels are never
-exported, because their URLs can contain secrets. Provider error logs are operational and not
-portable. FIRE projections, sensitivity grids and loan schedules are derived data: they are
-recomputed from the archived inputs and are never stored in the archive. The plan's
-include/ignore choice for a loan is user intent, not derived data, so it is stored in
-`fire_loan_settings.csv`.
+mappings, and who created or closed what. Notification channels are never exported, because
+their URLs can contain secrets. Provider error logs are operational and not portable. FIRE
+projections, sensitivity grids and loan schedules are derived data: they are recomputed from
+the archived inputs and are never stored in the archive. The plan's include/ignore choice for a
+loan is user intent, not derived data, so it is stored in `fire_loan_settings.csv`.
 
 The profile's `birth_year`, `life_expectancy` and `sidebar_items` are user data, not workspace
 data, so they are not archived. Dashboard widget layouts (`DashboardPreference`) are per-user
@@ -992,10 +1209,12 @@ interface state, not financial data; a restore starts from the default Home cata
 `investment_cost_basis` and `risk_target_policy` are workspace settings and live in
 `workspace.json`.
 
-Net-worth, investment, loan and FIRE files are restore-only in a full archive merge: they are
-ignored and listed once as a warning (`networth_restore_only`, `investment_restore_only`,
-`loan_restore_only` and `fire_restore_only`). A legacy 1.8 archive's four FIRE files are covered by
-the same `fire_restore_only` warning. A lone `item_valuations.csv`, a lone
-`investment_transactions.csv` and a lone `reference_rate_values.csv` can be merged. The other
-loan and FIRE files are refused as standalone uploads (`loans.csv` alone has no importer), because
-their rows reference loans, plans and planned values that a merge does not carry.
+Net-worth, investment, loan, FIRE and recurring/income/tax/work-calendar files are restore-only
+in a full archive merge: they are ignored and listed once as a warning (`networth_restore_only`,
+`investment_restore_only`, `loan_restore_only`, `fire_restore_only` and
+`recurring_restore_only`). A legacy 1.8 archive's four FIRE files are covered by the same
+`fire_restore_only` warning. A lone `item_valuations.csv`, a lone
+`investment_transactions.csv`, a lone `reference_rate_values.csv` and a lone `work_logs.csv`
+can be merged. The other loan, FIRE and recurring files are refused as standalone uploads
+(`loans.csv` alone has no importer), because their rows reference loans, plans, income sources
+and planned values that a merge does not carry.

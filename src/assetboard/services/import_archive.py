@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.income import IncomeSource
 from assetboard.db.models.investments import AssetClass, RiskTargetPolicy
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
@@ -42,6 +43,8 @@ from assetboard.db.repositories import (
     FireScenarioRepository,
     FxRateRepository,
     ImportCategoryMappingRepository,
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
     InstallmentPlanRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
@@ -64,13 +67,20 @@ from assetboard.db.repositories import (
     ReferenceRateRepository,
     ReferenceRateValueRepository,
     RiskTargetPolicyRepository,
+    ScheduledItemRepository,
+    ScheduledOccurrenceRepository,
+    TaxRuleRepository,
+    TaxRuleVersionRepository,
     TransactionRepository,
+    WorkDayRepository,
+    WorkLogRepository,
 )
 from assetboard.domain.archive import (
     FIRE_CSV_FILES,
     INVESTMENT_CSV_FILES,
     LEGACY_FIRE_CSV_FILES,
     LOAN_CSV_FILES,
+    M3_CSV_FILES,
     NETWORTH_CSV_FILES,
     ArchiveRows,
     BudgetLineRow,
@@ -90,10 +100,12 @@ from assetboard.domain.import_csv import (
     parse_transaction_amount,
 )
 from assetboard.domain.import_upload import DEADLINE_CHECK_ROWS, ParsedUpload, ParseTimeout
+from assetboard.domain.income import pay_date
 from assetboard.domain.ledger_csv import plain_amount
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.months import YearMonth
 from assetboard.domain.providers import PROVIDERS
+from assetboard.domain.text import text_key
 from assetboard.domain.transactions import EntryError, description_key
 from assetboard.services.archive import (
     suggested_asset_classes_to_remove,
@@ -108,6 +120,7 @@ from assetboard.services.import_dedupe import (
     match_budget_lines,
     match_transactions,
 )
+from assetboard.services.import_income import create_work_log, record_work_log_rollback
 from assetboard.services.imports import ImportAdapter, ImportRestoreUnavailable
 from assetboard.services.imports import ImportError as ImportServiceError
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
@@ -186,6 +199,14 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "fire_plan_created": 0,
         "fire_events_created": 0,
         "fire_loan_settings_created": 0,
+        "scheduled_items_created": 0,
+        "scheduled_occurrences_created": 0,
+        "income_sources_created": 0,
+        "tax_rules_created": 0,
+        "tax_rule_versions_created": 0,
+        "income_source_tax_rules_created": 0,
+        "work_logs_created": 0,
+        "work_days_created": 0,
         **values,
     }
 
@@ -354,6 +375,14 @@ def _restore_counts_for(
             + budget_lines
             + len(rows.transactions)
             + len(rows.months)
+            + len(rows.scheduled_items)
+            + len(rows.scheduled_occurrences)
+            + len(rows.income_sources)
+            + len(rows.tax_rules)
+            + len(rows.tax_rule_versions)
+            + len(rows.income_source_tax_rules)
+            + len(rows.work_logs)
+            + len(rows.work_days)
             + len(rows.networth_categories)
             + len(rows.networth_items)
             + len(rows.item_valuations)
@@ -415,6 +444,14 @@ def _restore_counts_for(
         loan_scenarios_created=len(rows.loan_scenarios),
         installment_plans_created=len(rows.installment_plans),
         fire_loan_settings_created=fire_loan_settings,
+        scheduled_items_created=len(rows.scheduled_items),
+        scheduled_occurrences_created=len(rows.scheduled_occurrences),
+        income_sources_created=len(rows.income_sources),
+        tax_rules_created=len(rows.tax_rules),
+        tax_rule_versions_created=len(rows.tax_rule_versions),
+        income_source_tax_rules_created=len(rows.income_source_tax_rules),
+        work_logs_created=len(rows.work_logs),
+        work_days_created=len(rows.work_days),
     )
 
 
@@ -1221,6 +1258,116 @@ def _merge_categories(
     ]
 
 
+def _merge_work_logs(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    apply: bool,
+) -> tuple[int, int, int, list[dict[str, object]]]:
+    """Merge ``work_logs.csv`` by income source name, never overwriting an existing month."""
+    if not archive.rows.work_logs:
+        return 0, 0, 0, []
+    sources = IncomeSourceRepository(session, ctx).ordered()
+    by_id = {row.id: row for row in sources}
+    by_name: dict[str, list[IncomeSource]] = {}
+    for source in sources:
+        by_name.setdefault(text_key(source.name), []).append(source)
+    logs = WorkLogRepository(session, ctx)
+    stored: dict[tuple[UUID, date], tuple[Decimal, bool]] = {
+        (row.income_source_id, row.work_month): (row.units, row.derived_from_days)
+        for source in sources
+        for row in logs.for_source(source.id)
+    }
+    closed_months = MonthStateRepository(session, ctx).closed_months()
+    occurrences = ScheduledOccurrenceRepository(session, ctx)
+    created = duplicates = conflicts = 0
+    skipped: list[dict[str, object]] = []
+    for line, row in enumerate(archive.rows.work_logs, start=2):
+        candidates: list[IncomeSource] = []
+        with contextlib.suppress(ValueError):
+            found = by_id.get(UUID(row.income_source_id))
+            if found is not None:
+                candidates = [found]
+        if not candidates:
+            candidates = by_name.get(text_key(row.income_source), [])
+        active = [source for source in candidates if source.archived_at is None]
+        if not active:
+            skipped.append(
+                _entry(
+                    "income_source_not_found" if not candidates else "income_source_archived",
+                    file="work_logs.csv",
+                    line=line,
+                    column="income_source",
+                )
+            )
+            continue
+        if len(active) > 1:
+            skipped.append(
+                _entry(
+                    "income_source_ambiguous",
+                    file="work_logs.csv",
+                    line=line,
+                    column="income_source",
+                )
+            )
+            continue
+        source = active[0]
+        if source.kind != "variable":
+            skipped.append(
+                _entry(
+                    "income_source_not_variable",
+                    file="work_logs.csv",
+                    line=line,
+                    column="income_source",
+                )
+            )
+            continue
+        month = parse_month(row.work_month).first_day
+        due = pay_date(month, source.pay_day, source.pay_lag_months)
+        occurrence = occurrences.for_income_work_month(source.id, month)
+        locked = {YearMonth.from_date(month), YearMonth.from_date(due)}
+        if occurrence is not None:
+            locked.add(YearMonth.from_date(occurrence.due_date))
+        if locked & closed_months:
+            skipped.append(
+                _entry("closed_month", file="work_logs.csv", line=line, column="work_month")
+            )
+            continue
+        if occurrence is not None and occurrence.status == "posted":
+            skipped.append(
+                _entry("income_received", file="work_logs.csv", line=line, column="work_month")
+            )
+            conflicts += 1
+            continue
+        existing = stored.get((source.id, month))
+        units = Decimal(row.units)
+        if existing is not None:
+            if existing == (units, False):
+                skipped.append(
+                    _entry("already_logged", file="work_logs.csv", line=line, column="work_month")
+                )
+                duplicates += 1
+            else:
+                skipped.append(
+                    _entry("work_log_changed", file="work_logs.csv", line=line, column="work_month")
+                )
+                conflicts += 1
+            continue
+        if apply:
+            log_id, new_occurrences = create_work_log(session, ctx, source, month, units)
+            record_work_log_rollback(
+                batch,
+                [str(log_id)],
+                [str(value) for value in new_occurrences],
+                [(source.id, month)],
+            )
+        stored[(source.id, month)] = (units, False)
+        created += 1
+    return created, duplicates, conflicts, skipped
+
+
 def _merge(
     session: Session,
     ctx: Context,
@@ -1386,6 +1533,9 @@ def _merge(
                     )
         session.flush()
 
+    work_created, work_duplicates, work_conflicts, work_skipped = _merge_work_logs(
+        session, ctx, batch, archive, apply=apply
+    )
     months_report = _merge_months(
         collected,
         incoming_transactions,
@@ -1405,6 +1555,7 @@ def _merge(
     skipped = [
         *collected.skipped,
         *category_resolution.skipped,
+        *work_skipped,
         *[
             _entry(match.code or "duplicate", file="transactions.csv", line=match.row.line)
             for match in transaction_matches
@@ -1419,9 +1570,13 @@ def _merge(
     closed_months = sorted(collected.closed_months)
     errors = [*collected.errors, *category_resolution.mapping_errors]
     counts = _restore_counts(
-        to_create=category_resolution.created + tx_created + line_created,
-        duplicates_skipped=category_resolution.duplicates + tx_duplicates + line_duplicates,
-        conflicts_skipped=category_resolution.conflicts + tx_conflicts + line_conflicts,
+        to_create=category_resolution.created + tx_created + line_created + work_created,
+        duplicates_skipped=(
+            category_resolution.duplicates + tx_duplicates + line_duplicates + work_duplicates
+        ),
+        conflicts_skipped=(
+            category_resolution.conflicts + tx_conflicts + line_conflicts + work_conflicts
+        ),
         closed_months_skipped=collected.closed,
         future_dates_skipped=collected.future,
         deleted_skipped=collected.deleted,
@@ -1437,6 +1592,7 @@ def _merge(
         categories_created=category_resolution.created,
         transactions_created=tx_created,
         budget_lines_created=line_created,
+        work_logs_created=work_created,
     )
     workspace = CurrentWorkspaceRepository(session, ctx).get()
     settings_diff = _settings_diff(workspace, _archive_setting_values(archive.rows.workspace))
@@ -1452,6 +1608,8 @@ def _merge(
         warnings.append(_entry("loan_restore_only", file="archive"))
     if any(name in archive.files for name in (*FIRE_CSV_FILES, *LEGACY_FIRE_CSV_FILES)):
         warnings.append(_entry("fire_restore_only", file="archive"))
+    if any(name in archive.files for name in M3_CSV_FILES if name != "work_logs.csv"):
+        warnings.append(_entry("recurring_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1472,6 +1630,7 @@ def _merge(
         "skipped": len(skipped) + len(errors),
         "categories_created": category_resolution.created,
         "budget_lines_created": line_created,
+        "work_logs_created": work_created,
     }
 
 
@@ -1685,6 +1844,14 @@ def _plan_restore(
         if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
             raise ParseTimeout
     for rows in (
+        archive.rows.scheduled_items,
+        archive.rows.scheduled_occurrences,
+        archive.rows.income_sources,
+        archive.rows.tax_rules,
+        archive.rows.tax_rule_versions,
+        archive.rows.income_source_tax_rules,
+        archive.rows.work_logs,
+        archive.rows.work_days,
         archive.rows.asset_classes,
         archive.rows.instruments,
         archive.rows.instrument_allocations,
@@ -2237,6 +2404,278 @@ def _restore_loans(
     )
 
 
+def _restore_m3_configuration(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    category_ids: Mapping[UUID, UUID],
+) -> tuple[
+    dict[str, list[str]],
+    dict[UUID, UUID],
+    dict[UUID, UUID],
+    dict[UUID, UUID],
+]:
+    """Recreate tax rules, income sources, tax links and work logs/days.
+
+    Returns the restored-id report plus the source-id maps used by the scheduled rows.
+    """
+    currency = ctx.workspace.base_currency
+    restored: dict[str, list[str]] = {}
+    tax_ids: dict[UUID, UUID] = {}
+    tax_repository = TaxRuleRepository(session, ctx)
+    for index, row in enumerate(archive.rows.tax_rules):
+        payment_category = (
+            _mapped_id(category_ids, row.payment_category_id, label="category")
+            if row.payment_category_id
+            else None
+        )
+        tax_id = _create_preserving_id(
+            session,
+            tax_repository,
+            row.id,
+            name=row.name,
+            kind=row.kind,
+            base=row.base,
+            payment_day=row.payment_day,
+            payment_timing=row.payment_timing,
+            payment_category_id=payment_category,
+            notes=row.notes,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        tax_ids[UUID(row.id)] = tax_id
+    restored["tax_rules"] = [str(value) for value in tax_ids.values()]
+
+    version_ids: dict[UUID, UUID] = {}
+    versions = TaxRuleVersionRepository(session, ctx)
+    for index, row in enumerate(archive.rows.tax_rule_versions):
+        version_id = _create_preserving_id(
+            session,
+            versions,
+            row.id,
+            tax_rule_id=_mapped_id(tax_ids, row.tax_rule_id, label="tax rule"),
+            effective_from=parse_date(row.effective_from),
+            mode=row.mode,
+            rate_bp=row.rate_bp,
+            fixed_minor=(
+                parse_planned_amount(row.fixed_amount, currency, decimal="dot")
+                if row.fixed_amount
+                else None
+            ),
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        version_ids[UUID(row.id)] = version_id
+    restored["tax_rule_versions"] = [str(value) for value in version_ids.values()]
+
+    income_ids: dict[UUID, UUID] = {}
+    income = IncomeSourceRepository(session, ctx)
+    for index, row in enumerate(archive.rows.income_sources):
+        income_id = _create_preserving_id(
+            session,
+            income,
+            row.id,
+            name=row.name,
+            kind=row.kind,
+            category_id=_mapped_id(category_ids, row.category_id, label="category"),
+            currency=row.currency,
+            fixed_minor=(
+                parse_planned_amount(row.fixed_amount, row.currency, decimal="dot")
+                if row.fixed_amount
+                else None
+            ),
+            rate_minor=(
+                parse_planned_amount(row.rate, row.currency, decimal="dot") if row.rate else None
+            ),
+            unit_label=row.unit_label,
+            pay_day=row.pay_day,
+            pay_lag_months=row.pay_lag_months,
+            expected_mode=row.expected_mode,
+            expected_units=Decimal(row.expected_units) if row.expected_units else None,
+            average_months=row.average_months,
+            active_from=parse_date(row.active_from),
+            active_to=parse_date(row.active_to) if row.active_to else None,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        income_ids[UUID(row.id)] = income_id
+    restored["income_sources"] = [str(value) for value in income_ids.values()]
+
+    attachment_ids: dict[UUID, UUID] = {}
+    attachments = IncomeSourceTaxRuleRepository(session, ctx)
+    for index, row in enumerate(archive.rows.income_source_tax_rules):
+        attachment_id = _create_preserving_id(
+            session,
+            attachments,
+            row.id,
+            income_source_id=_mapped_id(income_ids, row.income_source_id, label="income source"),
+            tax_rule_id=_mapped_id(tax_ids, row.tax_rule_id, label="tax rule"),
+            sort_order=row.sort_order,
+            generate_payment=row.generate_payment == "true",
+            payment_category_id=(
+                _mapped_id(category_ids, row.payment_category_id, label="category")
+                if row.payment_category_id
+                else None
+            ),
+            due_day=row.due_day,
+            due_month_offset=row.due_month_offset,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        attachment_ids[UUID(row.id)] = attachment_id
+    restored["income_source_tax_rules"] = [str(value) for value in attachment_ids.values()]
+
+    log_ids: dict[UUID, UUID] = {}
+    logs = WorkLogRepository(session, ctx)
+    for index, row in enumerate(archive.rows.work_logs):
+        log_id = _create_preserving_id(
+            session,
+            logs,
+            row.id,
+            income_source_id=_mapped_id(income_ids, row.income_source_id, label="income source"),
+            work_month=parse_month(row.work_month).first_day,
+            units=Decimal(row.units),
+            derived_from_days=row.derived_from_days == "true",
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        log_ids[UUID(row.id)] = log_id
+    restored["work_logs"] = [str(value) for value in log_ids.values()]
+
+    day_ids: dict[UUID, UUID] = {}
+    days = WorkDayRepository(session, ctx)
+    for index, row in enumerate(archive.rows.work_days):
+        day_id = _create_preserving_id(
+            session,
+            days,
+            row.id,
+            income_source_id=_mapped_id(income_ids, row.income_source_id, label="income source"),
+            work_date=parse_date(row.work_date),
+            units=Decimal(row.units),
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        day_ids[UUID(row.id)] = day_id
+    restored["work_days"] = [str(value) for value in day_ids.values()]
+    return restored, tax_ids, income_ids, attachment_ids
+
+
+def _restore_recurring(
+    session: Session,
+    ctx: Context,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    category_ids: Mapping[UUID, UUID],
+    loan_ids: Mapping[UUID, UUID],
+    income_ids: Mapping[UUID, UUID],
+    attachment_ids: Mapping[UUID, UUID],
+    transaction_ids: Mapping[UUID, UUID],
+) -> dict[str, list[str]]:
+    """Recreate recurring rules and occurrences; occurrences come after transactions."""
+    restored: dict[str, list[str]] = {}
+    item_ids: dict[UUID, UUID] = {}
+    items = ScheduledItemRepository(session, ctx)
+    for index, row in enumerate(archive.rows.scheduled_items):
+        item_id = _create_preserving_id(
+            session,
+            items,
+            row.id,
+            name=row.name,
+            direction=row.direction,
+            category_id=_mapped_id(category_ids, row.category_id, label="category"),
+            loan_id=_mapped_id(loan_ids, row.loan_id, label="loan") if row.loan_id else None,
+            amount_mode=row.amount_mode,
+            amount_minor=parse_planned_amount(row.amount, row.currency, decimal="dot"),
+            currency=row.currency,
+            start_date=parse_date(row.start_date),
+            end_date=parse_date(row.end_date) if row.end_date else None,
+            max_count=row.max_count,
+            freq=row.freq,
+            interval=row.interval,
+            weekdays=cast("list[int]", json.loads(row.weekdays)),
+            month_day=row.month_day,
+            month=row.month,
+            weekend_policy=row.weekend_policy,
+            notes=row.notes,
+            auto_post=row.auto_post == "true",
+            is_tax=row.is_tax == "true",
+            reminder_lead_days=row.reminder_lead_days,
+            paused_at=parse_timestamp(row.paused_at) if row.paused_at else None,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        item_ids[UUID(row.id)] = item_id
+    restored["scheduled_items"] = [str(value) for value in item_ids.values()]
+
+    occurrence_ids: dict[UUID, UUID] = {}
+    occurrences = ScheduledOccurrenceRepository(session, ctx)
+    ordered = sorted(
+        archive.rows.scheduled_occurrences,
+        key=lambda row: row.parent_occurrence_id is not None,
+    )
+    for index, row in enumerate(ordered):
+        occurrence_id = _create_preserving_id(
+            session,
+            occurrences,
+            row.id,
+            scheduled_item_id=(
+                _mapped_id(item_ids, row.scheduled_item_id, label="scheduled item")
+                if row.scheduled_item_id
+                else None
+            ),
+            income_source_id=(
+                _mapped_id(income_ids, row.income_source_id, label="income source")
+                if row.income_source_id
+                else None
+            ),
+            work_month=parse_month(row.work_month).first_day if row.work_month else None,
+            parent_occurrence_id=(
+                _mapped_id(occurrence_ids, row.parent_occurrence_id, label="parent occurrence")
+                if row.parent_occurrence_id
+                else None
+            ),
+            income_source_tax_rule_id=(
+                _mapped_id(attachment_ids, row.income_source_tax_rule_id, label="tax attachment")
+                if row.income_source_tax_rule_id
+                else None
+            ),
+            direction=row.direction,
+            category_id=_mapped_id(category_ids, row.category_id, label="category"),
+            nominal_date=parse_date(row.nominal_date),
+            due_date=parse_date(row.due_date),
+            expected_minor=parse_planned_amount(row.expected, row.currency, decimal="dot"),
+            currency=row.currency,
+            amount_state=row.amount_state,
+            status=row.status,
+            generated_by=row.generated_by,
+            transaction_id=(
+                _mapped_id(transaction_ids, row.transaction_id, label="transaction")
+                if row.transaction_id
+                else None
+            ),
+            previous_transaction_id=(
+                _mapped_id(transaction_ids, row.previous_transaction_id, label="transaction")
+                if row.previous_transaction_id
+                else None
+            ),
+            rescheduled_at=(parse_timestamp(row.rescheduled_at) if row.rescheduled_at else None),
+            amount_overridden=row.amount_overridden == "true",
+            label=row.label,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        occurrence_ids[UUID(row.id)] = occurrence_id
+    restored["scheduled_occurrences"] = [str(value) for value in occurrence_ids.values()]
+    return restored
+
+
 def _nonnegative_money_minor(value: str, currency: str) -> int:
     return _money_minor(value, currency, allow_zero=True)
 
@@ -2558,6 +2997,14 @@ def _apply_restore(
             import_batch_id=batch.id,
         )
         created_lines += 1
+    restored_m3_ids, _tax_ids, income_ids, attachment_ids = _restore_m3_configuration(
+        session,
+        ctx,
+        batch,
+        archive,
+        restore_now=restore_now,
+        category_ids=category_ids,
+    )
     transactions = TransactionRepository(session, ctx)
     total = len(archive.rows.transactions)
     base = restore_now - timedelta(microseconds=total)
@@ -2585,7 +3032,7 @@ def _apply_restore(
             created_by_user_id=ctx.user.id,
             created_at=base + timedelta(microseconds=index),
             deleted_at=parse_timestamp(row.deleted_at) if row.deleted_at else None,
-            source="investment" if row_id in linked_ledger_ids else "import",
+            source=row.source or ("investment" if row_id in linked_ledger_ids else "import"),
         )
         if row_id is not None:
             transaction_ids[row_id] = transaction.id
@@ -2617,6 +3064,22 @@ def _apply_restore(
         item_ids=networth_item_ids,
     )
     batch.report = {**(batch.report or {}), "restored_loan_ids": restored_loan_ids}
+    recurring_ids = _restore_recurring(
+        session,
+        ctx,
+        archive,
+        restore_now=restore_now,
+        category_ids=category_ids,
+        loan_ids=loan_ids,
+        income_ids=income_ids,
+        attachment_ids=attachment_ids,
+        transaction_ids=transaction_ids,
+    )
+    restored_m3_ids.update(recurring_ids)
+    batch.report = {
+        **(batch.report or {}),
+        "restored_m3_ids": restored_m3_ids,
+    }
     investment_counts, asset_class_ids, instrument_ids = _restore_investments(
         session,
         ctx,
@@ -2659,6 +3122,14 @@ def _apply_restore(
             "transactions": len(archive.rows.transactions),
             "budget_lines": created_lines,
             "months": len(archive.rows.months),
+            "scheduled_items": len(archive.rows.scheduled_items),
+            "scheduled_occurrences": len(archive.rows.scheduled_occurrences),
+            "income_sources": len(archive.rows.income_sources),
+            "tax_rules": len(archive.rows.tax_rules),
+            "tax_rule_versions": len(archive.rows.tax_rule_versions),
+            "income_source_tax_rules": len(archive.rows.income_source_tax_rules),
+            "work_logs": len(archive.rows.work_logs),
+            "work_days": len(archive.rows.work_days),
             "networth_categories": len(archive.rows.networth_categories),
             "networth_items": len(archive.rows.networth_items),
             "item_valuations": len(archive.rows.item_valuations),
@@ -2702,6 +3173,14 @@ def _apply_restore(
         "transactions_created": len(archive.rows.transactions),
         "budget_lines_created": created_lines,
         "months_created": len(archive.rows.months),
+        "scheduled_items_created": len(archive.rows.scheduled_items),
+        "scheduled_occurrences_created": len(archive.rows.scheduled_occurrences),
+        "income_sources_created": len(archive.rows.income_sources),
+        "tax_rules_created": len(archive.rows.tax_rules),
+        "tax_rule_versions_created": len(archive.rows.tax_rule_versions),
+        "income_source_tax_rules_created": len(archive.rows.income_source_tax_rules),
+        "work_logs_created": len(archive.rows.work_logs),
+        "work_days_created": len(archive.rows.work_days),
         "deleted_transactions": deleted,
         "suggested_categories_removed": len(removed),
         "suggested_networth_categories_removed": len(removed_networth),

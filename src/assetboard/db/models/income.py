@@ -94,9 +94,6 @@ class WorkLog(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     )
 
 
-MAX_WORK_DAY_UNITS = 24
-
-
 class WorkDay(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     """One day of the F3.7 work calendar (variable income sources only).
 
