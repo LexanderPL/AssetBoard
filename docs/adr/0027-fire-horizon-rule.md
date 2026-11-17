@@ -38,7 +38,9 @@ earlier retirement age; otherwise future salary would make an early retirement l
 ## Consequences
 
 - The rule can declare FIRE earlier than the capital-preserving rules because spending principal
-  is allowed until the horizon. It is not a safe-withdrawal, longevity or real-capital guarantee.
+  is allowed until the horizon. The projection stays deterministic: it uses the entered constant
+  rates, not a set of market paths, so it is one illustrative path. It is not a safe-withdrawal,
+  longevity or real-capital guarantee.
 - A candidate simulation costs one projection per candidate age. The horizon is capped at age 120
   and all arithmetic stays integer; the normal projection and the other two rules are unchanged.
 - Sensitivity, preview and save use the same rule automatically. The FIRE number and plan-progress

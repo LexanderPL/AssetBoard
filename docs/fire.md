@@ -283,7 +283,8 @@ the configured **Income stops at age**.
   **Income stops at age** and the year before the horizon; it cannot declare FIRE after base
   income has already stopped. Income and expense changes, saving overrides, loans and all other
   assumptions stay as entered. This rule deliberately allows spending principal and is not a
-  perpetual-withdrawal or longevity guarantee.
+  perpetual-withdrawal or longevity guarantee. Like the rest of the plan it uses the entered
+  constant rates, not a set of market paths, so the result is one illustrative projection.
 
 The FIRE number is defined for **Returns cover expenses** and **Withdrawal rate**. **Portfolio
 lasts to the horizon** has no rate-based FIRE number and no net-worth target, so the FIRE-number
