@@ -24,6 +24,7 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.fire import (
     DEFAULT_EXPENSE_FACTORS_BP,
     DEFAULT_RETURN_DELTAS_BP,
+    ILLUSTRATIVE_SWR_BP,
     Rule,
     SensitivityError,
     age_at_start,
@@ -643,7 +644,9 @@ def _detail_values(detail: fire_service.FirePlanDetail, locale: str) -> dict[str
         "real_return": _rate_input(plan.real_return_bp, locale),
         "income_growth": _rate_input(plan.income_growth_bp, locale),
         "rule": plan.rule,
-        "swr": "" if plan.swr_bp is None else _rate_input(plan.swr_bp, locale),
+        # Under a rule that does not store a withdrawal rate, show the illustrative rate so the
+        # inactive field matches its help text. Saving still stores no rate.
+        "swr": _rate_input(plan.swr_bp if plan.swr_bp is not None else ILLUSTRATIVE_SWR_BP, locale),
         "income_manual": format_amount_input(plan.income, locale),
         "expenses_manual": format_amount_input(plan.expenses, locale),
         "portfolio_manual": format_amount_input(plan.portfolio, locale),
@@ -672,6 +675,10 @@ def _form_context(
     posted = values is not None
     if values is None:
         values = _detail_values(detail, locale)
+    elif values.get("rule") != Rule.SWR.value and "swr" not in values:
+        # A disabled withdrawal-rate input is not posted. Keep the illustrative value in the
+        # re-rendered form, matching a fresh edit page; the rate is still never saved.
+        values = {**values, "swr": _rate_input(ILLUSTRATIVE_SWR_BP, locale)}
     currency = detail.plan.currency
     if adjustment_rows is None:
         if posted:

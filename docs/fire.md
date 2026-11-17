@@ -41,8 +41,10 @@ first; **Create plan** never saves values that differ from the review you last s
 
 1. **About you:** birth year (prefilled from your profile for a new plan, editable for this
    plan), horizon age (prefilled from your profile's life expectancy) and the age at which
-   income stops. The page shows your current age and the first and last projected years. A new
-   plan stores its own birth year; changing your profile later does not change an existing plan.
+   income stops. Birth year has its own full-width row; horizon age and the income-stop age share
+   the row below it. The page shows your current age and the first and last projected years. A
+   new plan stores its own birth year; changing your profile later does not change an existing
+   plan.
 2. **Income and expenses:** empty by default. Each field has a suggestion card: **Use suggested
    value** copies the suggestion into the field. The income and expense suggestions use the
    last 12 full calendar months, with the window, months with data and any warnings shown. Both
@@ -258,9 +260,11 @@ withdrawal rate) are illustrative examples, not recommendations.
 
 **Withdrawal rate** is used only when the independence rule is **Withdrawal rate**. With
 **Returns cover expenses** the field stays in the layout but is inactive and disabled; without
-JavaScript it stays enabled, and the server ignores the rate for that rule. The two fields share
-a row below inflation, return above inflation and income growth; there is no separate note
-beside the withdrawal rate.
+JavaScript it stays enabled, and the server ignores the rate for that rule. When the saved plan
+stores no withdrawal rate, edit mode shows the illustrative 4% in the inactive field so it
+matches the help text; the rate is still not stored for that rule. The two fields share a row
+below inflation, return above inflation and income growth; there is no separate note beside the
+withdrawal rate.
 
 ## Adjustments
 

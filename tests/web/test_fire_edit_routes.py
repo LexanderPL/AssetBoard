@@ -1694,6 +1694,45 @@ def test_the_withdrawal_rate_field_is_visible_server_side_without_inline_script(
     assert "onclick=" not in text
 
 
+def test_the_edit_form_shows_the_illustrative_withdrawal_rate_when_none_is_stored(owner) -> None:
+    plan_id = create_plan(owner, rule="returns_cover_expenses", swr="4")
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+    page = owner.client.get("/fire/edit").text
+    assert _input_value(page, "swr") == "4"
+    assert "data-fire-swr-field" in field_html(page, "swr")
+    # A posted rate is ignored under this rule, so saving stores no withdrawal rate.
+    response = owner.post(
+        "/fire/edit", _form(rule="returns_cover_expenses", swr="4"), token_from="/fire/edit"
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+    # With JavaScript the field is disabled and not posted at all; the save still succeeds
+    # and stores no rate.
+    payload = _form()
+    del payload["swr"]
+    response = owner.post("/fire/edit", payload, token_from="/fire/edit")
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp is None
+    # A failed save re-renders the illustrative value in the disabled field.
+    payload = _form(birth_year="1901")
+    del payload["swr"]
+    response = owner.post("/fire/edit", payload, token_from="/fire/edit")
+    assert response.status_code == 400
+    assert _input_value(response.text, "swr") == "4"
+
+
+def test_the_edit_form_shows_a_stored_withdrawal_rate_unchanged(owner) -> None:
+    plan_id = create_plan(owner, rule="swr", swr="3.5")
+    with owner.db() as session:
+        assert session.get_one(FireScenario, plan_id).swr_bp == 350
+    page = owner.client.get("/fire/edit").text
+    assert _input_value(page, "swr") == "3.5"
+    assert 'value="swr" selected' in field_html(page, "rule")
+
+
 def test_a_valid_posted_swr_is_ignored_unless_the_rule_uses_it(owner) -> None:
     plan_id = create_plan(owner)
     response = owner.post(

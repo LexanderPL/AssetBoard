@@ -207,6 +207,25 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
             page.goto(f"{base}/fire", wait_until="networkidle")
             expect(page.locator("[data-fire-wizard]")).to_have_attribute("data-fire-wizard", "1")
             expect(page.locator('[aria-current="step"]')).to_contain_text("About you")
+            birth_box = page.get_by_label("Birth year").bounding_box()
+            horizon_box = page.get_by_label("Horizon age").bounding_box()
+            stop_box = page.get_by_label("Income stops at age").bounding_box()
+            assert birth_box is not None and horizon_box is not None and stop_box is not None
+            # Birth year owns its own full-width row; the two ages share the row below it.
+            assert birth_box["y"] + birth_box["height"] < horizon_box["y"]
+            assert abs(horizon_box["y"] - stop_box["y"]) <= 1
+            assert abs(horizon_box["width"] - stop_box["width"]) <= 1
+            assert birth_box["width"] > horizon_box["width"] * 1.5
+            assert abs(birth_box["x"] - horizon_box["x"]) <= 1
+            # Below the sm breakpoint the age pair stacks and the step still fits the phone.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.wait_for_timeout(200)
+            _no_page_overflow(page)
+            mobile_horizon = page.get_by_label("Horizon age").bounding_box()
+            mobile_stop = page.get_by_label("Income stops at age").bounding_box()
+            assert mobile_horizon is not None and mobile_stop is not None
+            assert mobile_stop["y"] > mobile_horizon["y"]
+            page.set_viewport_size({"width": 1440, "height": 900})
             page.get_by_label("Birth year").fill("1985")
             page.get_by_label("Horizon age").fill("90")
             page.get_by_label("Income stops at age").fill("55")

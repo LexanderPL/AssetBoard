@@ -355,7 +355,8 @@ can keep the weight or remove it, but you cannot add a new allocation to an arch
 
 **Investments → Portfolio** values everything you hold today (quantity above zero), in the
 workspace base currency. It is read-only. The Holdings, By asset class and Risk balance tables
-sit directly on the page, without an outer card frame.
+sit directly on the page, without an outer card frame, and use the same surface background as the
+Transactions history table.
 
 - **Holdings**: instrument, quantity, average cost (cost basis ÷ quantity), the price used with
   its date, value, cost basis, unrealized gain (amount and %) and share of the portfolio.
