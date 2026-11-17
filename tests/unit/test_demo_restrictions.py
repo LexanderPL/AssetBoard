@@ -38,6 +38,7 @@ from assetboard.services import (
     account_email,
     auth,
     invitations,
+    navigation,
     notifications,
     price_refresh,
     price_sources,
@@ -212,6 +213,19 @@ def _profile_link(env: DemoEnv) -> None:
             host=None,
             user_agent=None,
         )
+
+
+def _sidebar_save(env: DemoEnv) -> None:
+    navigation.save_sidebar(
+        env.db.factory,
+        user_id=env.user_id,
+        order=["home", "loans"],
+        visible=["home", "loans"],
+    )
+
+
+def _sidebar_reset(env: DemoEnv) -> None:
+    navigation.reset_sidebar(env.db.factory, user_id=env.user_id)
 
 
 def _profile_unlink(env: DemoEnv) -> None:
@@ -446,6 +460,8 @@ def _totp_disable(env: DemoEnv) -> None:
 
 
 CASES: list[tuple[str, Callable[[DemoEnv], Any]]] = [
+    ("navigation.save_sidebar", _sidebar_save),
+    ("navigation.reset_sidebar", _sidebar_reset),
     ("profile.update_profile", _profile_update),
     ("profile.link_identity_to_user", _profile_link),
     ("profile.unlink_identity", _profile_unlink),
