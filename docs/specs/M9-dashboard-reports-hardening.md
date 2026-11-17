@@ -514,13 +514,15 @@ enable (today Taxes) are still hidden by that feature gate.
   Save sidebar applies the changes. Demo sessions see the existing "Not available in the demo
   workspace." read-only state.
   With JavaScript, the arrows move the row in place and never submit: the page does not reload
-  and nothing is stored until **Save sidebar** is pressed. Save sidebar and Reset to default
-  share one action row; Reset submits the same form to its own route with `formaction`, so it
-  is not a second form below Save. Without JavaScript the arrows stay submit buttons and the
-  server applies the move immediately; a `data-sidebar-nojs-note` note says so and the script
-  removes it when the local reorder is available. Stable hooks:
-  `data-sidebar-settings`, `data-sidebar-list`, `data-sidebar-item`, `data-sidebar-actions`,
-  `data-sidebar-save`, `data-sidebar-reset`, `data-sidebar-move`.
+  and nothing is stored until **Save sidebar** is pressed. Focus stays with the moved row; when
+  the arrow just used becomes disabled at a boundary, focus moves to the other arrow of that
+  row. Save sidebar and Reset to default share one action row; Reset submits the same form to
+  its own route with `formaction`, so it is not a second form below Save. Without JavaScript
+  the arrows stay submit buttons and the server applies the move immediately; a
+  `data-sidebar-nojs-note` note says so and the script removes it when the local reorder is
+  available. Stable hooks: `data-sidebar-settings`, `data-sidebar-list`, `data-sidebar-item`,
+  `data-sidebar-actions`, `data-sidebar-save`, `data-sidebar-reset`, `data-sidebar-move`,
+  `data-sidebar-nojs-note`.
 - **Routes.** `POST /account/sidebar` (`account_sidebar`) and
   `POST /account/sidebar/reset` (`account_sidebar_reset`), both CSRF-protected by the account
   router. A successful save or reset redirects (303) to
@@ -547,9 +549,10 @@ enable (today Taxes) are still hidden by that feature gate.
   (panel state, save/move/reset with CSRF, hidden link absent but URL 200, current marker and
   overdue badge after reorder, Taxes gate and saved position, no-workspace profile, Polish
   labels, demo read-only/403, unknown and missing stored keys); browser (1440 px and 390 px,
-  arrow click and keyboard move reorder in place with no navigation, Save sidebar persists,
-  Save and Reset share one visual row, checkbox + save, reset, both navs same order, no
-  horizontal overflow, and a JavaScript-disabled context that can still save and move).
+  arrow click and keyboard move reorder in place with no navigation or write, focus stays in
+  the moved row at the boundaries, Save sidebar persists, Save and Reset share one visual row,
+  checkbox + save, reset, both navs same order, no horizontal overflow, and a
+  JavaScript-disabled context that can still save and move).
 - No new runtime dependency. No link or control is added to Workspace settings → Menu, and the
   user menu/workspace switcher is unchanged.
 
@@ -571,11 +574,12 @@ plus `tests/web/test_sidebar_routes.py` and `tests/browser/test_sidebar_customiz
 The panel's submit button reads "Save sidebar", so it is distinct from the profile form's own
 "Save" button on the same page, and it shares one action row with "Reset to default". With
 JavaScript (`static/js/sidebar.js`), the arrows move the list rows in place, without navigation
-or a write; only Save sidebar stores the order. Without JavaScript the arrows remain submit
-buttons and apply the move on the server, as the `data-sidebar-nojs-note` note says. A test keeps
-`SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link rules in step with `CANONICAL_KEYS`, and an
-unhandled canonical key raises instead of silently disappearing. No follow-ups beyond the
-existing feature gate for Taxes.
+or a write; only Save sidebar stores the order, and focus stays in the moved row (on the other
+arrow when the used arrow becomes disabled at a boundary). Without JavaScript the arrows remain
+submit buttons and apply the move on the server, as the `data-sidebar-nojs-note` note says. A
+test keeps `SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link rules in step with `CANONICAL_KEYS`,
+and an unhandled canonical key raises instead of silently disappearing. No follow-ups beyond
+the existing feature gate for Taxes.
 
 ---
 
