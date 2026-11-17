@@ -84,6 +84,9 @@ def _oracle(inputs: ProjectionInputs) -> Projection:
                 else:
                     income_exact = Fraction(0)
                 expenses_exact *= inflation
+            elif age >= stop_working_age:
+                # The first row also has no base income when income stops at the current age.
+                income_exact = Fraction(0)
 
             income = _half_up(income_exact)
             for event_year, amount in income_changes.items():
@@ -460,6 +463,20 @@ def test_horizon_rule_validates_without_a_withdrawal_rate() -> None:
     assert result.fire_age == 41
     assert result.fire_number is None
     assert result.plan_progress_bp is None
+
+
+def test_oracle_agrees_when_income_stops_in_the_current_year() -> None:
+    inputs = _edge(
+        rule=Rule.LASTS_TO_HORIZON,
+        horizon_age=43,
+        stop_working_age=41,
+        start_income=_eur(100_000),
+        start_expenses=_eur(50_000),
+        start_portfolio=_eur(0),
+    )
+    result = _assert_matches_oracle(inputs)
+    assert result.rows[0].income == _eur(0)
+    assert result.fire_index is None
 
 
 def test_the_gain_compounds_inflation_and_real_return_exactly() -> None:
