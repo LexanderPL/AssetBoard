@@ -95,7 +95,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M6 | AssetClass, Instrument, InstrumentAllocation, InvestmentTransaction, PricePoint, FxRate, PriceSourceConfig, BondTerms |
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
 | M8 | FireScenario (one plan per workspace in v2), FireEvent, FireLoanSetting; FireContribution is migrated into saving-override events and removed |
-| M9 | ApiToken, BackupRun, DashboardPreference |
+| M9 | DashboardPreference, BackupRun (ApiToken is deferred with F9.5) |
 | M10 | none (reports read existing rows) |
 
 Key fields for the shared entities:
@@ -116,7 +116,7 @@ Key fields for the shared entities:
 | M6 | Investments | M5 | v0.6 |
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner; v2 rework in [M8-fire-planner-v2.md](M8-fire-planner-v2.md) | M2, M6, M7 | v0.8 |
-| M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
+| M9 | Dashboard, reports, export/backup, hardening (API deferred) | all | v1.0 |
 | M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
 
 F9.11 (demo data builder and demo mode) is pulled forward and lands before M7; every later milestone extends its builder.

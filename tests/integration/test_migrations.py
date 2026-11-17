@@ -44,6 +44,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "auth_throttles",
         "budget_lines",
         "categories",
+        "dashboard_preferences",
         "email_tokens",
         "fire_events",
         "fire_loan_settings",
@@ -2518,7 +2519,34 @@ def test_0064_fire_loan_settings_migration_is_reversible(tmp_path: Path) -> None
         assert (("workspace_id", "loan_id"), "loans") in foreign_keys
         command.downgrade(alembic_config(settings), "0063_f88_one_fire_plan")
         assert "fire_loan_settings" not in set(inspect(engine).get_table_names())
-        command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        command.upgrade(alembic_config(settings), "head")
+        assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0065_dashboard_preferences_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'dashboard.db'}",
+    )
+    command.upgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "dashboard_preferences" not in set(inspect(engine).get_table_names())
+        command.upgrade(alembic_config(settings), "0065_f91_dashboard")
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("dashboard_preferences")}
+        assert {"id", "workspace_id", "user_id", "widgets", "customised_at"} <= columns
+        unique = {
+            constraint["name"]
+            for constraint in inspector.get_unique_constraints("dashboard_preferences")
+        }
+        assert "uq_dashboard_preferences_workspace_user" in unique
+        command.downgrade(alembic_config(settings), "0064_f812_fire_loan_settings")
+        assert "dashboard_preferences" not in set(inspect(engine).get_table_names())
+        command.upgrade(alembic_config(settings), "head")
         assert database_is_at_head(settings)
     finally:
         engine.dispose()

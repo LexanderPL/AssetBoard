@@ -183,9 +183,15 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     )
     assert "data-forecast-toggle" not in summary
     # Home keeps its forecast line and second bar (a follow-up), and has no toggle.
-    home = owner.client.get("/").text
-    assert "data-pending-toggle" not in home and "Forecast spent" in home
-    assert "data-pending" not in home
+    home_flow = owner.client.get(
+        "/dashboard/widgets/month-in-out", headers={"HX-Request": "true"}
+    ).text
+    home_plan = owner.client.get(
+        "/dashboard/widgets/month-plan", headers={"HX-Request": "true"}
+    ).text
+    assert "data-pending-toggle" not in home_flow and "Forecast spent" not in home_flow
+    assert "data-pending-toggle" not in home_plan and "Forecast spent" in home_plan
+    assert "data-pending" not in home_flow and "data-pending" not in home_plan
 
 
 def test_pending_over_plan_is_a_softer_hint(rent) -> None:

@@ -1318,6 +1318,7 @@ WORKSPACE_TABLES = {
     "fire_scenarios",
     "fire_events",
     "fire_loan_settings",
+    "dashboard_preferences",
 }
 
 

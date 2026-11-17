@@ -2681,6 +2681,15 @@ msgstr "W tym miesiącu nie ma jeszcze wydatków"
 msgid "No income yet this month"
 msgstr "W tym miesiącu nie ma jeszcze przychodów"
 
+msgid "Unallocated"
+msgstr "Bez przydziału"
+
+msgid "Asset classes"
+msgstr "Klasy aktywów"
+
+msgid "Nothing is valued in the portfolio yet."
+msgstr "W portfelu nie ma jeszcze wycenionych pozycji."
+
 msgid "The password is not correct."
 msgstr "Hasło jest nieprawidłowe."
 
@@ -2693,6 +2702,89 @@ msgid ""
 msgstr ""
 "Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
 "logowania z ostatnich 10 minut."
+
+msgid "Missing price"
+msgstr "Brak ceny"
+
+msgid "Missing FX rate"
+msgstr "Brak kursu walutowego"
+
+msgid "Stale price"
+msgstr "Nieaktualna cena"
+
+msgid "Stale FX rate"
+msgstr "Nieaktualny kurs walutowy"
+
+msgid "This month: in vs out"
+msgstr "Ten miesiąc: wpływy i wydatki"
+
+msgid "The current month's income, spending and what is left."
+msgstr "Przychody, wydatki i pozostała kwota w bieżącym miesiącu."
+
+msgid "This month: expenses by category"
+msgstr "Ten miesiąc: wydatki według kategorii"
+
+msgid "Where this month's spending went."
+msgstr "Na co poszły wydatki w tym miesiącu."
+
+msgid "This month: income by category"
+msgstr "Ten miesiąc: przychody według kategorii"
+
+msgid "Where this month's income came from."
+msgstr "Skąd pochodzą przychody w tym miesiącu."
+
+msgid "This month: planned vs actual"
+msgstr "Ten miesiąc: plan a wykonanie"
+
+msgid "Spending and income against the plan, with the savings rate and forecast."
+msgstr "Wydatki i przychody wobec planu, ze stopą oszczędności i prognozą."
+
+msgid "Upcoming payments"
+msgstr "Nadchodzące płatności"
+
+msgid "Overdue items and payments due in the Upcoming window."
+msgstr "Zaległe pozycje i płatności należne w oknie Nadchodzących."
+
+msgid "The current value and its 12-month trend."
+msgstr "Bieżąca wartość i jej 12-miesięczny trend."
+
+msgid "Portfolio"
+msgstr "Portfel"
+
+msgid "The portfolio value, gain and allocation."
+msgstr "Wartość portfela, zysk i alokacja."
+
+msgid "Portfolio changes"
+msgstr "Zmiany portfela"
+
+msgid "Changes since yesterday and this month, with the largest movers."
+msgstr "Zmiany od wczoraj i od początku miesiąca oraz największe ruchy."
+
+msgid "Loans"
+msgstr "Kredyty"
+
+msgid "Remaining principal, payoff dates and how much is repaid."
+msgstr "Pozostały kapitał, daty spłaty i stopień spłaty."
+
+msgid "FIRE"
+msgstr "FIRE"
+
+msgid "Plan progress and the age at which the plan reaches independence."
+msgstr "Postęp planu i wiek, w którym plan osiąga niezależność."
+
+msgid "Missing data"
+msgstr "Brakujące dane"
+
+msgid "Stale prices, missing work logs and imports waiting to be applied."
+msgstr ""
+"Nieaktualne ceny, brakujące dzienniki pracy i importy oczekujące na "
+"zastosowanie."
+
+msgid "Home saved."
+msgstr "Strona główna została zapisana."
+
+msgid "Home reset to the default widgets."
+msgstr "Strona główna została przywrócona do domyślnych widżetów."
 
 msgid "Check your inbox"
 msgstr "Sprawdź skrzynkę pocztową"
@@ -2758,9 +2850,6 @@ msgstr "Po ostatnim roku planu"
 
 msgid "Saving override in the current year"
 msgstr "Korekta oszczędności w bieżącym roku"
-
-msgid "FIRE"
-msgstr "FIRE"
 
 #, python-format
 msgid "FIRE at age %(age)d (%(year)d)"
@@ -3179,9 +3268,6 @@ msgstr "O Tobie"
 
 msgid "Income and expenses"
 msgstr "Dochody i wydatki"
-
-msgid "Portfolio"
-msgstr "Portfel"
 
 msgid "Assumptions and review"
 msgstr "Założenia i przegląd"
@@ -4946,9 +5032,6 @@ msgstr ""
 "Przelewy własne nie są liczone w planie: ta kategoria nie przyjmuje "
 "wartości planowanych."
 
-msgid "Unallocated"
-msgstr "Bez przydziału"
-
 msgid "Risk targets saved."
 msgstr "Zapisano cele ryzyka."
 
@@ -4963,12 +5046,6 @@ msgstr "Stałe cele muszą sumować się dokładnie do 100%%."
 
 msgid "Set your birth year in Profile before using age-based targets."
 msgstr "Ustaw rok urodzenia w profilu, zanim użyjesz celów zależnych od wieku."
-
-msgid "Asset classes"
-msgstr "Klasy aktywów"
-
-msgid "Nothing is valued in the portfolio yet."
-msgstr "W portfelu nie ma jeszcze wycenionych pozycji."
 
 msgid "Holdings by instrument"
 msgstr "Pozycje według instrumentu"
@@ -5599,9 +5676,6 @@ msgstr[2] "%(num)d zaległych wystąpień"
 msgid "Recurring"
 msgstr "Cykliczne"
 
-msgid "Loans"
-msgstr "Kredyty"
-
 msgid "FIRE projection"
 msgstr "Prognoza FIRE"
 
@@ -5662,32 +5736,28 @@ msgstr "Kontynuuj"
 msgid "Cancel"
 msgstr "Anuluj"
 
-msgid "This month"
-msgstr "Ten miesiąc"
-
-msgid "All upcoming items"
-msgstr "Wszystkie nadchodzące pozycje"
-
-msgid "Estimate"
-msgstr "Szacunkowa"
-
-msgid "Mark paid or received"
-msgstr "Oznacz jako opłacone lub otrzymane"
-
-msgid "Save transaction"
-msgstr "Zapisz transakcję"
-
-msgid "Skip"
-msgstr "Pomiń"
-
-msgid "More items are waiting on the Upcoming page."
-msgstr "Więcej pozycji czeka na stronie Nadchodzące."
+msgid "Customise"
+msgstr "Dostosuj"
 
 #, python-format
-msgid "Nothing is overdue or due in the next %(days)d days."
-msgstr ""
-"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
-"dni."
+msgid "Loading %(widget)s…"
+msgstr "Ładowanie: %(widget)s…"
+
+msgid "This widget could not load. Open it instead."
+msgstr "Nie udało się wczytać widżetu. Otwórz go bezpośrednio."
+
+#, python-format
+msgid "Open %(widget)s"
+msgstr "Otwórz: %(widget)s"
+
+msgid "Your Home is empty"
+msgstr "Twoja strona główna jest pusta"
+
+msgid "Choose the widgets you want to see."
+msgstr "Wybierz widżety, które chcesz widzieć."
+
+msgid "Customise Home"
+msgstr "Dostosuj stronę główną"
 
 msgid "Link a sign-in method"
 msgstr "Powiąż metodę logowania"
@@ -6386,6 +6456,166 @@ msgstr "Usuń"
 msgid "Add category"
 msgstr "Dodaj kategorię"
 
+msgid "Back to Home"
+msgstr "Wróć do strony głównej"
+
+msgid ""
+"Choose the widgets you want on Home and their order. New widgets added in"
+" a later release appear here, but stay off until you choose them."
+msgstr ""
+"Wybierz widżety na stronie głównej i ich kolejność. Nowe widżety z "
+"późniejszych wersji pojawią się tutaj, ale pozostaną wyłączone, dopóki "
+"ich nie wybierzesz."
+
+msgid "You are using the default layout."
+msgstr "Używasz domyślnego układu."
+
+#, python-format
+msgid "Move %(widget)s up"
+msgstr "Przesuń %(widget)s w górę"
+
+msgid "Move up"
+msgstr "Przesuń w górę"
+
+#, python-format
+msgid "Move %(widget)s down"
+msgstr "Przesuń %(widget)s w dół"
+
+msgid "Move down"
+msgstr "Przesuń w dół"
+
+#, python-format
+msgid "%(num)d widget selected"
+msgid_plural "%(num)d widgets selected"
+msgstr[0] "%(num)d wybrany widżet"
+msgstr[1] "%(num)d wybrane widżety"
+msgstr[2] "%(num)d wybranych widżetów"
+
+msgid "Save Home"
+msgstr "Zapisz stronę główną"
+
+msgid "Reset to default"
+msgstr "Przywróć domyślne"
+
+msgid "No FIRE plan yet."
+msgstr "Nie ma jeszcze planu FIRE."
+
+msgid "Set up FIRE"
+msgstr "Skonfiguruj FIRE"
+
+msgid "The plan cannot be projected right now."
+msgstr "Nie można teraz prognozować planu."
+
+msgid "Review the plan"
+msgstr "Sprawdź plan"
+
+msgid "Plan progress"
+msgstr "Postęp planu"
+
+msgid "FIRE age"
+msgstr "Wiek FIRE"
+
+#, python-format
+msgid "Payoff %(date)s"
+msgstr "Data spłaty %(date)s"
+
+#, python-format
+msgid "%(rate)s repaid"
+msgstr "%(rate)s spłacone"
+
+#, python-format
+msgid "%(num)d more loan"
+msgid_plural "%(num)d more loans"
+msgstr[0] "%(num)d kolejny kredyt"
+msgstr[1] "%(num)d kolejne kredyty"
+msgstr[2] "%(num)d kolejnych kredytów"
+
+msgid "No active loans yet."
+msgstr "Brak aktywnych kredytów."
+
+msgid "Set up loans"
+msgstr "Skonfiguruj kredyty"
+
+msgid "Nothing needs attention."
+msgstr "Nic nie wymaga uwagi."
+
+msgid "Prices and FX"
+msgstr "Ceny i kursy walut"
+
+msgid "Missing work logs"
+msgstr "Brakujące dzienniki pracy"
+
+msgid "Imports waiting to be applied"
+msgstr "Importy oczekujące na zastosowanie"
+
+msgid "Open month"
+msgstr "Otwórz miesiąc"
+
+msgid "Add an expense category and an entry to see this chart."
+msgstr "Dodaj kategorię wydatków i wpis, aby zobaczyć ten wykres."
+
+msgid "Add an income category and an entry to see this chart."
+msgstr "Dodaj kategorię przychodów i wpis, aby zobaczyć ten wykres."
+
+msgid "Monthly values"
+msgstr "Wartości miesięczne"
+
+msgid "No values are counted for this range."
+msgstr "Dla tego zakresu nie są liczone żadne wartości."
+
+msgid "No values yet. Add an item and its first value to see the trend."
+msgstr "Brak wartości. Dodaj pozycję i jej pierwszą wartość, aby zobaczyć trend."
+
+msgid "Set up net worth"
+msgstr "Skonfiguruj majątek netto"
+
+msgid "No holdings are valued yet."
+msgstr "Żadne pozycje nie są jeszcze wycenione."
+
+msgid "Set up investments"
+msgstr "Skonfiguruj inwestycje"
+
+#, python-format
+msgid "Since yesterday (%(date)s)"
+msgstr "Od wczoraj (%(date)s)"
+
+#, python-format
+msgid "Since %(date)s"
+msgstr "Od %(date)s"
+
+msgid "Largest movers"
+msgstr "Największe zmiany"
+
+msgid "No holding changed since yesterday."
+msgstr "Żadna pozycja nie zmieniła się od wczoraj."
+
+msgid "No portfolio history yet. Add investment transactions and prices."
+msgstr "Brak historii portfela. Dodaj transakcje inwestycyjne i ceny."
+
+msgid "All upcoming items"
+msgstr "Wszystkie nadchodzące pozycje"
+
+msgid "Estimate"
+msgstr "Szacunkowa"
+
+msgid "Mark paid or received"
+msgstr "Oznacz jako opłacone lub otrzymane"
+
+msgid "Save transaction"
+msgstr "Zapisz transakcję"
+
+msgid "Skip"
+msgstr "Pomiń"
+
+msgid "More items are waiting on the Upcoming page."
+msgstr "Więcej pozycji czeka na stronie Nadchodzące."
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
+"dni."
+
 msgid "Hello,"
 msgstr "Dzień dobry,"
 
@@ -6853,9 +7083,6 @@ msgstr ""
 "Wszystkie kwoty są nominalne: rzeczywiste pieniądze z danego roku, bez "
 "korekty o inflację."
 
-msgid "FIRE age"
-msgstr "Wiek FIRE"
-
 msgid ""
 "The age at which the plan first meets its independence rule. The year is "
 "shown beside it."
@@ -6914,9 +7141,6 @@ msgstr "Portfel wystarcza do końca horyzontu."
 
 msgid "Not checked: no years after income stops fall inside the horizon."
 msgstr "Nie sprawdzono: w horyzoncie nie ma lat po zakończeniu dochodów."
-
-msgid "Plan progress"
-msgstr "Postęp planu"
 
 #, python-format
 msgid ""
@@ -8818,12 +9042,6 @@ msgstr "Brak ceny: pozycja nie jest wliczana do sum."
 msgid "No %(currency)s FX rate: not included in the totals."
 msgstr "Brak kursu %(currency)s: pozycja nie jest wliczana do sum."
 
-msgid "Stale price"
-msgstr "Nieaktualna cena"
-
-msgid "Stale FX rate"
-msgstr "Nieaktualny kurs walutowy"
-
 msgid "Bond terms needed"
 msgstr "Potrzebne warunki obligacji"
 
@@ -9520,10 +9738,6 @@ msgstr "Saldo początkowe %(amount)s"
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr "Wypłacono %(drawn)s z %(approved)s · %(undrawn)s niewypłacone"
-
-#, python-format
-msgid "Payoff %(date)s"
-msgstr "Data spłaty %(date)s"
 
 #, python-format
 msgid "Interest-only for the first %(months)d months."
@@ -11182,15 +11396,15 @@ msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
 msgid "Earned"
 msgstr "Zarobione"
 
-#, python-format
-msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
-msgstr "Prognoza wydatków %(spent)s · prognoza przychodów %(earned)s."
-
 msgid "Spent"
 msgstr "Wydane"
 
 msgid "Left"
 msgstr "Zostało"
+
+#, python-format
+msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
+msgstr "Prognoza wydatków %(spent)s · prognoza przychodów %(earned)s."
 
 #, python-format
 msgid "Saved / invested %(rate)s of income"
@@ -11675,9 +11889,6 @@ msgstr ""
 "Minione końce miesięcy korzystają z historii wartości, powiązanych "
 "pozycji i cen; dzisiejsza wartość jest bieżąca."
 
-msgid "Monthly values"
-msgstr "Wartości miesięczne"
-
 msgid "Breakdown"
 msgstr "Szczegóły"
 
@@ -11687,9 +11898,6 @@ msgid ""
 msgstr ""
 "Dla tego zakresu nie są liczone żadne wartości. Ostrzeżenia poniżej "
 "wyjaśniają pozycje, które nie zostały uwzględnione."
-
-msgid "No values yet. Add an item and its first value to see the trend."
-msgstr "Brak wartości. Dodaj pozycję i jej pierwszą wartość, aby zobaczyć trend."
 
 msgid "New channel"
 msgstr "Nowy kanał"
@@ -12054,9 +12262,6 @@ msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
 
 msgid "No more occurrences match this rule."
 msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
-
-msgid "Upcoming payments"
-msgstr "Nadchodzące płatności"
 
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
@@ -15048,4 +15253,10 @@ msgstr "Usuń obszar roboczy…"
 #~ " zakończeniu dochodów są wyciszone; "
 #~ "wyczerpany wiersz jest oznaczony na "
 #~ "czerwono."
+
+#~ msgid "PricepriceFX rate"
+#~ msgstr "Dostawca cen"
+
+#~ msgid "Stale prices"
+#~ msgstr "Nieaktualne ceny"
 

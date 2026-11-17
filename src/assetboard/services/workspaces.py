@@ -44,6 +44,7 @@ from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
+    DashboardPreferenceRepository,
     InvitationRepository,
     MembershipRepository,
     NotificationChannelRepository,
@@ -402,6 +403,7 @@ def remove_member(factory: sessionmaker[Session], ctx: Context, *, membership_id
         memberships.delete(target)
         # Their reminder channels hold secrets for this workspace only (ADR-0021).
         NotificationChannelRepository(session, ctx).delete_for_user(target.user_id)
+        DashboardPreferenceRepository(session, ctx).delete_for_user(target.user_id)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="member.removed",

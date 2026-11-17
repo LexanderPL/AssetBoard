@@ -79,6 +79,7 @@ from assetboard.web.audit_routes import router as audit_router
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.category_routes import router as category_router
 from assetboard.web.context import load_workspace_nav
+from assetboard.web.dashboard_routes import router as dashboard_router
 from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
@@ -378,6 +379,7 @@ def create_app(
     mimetypes.add_type("image/svg+xml", ".svg")
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
+    app.include_router(dashboard_router)
     app.include_router(scheduled_router)
     app.include_router(upcoming_router)
     app.include_router(tax_router)

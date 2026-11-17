@@ -20,6 +20,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from assetboard.db.models.dashboard import DashboardPreference
 from assetboard.db.models.fire import FireEvent, FireLoanSetting, FireScenario
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
@@ -81,6 +82,15 @@ def _user(session: Session) -> User:
 
 def make_membership(session: Session, workspace_id: UUID) -> Membership:
     return Membership(workspace_id=workspace_id, user_id=_user(session).id, role="viewer")
+
+
+def make_dashboard_preference(session: Session, workspace_id: UUID) -> DashboardPreference:
+    return DashboardPreference(
+        workspace_id=workspace_id,
+        user_id=_user(session).id,
+        widgets=["month-in-out", "upcoming"],
+        customised_at=session.info["clock"].now(),
+    )
 
 
 def make_audit_event(session: Session, workspace_id: UUID) -> AuditEvent:
@@ -870,6 +880,9 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
     Membership: TenantCase(make_membership, update_values={"role": "editor"}),
+    DashboardPreference: TenantCase(
+        make_dashboard_preference, update_values={"widgets": ["month-in-out"]}
+    ),
     AuditEvent: TenantCase(make_audit_event, unsupported=frozenset({"update", "delete"})),
     # Invitations change only through named transitions (revoke, mark_used, ...).
     Invitation: TenantCase(make_invitation, unsupported=frozenset({"update", "delete"})),

@@ -1,12 +1,14 @@
-# M9 — Dashboard, reports, backup/export, API and hardening → v1.0
+# M9 — Dashboard, reports, backup/export and hardening → v1.0
 
-**Goal:** make the app pleasant to live in and safe to expose in a homelab: an at-a-glance dashboard, reports, full export and backups, a read/write API with tokens, security hardening, a phone-ready installable web app, documentation and a polished release.
+**Goal:** make the app pleasant to live in and safe to expose in a homelab: an at-a-glance dashboard, reports, full export and backups, security hardening, a phone-ready installable web app, documentation and a polished release. The read/write API and tokens (F9.5) are deferred after v1.0 (owner, 2026-11-17); v1.0 ships without it.
 
 **Exit criteria:** a new user can install from the compose file, import their history in the documented archive format of M4 (or start fresh), and use every module; backups and restores are tested; a security checklist is completed; docs cover install, reverse proxies, SSO, backup/restore and upgrade; `v1.0.0` is tagged and the multi-arch image is published.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
-**Data model (sketch):** `ApiToken(id, workspace_id, user_id, name, token_hash, scopes[read|write], last_used_at, expires_at?, revoked_at?)`; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, widgets JSON, customised_at?)`, where `widgets` is the ordered list of enabled widget keys (F9.1).
+**Data model (sketch):** `ApiToken(...)` is deferred with F9.5; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, widgets JSON, customised_at?)`, where `widgets` is the ordered list of enabled widget keys (F9.1).
+
+**Scope decisions (owner, 2026-11-17):** F9.1 does **not** implement privacy mode; the bullet is removed from its acceptance. F9.5 (REST API and tokens) is deferred after v1.0 and is not part of the v1.0 release. The rest of M9 is unchanged.
 
 ---
 
@@ -14,7 +16,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **After F2.7 (owner, 2026-10-25):** the dashboard is the Home page (`/`) built in F2.7, which
 already shows the current month (flow bar, category donuts) and upcoming items. F9.1 adds the
-remaining module cards, hiding/reordering and privacy mode to that page; the "This month" and
+remaining module cards and hiding/reordering to that page; the "This month" and
 "Upcoming" cards are F2.7's blocks, not new ones.
 
 **Configurable widgets (owner, 2026-11-02, pre-1.0):** every user chooses what their Home page
@@ -55,7 +57,6 @@ and orders them. A widget is the same thing as a "card" in the rest of this spec
 - **Loading.** Each widget is its own HTMX fragment (lazy-loaded), so a slow widget never blocks
   the page. Every figure comes from existing services (no duplicated math). On a phone, widgets
   stack in the chosen order in one column.
-- **Privacy mode.** A toggle hides amounts everywhere; it is persisted per user.
 
 **Agent prompt**
 ```
@@ -63,10 +64,32 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F9.1 from docs/specs/M9-dashboard-reports-hardening.md: Home built from a widget registry (catalogue), lazy-loaded
 widget fragments calling existing services, a "Customise" picker (enable, order with up/down buttons, reset to default)
 stored per user and workspace (model + migration), defaults for users who never customised, graceful
-empty states, privacy mode. No new finance math.
+empty states. No new finance math.
 Tests: each widget renders with data and without; preferences persist per user and workspace; unknown stored widget keys are
 ignored; defaults and newly shipped widgets follow the rules above; reordering works without JavaScript.
 ```
+
+**As built (F9.1, 2026-11-17)**
+
+- Home is a shell of ordered widget placeholders; each widget is its own lazy HTMX fragment
+  (`GET /dashboard/widgets/{key}`). The widgets and their keys are:
+  `month-in-out`, `month-expenses`, `month-income`, `month-plan`, `upcoming`, `net-worth`,
+  `portfolio`, `portfolio-changes`, `loans`, `fire`, `missing-data`.
+- `DashboardPreference` stores the ordered enabled keys per (workspace, user). No row means the
+  default catalogue (all shipped widgets). A saved row keeps later widgets off until chosen;
+  unknown or corrupt stored keys are ignored.
+- `GET /dashboard/customise` is a plain form: checkboxes, up/down buttons that rerender the draft
+  without writing, Save and Reset. It works without JavaScript.
+- The old Home KPI block is split into "This month: in vs out" (the flow bar) and "This month:
+  planned vs actual" (the plan bars, savings rate and forecast), so the two widgets do not repeat
+  figures. The Upcoming block keeps its existing two-step confirm form.
+- Net worth, portfolio, loans and FIRE widgets reuse the existing module services; the portfolio
+  changes widget reuses F6.7's historical valuation and computes only differences and ratios.
+  The loans widget shows up to three active loans with `LoanListFigures.payoff_date`.
+- Missing data composes the existing portfolio price read (stale or absent prices and FX
+  rates), `income.missing_work_logs` and planned import batches (the last only for editors and
+  owners).
+- Privacy mode was removed from F9.1 by the owner on 2026-11-17 and is not implemented.
 
 ---
 
@@ -105,7 +128,7 @@ closes the gaps before 1.0.
 - The M4 archive coverage test passes with every workspace-owned model either archived or
   excluded with a reason; the exclusion list is reviewed and documented in
   docs/archive-format.md.
-- **Secrets** (notification URLs, price-provider keys, API tokens) stay out of the archive
+- **Secrets** (notification URLs and price-provider keys; API tokens when F9.5 ships) stay out of the archive
   unless the owner ticks "include secrets"; they are then written to a separate member encrypted
   with a passphrase (algorithm and any new dependency justified in the PR, per AGENTS.md) and
   restored only with that passphrase. A minor format version per ADR-0016.
@@ -145,6 +168,9 @@ Tests: backup of a DB under concurrent writes is consistent; restore round-trip;
 
 ## F9.5 REST API and tokens
 
+**Deferred (owner, 2026-11-17).** Not part of v1.0. The acceptance below is kept for the
+after-1.0 API work.
+
 **Acceptance**
 - Versioned `/api/v1` JSON API over the existing services (no logic duplicated): transactions, categories, month summary, scheduled occurrences (list/confirm/skip), net-worth summary, portfolio summary, loan summary, FIRE results.
 - API tokens: created in the UI, shown once, stored hashed, scoped `read` or `write`, optional expiry, revocable; `Authorization: Bearer`; last-used tracking; per-token rate limit.
@@ -167,7 +193,7 @@ Include a docs/api.md with curl examples.
 **Acceptance**
 - Written checklist `docs/security-checklist.md` (based on OWASP ASVS level 1 categories) with each item marked done/not-applicable and a link to the test or code.
 - CSRF coverage test (every non-GET HTML route rejects missing tokens); authorization matrix test (role × route); session fixation and logout tests; secure cookie flags per `BASE_URL` scheme; CSP and security headers verified by tests; no stack traces in production responses.
-- Login/API rate limiting verified; password-reset tokens single-use and expiring.
+- Login rate limiting verified; password-reset tokens single-use and expiring.
 - `pip-audit` and container image scan (e.g., Trivy) in CI as non-blocking → blocking for high severity; SBOM generated on release.
 - Container: non-root, read-only root filesystem tested, no shell tools beyond what's needed, dropped capabilities documented in the compose example.
 - Dependency and license review: all runtime deps compatible with AGPL-3.0-or-later; `THIRD_PARTY_LICENSES` generated.

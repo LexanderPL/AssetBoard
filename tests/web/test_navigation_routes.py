@@ -3,6 +3,7 @@ old addresses and the sidebar."""
 
 from __future__ import annotations
 
+import html as html_module
 import json
 import re
 from uuid import UUID
@@ -43,9 +44,20 @@ def _add(app: OwnerApp, category: UUID, amount: str, direction: str = "expense")
     assert app.post(f"{MONTH}/transactions", form, token_from=MONTH).status_code == 303
 
 
-def _chart(html: str, key: str) -> dict:
+def _fragment(app: OwnerApp, key: str) -> str:
+    response = app.client.get(f"/dashboard/widgets/{key}", headers={"HX-Request": "true"})
+    assert response.status_code == 200
+    return response.text
+
+
+def _chart(page: str, key: str) -> dict:
+    inline = re.search(rf"data-donut=\"{key}\".*?data-chart-json='([^']*)'", page, re.DOTALL)
+    if inline is not None:
+        return json.loads(html_module.unescape(inline.group(1)))
     match = re.search(
-        rf'<script type="application/json" id="chart-{key}-data">(.*?)</script>', html, re.DOTALL
+        rf'<script type="application/json" id="chart-{key}-data">(.*?)</script>',
+        page,
+        re.DOTALL,
     )
     assert match is not None
     return json.loads(match.group(1))
@@ -66,11 +78,17 @@ def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     html = nav.client.get("/").text
     assert ">Home</h1>" in html
     assert '<p class="text-sm font-medium text-primary-ink" data-home-month>March 2026</p>' in html
+    assert "data-customise-link" in html
+    assert html.count('data-widget="') == 11
     assert "data-open-month" not in html and "Open month" not in html
-    assert "data-summary-kpis" in html and 'data-flow-segment="empty"' in html
-    assert "No expenses yet this month" in html and "No income yet this month" in html
-    assert 'type="application/json"' not in html  # no chart without slices
-    assert "Nothing is overdue or due in the next 30 days." in html
+    flow = _fragment(nav, "month-in-out")
+    assert "data-summary-kpis" in flow and 'data-flow-segment="empty"' in flow
+    expenses = _fragment(nav, "month-expenses")
+    income = _fragment(nav, "month-income")
+    assert "No expenses yet this month" in expenses
+    assert "No income yet this month" in income
+    assert "data-chart-json" not in expenses  # no chart without slices
+    assert "Nothing is overdue or due in the next 30 days." in _fragment(nav, "upcoming")
     assert 'data-home-link aria-current="page"' in html
 
 
@@ -84,18 +102,20 @@ def test_home_charts_match_the_summary_and_have_tables(nav: OwnerApp) -> None:
     _add(nav, savings, "500")
     _add(nav, salary, "2000", "income")
     html = nav.client.get("/").text
-    expense = _chart(html, "expense")
+    expenses_html = _fragment(nav, "month-expenses")
+    income_html = _fragment(nav, "month-income")
+    expense = _chart(expenses_html, "expense")
     assert expense["currency"] == "EUR" and expense["total"] == "€100.00"
     assert [(s["name"], s["value"], s["amount"], s["share"], s["color"])
             for s in expense["slices"]] == [
         ("Rent", 7500, "€75.00", "75.0%", "#16a34a"),
         ("Food", 2500, "€25.00", "25.0%", "#ff0000"),
     ]  # fmt: skip
-    assert [s["name"] for s in _chart(html, "income")["slices"]] == ["Salary"]
+    assert [s["name"] for s in _chart(income_html, "income")["slices"]] == ["Salary"]
     assert "Broker" not in json.dumps(expense)  # no "Saved / invested" slice
     # The canvas is hidden from assistive technology; the table carries the same numbers.
-    assert re.search(r"hidden aria-hidden=\"true\" data-chart-canvas", html)
-    table = re.search(r'<section [^>]*data-donut="expense".*?</section>', html, re.DOTALL)
+    assert re.search(r"hidden aria-hidden=\"true\" data-chart-canvas", expenses_html)
+    table = re.search(r'<section [^>]*data-donut="expense".*?</section>', expenses_html, re.DOTALL)
     assert table is not None and "data-chart-table" in table.group(0)
     assert re.findall(r"<td[^>]*>([^<]+)</td>", table.group(0)) == [
         "€75.00", "75.0%", "€25.00", "25.0%",
@@ -106,7 +126,7 @@ def test_home_charts_match_the_summary_and_have_tables(nav: OwnerApp) -> None:
 def test_home_upcoming_items_for_editors_and_viewers(nav: OwnerApp) -> None:
     rent = _category(nav, "Rent")
     _recurring(nav, rent)
-    html = nav.client.get("/").text
+    html = _fragment(nav, "upcoming")
     items = re.findall(r"<li [^>]*data-occurrence=\"([0-9a-f-]+)\"([^>]*)>", html)
     assert items and len(items) <= 10
     assert any("data-overdue" in attrs for _, attrs in items)  # January to March, overdue
@@ -125,7 +145,7 @@ def test_home_upcoming_items_for_editors_and_viewers(nav: OwnerApp) -> None:
                          token_from="/")  # fmt: skip
     assert elsewhere.headers["location"] == "/upcoming"
     nav.set_admin_role("viewer")
-    viewer = nav.client.get("/").text
+    viewer = _fragment(nav, "upcoming")
     assert "data-occurrence=" in viewer
     assert "data-home-post" not in viewer and "data-home-skip" not in viewer
 
@@ -134,7 +154,7 @@ def test_home_upcoming_list_is_capped_at_ten(nav: OwnerApp) -> None:
     rent = _category(nav, "Rent")
     for name in ("Rent", "Gym", "Phone", "Water", "Power", "Gas"):
         _recurring(nav, rent, name)  # three occurrences each (January to March)
-    html = nav.client.get("/").text
+    html = _fragment(nav, "upcoming")
     assert len(re.findall(r"<li [^>]*data-occurrence=", html)) == 10
     assert "More items are waiting on the Upcoming page." in html
 

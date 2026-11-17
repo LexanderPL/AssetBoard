@@ -314,7 +314,7 @@ def test_upcoming_page_shows_a_monthly_item_due_in_twenty_days(owner):
     panel = page.index('class="panel divide-y divide-line"', week_start)
     assert week_start < heading < panel
     # Home uses the same window (it was a hard-coded week).
-    home = owner.client.get("/").text
+    home = owner.client.get("/dashboard/widgets/upcoming", headers={"HX-Request": "true"}).text
     assert re.search(r'<li [^>]*data-occurrence="[0-9a-f-]+"', home)
     assert 'datetime="2026-03-21"' in home
 
@@ -339,7 +339,7 @@ def test_workspace_upcoming_window_applies_to_upcoming_and_home(owner):
     assert 'value="10"' in owner.client.get("/workspace/settings").text
     page = owner.client.get("/upcoming").text
     assert "the next 10 days" in page and 'datetime="2026-03-21"' not in page
-    home = owner.client.get("/").text
+    home = owner.client.get("/dashboard/widgets/upcoming", headers={"HX-Request": "true"}).text
     assert 'datetime="2026-03-21"' not in home
     assert "Nothing is overdue or due in the next 10 days." in home
 

@@ -117,10 +117,11 @@ def test_context_falls_back_when_the_selected_workspace_is_not_a_membership(
 def test_home_page_uses_the_workspace_currency(signed: Signed) -> None:
     # The instance default (DEFAULT_CURRENCY) stays EUR; only the workspace currency changes.
     assert signed.app.state.settings.default_currency == "EUR"
-    assert "€0.00" in signed.client.get("/").text
+    fragment = signed.client.get("/dashboard/widgets/month-in-out", headers={"HX-Request": "true"})
+    assert fragment.status_code == 200 and "€0.00" in fragment.text
     with signed.db() as session, session.begin():
         session.execute(update(Workspace).values(base_currency="JPY"))
-    page = signed.client.get("/")
+    page = signed.client.get("/dashboard/widgets/month-in-out", headers={"HX-Request": "true"})
     assert page.status_code == 200
     assert "￥0" in page.text and "€" not in page.text  # native style: ja_JP
 

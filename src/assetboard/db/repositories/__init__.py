@@ -15,6 +15,7 @@ from assetboard.db.repositories.base import (
 )
 from assetboard.db.repositories.budget_line import BudgetLineRepository, LineUsage
 from assetboard.db.repositories.category import CategoryRepository
+from assetboard.db.repositories.dashboard import DashboardPreferenceRepository
 from assetboard.db.repositories.fire import (
     FireEventRepository,
     FireLoanSettingRepository,
@@ -137,6 +138,7 @@ __all__ = [
     "BudgetLineRepository",
     "CategoryCounts",
     "CategoryRepository",
+    "DashboardPreferenceRepository",
     "InstanceAuditReader",
     "CurrentWorkspaceRepository",
     "DescriptionMatch",

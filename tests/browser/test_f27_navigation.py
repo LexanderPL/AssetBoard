@@ -128,7 +128,7 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             today = page.locator("[data-home]").get_attribute("data-month") or ""
             assert re.fullmatch(r"\d{4}-\d{2}", today)
 
-            # Home without data: empty states, no chart.
+            # Home without data: the lazy donut fragments show their empty states.
             expect(page.locator("[data-chart-empty]")).to_have_count(2)
             expect(page.locator("[data-home-link]")).to_have_attribute("aria-current", "page")
 
@@ -155,8 +155,10 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_url(f"{base}/transactions/{target}")
             page.go_back()
 
-            # Home: the flow bar and both donuts are drawn; the tables become sr-only.
+            # Home: the flow bar and both lazy donuts are drawn; the tables become sr-only.
             page.goto(f"{base}/")
+            expect(page.locator("[data-donut='expense']")).to_have_count(1)
+            expect(page.locator("[data-donut='income']")).to_have_count(1)
             for key in ("expense", "income"):
                 donut = page.locator(f"[data-donut='{key}']")
                 expect(donut.locator("[data-chart]")).to_have_attribute("data-chart-ready", "true")

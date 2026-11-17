@@ -122,14 +122,14 @@
 {%- endmacro %}
 
 {# Home's flow bar (F2.4). #}
-{% macro flow_svg(f, n, attrs="", extra_class="") -%}
+{% macro flow_svg(f, n, attrs="", extra_class="", pattern_id="flow-overspend-hatch") -%}
 {% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
 <svg class="mt-2 h-6 w-full overflow-visible{% if extra_class %} {{ extra_class }}{% endif %}" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar{{ attrs|safe }}>
   {% if f.empty %}
   <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-flow-segment="empty"></rect>
   {% else %}
   <defs>
-    <pattern id="flow-overspend-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <pattern id="{{ pattern_id }}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect x="0" y="0" width="8" height="8" class="fill-danger-tint"></rect>
       <rect x="0" y="0" width="4" height="8" class="fill-danger"></rect>
     </pattern>
@@ -138,21 +138,20 @@
   {% if f.saved_end > f.spent_end %}<rect x="{{ f.spent_end }}" y="0" width="{{ f.saved_end - f.spent_end }}" height="24" class="fill-primary stroke-surface" {{ seg|safe }} data-flow-segment="saved"></rect>{% endif %}
   {% if f.left > 0 %}<rect x="{{ f.saved_end }}" y="0" width="{{ f.left }}" height="24" class="fill-success stroke-surface" {{ seg|safe }} data-flow-segment="left"></rect>{% endif %}
   {% if f.overspent > 0 %}
-  <rect x="{{ f.earned_end }}" y="0" width="{{ f.overspent }}" height="24" fill="url(#flow-overspend-hatch)" class="stroke-surface" {{ seg|safe }} data-flow-segment="overspent"></rect>
+  <rect x="{{ f.earned_end }}" y="0" width="{{ f.overspent }}" height="24" fill="url(#{{ pattern_id }})" class="stroke-surface" {{ seg|safe }} data-flow-segment="overspent"></rect>
   <line x1="{{ f.earned_end }}" x2="{{ f.earned_end }}" y1="-4" y2="28" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-flow-earned></line>
   {% endif %}
   {% endif %}
 </svg>
 {%- endmacro %}
 
-{# Home: the flow bar of earnings, the forecast line and bar, and the spent and earned bars. #}
-{% macro kpis(oob=false) -%}
+{# Home (F9.1): the flow bar widget. Planned values, savings rate and the forecast are the
+   separate "planned vs actual" widget, so the two cards never repeat the same figures. #}
+{% macro home_flow() -%}
 {% set k = summary.kpis %}
 {% set f = k.flow %}
 {% set n = k.flow_scale %}
-{# Separators between the segments stay 2px wide however the bar stretches. #}
-{% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
-<div id="summary-kpis" class="mt-4 space-y-5" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+<div id="summary-kpis" class="mt-4 space-y-5" data-summary-kpis>
   <div data-flow>
     <p class="sr-only" data-flow-summary>{{ _("Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left %(net)s.", earned=k.earned, spent=k.spent, saved=k.saved, net=k.net) }}{% if k.overspend %} {{ _("Spending and saving exceed earnings by %(amount)s.", amount=k.overspend) }}{% endif %}</p>
     <dl class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1" aria-hidden="true">
@@ -162,18 +161,6 @@
       </div>
     </dl>
     {{ flow_svg(f, n) }}
-    <p class="mt-3 text-sm text-muted" data-forecast-line>{{ _("Forecast spent %(spent)s · forecast earned %(earned)s.", spent=k.forecast_spent, earned=k.forecast_earned) }}</p>
-    {% set ff = k.forecast_flow %}
-    <svg class="mt-2 h-4 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar>
-      {% if ff.empty %}
-      <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
-      {% else %}
-      {% if ff.spent_end > 0 %}<rect x="0" y="0" width="{{ ff.spent_end }}" height="24" class="fill-danger stroke-surface" {{ seg|safe }}></rect>{% endif %}
-      {% if ff.saved_end > ff.spent_end %}<rect x="{{ ff.spent_end }}" y="0" width="{{ ff.saved_end - ff.spent_end }}" height="24" class="fill-primary stroke-surface" {{ seg|safe }}></rect>{% endif %}
-      {% if ff.left > 0 %}<rect x="{{ ff.saved_end }}" y="0" width="{{ ff.left }}" height="24" class="fill-success stroke-surface" {{ seg|safe }}></rect>{% endif %}
-      {% if ff.overspent > 0 %}<rect x="{{ ff.earned_end }}" y="0" width="{{ ff.overspent }}" height="24" fill="url(#flow-overspend-hatch)" class="stroke-surface" {{ seg|safe }}></rect>{% endif %}
-      {% endif %}
-    </svg>
     <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3" aria-hidden="true">
       {{ legend_item(_("Spent"), k.spent, "spent", "bg-danger") }}
       {{ legend_item(_("Saved / invested"), k.saved, "saved", "bg-primary") }}
@@ -183,11 +170,35 @@
       {{ legend_item(_("Left"), k.net, "net", "bg-success", "text-success-strong" if k.net_tone == "favourable" else "") }}
       {% endif %}
     </dl>
-    {% if k.savings_rate is not none %}
-    {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
-    <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
-    {% endif %}
   </div>
+</div>
+{%- endmacro %}
+
+{# Home (F9.1): planned vs actual, the savings rate and the forecast. #}
+{% macro home_plan() -%}
+{% set k = summary.kpis %}
+{% set n = k.flow_scale %}
+{% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
+<div class="mt-1 space-y-4" data-home-plan-body>
+  <p class="text-sm text-muted" data-forecast-line>{{ _("Forecast spent %(spent)s · forecast earned %(earned)s.", spent=k.forecast_spent, earned=k.forecast_earned) }}</p>
+  {% set ff = k.forecast_flow %}
+  <svg class="h-4 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar>
+    {% if ff.empty %}
+    <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
+    {% else %}
+    {% if ff.spent_end > 0 %}<rect x="0" y="0" width="{{ ff.spent_end }}" height="24" class="fill-danger stroke-surface" {{ seg|safe }}></rect>{% endif %}
+    {% if ff.saved_end > ff.spent_end %}<rect x="{{ ff.spent_end }}" y="0" width="{{ ff.saved_end - ff.spent_end }}" height="24" class="fill-primary stroke-surface" {{ seg|safe }}></rect>{% endif %}
+    {% if ff.left > 0 %}<rect x="{{ ff.saved_end }}" y="0" width="{{ ff.left }}" height="24" class="fill-success stroke-surface" {{ seg|safe }}></rect>{% endif %}
+    {% if ff.overspent > 0 %}
+  <defs><pattern id="home-plan-overspend-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" class="fill-danger-tint"></rect><rect width="4" height="8" class="fill-danger"></rect></pattern></defs>
+  <rect x="{{ ff.earned_end }}" y="0" width="{{ ff.overspent }}" height="24" fill="url(#home-plan-overspend-hatch)" class="stroke-surface" {{ seg|safe }}></rect>
+  {% endif %}
+    {% endif %}
+  </svg>
+  {% if k.savings_rate is not none %}
+  {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
+  <p class="text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
+  {% endif %}
   <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
     {% for b in summary.bars %}
     {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}

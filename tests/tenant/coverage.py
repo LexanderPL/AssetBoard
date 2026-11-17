@@ -122,6 +122,15 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "prune",
         )
     },
+    ("DashboardPreferenceRepository", "for_user"): (
+        "test_dashboard_preference_queries_stay_in_their_workspace"
+    ),
+    ("DashboardPreferenceRepository", "upsert"): (
+        "test_dashboard_preference_queries_stay_in_their_workspace"
+    ),
+    ("DashboardPreferenceRepository", "delete_for_user"): (
+        "test_dashboard_preference_queries_stay_in_their_workspace"
+    ),
     ("MembershipRepository", "members"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",

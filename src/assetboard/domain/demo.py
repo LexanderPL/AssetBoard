@@ -56,6 +56,9 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "NetWorthSnapshot": (
             "snapshots are legacy data; net-worth history is derived from valuations"
         ),
+        "DashboardPreference": (
+            "the Home layout is a user interface preference, not sample financial data"
+        ),
     }
 )
 

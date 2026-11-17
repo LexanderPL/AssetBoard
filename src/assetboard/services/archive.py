@@ -154,6 +154,9 @@ ARCHIVE_EXCLUDED_MODELS = {
     "ImportCategoryMapping": (
         "remembered import choices are workspace import preferences, not ledger data"
     ),
+    "DashboardPreference": (
+        "the Home widget layout is a per-user interface preference, not financial data"
+    ),
     "ScheduledItem": "recurring rules require the F3.8 archive extension",
     "ScheduledOccurrence": "occurrence links require the F3.8 archive extension",
     "IncomeSource": "income sources require the F3.8 archive extension",
