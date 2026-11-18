@@ -25,7 +25,9 @@ setup token, which the container prints once in its log at startup
 `docker compose -f compose.example.yaml exec assetboard assetboard create-admin`. Compose stores the
 database and generated secret in a named volume. See the [deployment guide](docs/deployment.md) for
 reverse proxies (recommended before exposing the app beyond your machine), bind mounts, image
-publishing, and the complete environment-variable reference.
+publishing, and the complete environment-variable reference. The
+[security checklist](docs/security-checklist.md) records the ASVS Level 1 review and the known
+gaps.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -54,6 +56,7 @@ make check
 
 ## User guides
 
+- [Install on your phone](docs/install-on-your-phone.md): add AssetBoard to an Android or iOS home screen (HTTPS required).
 - [Home dashboard](docs/dashboard.md): the widget catalogue, defaults and how to customise Home.
 - [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
 - [Categories](docs/categories.md): expense and income categories, savings and transfers.

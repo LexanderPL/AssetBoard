@@ -256,6 +256,17 @@ Include a docs/api.md with curl examples.
 - Container: non-root, read-only root filesystem tested, no shell tools beyond what's needed, dropped capabilities documented in the compose example.
 - Dependency and license review: all runtime deps compatible with AGPL-3.0-or-later; `THIRD_PARTY_LICENSES` generated.
 
+**As built (2026-11-18):** the checklist covers all 127 ASVS 4.0.3 Level 1 requirements
+(87 done, 27 not applicable, 13 gaps with follow-ups). The gaps are password length limits
+(8/1024 versus 12/128), no strength meter, no sign-in breach re-check, no outbound notices for
+authentication changes, temporary-password expiry, MFA not required for instance-admin pages,
+user-configured notification/provider hosts (ADR-0021 accepted risk), invite/reset tokens in
+URLs (ADR-0013 accepted trade-off), no antivirus scan, outbound host allow-listing, and HSTS
+without `includeSubDomains`. `pip-audit` and Trivy report first and then block high/critical;
+releases carry a CycloneDX SBOM and `THIRD_PARTY_LICENSES`. The 500 page test, cookie/session,
+CSRF, header and role-matrix tests live in `tests/web/test_security_hardening.py`,
+`tests/web/test_authorization_matrix.py` and the existing feature suites.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -377,6 +388,31 @@ keep going through the existing Apprise channels (F3.6); web push is out of scop
   - the service worker's caching rules (a static asset is cached; an HTML page is not; a
     workspace fragment is not);
   - a browser test that registers the worker and loads the offline page.
+
+**As built (F9.10, 2026-11-18)**
+
+- `GET /manifest.webmanifest` builds the manifest from `branding.APP_NAME`, the ASGI root path
+  (`start_url`, `scope` and `id`) and the design tokens (`primary` for `theme_color`, `canvas`
+  for `background_color`). The dark tokens travel in the draft `color_scheme_dark` manifest
+  member, with `<meta name="theme-color" media="(prefers-color-scheme: …)">` in both page heads
+  for current browsers. Both heads link the manifest and the 180 px `apple-touch-icon`.
+- The icons are generated from `static/img/favicon.svg` by
+  `scripts/generate_pwa_icons.py` (`make icons`) with Playwright's Chromium; the five PNGs are
+  committed. No runtime dependency was added.
+- `GET /service-worker.js` serves the worker from the app root, so its scope matches the root
+  path. It is registered by `app.js` with the running version in `?v=`; the cache name carries
+  that version. Only versioned `/static/` assets and `GET /offline` are cached. Navigations are
+  network-first and fall back to the translated, data-free offline page; fragments, exports and
+  every other workspace response are network-only. `worker-src 'self'` was added to the CSP.
+- With AssetBoard at the origin root, sign-in, sign-out and OIDC redirects already stay on the
+  app's URLs (OIDC uses a local `next`), so they return to the installed app. A subpath (ASGI
+  root path) is honoured by the manifest, worker and offline page, but not yet by the auth
+  redirects, so the guide scopes installation to a root deployment; that is a recorded follow-up.
+  A real install and an Authelia/OIDC round trip on physical Android and iOS devices cannot be
+  automated here; the [Install on your phone](../install-on-your-phone.md) guide covers the
+  manual check, and the Chromium test covers the phone viewport, manifest, registration, cache
+  rules, the offline page and its working retry. The update notice and version are served in the
+  (never cached) HTML.
 
 **Agent prompt**
 ```

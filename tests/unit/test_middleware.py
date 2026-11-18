@@ -144,10 +144,20 @@ def test_content_length_over_limit_is_rejected_without_reading() -> None:
     assert response_messages[0]["status"] == 413
 
 
-def test_request_body_limit_is_the_outermost_app_middleware() -> None:
+def test_request_body_limit_sits_inside_the_response_security_layers() -> None:
     app = create_app(Settings(_env_file=None, secret_key="test-secret"))
+    names = [
+        str(getattr(middleware.cls, "__name__", middleware.cls))
+        for middleware in app.user_middleware
+    ]
 
-    assert app.user_middleware[0].cls is RequestBodyLimitMiddleware
+    # Starlette lists middleware outermost first. The 413 must pass through request-id and
+    # security headers; only then does it carry the same x-request-id, CSP, HSTS and cache
+    # headers as every other response.
+    body_limit = names.index("RequestBodyLimitMiddleware")
+    request_id = names.index("RequestIdMiddleware")
+    assert request_id < body_limit
+    assert names[0] == "SecurityHeadersMiddleware"
 
 
 def test_request_log_has_safe_path_status_duration_and_request_id() -> None:

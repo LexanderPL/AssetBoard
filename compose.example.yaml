@@ -25,13 +25,16 @@ services:
       #ASSETBOARD_DEMO_IP_LIMIT: "20"
     volumes:
       - assetboard-data:/data
-    read_only: true
+    # Container hardening (ADR-0009). Keep all four settings; the smoke test and the image
+    # scan exercise them. Do not add `privileged: true`, host networking or the Docker socket.
+    user: "10001:10001"          # the image's own unprivileged user, never root
+    read_only: true              # the application files cannot be changed at runtime
     tmpfs:
-      - /tmp:mode=1777
+      - /tmp:mode=1777           # the only other writable path, cleared on restart
     cap_drop:
-      - ALL
+      - ALL                      # no Linux capabilities are needed by the process
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges:true   # a compromised process cannot gain privileges
     restart: unless-stopped
     healthcheck:
       test:

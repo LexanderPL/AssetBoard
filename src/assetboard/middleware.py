@@ -17,14 +17,21 @@ _REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
 SECURITY_HEADERS = {
     "content-security-policy": (
         "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
-        "object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-        "font-src 'self'; connect-src 'self'"
+        "object-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'"
     ),
+    "permissions-policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-frame-options": "DENY",
 }
-_SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEADERS)
+# HSTS is added only when BASE_URL says the public endpoint is HTTPS. Adding it on a plain-HTTP
+# development instance would make the browser refuse later HTTP visits for a year.
+HSTS_HEADER = "strict-transport-security"
+HSTS_VALUE = "max-age=31536000"
+_SECURITY_HEADER_NAMES = frozenset(
+    name.encode("ascii") for name in (*SECURITY_HEADERS, HSTS_HEADER)
+)
 # Pages whose URL can carry a secret send no Referer to other sites (ADR-0013): invitation pages
 # (``/invite/<token>``), and sign-in and registration, whose ``next`` may be ``/invite/<token>``.
 # "same-origin", not "no-referrer": under "no-referrer" browsers send ``Origin: null`` on form
@@ -248,13 +255,18 @@ class LocaleMiddleware:
 
 
 class SecurityHeadersMiddleware:
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, *, https: bool = False) -> None:
         self.app = app
+        self.https = https
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+
+        headers = dict(SECURITY_HEADERS)
+        if self.https:
+            headers[HSTS_HEADER] = HSTS_VALUE
 
         async def send_with_security_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -264,8 +276,7 @@ class SecurityHeadersMiddleware:
                     if name.lower() not in _SECURITY_HEADER_NAMES
                 ]
                 response_headers.extend(
-                    (key.encode("ascii"), value.encode("ascii"))
-                    for key, value in SECURITY_HEADERS.items()
+                    (key.encode("ascii"), value.encode("ascii")) for key, value in headers.items()
                 )
                 path = route_path(scope)
                 policy: bytes | None = None

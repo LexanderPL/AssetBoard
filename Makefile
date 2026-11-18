@@ -1,4 +1,4 @@
-.PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile
+.PHONY: setup dev check test css icons migrate revision i18n-extract i18n-update i18n-compile licenses licenses-check
 
 UV := uv
 # Parallel test workers for make check/test (pytest-xdist); PYTEST_WORKERS=0 runs serially.
@@ -15,6 +15,7 @@ check: i18n-compile
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
 	$(UV) run pyright
+	$(MAKE) licenses-check
 	$(UV) run pytest -n $(PYTEST_WORKERS)
 	@temp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$temp_dir"' EXIT; \
@@ -52,6 +53,10 @@ css:
 		--input src/assetboard/static/css/input.css \
 		--output src/assetboard/static/css/app.css --minify
 
+# Regenerate the committed PWA icons from the SVG favicon (Chromium for Playwright required).
+icons:
+	$(UV) run python scripts/generate_pwa_icons.py
+
 migrate:
 	$(UV) run assetboard migrate
 
@@ -71,6 +76,13 @@ i18n-update:
 # Compiled .mo catalogs are build output (gitignored); recompiling is cheap and idempotent.
 i18n-compile:
 	$(UV) run pybabel compile -d src/assetboard/locales
+
+# Regenerate the third-party notices from the locked runtime dependencies.
+licenses:
+	$(UV) run --locked python scripts/generate_third_party_licenses.py
+
+licenses-check:
+	$(UV) run --locked python scripts/generate_third_party_licenses.py --check
 
 dev:
 	$(MAKE) css i18n-compile

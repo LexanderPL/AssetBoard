@@ -318,6 +318,64 @@ def test_reset_sets_the_password_ends_every_session_and_is_audited(
     assert event.data == {"sessions_revoked": 1}
 
 
+def test_a_reset_link_is_consumed_by_its_first_successful_post(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    link = _issue_reset(app, web, client)
+    page = client.get(link)
+    form = {
+        "csrf_token": web.csrf(page.text),
+        "new_password": NEW_PASSWORD,
+        "confirm_password": NEW_PASSWORD,
+    }
+    assert client.post(link, data=form).status_code == 200
+    # A replay has a fresh anonymous CSRF token (it is a signed-out form now) but the link
+    # itself is gone, so the second POST can never set another password.
+    replay = client.post(
+        link,
+        data={
+            "csrf_token": web.csrf(client.get("/login").text),
+            "new_password": "Replay Password",
+            "confirm_password": "Replay Password",
+        },
+    )
+    assert replay.status_code == 404
+    assert "This link is not valid" in replay.text
+    with app.state.session_factory() as session:
+        assert session.scalars(select(EmailToken).where(EmailToken.purpose == "reset")).all() == []
+    client.cookies.clear()
+    assert web.sign_in(client, password=NEW_PASSWORD).status_code == 303
+    client.cookies.clear()
+    assert web.sign_in(client, password="Replay Password").status_code == 401
+
+
+def test_a_reset_link_expires_sixty_minutes_after_it_was_issued(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    link = _issue_reset(app, web, client)
+    issued = app.state.clock.now()
+    # One second before the TTL the page and the POST still work.
+    app.state.clock = FixedClock((issued + timedelta(minutes=59, seconds=59)).isoformat())
+    page = client.get(link)
+    assert page.status_code == 200
+    # One second after it both answer the same 404 as an unknown token, whatever the CSRF token.
+    app.state.clock = FixedClock((issued + timedelta(minutes=60, seconds=1)).isoformat())
+    assert client.get(link).status_code == 404
+    late = client.post(
+        link,
+        data={
+            "csrf_token": web.csrf(client.get("/login").text),
+            "new_password": NEW_PASSWORD,
+            "confirm_password": NEW_PASSWORD,
+        },
+    )
+    assert late.status_code == 404
+    assert "This link is not valid" in late.text
+    assert web.sign_in(client, password=ADMIN_PASSWORD).status_code == 303
+
+
 def test_reset_by_email_keeps_the_second_factor_and_its_mail_does_not_mention_it(
     mail: tuple[FastAPI, TestClient], web: WebHarness
 ) -> None:

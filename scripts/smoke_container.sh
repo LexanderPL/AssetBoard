@@ -160,10 +160,29 @@ if docker exec "$container" sh -c 'touch /app/.smoke-write-test' >/dev/null 2>&1
   exit 1
 fi
 echo "Writing under /app fails."
+test "$(docker exec "$container" sh -c 'sed -n "s/^CapEff:[[:space:]]*//p" /proc/self/status')" = 0000000000000000
+echo "The process has no effective Linux capabilities."
+test "$(docker exec "$container" sh -c 'sed -n "s/^NoNewPrivs:[[:space:]]*//p" /proc/self/status')" = 1
+echo "NoNewPrivs is set."
+for tool in curl wget git gcc make nc; do
+  if docker exec "$container" sh -c "command -v $tool" >/dev/null 2>&1; then
+    echo "Unexpected tool in the runtime image: $tool" >&2
+    exit 1
+  fi
+done
+echo "No curl, wget, git, compiler, make or netcat in the runtime image."
+docker exec "$container" sh -c 'touch /tmp/.smoke-write-test && rm /tmp/.smoke-write-test'
+echo "/tmp is writable."
+docker exec "$container" test -s /licenses/AssetBoard/THIRD_PARTY_LICENSES
+echo "/licenses/AssetBoard/THIRD_PARTY_LICENSES exists."
 docker exec "$container" test -s /licenses/AssetBoard/LICENSE
 echo "/licenses/AssetBoard/LICENSE exists."
 docker exec "$container" python -c \
   'import importlib.util; assert importlib.util.find_spec("pytest") is None, "pytest is installed in runtime image"'
+docker exec "$container" python -c \
+  'import importlib.util; assert importlib.util.find_spec("pip") is None, "pip is installed in runtime image"'
+docker exec "$container" sh -c 'test ! -e /usr/local/bin/pip'
+echo "Runtime excludes pytest and pip."
 docker exec "$container" python -c 'from zoneinfo import ZoneInfo; ZoneInfo("Europe/Warsaw")'
 echo "Runtime excludes pytest and includes Europe/Warsaw timezone data."
 

@@ -13,6 +13,13 @@ you already run; you can move between them later by moving the data directory (s
 
 Not covered yet: Kubernetes and Helm, Nix, NAS app stores. These come after 1.0.
 
+## Install it on your phone
+
+AssetBoard is an installable web app: open it over HTTPS, sign in and add it to your home screen
+(Android and iOS 16.4+). There is no separate app to download. See
+[Install on your phone](../install-on-your-phone.md) for the steps, the HTTPS requirement and
+troubleshooting.
+
 ## What every method has in common
 
 - **One process.** Run a single instance with a single worker: the recurring-item scheduler, the

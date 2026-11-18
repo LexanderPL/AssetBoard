@@ -5613,6 +5613,20 @@ msgstr ""
 msgid "Customise"
 msgstr ""
 
+msgid "You are offline"
+msgstr ""
+
+msgid ""
+"Check your connection, then try again. This page contains no workspace "
+"data."
+msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+msgid "Go to Home"
+msgstr ""
+
 msgid "Link a sign-in method"
 msgstr ""
 
