@@ -280,3 +280,29 @@ def test_uuid_keys_are_not_confused_with_other_categories() -> None:
             step=ReportStep.MONTH,
             currency="EUR",
         )
+
+
+@given(entries=entries_strategy(), bounds=range_strategy())
+def test_property_year_series_sums_the_monthly_series(
+    entries: list[LedgerEntry], bounds: tuple[date, date]
+) -> None:
+    start, end = bounds
+    monthly = ledger_series(
+        entries, CATEGORIES, start=start, end=end, step=ReportStep.MONTH, currency="EUR"
+    )
+    yearly = ledger_series(
+        entries, CATEGORIES, start=start, end=end, step=ReportStep.YEAR, currency="EUR"
+    )
+    assert [period.period for period in yearly] == list(range(start.year, end.year + 1))
+    for year in yearly:
+        year_key = year.period
+        assert isinstance(year_key, int)
+        months = [
+            period
+            for period in monthly
+            if isinstance(period.period, YearMonth) and period.period.year == year_key
+        ]
+        assert year.earned.amount_minor == sum(period.earned.amount_minor for period in months)
+        assert year.spent.amount_minor == sum(period.spent.amount_minor for period in months)
+        assert year.saved.amount_minor == sum(period.saved.amount_minor for period in months)
+        assert year.net.amount_minor == sum(period.net.amount_minor for period in months)

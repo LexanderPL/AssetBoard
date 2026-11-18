@@ -11,7 +11,7 @@ JavaScript. Unknown query parameters are ignored.
 
 | Filter | Values | Default |
 | --- | --- | --- |
-| From year | `from=YYYY`, 1900–2199 | the current year and the two before it |
+| From year | `from=YYYY`, 1900–2199 | the current year and the two calendar years before it (3 years) |
 | To year | `to=YYYY`, inclusive | the current year |
 | Granularity | `step=month` or `step=year` | monthly up to a 3-year range, yearly beyond |
 | Currency | `currency=XXX` | the workspace's base currency |
@@ -20,10 +20,10 @@ A range is at most 30 years. A malformed year, `from` after `to`, or a longer ra
 the field and no chart is drawn. The range always ends with the current month in the workspace's
 time zone, even when `to` names a later year; the page then says so.
 
-The currency selector appears only when more than one currency occurs in the range. In v1 ledger
-entries are in the workspace's base currency, so it usually stays hidden. Amounts in another
-currency than the selected one are never converted or added: they are left out and counted in a
-note.
+The currency selector appears only when more than one currency occurs in the charted range; the
+base currency is always listed as the fallback. In v1 ledger entries are in the workspace's base
+currency, so it usually stays hidden. Amounts in another currency than the selected one are never
+converted or added: they are left out and counted in a note.
 
 ## What counts
 

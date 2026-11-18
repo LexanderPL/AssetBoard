@@ -5000,9 +5000,6 @@ msgstr ""
 msgid "Income vs expenses"
 msgstr ""
 
-msgid "No entries in this range."
-msgstr ""
-
 msgid "so far"
 msgstr ""
 
@@ -11373,6 +11370,9 @@ msgstr ""
 msgid "Fix the filters to see the report."
 msgstr ""
 
+msgid "No earned, spent or saved amounts in this range."
+msgstr ""
+
 msgid "Show as table"
 msgstr ""
 
@@ -14928,5 +14928,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Portfolio chart range"
+#~ msgstr ""
+
+#~ msgid "No entries in this range."
 #~ msgstr ""
 

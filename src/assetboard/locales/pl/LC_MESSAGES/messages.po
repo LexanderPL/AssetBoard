@@ -5396,9 +5396,6 @@ msgstr "Wybierz najwyżej 30 lat."
 msgid "Income vs expenses"
 msgstr "Dochody i wydatki"
 
-msgid "No entries in this range."
-msgstr "Brak wpisów w tym zakresie."
-
 msgid "so far"
 msgstr "jak dotąd"
 
@@ -5430,9 +5427,15 @@ msgstr[2] "%(num)d wpisów ma daty po dniu dzisiejszym i nie są pokazane na wyk
 #, python-format
 msgid "%(num)d entry in another currency is left out; reports do not convert."
 msgid_plural "%(num)d entries in another currency are left out; reports do not convert."
-msgstr[0] "%(num)d wpis w innej walucie został pominięty; raporty nie przeliczają walut."
-msgstr[1] "%(num)d wpisy w innych walutach zostały pominięte; raporty nie przeliczają walut."
-msgstr[2] "%(num)d wpisów w innych walutach zostało pominiętych; raporty nie przeliczają walut."
+msgstr[0] ""
+"%(num)d wpis w innej walucie został pominięty; raporty nie przeliczają "
+"walut."
+msgstr[1] ""
+"%(num)d wpisy w innych walutach zostały pominięte; raporty nie "
+"przeliczają walut."
+msgstr[2] ""
+"%(num)d wpisów w innych walutach zostało pominiętych; raporty nie "
+"przeliczają walut."
 
 msgid "on Monday"
 msgstr "w poniedziałek"
@@ -12514,6 +12517,9 @@ msgstr "Kwoty w %(currency)s."
 
 msgid "Fix the filters to see the report."
 msgstr "Popraw filtry, aby zobaczyć raport."
+
+msgid "No earned, spent or saved amounts in this range."
+msgstr "W tym zakresie nie ma kwot zarobionych, wydanych ani zaoszczędzonych."
 
 msgid "Show as table"
 msgstr "Pokaż jako tabelę"

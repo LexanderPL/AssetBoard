@@ -19,9 +19,9 @@ from datetime import date
 from enum import StrEnum
 from uuid import UUID
 
-from assetboard.domain.categories import Kind, Treatment
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
+from assetboard.domain.summary import block_of
 
 
 class ReportStep(StrEnum):
@@ -126,16 +126,16 @@ def ledger_series(
         category = categories.get(entry.category_id)
         if category is None:
             raise ValueError(f"unknown category {entry.category_id}")
-        if category.treatment == Treatment.TRANSFER:
-            continue
-        if category.kind == Kind.EXPENSE:
-            target = saved if category.treatment == Treatment.SAVINGS else spent
-        elif category.kind == Kind.INCOME:
-            if category.treatment == Treatment.SAVINGS:
-                continue  # a withdrawal from savings is not earnings
+        block = block_of(category.kind, category.treatment)
+        if block == "expense":
+            target = spent
+        elif block == "saved":
+            target = saved
+        elif block == "income":
             target = earned
         else:
-            raise ValueError(f"unknown kind: {category.kind}")
+            # Transfers are in nothing; a withdrawal from savings is not earnings.
+            continue
         key: PeriodKey = (
             entry.day.year if wanted is ReportStep.YEAR else YearMonth.from_date(entry.day)
         )

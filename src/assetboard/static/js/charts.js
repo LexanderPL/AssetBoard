@@ -423,9 +423,14 @@
       option = lineOptions(data);
     } else if (kind === "report-bars" && Array.isArray(data.series)) {
       option = reportBarsOptions(data);
-      element.querySelector("[data-chart-table]")?.classList.add("sr-only");
+      const table = element.querySelector("[data-chart-table]");
       const toggle = element.querySelector("[data-chart-table-toggle]");
-      if (toggle) toggle.hidden = false;
+      if (toggle instanceof HTMLElement && toggle.hidden) {
+        // First draw: hide the no-JS table and reveal its toggle. A redraw (theme change, HTMX
+        // swap) keeps whatever the visitor chose, including the button's aria-expanded state.
+        table?.classList.add("sr-only");
+        toggle.hidden = false;
+      }
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
     } else if (kind === "loan-payments" && Array.isArray(data.series)) {

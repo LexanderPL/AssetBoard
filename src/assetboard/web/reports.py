@@ -37,7 +37,6 @@ FILTER_ERRORS: dict[FilterError, str] = {
     FilterError.TOO_MANY_YEARS: _("Choose at most 30 years."),
 }
 CHART_TITLE = _("Income vs expenses")
-EMPTY = _("No entries in this range.")
 SO_FAR = _("so far")
 TOTAL = _("Total")
 TABLE_CAPTION = _("Income, expenses and savings by period")

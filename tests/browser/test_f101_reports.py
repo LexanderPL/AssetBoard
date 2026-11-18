@@ -208,21 +208,19 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             toggle.click()
             expect(toggle).to_have_text("Hide table")
             assert "sr-only" not in (table.get_attribute("class") or "").split()
-            toggle.click()
-            expect(toggle).to_have_text("Show as table")
-            assert "sr-only" in (table.get_attribute("class") or "").split()
 
-            # The grouped bars draw in the dark theme too, with token colours refreshed.
+            # A theme redraw must not hide a table the visitor revealed or desynchronise the
+            # button's aria-expanded state.
             page.locator("[data-theme-toggle]").click()
             page.wait_for_function("document.documentElement.classList.contains('dark')")
             expect(chart).to_have_attribute("data-chart-ready", "true")
-            # The table can still be revealed after the theme redraw.
-            chart.locator("[data-chart-table-toggle]").click()
-            assert (
-                "sr-only"
-                not in (chart.locator("[data-chart-table]").get_attribute("class") or "").split()
-            )
-            chart.locator("[data-chart-table-toggle]").click()
+            expect(toggle).to_have_text("Hide table")
+            expect(toggle).to_have_attribute("aria-expanded", "true")
+            assert "sr-only" not in (table.get_attribute("class") or "").split()
+
+            toggle.click()
+            expect(toggle).to_have_text("Show as table")
+            assert "sr-only" in (table.get_attribute("class") or "").split()
 
             # Phone width: one column, no sideways page scroll.
             page.set_viewport_size({"width": 390, "height": 844})

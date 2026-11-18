@@ -27,7 +27,6 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     TransactionRepository,
 )
-from assetboard.domain.categories import Kind, Treatment
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, MIN_YEAR
 from assetboard.domain.reports import (
@@ -39,6 +38,7 @@ from assetboard.domain.reports import (
     ledger_series,
     totals_of,
 )
+from assetboard.domain.summary import block_of
 from assetboard.services.context import Context, Role, require_role
 
 DEFAULT_YEARS = 3
@@ -99,9 +99,8 @@ def _parse_year(raw: str) -> int | None:
     return year if MIN_YEAR <= year <= MAX_YEAR else None
 
 
-def _default_step(start_year: int, end_year: int, today: date) -> ReportStep:
-    effective_end = min(end_year, today.year)
-    years = effective_end - start_year + 1
+def _default_step(start_year: int, end_year: int) -> ReportStep:
+    years = end_year - start_year + 1
     return ReportStep.MONTH if years <= MAX_MONTHLY_ONLY_YEARS else ReportStep.YEAR
 
 
@@ -128,7 +127,7 @@ def _resolve_filters(
             errors["to"] = FilterError.FROM_AFTER_TO
         elif end_year - start_year + 1 > MAX_YEARS:
             errors["to"] = FilterError.TOO_MANY_YEARS
-    defaulted = _default_step(start_year, end_year, today)
+    defaulted = _default_step(start_year, end_year)
     step = ReportStep(raw_step) if raw_step in ("month", "year") else defaulted
     return ReportFilters(
         start_year=start_year,
@@ -150,13 +149,7 @@ def _select_currency(requested: str, available: tuple[str, ...], base_currency: 
 
 def _counts(category: ReportCategory) -> bool:
     """Whether an entry of this category contributes to earned, spent or saved."""
-    if category.treatment == Treatment.TRANSFER:
-        return False
-    if category.kind == Kind.EXPENSE:
-        return category.treatment in (Treatment.REGULAR, Treatment.SAVINGS)
-    if category.kind == Kind.INCOME:
-        return category.treatment == Treatment.REGULAR
-    return False
+    return block_of(category.kind, category.treatment) in {"expense", "saved", "income"}
 
 
 def _entries(
@@ -218,31 +211,41 @@ def reports_data(
             )
         read_start = date(filters.start_year, 1, 1)
         read_end = date(filters.end_year, 12, 31)
-        observed = TransactionRepository(session, ctx).currencies_in_window(
-            start=read_start, end=read_end
+        series_start = read_start
+        series_end = min(today, read_end)
+        observed = (
+            TransactionRepository(session, ctx).currencies_in_window(
+                start=read_start, end=series_end
+            )
+            if series_end >= read_start
+            else ()
         )
         available = tuple(dict.fromkeys((base_currency, *observed)))
         selected = _select_currency(currency, available, base_currency)
         filters = replace(filters, currency=selected)
-        series_start = read_start
-        series_end = min(today, read_end)
         stats = _StreamStats()
+        stream = _entries(
+            TransactionRepository(session, ctx),
+            categories,
+            start=read_start,
+            end=read_end,
+            today=today,
+            currency=selected,
+            stats=stats,
+        )
         series = ledger_series(
-            _entries(
-                TransactionRepository(session, ctx),
-                categories,
-                start=read_start,
-                end=read_end,
-                today=today,
-                currency=selected,
-                stats=stats,
-            ),
+            stream,
             categories,
             start=series_start,
             end=series_end,
             step=filters.step,
             currency=selected,
         )
+        if not series:
+            # A future-only range has no period keys, so the pure function returns before the
+            # generator runs; consume it so the future/other-currency notes are still counted.
+            for _entry in stream:
+                pass
     return ReportsData(
         filters=filters,
         series=tuple(series),

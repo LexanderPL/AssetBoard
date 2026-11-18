@@ -75,7 +75,7 @@
       <script type="application/json" id="reports-data">{{ view.chart|tojson }}</script>
       <div class="mt-4 h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
       {% else %}
-      <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No entries in this range.") }}</p>
+      <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No earned, spent or saved amounts in this range.") }}</p>
       {% endif %}
       <div class="mt-4">
         <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>

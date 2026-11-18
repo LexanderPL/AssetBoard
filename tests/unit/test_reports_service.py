@@ -392,3 +392,48 @@ def test_only_column_reads_are_used(team: WorkspaceDb) -> None:
         "sum(" in statement.lower() or "count(" in statement.lower()
         for statement in transaction_statements
     )
+
+
+def test_a_future_only_range_still_counts_the_excluded_rows(team: WorkspaceDb) -> None:
+    food = _category(team, "Golden Food")
+    with team.factory.begin() as session:
+        TransactionRepository(session, _editor(team)).create(
+            direction="expense",
+            day=date(2027, 1, 5),
+            amount_minor=10_000,
+            currency="EUR",
+            category_id=food,
+            description="Next year",
+            description_key="next year",
+            source="manual",
+            created_by_user_id=None,
+        )
+    data = _report(team, from_year="2027", to_year="2028", step="year")
+    assert data.series == ()
+    assert data.future_count == 1
+    assert data.has_data is False
+
+
+def test_the_default_step_uses_the_requested_range_not_the_future_end(team: WorkspaceDb) -> None:
+    data = _report(team, from_year="2024", to_year="2030")
+    assert data.filters.errors == {}
+    assert data.filters.step is ReportStep.YEAR
+
+
+def test_a_currency_that_only_occurs_after_today_is_not_offered(team: WorkspaceDb) -> None:
+    food = _category(team, "Golden Food")
+    with team.factory.begin() as session:
+        TransactionRepository(session, _editor(team)).create(
+            direction="expense",
+            day=date(2026, 12, 1),
+            amount_minor=10_000,
+            currency="USD",
+            category_id=food,
+            description="Future dollars",
+            description_key="future dollars",
+            source="manual",
+            created_by_user_id=None,
+        )
+    data = _report(team, from_year="2026", to_year="2026", step="year")
+    assert data.available_currencies == ("EUR",)
+    assert data.show_currency_selector is False
