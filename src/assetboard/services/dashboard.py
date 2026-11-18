@@ -18,10 +18,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.db.engine import run_immediate
 from assetboard.db.repositories import DashboardPreferenceRepository, ImportBatchRepository
 from assetboard.domain.dashboard import (
+    DEFAULT_NET_WORTH_RANGE,
     DEFAULT_PORTFOLIO_RANGE,
     DEFAULT_UPCOMING_LIMIT,
     DEFAULT_WIDGET_KEYS,
     WIDGET_KEYS,
+    clean_net_worth_range,
     clean_portfolio_range,
     clean_upcoming_limit,
     clean_widgets,
@@ -50,6 +52,7 @@ class DashboardPreferences:
     customised: bool
     upcoming_limit: int
     portfolio_range: str
+    net_worth_range: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +105,7 @@ def read_dashboard_preferences(
                 customised=False,
                 upcoming_limit=DEFAULT_UPCOMING_LIMIT,
                 portfolio_range=DEFAULT_PORTFOLIO_RANGE,
+                net_worth_range=DEFAULT_NET_WORTH_RANGE,
             )
         stored = cast(object, row.widgets)
         if not isinstance(stored, list | tuple):
@@ -113,6 +117,7 @@ def read_dashboard_preferences(
             customised=True,
             upcoming_limit=clean_upcoming_limit(cast(object, row.upcoming_limit)),
             portfolio_range=clean_portfolio_range(cast(object, row.portfolio_range)),
+            net_worth_range=clean_net_worth_range(cast(object, row.net_worth_range)),
         )
 
 
@@ -123,6 +128,7 @@ def save_dashboard_preferences(
     *,
     upcoming_limit: int = DEFAULT_UPCOMING_LIMIT,
     portfolio_range: str = DEFAULT_PORTFOLIO_RANGE,
+    net_worth_range: str = DEFAULT_NET_WORTH_RANGE,
     known: tuple[str, ...] = WIDGET_KEYS,
 ) -> None:
     """Store the enabled widgets and widget settings; unknown keys are ignored."""
@@ -130,6 +136,7 @@ def save_dashboard_preferences(
     cleaned = clean_widgets(list(widgets), known)
     limit = clean_upcoming_limit(upcoming_limit)
     range_code = clean_portfolio_range(portfolio_range)
+    net_worth_code = clean_net_worth_range(net_worth_range)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.VIEWER)
@@ -138,6 +145,7 @@ def save_dashboard_preferences(
             widgets=list(cleaned),
             upcoming_limit=limit,
             portfolio_range=range_code,
+            net_worth_range=net_worth_code,
             customised_at=ctx.clock.now(),
         )
 

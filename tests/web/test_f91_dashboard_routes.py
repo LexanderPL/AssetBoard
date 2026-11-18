@@ -319,6 +319,7 @@ def test_every_widget_renders_without_data(owner: OwnerApp, key: str) -> None:
         ("upcoming", "Nothing is overdue or due in the next"),
         ("net-worth", "No values yet"),
         ("portfolio", "No holdings are valued yet"),
+        ("portfolio-history", "No dated investment transactions yet"),
         ("portfolio-changes", "No portfolio history yet"),
         ("loans", "No active loans yet"),
         ("fire", "No FIRE plan yet"),
@@ -340,6 +341,7 @@ def test_every_widget_links_to_its_module(owner: OwnerApp) -> None:
         "upcoming": "/upcoming",
         "net-worth": "/net-worth/summary",
         "portfolio": "/investments/portfolio",
+        "portfolio-history": "/investments/performance",
         "portfolio-changes": "/investments/portfolio",
         "loans": "/loans",
         "fire": "/fire",
@@ -409,6 +411,7 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
             ("order", order_csv),
             ("upcoming_limit", "7"),
             ("portfolio_range", "6m"),
+            ("net_worth_range", "5y"),
             *(("enabled", key) for key in chosen),
         ],
         token_from="/dashboard/customise",
@@ -420,6 +423,7 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
         row = DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id)
         assert row is not None and row.widgets == chosen
         assert row.upcoming_limit == 7 and row.portfolio_range == "6m"
+        assert row.net_worth_range == "5y"
 
     reset = owner.post("/dashboard/customise/reset", token_from="/dashboard/customise")
     assert reset.status_code == 303 and reset.headers["location"] == "/?reset=1"
@@ -451,6 +455,11 @@ def test_customise_page_renders_arrows_local_reordering_markup_and_settings(
     assert page.count('name="portfolio_range"') == 1
     for code in ("1m", "3m", "6m", "1y", "all"):
         assert f'<option value="{code}"' in page
+    assert _selected_option(page, "net_worth_range") == "1y"
+    assert page.count('name="net_worth_range"') == 1
+    for code in ("1y", "3y", "5y", "all"):
+        assert f'<option value="{code}"' in page
+    assert "data-customise-net-worth-range" in page
     assert page.index("data-customise-save") < page.index("data-customise-reset")
     assert re.search(
         r'<button[^>]*formaction="[^"]*/dashboard/customise/reset"[^>]*data-customise-reset',
@@ -475,6 +484,7 @@ def test_move_previews_the_draft_without_saving(owner: OwnerApp) -> None:
             ("enabled", "loans"),
             ("upcoming_limit", "25"),
             ("portfolio_range", "3m"),
+            ("net_worth_range", "3y"),
         ],
         token_from="/dashboard/customise",
     )
@@ -484,6 +494,7 @@ def test_move_previews_the_draft_without_saving(owner: OwnerApp) -> None:
     # The draft keeps the unsaved settings in the form.
     assert _setting_value(response.text, "upcoming_limit") == "25"
     assert _selected_option(response.text, "portfolio_range") == "3m"
+    assert _selected_option(response.text, "net_worth_range") == "3y"
     with owner.db() as session:
         assert DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id) is None
 
@@ -577,7 +588,7 @@ def test_the_upcoming_widget_uses_the_saved_limit(owner: OwnerApp) -> None:
     assert "More items are waiting" not in _fragment(owner, "upcoming")
 
 
-def test_the_portfolio_widget_uses_the_saved_range_and_chart_only_read(
+def test_the_portfolio_history_widget_uses_the_saved_range_and_chart_only_read(
     owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _fixed(owner)
@@ -599,20 +610,24 @@ def test_the_portfolio_widget_uses_the_saved_range_and_chart_only_read(
             customised_at=owner.app.state.clock.now(),
         )
     portfolio = _fragment(owner, "portfolio")
+    assert 'data-chart="performance"' not in portfolio
+    history = _fragment(owner, "portfolio-history")
     assert calls[-1]["range_code"] == "6m"
     assert calls[-1]["ranges"] == VALUE_RANGES
     assert calls[-1]["with_periods"] is False
-    assert "data-portfolio-range" in portfolio and "6 months" in portfolio
+    assert "data-portfolio-range" in history and "6 months" in history
 
 
-def test_the_portfolio_widget_has_a_useful_empty_history_state(owner: OwnerApp) -> None:
+def test_the_portfolio_widgets_have_useful_empty_states(owner: OwnerApp) -> None:
     _fixed(owner)
     _undated_portfolio(owner)
     portfolio = _fragment(owner, "portfolio")
     assert "data-portfolio-value" in portfolio
-    assert "data-portfolio-history-empty" in portfolio
-    assert "No dated investment transactions yet" in portfolio
-    assert 'data-chart="performance"' not in portfolio
+    assert "data-donut" in portfolio
+    history = _fragment(owner, "portfolio-history")
+    assert "data-portfolio-history-empty" in history
+    assert "No dated investment transactions yet" in history
+    assert 'data-chart="performance"' not in history
 
 
 def test_a_sold_out_portfolio_still_shows_its_value_history(owner: OwnerApp) -> None:
@@ -620,9 +635,37 @@ def test_a_sold_out_portfolio_still_shows_its_value_history(owner: OwnerApp) -> 
     _sold_out_portfolio(owner)
     portfolio = _fragment(owner, "portfolio")
     assert "data-portfolio-value" not in portfolio
-    assert 'data-chart="performance"' in portfolio
-    assert "data-portfolio-history-empty" not in portfolio
-    assert "data-portfolio-history-table" in portfolio
+    assert "data-empty" in portfolio
+    history = _fragment(owner, "portfolio-history")
+    assert 'data-chart="performance"' in history
+    assert "data-portfolio-history-empty" not in history
+    assert "data-portfolio-history-table" in history
+
+
+def test_the_net_worth_widget_uses_the_saved_range(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fixed(owner)
+    calls: list[tuple[object, ...]] = []
+    original = dashboard_module.networth_history
+
+    def recording(*args: object, **kwargs: object):
+        calls.append(args)
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(dashboard_module, "networth_history", recording)
+    with owner.db() as session, session.begin():
+        DashboardPreferenceRepository(session, _ctx(owner)).upsert(
+            user_id=owner.admin_id,
+            widgets=list(WIDGET_KEYS),
+            upcoming_limit=10,
+            portfolio_range="1y",
+            net_worth_range="5y",
+            customised_at=owner.app.state.clock.now(),
+        )
+    net_worth = _fragment(owner, "net-worth")
+    assert calls[-1][2] == "5y"
+    assert "data-net-worth-range" in net_worth and "5 years" in net_worth
 
 
 def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> None:
@@ -663,10 +706,12 @@ def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> Non
     assert "data-donut" in portfolio
     assert "data-donut-compact" in portfolio
     assert "h-80 w-full" in portfolio  # the Home pie matches the expense/income donuts
-    portfolio_chart = _performance_chart_data(portfolio)
+    assert 'data-chart="performance"' not in portfolio
+    history = _fragment(owner, "portfolio-history")
+    portfolio_chart = _performance_chart_data(history)
     assert portfolio_chart["labels"] and portfolio_chart["value"]
     assert portfolio_chart["legend"]["value"] == "Value"
-    assert "data-portfolio-history-table" in portfolio
+    assert "data-portfolio-history-table" in history
     assert "data-change-day" in _fragment(owner, "portfolio-changes")
     loans = _fragment(owner, "loans")
     assert "data-loan-row" in loans and "Payoff" in loans and "repaid" in loans

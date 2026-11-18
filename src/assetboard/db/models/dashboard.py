@@ -19,23 +19,26 @@ from sqlalchemy.orm import Mapped, mapped_column
 from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
 from assetboard.db.types import UtcDateTime
 from assetboard.domain.dashboard import (
+    DEFAULT_NET_WORTH_RANGE,
     DEFAULT_PORTFOLIO_RANGE,
     DEFAULT_UPCOMING_LIMIT,
+    NET_WORTH_RANGES,
     PORTFOLIO_RANGES,
     UPCOMING_LIMIT_MAX,
     UPCOMING_LIMIT_MIN,
 )
 
 _PORTFOLIO_RANGE_SQL = ", ".join(f"'{value}'" for value in PORTFOLIO_RANGES)
+_NET_WORTH_RANGE_SQL = ", ".join(f"'{value}'" for value in NET_WORTH_RANGES)
 
 
 class DashboardPreference(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     """The ordered Home widgets and their settings for one member of one workspace.
 
     No row means the default catalogue: every shipped widget, in catalogue order, with the
-    default upcoming-payment limit and portfolio chart range. A row whose ``widgets`` list is
-    empty is a deliberate empty Home. Unknown keys are ignored on read, so a removed widget
-    never breaks the page.
+    default upcoming-payment limit, Net worth range and portfolio chart range. A row whose
+    ``widgets`` list is empty is a deliberate empty Home. Unknown keys are ignored on read, so a
+    removed widget never breaks the page.
     """
 
     __tablename__ = "dashboard_preferences"
@@ -47,6 +50,9 @@ class DashboardPreference(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         ),
         CheckConstraint(
             f"portfolio_range IN ({_PORTFOLIO_RANGE_SQL})", name="portfolio_range_valid"
+        ),
+        CheckConstraint(
+            f"net_worth_range IN ({_NET_WORTH_RANGE_SQL})", name="net_worth_range_valid"
         ),
     )
 
@@ -68,4 +74,11 @@ class DashboardPreference(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         nullable=False,
         default=DEFAULT_PORTFOLIO_RANGE,
         server_default=DEFAULT_PORTFOLIO_RANGE,
+    )
+    # The Home net-worth history range: one of ``NET_WORTH_RANGES``.
+    net_worth_range: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        default=DEFAULT_NET_WORTH_RANGE,
+        server_default=DEFAULT_NET_WORTH_RANGE,
     )

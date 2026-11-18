@@ -11,6 +11,12 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Sequence
 from typing import cast
 
+from assetboard.domain.networth_history import (
+    DEFAULT_HISTORY_RANGE,
+    HISTORY_RANGES,
+    normalize_history_range,
+)
+
 WIDGET_KEYS: tuple[str, ...] = (
     "month-in-out",
     "month-expenses",
@@ -20,6 +26,7 @@ WIDGET_KEYS: tuple[str, ...] = (
     "net-worth",
     "portfolio",
     "portfolio-changes",
+    "portfolio-history",
     "loans",
     "fire",
     "missing-data",
@@ -34,6 +41,9 @@ UPCOMING_LIMIT_MIN = 1
 UPCOMING_LIMIT_MAX = 50
 PORTFOLIO_RANGES: tuple[str, ...] = ("1m", "3m", "6m", "1y", "all")
 DEFAULT_PORTFOLIO_RANGE = "1y"
+# The Net worth page's monthly history ranges; the Home widget offers the same choices.
+NET_WORTH_RANGES: tuple[str, ...] = HISTORY_RANGES
+DEFAULT_NET_WORTH_RANGE = DEFAULT_HISTORY_RANGE
 
 _DIRECTIONS = frozenset({"up", "down"})
 
@@ -119,3 +129,10 @@ def clean_portfolio_range(value: object) -> str:
     if isinstance(value, str) and value in PORTFOLIO_RANGES:
         return value
     return DEFAULT_PORTFOLIO_RANGE
+
+
+def clean_net_worth_range(value: object) -> str:
+    """A posted or stored Net worth range, or the page's default when it is not one."""
+    if isinstance(value, str):
+        return normalize_history_range(value)
+    return DEFAULT_NET_WORTH_RANGE

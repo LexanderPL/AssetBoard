@@ -177,12 +177,14 @@ def test_no_row_means_the_default_catalogue(team: WorkspaceDb) -> None:
         "net-worth",
         "portfolio",
         "portfolio-changes",
+        "portfolio-history",
         "loans",
         "fire",
         "missing-data",
     )
     assert preferences.upcoming_limit == 10
     assert preferences.portfolio_range == "1y"
+    assert preferences.net_worth_range == "1y"
 
 
 def test_a_later_widget_is_default_for_uncustomised_users_and_off_for_customised_ones(
@@ -210,15 +212,18 @@ def test_save_read_and_reset_are_per_user_and_workspace(team: WorkspaceDb) -> No
         ["missing-data", "month-in-out", "unknown"],
         upcoming_limit=7,
         portfolio_range="6m",
+        net_worth_range="5y",
     )
     saved = read_dashboard_preferences(team.factory, olga)
     assert saved.customised is True
     assert saved.widgets == ("missing-data", "month-in-out")
     assert saved.upcoming_limit == 7
     assert saved.portfolio_range == "6m"
+    assert saved.net_worth_range == "5y"
     defaults = read_dashboard_preferences(team.factory, vic)
     assert defaults.customised is False
     assert defaults.upcoming_limit == 10 and defaults.portfolio_range == "1y"
+    assert defaults.net_worth_range == "1y"
 
     second = team.add_workspace("Second")
     team.add_member("olga", "owner", workspace_id=second)
@@ -236,6 +241,7 @@ def test_save_read_and_reset_are_per_user_and_workspace(team: WorkspaceDb) -> No
     after_reset = read_dashboard_preferences(team.factory, olga)
     assert after_reset.customised is False
     assert after_reset.upcoming_limit == 10 and after_reset.portfolio_range == "1y"
+    assert after_reset.net_worth_range == "1y"
 
 
 def test_saving_clamps_the_upcoming_limit_and_rejects_an_unknown_range(
@@ -243,11 +249,17 @@ def test_saving_clamps_the_upcoming_limit_and_rejects_an_unknown_range(
 ) -> None:
     ctx = _owner(team)
     save_dashboard_preferences(
-        team.factory, ctx, ["upcoming"], upcoming_limit=999, portfolio_range="2y"
+        team.factory,
+        ctx,
+        ["upcoming"],
+        upcoming_limit=999,
+        portfolio_range="2y",
+        net_worth_range="2y",
     )
     stored = read_dashboard_preferences(team.factory, ctx)
     assert stored.upcoming_limit == 50
     assert stored.portfolio_range == "1y"
+    assert stored.net_worth_range == "1y"
 
     save_dashboard_preferences(team.factory, ctx, ["upcoming"], upcoming_limit=0)
     assert read_dashboard_preferences(team.factory, ctx).upcoming_limit == 1

@@ -5,13 +5,16 @@ from __future__ import annotations
 import pytest
 
 from assetboard.domain.dashboard import (
+    DEFAULT_NET_WORTH_RANGE,
     DEFAULT_PORTFOLIO_RANGE,
     DEFAULT_UPCOMING_LIMIT,
     DEFAULT_WIDGET_KEYS,
+    NET_WORTH_RANGES,
     PORTFOLIO_RANGES,
     UPCOMING_LIMIT_MAX,
     UPCOMING_LIMIT_MIN,
     WIDGET_KEYS,
+    clean_net_worth_range,
     clean_portfolio_range,
     clean_upcoming_limit,
     clean_widgets,
@@ -27,6 +30,8 @@ def test_default_keys_are_the_catalogue_in_order() -> None:
     assert DEFAULT_WIDGET_KEYS == WIDGET_KEYS
     assert len(set(WIDGET_KEYS)) == len(WIDGET_KEYS)
     assert WIDGET_KEYS[0] == "month-in-out"
+    assert WIDGET_KEYS.index("portfolio") < WIDGET_KEYS.index("portfolio-changes")
+    assert WIDGET_KEYS.index("portfolio-changes") + 1 == WIDGET_KEYS.index("portfolio-history")
     assert "missing-data" in WIDGET_KEYS
 
 
@@ -107,3 +112,13 @@ def test_every_portfolio_range_is_accepted(value: str) -> None:
 @pytest.mark.parametrize("stored", [None, "", "2y", "1Y", 6, True])
 def test_clean_portfolio_range_falls_back_to_one_year(stored: object) -> None:
     assert clean_portfolio_range(stored) == DEFAULT_PORTFOLIO_RANGE == "1y"
+
+
+@pytest.mark.parametrize("value", NET_WORTH_RANGES)
+def test_every_net_worth_range_is_accepted(value: str) -> None:
+    assert clean_net_worth_range(value) == value
+
+
+@pytest.mark.parametrize("stored", [None, "", "2y", "1Y", "1m", 6, True])
+def test_clean_net_worth_range_falls_back_to_one_year(stored: object) -> None:
+    assert clean_net_worth_range(stored) == DEFAULT_NET_WORTH_RANGE == "1y"

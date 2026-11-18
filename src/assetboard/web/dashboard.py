@@ -17,10 +17,12 @@ from fastapi import Request
 
 from assetboard.domain.charts import ChartBlock
 from assetboard.domain.dashboard import (
+    NET_WORTH_RANGES,
     PORTFOLIO_RANGES,
     UPCOMING_LIMIT_MAX,
     UPCOMING_LIMIT_MIN,
     WIDGET_KEYS,
+    clean_net_worth_range,
     clean_portfolio_range,
     clean_upcoming_limit,
     complete_order,
@@ -48,6 +50,7 @@ from assetboard.services.performance import VALUE_RANGES, normalize_value_range,
 from assetboard.services.portfolio import portfolio_page
 from assetboard.services.portfolio_changes import ValueChange, portfolio_changes
 from assetboard.web.charts import build_class_donut, build_donut, build_performance_chart
+from assetboard.web.networth_history import RANGE_LABELS as NET_WORTH_RANGE_LABELS
 from assetboard.web.networth_history import build_trend_view
 from assetboard.web.networth_summary import build_summary_view
 from assetboard.web.plan import SummaryView, build_summary
@@ -140,6 +143,8 @@ class CustomiseView:
     upcoming_limit_max: int
     portfolio_range: str
     portfolio_range_options: tuple[tuple[str, str], ...]
+    net_worth_range: str
+    net_worth_range_options: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,16 +291,34 @@ def build_upcoming(request: Request, ctx: Context) -> dict[str, object]:
 def build_net_worth(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
+    preferences = read_dashboard_preferences(factory, ctx)
     data = networth_summary(factory, ctx)
-    trend = build_trend_view(networth_history(factory, ctx, "1y"), locale)
+    trend = build_trend_view(networth_history(factory, ctx, preferences.net_worth_range), locale)
     return {"view": build_summary_view(data, locale), "trend": trend}
 
 
 def build_portfolio(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
-    preferences = read_dashboard_preferences(factory, ctx)
     page = portfolio_page(factory, ctx)
+    return {
+        "page": page,
+        "donut": build_class_donut(page, locale),
+        "value": format_money(page.valuation.value, locale),
+        "gain": format_money(page.valuation.gain, locale),
+        "gain_pct": (
+            format_rate_tenths(page.valuation.gain_tenths, locale)
+            if page.valuation.gain_tenths is not None
+            else None
+        ),
+        "has_data": bool(page.valuation.value.amount_minor or page.valuation.cost.amount_minor),
+    }
+
+
+def build_portfolio_history(request: Request, ctx: Context) -> dict[str, object]:
+    factory = request.app.state.session_factory
+    locale = request.state.locale
+    preferences = read_dashboard_preferences(factory, ctx)
     history_page = performance_page(
         factory,
         ctx,
@@ -322,16 +345,6 @@ def build_portfolio(request: Request, ctx: Context) -> dict[str, object]:
         incomplete_points=history_page.incomplete_points,
     )
     return {
-        "page": page,
-        "donut": build_class_donut(page, locale),
-        "value": format_money(page.valuation.value, locale),
-        "gain": format_money(page.valuation.gain, locale),
-        "gain_pct": (
-            format_rate_tenths(page.valuation.gain_tenths, locale)
-            if page.valuation.gain_tenths is not None
-            else None
-        ),
-        "has_data": bool(page.valuation.value.amount_minor or page.valuation.cost.amount_minor),
         "history": history,
         "has_history_data": history_page.first_date is not None,
     }
@@ -548,7 +561,7 @@ WIDGETS: tuple[Widget, ...] = (
     Widget(
         "net-worth",
         _("Net worth"),
-        _("The current value and its 12-month trend."),
+        _("The current value and its trend over the chosen range."),
         "dashboard/widgets/net_worth.html",
         "full",
         _route_url("networth_summary"),
@@ -571,6 +584,15 @@ WIDGETS: tuple[Widget, ...] = (
         "half",
         _route_url("investments_portfolio"),
         build_portfolio_changes,
+    ),
+    Widget(
+        "portfolio-history",
+        _("Portfolio value over time"),
+        _("Value and invested capital over the chosen range."),
+        "dashboard/widgets/portfolio_history.html",
+        "full",
+        _route_url("investments_performance"),
+        build_portfolio_history,
     ),
     Widget(
         "loans",
@@ -654,6 +676,7 @@ def customise_context(
     enabled: set[str] | None = None,
     upcoming_limit: int | None = None,
     portfolio_range: str | None = None,
+    net_worth_range: str | None = None,
 ) -> dict[str, object]:
     """The Customise page: every known widget, widget settings and the draft order."""
     locale = request.state.locale
@@ -669,6 +692,11 @@ def customise_context(
         clean_portfolio_range(portfolio_range)
         if portfolio_range is not None
         else preferences.portfolio_range
+    )
+    net_worth_code = (
+        clean_net_worth_range(net_worth_range)
+        if net_worth_range is not None
+        else preferences.net_worth_range
     )
     rows = []
     for index, key in enumerate(draft):
@@ -695,6 +723,10 @@ def customise_context(
             portfolio_range=range_code,
             portfolio_range_options=tuple(
                 (code, gettext(PORTFOLIO_RANGE_LABELS[code], locale)) for code in PORTFOLIO_RANGES
+            ),
+            net_worth_range=net_worth_code,
+            net_worth_range_options=tuple(
+                (code, gettext(NET_WORTH_RANGE_LABELS[code], locale)) for code in NET_WORTH_RANGES
             ),
         )
     }

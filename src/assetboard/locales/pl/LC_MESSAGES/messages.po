@@ -3004,8 +3004,8 @@ msgstr "Nadchodzące płatności"
 msgid "Overdue items and payments due in the Upcoming window."
 msgstr "Zaległe pozycje i płatności należne w oknie Nadchodzących."
 
-msgid "The current value and its 12-month trend."
-msgstr "Bieżąca wartość i jej 12-miesięczny trend."
+msgid "The current value and its trend over the chosen range."
+msgstr "Bieżąca wartość i jej trend w wybranym zakresie."
 
 msgid "Portfolio"
 msgstr "Portfel"
@@ -3018,6 +3018,12 @@ msgstr "Zmiany portfela"
 
 msgid "Changes since yesterday and this month, with the largest movers."
 msgstr "Zmiany od wczoraj i od początku miesiąca oraz największe ruchy."
+
+msgid "Portfolio value over time"
+msgstr "Wartość portfela w czasie"
+
+msgid "Value and invested capital over the chosen range."
+msgstr "Wartość i zainwestowany kapitał w wybranym zakresie."
 
 msgid "Loans"
 msgstr "Kredyty"
@@ -6861,8 +6867,11 @@ msgstr "Liczba nadchodzących płatności"
 msgid "Between %(min)d and %(max)d; the rest stay on the Upcoming page."
 msgstr "Od %(min)d do %(max)d; pozostałe pozostaną na stronie Nadchodzące."
 
-msgid "Portfolio chart range"
-msgstr "Zakres wykresu portfela"
+msgid "Net worth chart range"
+msgstr "Zakres wykresu majątku netto"
+
+msgid "Portfolio value-over-time range"
+msgstr "Zakres wykresu wartości portfela w czasie"
 
 #, python-format
 msgid "%(num)d widget selected"
@@ -6950,49 +6959,6 @@ msgstr "Brak wartości. Dodaj pozycję i jej pierwszą wartość, aby zobaczyć 
 msgid "Set up net worth"
 msgstr "Skonfiguruj majątek netto"
 
-msgid "Value over time"
-msgstr "Wartość w czasie"
-
-#, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
-"lub kursu walutowego."
-msgstr[1] ""
-"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
-"ceny lub kursu walutowego."
-msgstr[2] ""
-"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
-"mają ceny lub kursu walutowego."
-
-msgid "Plotted data"
-msgstr "Dane wykresu"
-
-msgid "Portfolio value over time"
-msgstr "Wartość portfela w czasie"
-
-msgid ""
-"No value history in this range yet. Choose a longer range in Customise "
-"Home."
-msgstr ""
-"Brak historii wartości w tym zakresie. Wybierz dłuższy zakres w opcji "
-"Dostosuj stronę główną."
-
-msgid ""
-"No dated investment transactions yet. Add investment transactions and "
-"prices to see the value over time."
-msgstr ""
-"Brak transakcji inwestycyjnych z datą. Dodaj transakcje i ceny, aby "
-"zobaczyć wartość w czasie."
-
-msgid "Open the portfolio"
-msgstr "Otwórz portfel"
-
 msgid "No holdings are valued yet."
 msgstr "Żadne pozycje nie są jeszcze wycenione."
 
@@ -7015,6 +6981,43 @@ msgstr "Żadna pozycja nie zmieniła się od wczoraj."
 
 msgid "No portfolio history yet. Add investment transactions and prices."
 msgstr "Brak historii portfela. Dodaj transakcje inwestycyjne i ceny."
+
+#, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
+"lub kursu walutowego."
+msgstr[1] ""
+"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
+"ceny lub kursu walutowego."
+msgstr[2] ""
+"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
+"mają ceny lub kursu walutowego."
+
+msgid "Plotted data"
+msgstr "Dane wykresu"
+
+msgid ""
+"No value history in this range yet. Choose a longer range in Customise "
+"Home."
+msgstr ""
+"Brak historii wartości w tym zakresie. Wybierz dłuższy zakres w opcji "
+"Dostosuj stronę główną."
+
+msgid ""
+"No dated investment transactions yet. Add investment transactions and "
+"prices to see the value over time."
+msgstr ""
+"Brak transakcji inwestycyjnych z datą. Dodaj transakcje i ceny, aby "
+"zobaczyć wartość w czasie."
+
+msgid "Open the portfolio"
+msgstr "Otwórz portfel"
 
 msgid "All upcoming items"
 msgstr "Wszystkie nadchodzące pozycje"
@@ -15795,4 +15798,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Planned for %(name)s"
 #~ msgstr "Plan dla: %(name)s"
+
+#~ msgid "Value over time"
+#~ msgstr "Wartość w czasie"
+
+#~ msgid "Portfolio chart range"
+#~ msgstr "Zakres wykresu portfela"
 
