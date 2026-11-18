@@ -304,6 +304,33 @@ The container runs as UID/GID `10001:10001`. A named Docker volume is initialize
 For a host bind mount, create the directory and run `chown 10001:10001` on it before starting
 Compose. The startup check reports this command when `DATA_DIR` is not writable.
 
+## Security and hardening
+
+The controls, their evidence and the known gaps are tracked in
+[docs/security-checklist.md](security-checklist.md) against OWASP ASVS 4.0.3 Level 1. The
+short version for operators:
+
+- **TLS.** Put AssetBoard behind HTTPS and set `ASSETBOARD_BASE_URL` to the public `https://`
+  URL. Cookies become `Secure` and `__Host-` prefixed, and the app sends HSTS
+  (`max-age=31536000`). HSTS deliberately omits `includeSubDomains`: a self-hosted instance
+  may share a parent domain. Plain HTTP is intended only for local development or a loopback
+  reverse proxy.
+- **Container.** Run the published image with a read-only root filesystem, `cap_drop: [ALL]`,
+  `no-new-privileges:true`, a writable `/data` volume and a `tmpfs` at `/tmp`, exactly as
+  `compose.example.yaml` shows. The image runs as UID/GID `10001:10001` and contains no
+  compiler, `pip`, `curl`, `wget`, `git` or netcat. Do not add `privileged`, host networking or
+  the Docker socket.
+- **Dependencies.** `.github/workflows/security.yml` runs `pip-audit` against the locked
+  runtime requirements and fails on high or critical findings. A full report runs first and
+  is non-blocking, so a newly published advisory is visible without blocking an unrelated
+  fix. `THIRD_PARTY_LICENSES` lists every runtime package and its license; it is generated
+  with `make licenses` and checked in CI.
+- **Image scan and SBOM.** `.github/workflows/docker.yml` scans the built image with Trivy
+  (report first, then a HIGH/CRITICAL gate) and attaches a BuildKit SBOM attestation. Each
+  release also ships a CycloneDX SBOM next to the wheel and native-install files.
+- **Errors.** Production responses never contain exception text or a stack trace; a 500 page
+  carries only a request id that matches the server log.
+
 ## Backups
 
 **What to back up:** the database `<DATA_DIR>/assetboard.db` **and** the secret key

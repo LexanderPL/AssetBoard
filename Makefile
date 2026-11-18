@@ -1,4 +1,4 @@
-.PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile
+.PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile licenses licenses-check
 
 UV := uv
 # Parallel test workers for make check/test (pytest-xdist); PYTEST_WORKERS=0 runs serially.
@@ -71,6 +71,13 @@ i18n-update:
 # Compiled .mo catalogs are build output (gitignored); recompiling is cheap and idempotent.
 i18n-compile:
 	$(UV) run pybabel compile -d src/assetboard/locales
+
+# Regenerate the third-party notices from the locked runtime dependencies.
+licenses:
+	$(UV) run python scripts/generate_third_party_licenses.py
+
+licenses-check:
+	$(UV) run python scripts/generate_third_party_licenses.py --check
 
 dev:
 	$(MAKE) css i18n-compile

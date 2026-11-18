@@ -371,7 +371,9 @@ def create_app(
     app.add_middleware(OriginCheckMiddleware)
     app.add_middleware(RequestIdMiddleware, logger=logger)
     app.add_middleware(LocaleMiddleware, default_locale=settings.default_locale)
-    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(
+        SecurityHeadersMiddleware, https=settings.base_url.lower().startswith("https://")
+    )
     app.add_middleware(
         RequestBodyLimitMiddleware,
         max_request_bytes=settings.max_request_bytes,

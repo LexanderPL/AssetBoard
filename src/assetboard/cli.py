@@ -119,9 +119,17 @@ def server_options(settings: Settings) -> dict[str, Any]:
     after recording the TCP peer that proxy authentication checks (ADR-0015). The empty
     ``forwarded_allow_ips`` keeps uvicorn from falling back to the ``FORWARDED_ALLOW_IPS``
     environment variable or ``127.0.0.1``.
+
+    The ``Server`` header is off: the application answers the same whether it runs under
+    Uvicorn or another ASGI server, and a response should not name the exact server build.
     """
     del settings  # TRUSTED_PROXIES is applied by serve_app
-    return {"access_log": False, "proxy_headers": False, "forwarded_allow_ips": ""}
+    return {
+        "access_log": False,
+        "proxy_headers": False,
+        "forwarded_allow_ips": "",
+        "server_header": False,
+    }
 
 
 @app.command()

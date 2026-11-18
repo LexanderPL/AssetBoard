@@ -56,7 +56,14 @@ RUN mkdir -p /data /licenses/AssetBoard/vendor \
     && chown 10001:10001 /data
 
 COPY --from=builder --chown=10001:10001 /opt/venv /opt/venv
+# pip is not used at runtime (the app is already installed in /opt/venv), and the base image's
+# pip vendors its own msgpack, urllib3 and setuptools. Removing it keeps the runtime package
+# set to what the application actually imports and removes those vendored advisories.
+RUN rm -rf /usr/local/lib/python3.15/site-packages/pip \
+           /usr/local/lib/python3.15/site-packages/pip-*.dist-info \
+    && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.15
 COPY --from=builder /build/LICENSE /licenses/AssetBoard/LICENSE
+COPY --from=builder /build/THIRD_PARTY_LICENSES /licenses/AssetBoard/THIRD_PARTY_LICENSES
 COPY --from=builder /build/src/assetboard/data/NOTICE /licenses/AssetBoard/NOTICE
 COPY --from=builder /build/src/assetboard/data/SECLists-LICENSE.txt /licenses/AssetBoard/SECLists-LICENSE.txt
 COPY --from=builder /build/src/assetboard/static/vendor/*-LICENSE.txt /licenses/AssetBoard/vendor/

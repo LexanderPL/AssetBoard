@@ -59,6 +59,29 @@ jobs:
           cache-from: type=gha,scope=smoke-amd64
           cache-to: type=gha,scope=smoke-amd64,mode=max
 
+      # Rollout is report-first: the full scan is visible but does not fail the build, so a
+      # newly published advisory cannot block an unrelated fix. The next step is the gate.
+      - name: Scan the image (all severities, non-blocking)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: assetboard:ci
+          scan-type: image
+          format: table
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Reject high or critical image vulnerabilities (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: assetboard:ci
+          scan-type: image
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
       - name: Smoke-test container, read-only root, readiness, restart, and data persistence
         run: scripts/smoke_container.sh assetboard:ci
 
@@ -192,6 +215,9 @@ jobs:
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # BuildKit attaches an SPDX SBOM attestation to the published manifest list. A manual
+          # dispatch without publishing builds cache-only, which cannot carry attestations.
+          sbom: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
           build-args: |
             VERSION=${{ inputs.tag || github.ref_name }}
             SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
