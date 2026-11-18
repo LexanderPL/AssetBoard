@@ -40,11 +40,19 @@
     </ul>
     <section class="panel mt-5 p-4 sm:p-5" aria-labelledby="customise-settings-heading" data-customise-settings>
       <h2 id="customise-settings-heading" class="text-base font-semibold">{{ _("Widget settings") }}</h2>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <div class="mt-4 grid gap-4 sm:grid-cols-3">
         <div class="space-y-1.5">
           <label for="customise-upcoming-limit" class="block text-sm font-medium">{{ _("Upcoming payments shown") }}</label>
           <input id="customise-upcoming-limit" name="upcoming_limit" type="number" min="{{ view.upcoming_limit_min }}" max="{{ view.upcoming_limit_max }}" step="1" value="{{ view.upcoming_limit }}" aria-describedby="customise-upcoming-limit-help" class="form-control w-full" data-customise-upcoming-limit>
           <p id="customise-upcoming-limit-help" class="text-xs text-muted">{{ _("Between %(min)d and %(max)d; the rest stay on the Upcoming page.", min=view.upcoming_limit_min, max=view.upcoming_limit_max) }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <label for="customise-net-worth-range" class="block text-sm font-medium">{{ _("Net worth chart range") }}</label>
+          <select id="customise-net-worth-range" name="net_worth_range" class="form-select w-full" data-customise-net-worth-range>
+            {% for value, label in view.net_worth_range_options %}
+            <option value="{{ value }}"{% if value == view.net_worth_range %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="space-y-1.5">
           <label for="customise-portfolio-range" class="block text-sm font-medium">{{ _("Portfolio chart range") }}</label>

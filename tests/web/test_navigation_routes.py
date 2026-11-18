@@ -14,6 +14,7 @@ from sqlalchemy import select
 from assetboard.clock import FixedClock
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.scheduled import ScheduledOccurrence
+from assetboard.domain.dashboard import WIDGET_KEYS
 from tests.conftest import OwnerApp
 
 NOW = "2026-03-10T12:00:00+00:00"
@@ -79,7 +80,7 @@ def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     assert ">Home</h1>" in html
     assert '<p class="text-sm font-medium text-primary-ink" data-home-month>March 2026</p>' in html
     assert "data-customise-link" in html
-    assert html.count('data-widget="') == 11
+    assert html.count('data-widget="') == len(WIDGET_KEYS)
     assert "data-open-month" not in html and "Open month" not in html
     flow = _fragment(nav, "month-in-out")
     assert "data-summary-kpis" in flow and 'data-flow-segment="empty"' in flow

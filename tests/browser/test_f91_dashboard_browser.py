@@ -146,7 +146,7 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             # locally, and Save/Reset share one horizontal action row. No drag and drop.
             page.locator("[data-customise-link]").click()
             page.wait_for_url(f"{base}/dashboard/customise")
-            expect(page.locator("[data-customise-widget]")).to_have_count(11)
+            expect(page.locator("[data-customise-widget]")).to_have_count(12)
             expect(page.locator("[data-customise-nojs-note]")).to_have_count(0)
             expect(page.locator("[data-customise-save]")).to_have_text("Save")
             expect(page.locator('[data-customise-move="loans:up"]')).to_have_attribute(
@@ -178,6 +178,7 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             page.locator("#customise-month-expenses").uncheck()
             page.locator("[data-customise-upcoming-limit]").fill("3")
             page.locator("[data-customise-portfolio-range]").select_option("3m")
+            page.locator("[data-customise-net-worth-range]").select_option("5y")
             page.locator("[data-customise-save]").click()
             page.wait_for_url(f"{base}/?saved=1")
             order = _home_order(page)
@@ -185,12 +186,14 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             stored = _stored_preferences(app)
             assert stored is not None
             assert stored.upcoming_limit == 3 and stored.portfolio_range == "3m"
+            assert stored.net_worth_range == "5y"
             assert page.evaluate("window.__cspViolations") == []
 
             page.locator("[data-customise-link]").click()
             page.wait_for_url(f"{base}/dashboard/customise")
             expect(page.locator("[data-customise-upcoming-limit]")).to_have_value("3")
             expect(page.locator("[data-customise-portfolio-range]")).to_have_value("3m")
+            expect(page.locator("[data-customise-net-worth-range]")).to_have_value("5y")
             _actions_are_inline(page)
             page.locator("[data-customise-reset]").click()
             page.wait_for_url(f"{base}/?reset=1")
@@ -235,7 +238,7 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             ).to_be_visible()
             nojs_page.locator("[data-customise-link]").click()
             nojs_page.wait_for_url(re.compile(r"/dashboard/customise$"))
-            expect(nojs_page.locator("[data-customise-widget]")).to_have_count(11)
+            expect(nojs_page.locator("[data-customise-widget]")).to_have_count(12)
             expect(nojs_page.locator("[data-customise-nojs-note]")).to_be_visible()
             expect(nojs_page.locator('[data-customise-move="upcoming:up"]')).to_have_attribute(
                 "type", "submit"
