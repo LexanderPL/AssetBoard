@@ -156,11 +156,17 @@ def generate(requirements: dict[str, str]) -> str:
     for name in sorted(requirements):
         dist = installed[name]
         metadata = dist.metadata
+        locked_version = requirements[name]
+        if dist.version != locked_version:
+            raise SystemExit(
+                f"{metadata['Name']} {dist.version} is installed but uv.lock pins "
+                f"{locked_version}; run `uv sync --all-groups` first."
+            )
         lines.extend(
             [
                 "-" * 78,
                 f"Package: {metadata['Name']}",
-                f"Version: {dist.version}",
+                f"Version: {locked_version}",
                 f"License: {_license_expression(metadata)}",
             ]
         )

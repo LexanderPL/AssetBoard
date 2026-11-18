@@ -15,6 +15,7 @@ check: i18n-compile
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
 	$(UV) run pyright
+	$(MAKE) licenses-check
 	$(UV) run pytest -n $(PYTEST_WORKERS)
 	@temp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$temp_dir"' EXIT; \
@@ -74,10 +75,10 @@ i18n-compile:
 
 # Regenerate the third-party notices from the locked runtime dependencies.
 licenses:
-	$(UV) run python scripts/generate_third_party_licenses.py
+	$(UV) run --locked python scripts/generate_third_party_licenses.py
 
 licenses-check:
-	$(UV) run python scripts/generate_third_party_licenses.py --check
+	$(UV) run --locked python scripts/generate_third_party_licenses.py --check
 
 dev:
 	$(MAKE) css i18n-compile

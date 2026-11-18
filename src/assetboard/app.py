@@ -330,6 +330,13 @@ def create_app(
         title=APP_NAME,
         version=version("assetboard"),
         lifespan=lifespan,
+        # The app is server-rendered HTML with no public API in v1. FastAPI's schema and
+        # documentation pages would expose every route, form field and admin path to any
+        # signed-in viewer, and /docs pulls assets from a CDN. F9.5 can add an admin-only
+        # schema view after v1.0.
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
         # Every signed-in page gets the workspace nav in its sidebar (base.html).
         dependencies=[Depends(load_workspace_nav)],
     )
@@ -366,18 +373,20 @@ def create_app(
     app.state.release_source = GitHubReleaseSource()
     app.state.mail_log_key = mail_log_key
     app.state.database_checker = checker
-    # Added innermost first; see ADR-0012 for the resulting order.
+    # Added innermost first; see ADR-0012 for the resulting order. The body limit sits inside
+    # the request-id, locale and security-header layers so its own 413 response carries the
+    # same headers (and request id) as every other response.
     app.add_middleware(AccessGateMiddleware)
+    app.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_request_bytes=settings.max_request_bytes,
+        import_max_upload_bytes=settings.import_max_upload_bytes,
+    )
     app.add_middleware(OriginCheckMiddleware)
     app.add_middleware(RequestIdMiddleware, logger=logger)
     app.add_middleware(LocaleMiddleware, default_locale=settings.default_locale)
     app.add_middleware(
         SecurityHeadersMiddleware, https=settings.base_url.lower().startswith("https://")
-    )
-    app.add_middleware(
-        RequestBodyLimitMiddleware,
-        max_request_bytes=settings.max_request_bytes,
-        import_max_upload_bytes=settings.import_max_upload_bytes,
     )
     static_directory = Path(__file__).parent / "static"
     # The favicon is an SVG; do not depend on the host's mime.types knowing the extension.

@@ -6,6 +6,7 @@
 #   <app>-<version>-py3-none-any.whl     the app (compiled .mo catalogs included)
 #   <app>-<version>-requirements.txt     locked runtime dependencies, with hashes
 #   <app>-<version>-sbom.cdx.json        CycloneDX SBOM for those dependencies
+#   THIRD_PARTY_LICENSES                 aggregate third-party notices
 #   <app>.service, <app>.env.example     systemd unit and settings template
 #   install-debian.sh, SHA256SUMS
 #
@@ -44,15 +45,16 @@ printf '==> Exporting locked runtime requirements\n'
 
 printf '==> Generating CycloneDX SBOM\n'
 (cd "$checkout" && uvx --from cyclonedx-bom==8.0.1 cyclonedx-py requirements \
-  "$out/$requirements" --output-format JSON \
-  --output-file "$out/$app-$version-sbom.cdx.json" --no-validate >/dev/null)
+  "$out/$requirements" --pyproject pyproject.toml --output-format JSON \
+  --output-file "$out/$app-$version-sbom.cdx.json" >/dev/null)
 
 install -m 0644 "$here/systemd/$app.service" "$out/$app.service"
 install -m 0644 "$here/$app.env.example" "$out/$app.env.example"
+install -m 0644 "$checkout/THIRD_PARTY_LICENSES" "$out/THIRD_PARTY_LICENSES"
 install -m 0755 "$here/install-debian.sh" "$out/install-debian.sh"
 
 (cd "$out" && sha256sum "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
-  "$app.service" "$app.env.example" install-debian.sh >SHA256SUMS)
+  "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh >SHA256SUMS)
 
 printf '==> Done\n'
 ls -l "$out"

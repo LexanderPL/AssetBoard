@@ -323,11 +323,14 @@ short version for operators:
 - **Dependencies.** `.github/workflows/security.yml` runs `pip-audit` against the locked
   runtime requirements and fails on high or critical findings. A full report runs first and
   is non-blocking, so a newly published advisory is visible without blocking an unrelated
-  fix. `THIRD_PARTY_LICENSES` lists every runtime package and its license; it is generated
-  with `make licenses` and checked in CI.
-- **Image scan and SBOM.** `.github/workflows/docker.yml` scans the built image with Trivy
-  (report first, then a HIGH/CRITICAL gate) and attaches a BuildKit SBOM attestation. Each
-  release also ships a CycloneDX SBOM next to the wheel and native-install files.
+  fix. An advisory whose severity cannot be resolved from OSV is treated as high (fail
+  closed). `THIRD_PARTY_LICENSES` lists every runtime package and its license; it is
+  generated with `make licenses` and checked in CI.
+- **Image scan and SBOM.** `.github/workflows/docker.yml` scans the amd64 and native arm64
+  images with Trivy (report first, then a **fixed** HIGH/CRITICAL gate; unfixed base-image
+  advisories stay visible but do not block). A weekly scheduled build scans the current
+  image. The published manifest carries a BuildKit SBOM attestation, and each release also
+  ships a CycloneDX SBOM next to the wheel and native-install files.
 - **Errors.** Production responses never contain exception text or a stack trace; a 500 page
   carries only a request id that matches the server log.
 

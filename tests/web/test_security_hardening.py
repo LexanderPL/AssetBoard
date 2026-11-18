@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from assetboard.cli import server_options
 from assetboard.middleware import HSTS_HEADER, HSTS_VALUE, SECURITY_HEADERS
+from assetboard.web.security import session_cookie_name
 
 if TYPE_CHECKING:
     from conftest import WebHarness
@@ -179,3 +180,49 @@ def test_responses_do_not_advertise_the_server_software(
     assert "server" not in {name.lower() for name in response.headers}
     assert re.search(r"\buvicorn\b", response.text, re.IGNORECASE) is None
     assert server_options(web.settings())["server_header"] is False
+
+
+def test_api_documentation_and_schema_are_not_served(
+    signed_in: TestClient, web: WebHarness
+) -> None:
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        response = signed_in.get(path)
+        assert response.status_code == 404, (path, response.status_code)
+
+
+@pytest.mark.parametrize("https", [False, True])
+def test_a_413_response_carries_the_security_headers_and_request_id(
+    web: WebHarness, https: bool
+) -> None:
+    base_url = "https://assets.example" if https else "http://localhost:8000"
+    normal = web.app(base_url=base_url)
+    with TestClient(
+        normal, base_url="https://testserver" if https else "http://testserver"
+    ) as client:
+        web.complete_setup(normal)
+        assert web.sign_in(client).status_code == 303
+        session = client.cookies[session_cookie_name(normal.state.settings)]
+        token = web.csrf(client.get("/").text)
+
+    limited = web.app(base_url=base_url, max_request_bytes=64)
+    with TestClient(
+        limited, base_url="https://testserver" if https else "http://testserver"
+    ) as client:
+        client.cookies.set(session_cookie_name(limited.state.settings), session)
+        response = client.post(
+            "/dashboard/customise",
+            data={"csrf_token": token, "order": "x" * 200},
+        )
+    assert response.status_code == 413
+    assert response.headers["content-security-policy"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["permissions-policy"]
+    assert response.headers["x-request-id"]
+    assert response.headers["cache-control"] == "no-store"
+    assert (response.headers.get(HSTS_HEADER) == HSTS_VALUE) is https
+
+
+def test_unsupported_methods_are_rejected(signed_in: TestClient) -> None:
+    assert signed_in.put("/").status_code == 405

@@ -56,3 +56,19 @@ def test_checklist_names_the_ci_and_license_artefacts() -> None:
         "SBOM",
     ):
         assert required in text, required
+
+
+def test_summary_counts_match_the_rows() -> None:
+    text = CHECKLIST.read_text(encoding="utf-8")
+    counts = {
+        status: sum(1 for row in rows() if row["status"] == status)
+        for status in ("Done", "N/A", "Gap")
+    }
+    for status, count in counts.items():
+        assert re.search(rf"\| {re.escape(status)} \| {count} \|", text), (status, count)
+
+
+def test_every_local_link_target_exists() -> None:
+    text = CHECKLIST.read_text(encoding="utf-8")
+    for target in re.findall(r"\]\((\.\./[^)#]+)", text):
+        assert (CHECKLIST.parent / target).resolve().exists(), target
