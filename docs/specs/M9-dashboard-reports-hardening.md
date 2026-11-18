@@ -373,6 +373,28 @@ keep going through the existing Apprise channels (F3.6); web push is out of scop
     workspace fragment is not);
   - a browser test that registers the worker and loads the offline page.
 
+**As built (F9.10, 2026-11-18)**
+
+- `GET /manifest.webmanifest` builds the manifest from `branding.APP_NAME`, the ASGI root path
+  (`start_url`, `scope` and `id`) and the design tokens (`primary` for `theme_color`, `canvas`
+  for `background_color`). The dark tokens travel in the draft `color_scheme_dark` manifest
+  member, with `<meta name="theme-color" media="(prefers-color-scheme: …)">` in both page heads
+  for current browsers. Both heads link the manifest and the 180 px `apple-touch-icon`.
+- The icons are generated from `static/img/favicon.svg` by
+  `scripts/generate_pwa_icons.py` (`make icons`) with Playwright's Chromium; the five PNGs are
+  committed. No runtime dependency was added.
+- `GET /service-worker.js` serves the worker from the app root, so its scope matches the root
+  path. It is registered by `app.js` with the running version in `?v=`; the cache name carries
+  that version. Only versioned `/static/` assets and `GET /offline` are cached. Navigations are
+  network-first and fall back to the translated, data-free offline page; fragments, exports and
+  every other workspace response are network-only. `worker-src 'self'` was added to the CSP.
+- Sign-in, sign-out and OIDC redirects already stay on the app's URLs (OIDC uses a local `next`),
+  so they return to the installed app when the scope covers the root path. A real install and an
+  Authelia/OIDC round trip on physical Android and iOS devices cannot be automated here; the
+  [Install on your phone](../install-on-your-phone.md) guide covers the manual check, and the
+  Chromium test exercises the standalone viewport, manifest, registration, cache rules and
+  offline page. The update notice and version are served in the (never cached) HTML.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

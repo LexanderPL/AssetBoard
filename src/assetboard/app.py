@@ -105,6 +105,7 @@ from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.portfolio_routes import router as portfolio_router
 from assetboard.web.provider_routes import router as provider_router
 from assetboard.web.proxy_routes import router as proxy_router
+from assetboard.web.pwa_routes import router as pwa_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.scheduled_routes import router as scheduled_router
@@ -381,6 +382,7 @@ def create_app(
     # The favicon is an SVG; do not depend on the host's mime.types knowing the extension.
     mimetypes.add_type("image/svg+xml", ".svg")
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
+    app.include_router(pwa_router)
     app.include_router(web_router)
     app.include_router(dashboard_router)
     app.include_router(scheduled_router)

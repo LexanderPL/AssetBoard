@@ -1435,3 +1435,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// Installable web app (F9.10): register the static-only service worker once the page has loaded
+// (it caches versioned assets and the offline page, never workspace data). The root path and the
+// version come from <html data-pwa-root data-pwa-version>, so the worker's scope always matches
+// the app root and a release fetches a new worker and cache.
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  const root = document.documentElement.dataset.pwaRoot;
+  if (!root) return;
+  try {
+    const base = new URL(root, window.location.origin);
+    const script = new URL("service-worker.js", base);
+    const version = document.documentElement.dataset.pwaVersion;
+    if (version) script.searchParams.set("v", version);
+    navigator.serviceWorker.register(script, { scope: base.pathname }).catch(() => {
+      // Insecure origin, a private window or a browser without support: the app still works.
+    });
+  } catch {
+    // A malformed root attribute must not break the page.
+  }
+}
+
+if (document.readyState === "complete") registerServiceWorker();
+else window.addEventListener("load", registerServiceWorker, { once: true });

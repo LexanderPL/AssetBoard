@@ -6021,6 +6021,20 @@ msgstr ""
 msgid "Customise"
 msgstr "Dostosuj"
 
+msgid "You are offline"
+msgstr "Jesteś offline"
+
+msgid ""
+"Check your connection, then try again. This page contains no workspace "
+"data."
+msgstr "Sprawdź połączenie i spróbuj ponownie. Ta strona nie zawiera danych obszaru roboczego."
+
+msgid "Try again"
+msgstr "Spróbuj ponownie"
+
+msgid "Go to Home"
+msgstr "Otwórz stronę główną"
+
 msgid "Link a sign-in method"
 msgstr "Powiąż metodę logowania"
 

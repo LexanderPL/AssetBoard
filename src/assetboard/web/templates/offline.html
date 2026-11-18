@@ -1,0 +1,10 @@
+{% extends "auth_base.html" %}
+{% block title %}{{ _("You are offline") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("You are offline") }}{% endblock %}
+{% block content %}
+<p class="mt-4 text-sm text-muted">{{ _("Check your connection, then try again. This page contains no workspace data.") }}</p>
+<div class="mt-6 flex flex-wrap gap-3">
+  <a class="btn-primary" href="{{ scoped_url(request, 'offline') }}">{{ _("Try again") }}</a>
+  <a class="btn" href="{{ scoped_url(request, 'home') }}">{{ _("Go to Home") }}</a>
+</div>
+{% endblock %}

@@ -54,6 +54,7 @@ make check
 
 ## User guides
 
+- [Install on your phone](docs/install-on-your-phone.md): add AssetBoard to an Android or iOS home screen (HTTPS required).
 - [Home dashboard](docs/dashboard.md): the widget catalogue, defaults and how to customise Home.
 - [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
 - [Categories](docs/categories.md): expense and income categories, savings and transfers.
