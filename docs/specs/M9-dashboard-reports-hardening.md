@@ -256,6 +256,17 @@ Include a docs/api.md with curl examples.
 - Container: non-root, read-only root filesystem tested, no shell tools beyond what's needed, dropped capabilities documented in the compose example.
 - Dependency and license review: all runtime deps compatible with AGPL-3.0-or-later; `THIRD_PARTY_LICENSES` generated.
 
+**As built (2026-11-18):** the checklist covers all 127 ASVS 4.0.3 Level 1 requirements
+(87 done, 27 not applicable, 13 gaps with follow-ups). The gaps are password length limits
+(8/1024 versus 12/128), no strength meter, no sign-in breach re-check, no outbound notices for
+authentication changes, temporary-password expiry, MFA not required for instance-admin pages,
+user-configured notification/provider hosts (ADR-0021 accepted risk), invite/reset tokens in
+URLs (ADR-0013 accepted trade-off), no antivirus scan, outbound host allow-listing, and HSTS
+without `includeSubDomains`. `pip-audit` and Trivy report first and then block high/critical;
+releases carry a CycloneDX SBOM and `THIRD_PARTY_LICENSES`. The 500 page test, cookie/session,
+CSRF, header and role-matrix tests live in `tests/web/test_security_hardening.py`,
+`tests/web/test_authorization_matrix.py` and the existing feature suites.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

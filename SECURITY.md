@@ -20,3 +20,6 @@ one-time setup token. The design and its accepted risks are recorded in
 [ADR-0012](docs/adr/0012-local-authentication.md). Run it behind HTTPS and a correctly configured
 reverse proxy as described in the [deployment guide](docs/deployment.md#reverse-proxies). The
 accepted risks listed in ADR-0012 are known limitations, not vulnerability reports.
+
+The current OWASP ASVS 4.0.3 Level 1 self-assessment, including every known gap and its
+follow-up, is in [docs/security-checklist.md](docs/security-checklist.md).

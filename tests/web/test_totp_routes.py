@@ -1354,3 +1354,40 @@ def test_signing_out_other_devices_ends_pending_tickets(owner: OwnerApp) -> None
             session, owner.admin_id, "not-a-current-session", clock=owner.app.state.clock
         )
     assert _ticket_count(owner) == 0
+
+
+def test_https_two_step_login_keeps_the_path_scoped_ticket_and_completes(
+    owner: OwnerApp,
+) -> None:
+    """``__Secure-`` is required for a path-scoped ticket; ``__Host-`` forbids Path=/login."""
+    secret, _codes = _enable(owner)
+    app = owner.web.app(base_url="https://assets.example")
+    app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    with TestClient(app, base_url="https://testserver") as client:
+        login = client.get("/login")
+        first = client.post(
+            "/login",
+            data={
+                "csrf_token": owner.web.csrf(login.text),
+                "email": owner.web.admin_email,
+                "password": owner.web.admin_password,
+            },
+            follow_redirects=False,
+        )
+        assert first.status_code == 303
+        assert first.headers["location"] == "/login/verify"
+        cookie = first.headers["set-cookie"]
+        assert cookie.startswith("__Secure-assetboard_login_ticket=")
+        assert "Path=/login" in cookie
+        assert "Secure" in cookie
+        challenge = client.get("/login/verify")
+        assert "Enter the code from your authenticator app" in challenge.text
+        success = client.post(
+            "/login/verify",
+            data={
+                "csrf_token": owner.web.csrf(challenge.text),
+                "second_factor": pyotp.TOTP(secret).at(app.state.clock.now()),
+            },
+            follow_redirects=False,
+        )
+    assert success.status_code == 303

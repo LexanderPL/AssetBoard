@@ -44,9 +44,11 @@ def is_https(settings: Settings) -> bool:
     return settings.base_url.lower().startswith("https://")
 
 
-def _cookie_name(settings: Settings, purpose: str) -> str:
+def _cookie_name(settings: Settings, purpose: str, *, host_prefix: bool = True) -> str:
     # ``__Host-`` requires Secure, Path=/ and no Domain; browsers enforce it on https only.
-    prefix = "__Host-" if is_https(settings) else ""
+    # A path-scoped cookie (the login ticket) uses ``__Secure-`` instead, which only requires
+    # Secure and accepts a narrower Path.
+    prefix = ("__Host-" if host_prefix else "__Secure-") if is_https(settings) else ""
     return f"{prefix}{CLI_NAME}_{purpose}"
 
 
@@ -59,7 +61,7 @@ def csrf_cookie_name(settings: Settings) -> str:
 
 
 def login_ticket_cookie_name(settings: Settings) -> str:
-    return _cookie_name(settings, "login_ticket")
+    return _cookie_name(settings, "login_ticket", host_prefix=False)
 
 
 def summary_sort_cookie_name(settings: Settings) -> str:
