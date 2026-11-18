@@ -25,7 +25,15 @@ def reports(owner: OwnerApp) -> OwnerApp:
     return owner
 
 
-def _category(app: OwnerApp, name: str, kind: str = "expense", treatment: str = "regular") -> UUID:
+def _category(
+    app: OwnerApp,
+    name: str,
+    kind: str = "expense",
+    treatment: str = "regular",
+    *,
+    archived: bool = False,
+    color: str = "#16a34a",
+) -> UUID:
     category_id = uuid4()
     with app.db() as session, session.begin():
         session.execute(
@@ -38,11 +46,11 @@ def _category(app: OwnerApp, name: str, kind: str = "expense", treatment: str = 
                     "name_key": name.casefold(),
                     "kind": kind,
                     "treatment": treatment,
-                    "color": "#16a34a",
+                    "color": color,
                     "sort_order": 0,
                     "import_key": None,
                     "import_batch_id": None,
-                    "archived_at": None,
+                    "archived_at": STAMP if archived else None,
                     "created_at": STAMP,
                     "updated_at": STAMP,
                 }
@@ -254,6 +262,7 @@ def test_viewers_may_open_the_page(reports: OwnerApp) -> None:
     html = _page(reports)
     assert ">Reports</h1>" in html
     assert re.search(r'<a class="nav-link" href="/reports"', _sidebar(html))
+    assert "data-report-category-section" in html
 
 
 # F10.2 savings rate
@@ -359,3 +368,155 @@ def test_a_range_without_earnings_has_no_rate_chart(reports: OwnerApp) -> None:
     assert "data-report-rolling-rate" not in html  # fewer than 12 months
     total = re.search(r"<tr [^>]*data-report-rate-total.*?</tr>", html, re.DOTALL)
     assert total is not None and "—" in total.group(0)
+
+
+# F10.3 expenses by category
+
+
+def _category_data(html: str) -> dict:
+    match = re.search(
+        r'<script type="application/json" id="reports-category-data">(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    assert match is not None
+    return json.loads(match.group(1))
+
+
+def _category_row(html: str, label: str) -> str:
+    for row in re.findall(r"<tr data-report-category-row>.*?</tr>", html, re.DOTALL):
+        header = re.sub(r"<svg.*?</svg>", "", row, flags=re.DOTALL)
+        if re.search(r">\s*" + re.escape(label) + r"\s*</th>", header):
+            return row
+    raise AssertionError(label)
+
+
+def _category_cells(row: str) -> list[str]:
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
+    return [re.sub(r"<[^>]+>", "", cell).strip() for cell in cells]
+
+
+def test_the_category_section_has_a_stacked_chart_and_its_table(reports: OwnerApp) -> None:
+    food = _category(reports, "Golden Food")
+    rent = _category(reports, "Golden Rent", color="#2563eb")
+    salary = _category(reports, "Golden Salary", "income")
+    savings = _category(reports, "Golden Savings", "expense", "savings")
+    _tx(reports, food, date(2026, 1, 10), 12_000)
+    _tx(reports, food, date(2026, 2, 10), 13_000)
+    _tx(reports, rent, date(2026, 1, 11), 90_000)
+    _tx(reports, salary, date(2026, 1, 12), 300_000, direction="income")
+    _tx(reports, savings, date(2026, 1, 13), 20_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month")
+    assert "data-report-category-section" in html
+    assert ">Expenses by category over time</h2>" in html
+    assert "Spending by category and period" in html
+    assert 'data-chart="report-category-bars"' in html
+    assert 'name="category"' in html and "multiple" in html
+    assert "Golden Food" in html and "Golden Rent" in html
+    assert "Golden Salary" not in html  # income is not offered
+    assert "Golden Savings" not in html  # savings only with the option
+    assert 'name="savings"' in html
+
+    data = _category_data(html)
+    assert data["stack"] == "spending"
+    assert [series["name"] for series in data["series"]] == ["Golden Rent", "Golden Food"]
+    assert [series["color"] for series in data["series"]] == ["#2563eb", "#16a34a"]
+    assert data["series"][0]["values"][0] == 90_000
+    assert data["series"][1]["values"][:2] == [12_000, 13_000]
+    assert data["labels"][0] == "January 2026"
+    assert "Golden Rent: €900.00" in data["tooltips"][0]
+    assert "Total: €1,020.00" in data["tooltips"][0]
+
+    rent_row = _category_row(html, "Golden Rent")
+    assert _category_cells(rent_row)[-1] == "€900.00"
+    food_row = _category_row(html, "Golden Food")
+    assert _category_cells(food_row)[:2] == ["€120.00", "€130.00"]
+    totals = re.search(r"<tr [^>]*data-report-category-totals.*?</tr>", html, re.DOTALL)
+    assert totals is not None
+    assert re.search(r"data-report-category-totals>.*?€1,020\.00", totals.group(0), re.DOTALL)
+    assert "The 8 largest categories are shown" not in html  # only two categories
+
+    with_savings = _page(reports, "from=2026&to=2026&step=month&savings=1")
+    assert 'name="savings" value="1" checked' in with_savings
+    assert "Golden Savings" in with_savings
+    savings_data = _category_data(with_savings)
+    assert {series["name"] for series in savings_data["series"]} == {
+        "Golden Rent",
+        "Golden Food",
+        "Golden Savings",
+    }
+    assert savings_data["tooltips"][0][-1] == "Total: €1,220.00"
+
+
+def test_the_category_filter_is_repeatable_and_shows_no_other(reports: OwnerApp) -> None:
+    categories = [_category(reports, f"Filter Category {index}") for index in range(1, 11)]
+    for index, category in enumerate(categories, start=1):
+        _tx(reports, category, date(2026, 1, 10), index * 1_000)
+
+    query = "from=2026&to=2026&step=month&" + "&".join(
+        f"category={categories[index]}" for index in (0, 2)
+    )
+    html = _page(reports, query)
+    assert f'<option value="{categories[0]}" selected>' in html
+    assert f'<option value="{categories[1]}" selected>' not in html
+    data = _category_data(html)
+    assert [series["name"] for series in data["series"]] == [
+        "Filter Category 3",
+        "Filter Category 1",
+    ]
+    assert "Other" not in [series["name"] for series in data["series"]]
+    assert "Showing the selected categories only." in html
+    assert "The 8 largest categories are shown" not in html
+
+    # A selected category without spending still gets a zero table row; the chart is empty.
+    empty = _category(reports, "Filter Empty")
+    html = _page(reports, f"from=2026&to=2026&step=month&category={empty}")
+    assert "No expenses in this range." in html
+    assert 'id="reports-category-data"' not in html
+    assert ">Other</th>" not in html
+    assert _category_cells(_category_row(html, "Filter Empty"))[-1] == "€0.00"
+
+
+def test_unknown_category_ids_are_ignored_and_top_eight_gets_other(reports: OwnerApp) -> None:
+    categories = [_category(reports, f"Top Category {index:02d}") for index in range(1, 11)]
+    for index, category in enumerate(categories, start=1):
+        _tx(reports, category, date(2026, 1, 10), index * 1_000)
+
+    html = _page(
+        reports,
+        f"from=2026&to=2026&step=month&category=junk&category={uuid4()}",
+    )
+    data = _category_data(html)
+    assert len(data["series"]) == 9
+    assert data["series"][-1]["name"] == "Other"
+    assert data["series"][-1]["values"][0] == 3_000  # the two smallest: 1 000 + 2 000
+    assert "The 8 largest categories are shown; the rest are combined as Other." in html
+    rows = re.findall(r"<tr data-report-category-row>", html)
+    assert len(rows) == 9
+    assert _category_cells(_category_row(html, "Other"))[-1] == "€30.00"
+
+
+def test_an_archived_category_appears_with_its_name(reports: OwnerApp) -> None:
+    old = _category(reports, "Archived Food", archived=True)
+    empty = _category(reports, "Archived Empty", archived=True)
+    _tx(reports, old, date(2026, 4, 10), 4_200)
+
+    html = _page(reports, "from=2026&to=2026&step=month")
+    data = _category_data(html)
+    assert [series["name"] for series in data["series"]] == ["Archived Food"]
+    assert "Archived Empty" not in html
+    assert f'<option value="{old}">Archived Food</option>' in html
+    assert f'<option value="{empty}">' not in html
+
+
+def test_a_range_without_spending_shows_the_category_empty_state(reports: OwnerApp) -> None:
+    salary = _category(reports, "Empty Salary", "income")
+    _tx(reports, salary, date(2026, 1, 10), 5_000, direction="income")
+    html = _page(reports, "from=2026&to=2026&step=month")
+    assert "data-report-category-section" in html
+    assert "No expenses in this range." in html
+    assert 'id="reports-category-data"' not in html
+
+    with_savings = _page(reports, "from=2026&to=2026&step=month&savings=1")
+    assert "No expenses or savings in this range." in with_savings

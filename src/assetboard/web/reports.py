@@ -1,10 +1,11 @@
-"""The Reports page's view model (F10.1/F10.2): formatted rows, chart JSON and notes.
+"""The Reports page's view model (F10.1–F10.3): formatted rows, chart JSON and notes.
 
 Amounts, rates and labels are formatted here by the server's locale helpers; the browser only
 draws the integers it receives. Chart colours are CSS token names (read by
-``static/js/charts.js``), so both themes keep their contrast. The data block is the same JSON
-shape every chart uses (``<script type="application/json">`` read by the static module); each
-table carries the same figures for assistive technology and for visitors without JavaScript.
+``static/js/charts.js``) or a category's ``#rrggbb`` colour, so both themes keep their contrast.
+The data block is the same JSON shape every chart uses (``<script type="application/json">``
+read by the static module); each table carries the same figures for assistive technology and
+for visitors without JavaScript.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
+from uuid import UUID
 
 from fastapi import Request
 
@@ -19,6 +21,8 @@ from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.reports import (
     REPORT_ROLLING_MONTHS,
+    CategorySeries,
+    CategorySpend,
     PeriodKey,
     PeriodTotals,
     ReportStep,
@@ -30,7 +34,7 @@ from assetboard.domain.reports import (
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_month
 from assetboard.i18n.numbers import format_money, format_rate_tenths
-from assetboard.services.reports import FilterError, ReportsData
+from assetboard.services.reports import CategoryOption, FilterError, ReportsData
 from assetboard.web.chart_axis import money_axis, rate_axis
 from assetboard.web.rendering import scoped_url
 
@@ -58,6 +62,17 @@ SAVINGS_RATE = _("Savings rate")
 ROLLING_RATE = _("12-month rolling rate")
 NOT_AVAILABLE = _("Not available: nothing earned")
 NOT_ENOUGH_HISTORY = _("Not available: fewer than 12 months of data.")
+CATEGORY_CHART_TITLE = _("Expenses by category over time")
+CATEGORY_TABLE_CAPTION = _("Spending by category and period")
+CATEGORY_EMPTY = _("No expenses in this range.")
+CATEGORY_EMPTY_SAVINGS = _("No expenses or savings in this range.")
+CATEGORY_FILTER = _("Categories")
+CATEGORY_FILTER_HELP = _("Leave empty to show the 8 largest categories and the rest as Other.")
+CATEGORY_FILTER_ACTIVE = _("Showing the selected categories only.")
+CATEGORY_TOP_NOTE = _("The 8 largest categories are shown; the rest are combined as Other.")
+INCLUDE_SAVINGS = _("Include saved / invested")
+INCLUDE_SAVINGS_HELP = _("Saved and invested amounts get their own category series.")
+OTHER = _("Other")
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +122,40 @@ class RateTotal:
 
 
 @dataclass(frozen=True, slots=True)
+class CategoryColumn:
+    """One period column of the category table."""
+
+    label: str
+    href: str | None
+    so_far: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryRow:
+    """One category row: formatted cells, a row total and its swatch colour."""
+
+    label: str
+    color: str | None
+    cells: tuple[str, ...]
+    total: str
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryTable:
+    columns: tuple[CategoryColumn, ...]
+    rows: tuple[CategoryRow, ...]
+    totals: tuple[str, ...]
+    total: str
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryOptionView:
+    id: UUID
+    name: str
+    selected: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ReportsView:
     data: ReportsData
     errors: dict[str, str]
@@ -117,6 +166,11 @@ class ReportsView:
     rate_total: RateTotal
     rate_chart: dict[str, Any] | None
     show_rolling: bool
+    category_chart: dict[str, Any] | None
+    category_table: CategoryTable
+    category_options: tuple[CategoryOptionView, ...]
+    category_notes: tuple[str, ...]
+    category_empty: str
     notes: tuple[str, ...]
     range_years: str
 
@@ -131,6 +185,20 @@ class ReportsView:
     @property
     def show_currency_selector(self) -> bool:
         return self.data.show_currency_selector
+
+    @property
+    def include_savings(self) -> bool:
+        return self.data.filters.savings
+
+    @property
+    def category_has_data(self) -> bool:
+        # A selected category without spending still has a zero table row; the chart itself is
+        # empty (no bars), as for any range with nothing to draw.
+        return bool(self.category_table.rows)
+
+    @property
+    def category_filter_active(self) -> bool:
+        return self.data.category_filter_active
 
 
 def _period_label(period: PeriodKey, step: ReportStep, locale: str) -> str:
@@ -351,6 +419,113 @@ def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
     }
 
 
+def _category_name(row: CategorySpend, locale: str) -> str:
+    return gettext(OTHER, locale) if row.other else row.name
+
+
+def _category_columns(
+    series: CategorySeries,
+    data: ReportsData,
+    locale: str,
+    request: Request,
+) -> tuple[CategoryColumn, ...]:
+    columns: list[CategoryColumn] = []
+    for period in series.periods:
+        href = None
+        if data.filters.step is ReportStep.MONTH:
+            assert isinstance(period, YearMonth)
+            href = scoped_url(request, "month", month=str(period))
+        columns.append(
+            CategoryColumn(
+                label=_period_label(period, data.filters.step, locale),
+                href=href,
+                so_far=_is_so_far(period, data.filters.step, data.today),
+            )
+        )
+    return tuple(columns)
+
+
+def _category_table(data: ReportsData, locale: str, request: Request) -> CategoryTable:
+    series = data.category_series
+    rows = tuple(
+        CategoryRow(
+            label=_category_name(row, locale),
+            color=row.color or None,
+            cells=tuple(format_money(amount, locale) for amount in row.amounts),
+            total=format_money(row.total, locale),
+        )
+        for row in series.rows
+    )
+    return CategoryTable(
+        columns=_category_columns(series, data, locale, request),
+        rows=rows,
+        totals=tuple(format_money(total, locale) for total in series.totals),
+        total=format_money(series.total, locale),
+    )
+
+
+def _category_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
+    series = data.category_series
+    if not series.rows or series.total.amount_minor <= 0:
+        return None
+    currency = data.filters.currency
+    labels = [_period_label(period, data.filters.step, locale) for period in series.periods]
+    low, high, step, axis_labels = money_axis(
+        (total.amount_minor for total in series.totals), currency, locale
+    )
+    tooltips: list[list[str]] = []
+    for index, period in enumerate(series.periods):
+        lines = [
+            f"{_category_name(row, locale)}: {format_money(row.amounts[index], locale)}"
+            for row in series.rows
+            if row.amounts[index].amount_minor != 0
+        ]
+        lines.append(f"{gettext(TOTAL, locale)}: {format_money(series.totals[index], locale)}")
+        if _is_so_far(period, data.filters.step, data.today):
+            lines.append(gettext(SO_FAR, locale))
+        tooltips.append(lines)
+    return {
+        "labels": labels,
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "stack": "spending",
+        "series": [
+            {
+                "key": str(row.category_id) if row.category_id is not None else "other",
+                "name": _category_name(row, locale),
+                "color": row.color or "line-strong",
+                "values": [amount.amount_minor for amount in row.amounts],
+                "amounts": [format_money(amount, locale) for amount in row.amounts],
+            }
+            for row in series.rows
+        ],
+        "tooltips": tooltips,
+    }
+
+
+def _category_options(data: ReportsData) -> tuple[CategoryOptionView, ...]:
+    selected = set(data.filters.category_ids)
+    options: tuple[CategoryOption, ...] = data.category_options
+    return tuple(
+        CategoryOptionView(
+            id=option.id,
+            name=option.name,
+            selected=option.id in selected,
+        )
+        for option in options
+    )
+
+
+def _category_notes(data: ReportsData, locale: str) -> tuple[str, ...]:
+    if data.category_filter_active:
+        return (gettext(CATEGORY_FILTER_ACTIVE, locale),)
+    if any(row.other for row in data.category_series.rows):
+        return (gettext(CATEGORY_TOP_NOTE, locale),)
+    return ()
+
+
 def _notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     notes: list[str] = []
     if data.future_count:
@@ -394,6 +569,7 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
     )
     rolling = _rolling_rates(data)
     show_rolling = step is ReportStep.MONTH and len(data.series) >= REPORT_ROLLING_MONTHS
+    category_empty = CATEGORY_EMPTY_SAVINGS if data.filters.savings else CATEGORY_EMPTY
     return ReportsView(
         data=data,
         errors=errors,
@@ -406,6 +582,11 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         rate_total=_rate_total(data, locale),
         rate_chart=_rate_chart(data, rolling, show_rolling=show_rolling, locale=locale),
         show_rolling=show_rolling,
+        category_chart=_category_chart(data, locale),
+        category_table=_category_table(data, locale, request),
+        category_options=_category_options(data),
+        category_notes=_category_notes(data, locale),
+        category_empty=gettext(category_empty, locale),
         notes=_notes(data, locale),
         range_years=range_years,
     )

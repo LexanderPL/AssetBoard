@@ -1,6 +1,7 @@
-"""The Reports page (F10.1): ``/reports``, income vs expenses for a range of years.
+"""The Reports page (F10.1–F10.3): ``/reports``, ledger report sections for a range of years.
 
-A plain GET form: every view is a bookmarkable URL and works without JavaScript.
+A plain GET form: every view is a bookmarkable URL and works without JavaScript. The category
+filter is repeatable (``?category=<id>&category=<id>``).
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ async def reports(
     to_year: Annotated[str, Query(alias="to")] = "",
     step: str = "",
     currency: str = "",
+    category: Annotated[list[str] | None, Query()] = None,
+    savings: str = "",
 ) -> object:
     data = await run_in_threadpool(
         lambda: reports_data(
@@ -36,6 +39,8 @@ async def reports(
             to_year=to_year,
             step=step,
             currency=currency,
+            category=category or (),
+            savings=savings,
         )
     )
     view = build_reports_view(request, data, request.state.locale)

@@ -5429,6 +5429,37 @@ msgstr "Niedostępne: brak zarobków"
 msgid "Not available: fewer than 12 months of data."
 msgstr "Niedostępne: mniej niż 12 miesięcy danych."
 
+msgid "Expenses by category over time"
+msgstr "Wydatki według kategorii w czasie"
+
+msgid "Spending by category and period"
+msgstr "Wydatki według kategorii i okresu"
+
+msgid "No expenses in this range."
+msgstr "W tym zakresie nie ma wydatków."
+
+msgid "No expenses or savings in this range."
+msgstr "W tym zakresie nie ma wydatków ani oszczędności."
+
+msgid "Leave empty to show the 8 largest categories and the rest as Other."
+msgstr ""
+"Pozostaw puste, aby pokazać 8 największych kategorii, a resztę jako "
+"„Inne”."
+
+msgid "Showing the selected categories only."
+msgstr "Pokazywane są tylko wybrane kategorie."
+
+msgid "The 8 largest categories are shown; the rest are combined as Other."
+msgstr ""
+"Pokazywanych jest 8 największych kategorii; reszta jest łączona jako "
+"„Inne”."
+
+msgid "Include saved / invested"
+msgstr "Uwzględnij oszczędności / inwestycje"
+
+msgid "Saved and invested amounts get their own category series."
+msgstr "Oszczędności i inwestycje otrzymują własne serie kategorii."
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."

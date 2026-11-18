@@ -5033,6 +5033,33 @@ msgstr ""
 msgid "Not available: fewer than 12 months of data."
 msgstr ""
 
+msgid "Expenses by category over time"
+msgstr ""
+
+msgid "Spending by category and period"
+msgstr ""
+
+msgid "No expenses in this range."
+msgstr ""
+
+msgid "No expenses or savings in this range."
+msgstr ""
+
+msgid "Leave empty to show the 8 largest categories and the rest as Other."
+msgstr ""
+
+msgid "Showing the selected categories only."
+msgstr ""
+
+msgid "The 8 largest categories are shown; the rest are combined as Other."
+msgstr ""
+
+msgid "Include saved / invested"
+msgstr ""
+
+msgid "Saved and invested amounts get their own category series."
+msgstr ""
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."

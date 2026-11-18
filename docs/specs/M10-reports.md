@@ -115,7 +115,8 @@ conventions). Golden test against services.summary.month_summary; property tests
 - The service reads the categories, one distinct currency lookup and one column-only stream of
   transactions (`TransactionRepository.iter_ledger_columns`) per request; the table's total row is
   the exact integer sum of the periods. The performance test holds 10 years × 5 000 rows to
-  2 s (a 4× margin over the 500 ms target on CI).
+  2.5 s (a 5× margin over the 500 ms target on CI; F10.3 shares the same read and one pure pass
+  now builds both report series, so the budget was raised from F10.1's original 2 s).
 - The chart is a new `report-bars` kind of the F2.7 chart module: grouped bars, ECharts' legend
   hides a series, server-formatted labels, token colours, and an sr-only table with a
   “Show as table” control. User guide: [Reports](../reports.md).
@@ -192,6 +193,29 @@ Implement F10.3 from docs/specs/M10-reports.md: pure category_series, the stacke
 multi-select and the savings option, and the category x period table. Property test: column totals equal F10.1's spent
 (and saved with the option).
 ```
+
+**As built (F10.3):**
+- `domain.reports.category_series` returns a `CategorySeries` of named/coloured `CategorySpend`
+  rows (one per regular expense category, or per expense/savings category with the option) in
+  integer minor units, ordered by range total. `top_categories` combines everything after the
+  eight largest into one unnamed row that the view labels "Other"; it keeps every period total.
+  A non-empty `selected` shows exactly those categories (zero rows included) and never combines.
+- The service keeps F10.1's single scoped column read and runs one pure pass
+  (`ledger_and_category_series`) that accumulates the ledger totals and the per-category sums
+  together; a category filter narrows the computed series without a second pass. The repeatable
+  `category` parameter is resolved against the workspace's eligible categories, so unknown and
+  other-workspace ids are ignored and fall back to the default when none survive. Archived
+  categories are offered only when they have spending in the range; they keep their current name
+  and colour in the chart and table.
+- The page adds a third section with a stacked-bar chart (new `report-category-bars` kind of the
+  report chart module; the same `report-bars` option builder and a `stack` name), the category
+  multi-select and "Include saved / invested" checkbox in the shared filter form, and the
+  category × period table with row, column and grand totals. Category series use the category's
+  `#rrggbb` colour or a theme token for Other; labels and amounts are server-formatted. A filter
+  with no spending still shows its zero table row and the section's empty state.
+- Column totals equal F10.1's `spent` (and `saved` with the option) for every period without a
+  category filter; the property test proves it against `ledger_series`. No migration and no new
+  dependency. User guide: [Reports](../reports.md).
 
 ---
 

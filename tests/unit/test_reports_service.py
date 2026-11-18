@@ -352,8 +352,9 @@ def test_the_read_stays_one_stream_and_meets_the_performance_budget(team: Worksp
     elapsed = time.perf_counter() - began
     assert len(data.series) == 120
     assert data.totals.spent.amount_minor > 0
-    # The target is 500 ms on CI; 2 s leaves a 4x margin for busy shared runners.
-    assert elapsed < 2.0, f"reports read took {elapsed:.3f}s"
+    # The target is 500 ms on CI; 2.5 s leaves a 5x margin for busy shared runners. F10.3
+    # shares this read with the category series, so the one pass now builds two report sections.
+    assert elapsed < 2.5, f"reports read took {elapsed:.3f}s"
 
 
 def test_only_column_reads_are_used(team: WorkspaceDb) -> None:

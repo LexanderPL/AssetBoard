@@ -1,8 +1,8 @@
 # Reports
 
 Reports (`/reports`) show how much came in and went out over a range of years, month by month or
-year by year. Every member of a workspace, viewers included, can open the page: it only reads
-what they can already see in the ledger.
+year by year, and where the spending went by category. Every member of a workspace, viewers
+included, can open the page: it only reads what they can already see in the ledger.
 
 ## Filters
 
@@ -15,6 +15,11 @@ JavaScript. Unknown query parameters are ignored.
 | To year | `to=YYYY`, inclusive | the current year |
 | Granularity | `step=month` or `step=year` | monthly up to a 3-year range, yearly beyond |
 | Currency | `currency=XXX` | the workspace's base currency |
+| Categories | `category=<id>`, repeatable | empty: the 8 largest categories and Other |
+| Include saved / invested | `savings=1` | off |
+
+The **Categories** and **Include saved / invested** filters apply to the expenses-by-category
+section; the other sections always use the whole ledger.
 
 A range is at most 30 years. A malformed year, `from` after `to`, or a longer range is marked on
 the field and no chart is drawn. The range always ends with the current month in the workspace's
@@ -76,6 +81,28 @@ averaging monthly rates, and starts at the 12th month of the range.
 
 Money merely left over is not savings: only expense categories with the `savings` treatment
 count. See [Months](months.md) for the same KPI in the monthly summary.
+
+## Expenses by category over time
+
+The category chart stacks one bar segment per category for every period. It uses the same
+treatment rules as the other reports: only expense categories with the `regular` treatment count;
+income, transfers and withdrawals from savings never appear. A category's segment uses the
+category's own colour, and archived categories keep their name and history when they had spending
+in the range.
+
+By default the eight categories with the largest total in the range are shown separately and all
+others are combined into **Other**. Choose one or more categories in the **Categories** filter
+(the URL carries one `category=<id>` parameter per choice) to show exactly those categories and
+no Other. An unknown category id, a category of another workspace, or one that does not fit the
+current option is ignored, so an old bookmark still opens.
+
+**Include saved / invested** (`savings=1`) adds expense categories with the `savings` treatment
+as their own series, so the chart covers everything the ledger counted as saved as well as spent.
+
+The table has a row per category and a column per period, with row and column totals. Without a
+category filter the column totals equal the income-vs-expenses report's **spent** for the same
+period, plus **saved** when the option is on; **Other** takes the remainder. With a category
+filter the column totals are the sum of the chosen categories.
 
 ## Limits
 

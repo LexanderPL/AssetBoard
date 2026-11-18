@@ -64,7 +64,7 @@ make check
 - [Import and export](docs/import-export.md): downloading, restoring and merging workspace archives; importing CSV files and converting a spreadsheet.
 - [Archive format](docs/archive-format.md): the files and columns of the workspace archive and of importable CSV files.
 - [Transactions](docs/transactions.md): entering, editing and deleting expenses and income; searching, CSV export and changing the category of many entries.
-- [Reports](docs/reports.md): income against expenses and savings per month or year, the savings-rate trend including a 12-month rolling rate, with the shared year, granularity and currency filters.
+- [Reports](docs/reports.md): income against expenses and savings per month or year, the savings-rate trend including a 12-month rolling rate, and spending by category over time with a top-8/Other stack, category filter and optional savings series, all under the shared year, granularity and currency filters.
 - [Net worth](docs/net-worth.md): assets and liabilities, categories, values and value history.
 - [Investments](docs/investments.md): asset classes, instruments and allocation weights.
 - [Loans](docs/loans.md): mortgage and loan terms, rates, costs, overpayments and reference rates.
