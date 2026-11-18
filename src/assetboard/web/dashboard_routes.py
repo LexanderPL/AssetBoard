@@ -13,7 +13,11 @@ from starlette.datastructures import FormData
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
-from assetboard.domain.dashboard import WIDGET_KEYS, clean_upcoming_limit, selected_widgets
+from assetboard.domain.dashboard import (
+    WIDGET_KEYS,
+    clean_upcoming_limit,
+    selected_widgets,
+)
 from assetboard.services.dashboard import (
     reset_dashboard_preferences,
     save_dashboard_preferences,
@@ -80,6 +84,7 @@ async def dashboard_customise_move(request: Request, ctx: CurrentContext) -> Res
             enabled=enabled,
             upcoming_limit=clean_upcoming_limit(_setting(form, "upcoming_limit")),
             portfolio_range=_setting(form, "portfolio_range") or None,
+            net_worth_range=_setting(form, "net_worth_range") or None,
         )
     )
     return render_template(request, "dashboard/customise.html", context=context)
@@ -96,6 +101,7 @@ async def dashboard_customise_save(request: Request, ctx: CurrentContext) -> Res
         widgets,
         upcoming_limit=clean_upcoming_limit(_setting(form, "upcoming_limit")),
         portfolio_range=_setting(form, "portfolio_range"),
+        net_worth_range=_setting(form, "net_worth_range"),
     )
     return RedirectResponse(scoped_url(request, "home") + "?saved=1", status_code=303)
 

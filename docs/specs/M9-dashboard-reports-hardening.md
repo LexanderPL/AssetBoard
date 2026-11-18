@@ -6,7 +6,7 @@
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
-**Data model (sketch):** `ApiToken(...)` is deferred with F9.5; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, widgets JSON, upcoming_limit, portfolio_range, customised_at?)`, where `widgets` is the ordered list of enabled widget keys (F9.1).
+**Data model (sketch):** `ApiToken(...)` is deferred with F9.5; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, widgets JSON, upcoming_limit, portfolio_range, net_worth_range, customised_at?)`, where `widgets` is the ordered list of enabled widget keys (F9.1).
 
 **Scope decisions (owner, 2026-11-17):** F9.1 does **not** implement privacy mode; the bullet is removed from its acceptance. F9.5 (REST API and tokens) is deferred after v1.0 and is not part of the v1.0 release. The rest of M9 is unchanged.
 
@@ -32,10 +32,11 @@ and orders them. A widget is the same thing as a "card" in the rest of this spec
   - **This month: planned vs actual** (planned vs actual, savings rate, forecast);
   - **Upcoming payments** (F2.7's upcoming block; overdue highlighted, one-click confirm; it uses
     the workspace's Upcoming window setting);
-  - **Net worth** (value + 12-month trend);
+  - **Net worth** (value + trend over the chosen range);
   - **Portfolio** (value, gain %, allocation mini-donut);
   - **Portfolio changes** (change in value since the previous day and since the start of the
     month, in money and %, plus the largest movers);
+  - **Portfolio value over time** (value and invested capital over the chosen range);
   - **Loans** (remaining principal, payoff date, % repaid);
   - **FIRE** (progress, FIRE age of the default scenario);
   - **Missing data** (stale prices, missing work logs, imports planned but not applied).
@@ -45,8 +46,9 @@ and orders them. A widget is the same thing as a "card" in the rest of this spec
 - **Customise Home.** A "Customise" control on Home opens the picker:
   - a checkbox per widget;
   - ↑/↓ buttons, so reordering works without drag and drop, by keyboard and on a phone;
-  - per-widget settings: how many Upcoming payments to show (1–50, default 10) and the Portfolio
-    value-history range (1M, 3M, 6M, 1Y, All; default 1Y);
+  - per-widget settings: how many Upcoming payments to show (1–50, default 10), the Net worth
+    range (1Y, 3Y, 5Y, All; default 1Y) and the Portfolio value-history range (1M, 3M, 6M, 1Y,
+    All; default 1Y);
   - "Reset to default".
   Changes apply on save. It works without JavaScript beyond the CSP-safe Alpine build.
 - **Defaults.** A user with no saved preference sees what Home shows today (This month: in vs out,
@@ -76,13 +78,14 @@ ignored; defaults and newly shipped widgets follow the rules above; reordering w
 - Home is a shell of ordered widget placeholders; each widget is its own lazy HTMX fragment
   (`GET /dashboard/widgets/{key}`). The widgets and their keys are:
   `month-in-out`, `month-expenses`, `month-income`, `month-plan`, `upcoming`, `net-worth`,
-  `portfolio`, `portfolio-changes`, `loans`, `fire`, `missing-data`.
+  `portfolio`, `portfolio-changes`, `portfolio-history`, `loans`, `fire`, `missing-data`.
 - `DashboardPreference` stores the ordered enabled keys per (workspace, user). No row means the
   default catalogue (all shipped widgets). A saved row keeps later widgets off until chosen;
   unknown or corrupt stored keys are ignored.
-- The same row stores the Upcoming limit (1–50, default 10) and the Portfolio history range
-  (1M, 3M, 6M, 1Y, All; default 1Y), both chosen in Customise Home.
-- `GET /dashboard/customise` is a plain form: checkboxes, ↑/↓ buttons, the two widget settings,
+- The same row stores the Upcoming limit (1–50, default 10), the Net worth range (1Y, 3Y, 5Y,
+  All; default 1Y) and the Portfolio history range (1M, 3M, 6M, 1Y, All; default 1Y), all chosen
+  in Customise Home.
+- `GET /dashboard/customise` is a plain form: checkboxes, ↑/↓ buttons, the three widget settings,
   Save and Reset. With JavaScript `static/js/customise.js` moves the rows in place, updates the
   arrow disabled states and the hidden order field; nothing is written until Save. Without
   JavaScript each arrow rerenders the draft on the server, and Save still applies it.
@@ -95,9 +98,11 @@ ignored; defaults and newly shipped widgets follow the rules above; reordering w
   changes widget reuses F6.7's historical valuation and computes only differences and ratios.
   The loans widget shows up to three active loans with `LoanListFigures.payoff_date`.
 - The Portfolio widget's pie uses the same chart height as the expense/income donuts (the macro's
-  `canvas_size` parameter leaves the portfolio page's compact donut unchanged), and adds a value
-  history line chart. The chart reuses `services.performance.performance_page` in chart-only mode
-  and `web.charts.build_performance_chart`; no valuation maths is duplicated.
+  `canvas_size` parameter leaves the portfolio page's compact donut unchanged). The separate
+  Portfolio value-over-time widget draws the line chart, reusing
+  `services.performance.performance_page` in chart-only mode and
+  `web.charts.build_performance_chart`; no valuation maths is duplicated. The Net worth widget
+  reuses `services.networth_history` with the saved range.
 - The Customise entry point sits at the bottom of Home below the widgets, not in the page header.
 - Missing data composes the existing portfolio price read (stale or absent prices and FX
   rates), `income.missing_work_logs` and planned import batches (the last only for editors and

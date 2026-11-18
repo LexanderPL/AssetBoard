@@ -2840,7 +2840,7 @@ msgstr ""
 msgid "Overdue items and payments due in the Upcoming window."
 msgstr ""
 
-msgid "The current value and its 12-month trend."
+msgid "The current value and its trend over the chosen range."
 msgstr ""
 
 msgid "Portfolio"
@@ -2853,6 +2853,12 @@ msgid "Portfolio changes"
 msgstr ""
 
 msgid "Changes since yesterday and this month, with the largest movers."
+msgstr ""
+
+msgid "Portfolio value over time"
+msgstr ""
+
+msgid "Value and invested capital over the chosen range."
 msgstr ""
 
 msgid "Loans"
@@ -6308,7 +6314,10 @@ msgstr ""
 msgid "Between %(min)d and %(max)d; the rest stay on the Upcoming page."
 msgstr ""
 
-msgid "Portfolio chart range"
+msgid "Net worth chart range"
+msgstr ""
+
+msgid "Portfolio value-over-time range"
 msgstr ""
 
 #, fuzzy, python-format
@@ -6394,38 +6403,6 @@ msgstr ""
 msgid "Set up net worth"
 msgstr ""
 
-msgid "Value over time"
-msgstr ""
-
-#, fuzzy, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Plotted data"
-msgstr ""
-
-msgid "Portfolio value over time"
-msgstr ""
-
-msgid ""
-"No value history in this range yet. Choose a longer range in Customise "
-"Home."
-msgstr ""
-
-msgid ""
-"No dated investment transactions yet. Add investment transactions and "
-"prices to see the value over time."
-msgstr ""
-
-msgid "Open the portfolio"
-msgstr ""
-
 msgid "No holdings are valued yet."
 msgstr ""
 
@@ -6447,6 +6424,32 @@ msgid "No holding changed since yesterday."
 msgstr ""
 
 msgid "No portfolio history yet. Add investment transactions and prices."
+msgstr ""
+
+#, fuzzy, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Plotted data"
+msgstr ""
+
+msgid ""
+"No value history in this range yet. Choose a longer range in Customise "
+"Home."
+msgstr ""
+
+msgid ""
+"No dated investment transactions yet. Add investment transactions and "
+"prices to see the value over time."
+msgstr ""
+
+msgid "Open the portfolio"
 msgstr ""
 
 msgid "All upcoming items"
@@ -14852,5 +14855,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Planned for %(name)s"
+#~ msgstr ""
+
+#~ msgid "The current value and its 12-month trend."
+#~ msgstr ""
+
+#~ msgid "Value over time"
+#~ msgstr ""
+
+#~ msgid "Portfolio chart range"
 #~ msgstr ""
 

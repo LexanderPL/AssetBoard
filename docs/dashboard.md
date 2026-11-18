@@ -13,9 +13,10 @@ widgets appear and in what order; the choice is saved separately for each worksp
 | This month: income by category | The month's income by category |
 | This month: planned vs actual | Spending and income against the plan, the savings rate and the forecast |
 | Upcoming payments | Overdue items and payments due in the Upcoming window; editors and owners can confirm or skip them |
-| Net worth | The current net worth and its 12-month trend |
-| Portfolio | The portfolio value, gain, allocation by asset class and a value-over-time chart |
+| Net worth | The current net worth and its trend over the chosen range |
+| Portfolio | The portfolio value, gain and allocation by asset class |
 | Portfolio changes | The change since yesterday and since the start of the month, plus the largest movers |
+| Portfolio value over time | The current value and invested capital over the chosen range |
 | Loans | The remaining principal, payoff date and repaid share of up to three active loans |
 | FIRE | Plan progress and the FIRE age from the workspace's FIRE plan |
 | Missing data | Stale prices, missing work logs and imports that are planned but not applied |
@@ -41,7 +42,9 @@ Choose **Customise** at the bottom of Home, below the widgets:
   keyboard and on a phone);
 - choose how many upcoming payments the Upcoming widget lists (between 1 and 50; the default is
   10; the rest stay on the Upcoming page);
-- choose the Portfolio chart range: 1 month, 3 months, 6 months, 1 year (the default) or all time;
+- choose the Net worth chart range: 1 year (the default), 3 years, 5 years or all time;
+- choose the Portfolio value-over-time range: 1 month, 3 months, 6 months, 1 year (the default)
+  or all time;
 - **Save** applies the layout, or **Reset to default** returns to the full catalogue and default
   settings.
 
@@ -49,9 +52,11 @@ With JavaScript, moving a widget only changes the draft on the screen until you 
 a plain form, so without JavaScript an arrow rerenders the draft on the server and **Save** still
 applies it.
 
-The Portfolio value-over-time chart shows the current value and the invested capital. When there
-is no dated investment history it says so and links to the portfolio page instead of drawing an
-empty chart.
+The Portfolio widget holds the current value, gain and allocation pie. The separate Portfolio
+value-over-time widget shows the current value and invested capital; when there is no dated
+investment history it says so and links to the portfolio page instead of drawing an empty chart.
+The Net worth widget uses the same monthly history as the Net worth page, clipped to the chosen
+range.
 
 ## Loading and accessibility
 
@@ -65,10 +70,13 @@ each placeholder links directly to its module page.
 
 The **Missing data** widget is a checklist, not a warning that blocks the app:
 
-- **Stale or missing prices** are holdings whose latest price is older than the usual
-  threshold or has no price at all; open the portfolio to add a price or refresh a provider.
-- **Missing work logs** are variable income sources whose payment is due soon and whose month has
-  no work log; open the income calendar to fill it.
+- **Stale or missing prices** are held instruments with no price at all, or a latest price older
+  than 5 days. The same check lists each quote currency needed to convert a holding into the
+  workspace base currency when its FX rate is missing or older than 5 days. Open the portfolio to
+  add a price, or refresh the configured provider.
+- **Missing work logs** are active variable-income sources whose calculated pay date is within
+  the next 10 days (or already past) and whose work month has no work log; open the income
+  calendar to fill it.
 - **Imports waiting to be applied** are planned imports whose file has not been applied yet. This
   section is only shown to editors and owners, like the import page itself.
 
