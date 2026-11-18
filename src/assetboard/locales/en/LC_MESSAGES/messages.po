@@ -5024,19 +5024,7 @@ msgstr ""
 msgid "Savings rate"
 msgstr ""
 
-msgid "Savings rate by period"
-msgstr ""
-
-msgid ""
-"The share of earnings that regular spending did not use up: (earned − "
-"spent) ÷ earned. Money moved to savings and money left over both count as"
-" kept."
-msgstr ""
-
 msgid "12-month rolling rate"
-msgstr ""
-
-msgid "No savings rate: nothing was earned in this range."
 msgstr ""
 
 msgid "Not available: nothing earned"
@@ -11417,6 +11405,17 @@ msgstr ""
 msgid "Hide table"
 msgstr ""
 
+msgid ""
+"The share of earnings moved to savings and investments: saved ÷ earned, "
+"the same measure as the Month page."
+msgstr ""
+
+msgid "No savings rate for the charted entries."
+msgstr ""
+
+msgid "Savings rate by period"
+msgstr ""
+
 msgid "Edit recurring item"
 msgstr ""
 
@@ -14969,5 +14968,16 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "No entries in this range."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The share of earnings that regular "
+#~ "spending did not use up: (earned −"
+#~ " spent) ÷ earned. Money moved to "
+#~ "savings and money left over both "
+#~ "count as kept."
+#~ msgstr ""
+
+#~ msgid "No savings rate: nothing was earned in this range."
 #~ msgstr ""
 

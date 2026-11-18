@@ -55,13 +55,7 @@ SPENT = _("Spent")
 SAVED = _("Saved")
 NET = _("Net")
 SAVINGS_RATE = _("Savings rate")
-SAVINGS_RATE_CAPTION = _("Savings rate by period")
-SAVINGS_RATE_EXPLANATION = _(
-    "The share of earnings that regular spending did not use up: (earned − spent) ÷ earned. "
-    "Money moved to savings and money left over both count as kept."
-)
 ROLLING_RATE = _("12-month rolling rate")
-NO_RATE = _("No savings rate: nothing was earned in this range.")
 NOT_AVAILABLE = _("Not available: nothing earned")
 NOT_ENOUGH_HISTORY = _("Not available: fewer than 12 months of data.")
 
@@ -236,7 +230,7 @@ def _rate_rows(
 
 
 def _rate_total(data: ReportsData, locale: str) -> RateTotal:
-    rate = savings_rate(data.totals.earned.amount_minor, data.totals.spent.amount_minor)
+    rate = savings_rate(data.totals.earned.amount_minor, data.totals.saved.amount_minor)
     return RateTotal(TOTAL, _rate_text(rate, locale), rate.tenths)
 
 

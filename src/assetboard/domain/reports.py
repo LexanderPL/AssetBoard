@@ -11,12 +11,11 @@ calendar order, with zeros when nothing happened. Entries outside the range or i
 currency are ignored here (the service counts the latter for its note); an entry whose category
 is unknown raises ``ValueError``, as the month summary does.
 
-**Savings rate (F10.2).** The report's rate is ``(earned - spent) / earned``: the share of
-earnings that regular spending did not use up. (The Month page's KPI is the narrower
-``saved / earned``; F10.2's acceptance and golden example require this report measure.) It is
-kept as integer basis points and tenths of a percent, each rounded **once** from the exact ratio
-with F2.4's half-away-from-zero rule; a period with ``earned = 0`` has no rate (``None``). A
-yearly rate is computed from the year's summed integers, never averaged from monthly rates.
+**Savings rate (F10.2).** The report's rate is ``saved / earned``, the same measure as F2.4's
+Month-page KPI: the share of earnings moved to savings and investments. It is kept as integer
+basis points and tenths of a percent, each rounded **once** from the exact ratio with F2.4's
+half-away-from-zero rule; a period with ``earned = 0`` has no rate. A yearly rate is computed
+from the year's summed integers, never averaged from monthly rates.
 """
 
 from __future__ import annotations
@@ -99,8 +98,8 @@ class PeriodTotals:
 
     @property
     def savings_rate(self) -> SavingsRate:
-        """``(earned - spent) / earned`` from this period's exact integer sums."""
-        return savings_rate(self.earned.amount_minor, self.spent.amount_minor)
+        """``saved / earned`` from this period's exact integer sums."""
+        return savings_rate(self.earned.amount_minor, self.saved.amount_minor)
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,17 +186,17 @@ def ledger_series(
 REPORT_ROLLING_MONTHS = 12
 
 
-def savings_rate(earned: int, spent: int) -> SavingsRate:
-    """``(earned - spent) / earned``, each representation rounded once (F2.4's rule).
+def savings_rate(earned: int, saved: int) -> SavingsRate:
+    """``saved / earned``, each representation rounded once (F2.4's rule).
 
     ``None`` in both fields when ``earned`` is 0. The rounding lives in F2.4's
-    ``savings_rate_bp`` / ``savings_rate_tenths`` (shared with the month summary); this function
-    only supplies the report's numerator, so both representations use the same exact-ratio rule.
+    ``savings_rate_bp`` / ``savings_rate_tenths`` (shared with the month summary), so the
+    report and the Month KPI use the same definition: the share of earnings moved to savings
+    and investments, not money merely left over.
     """
-    kept = earned - spent
     return SavingsRate(
-        bp=savings_rate_bp(earned, kept),
-        tenths=savings_rate_tenths(earned, kept),
+        bp=savings_rate_bp(earned, saved),
+        tenths=savings_rate_tenths(earned, saved),
     )
 
 
@@ -213,15 +212,15 @@ def rolling_savings_rates(
     if months < 1:
         raise ValueError("months must be at least 1")
     result: list[SavingsRate | None] = []
-    earned = spent = 0
+    earned = saved = 0
     for index, period in enumerate(series):
         earned += period.earned.amount_minor
-        spent += period.spent.amount_minor
+        saved += period.saved.amount_minor
         if index >= months:
             leaving = series[index - months]
             earned -= leaving.earned.amount_minor
-            spent -= leaving.spent.amount_minor
-        result.append(savings_rate(earned, spent) if index >= months - 1 else None)
+            saved -= leaving.saved.amount_minor
+        result.append(savings_rate(earned, saved) if index >= months - 1 else None)
     return tuple(result)
 
 

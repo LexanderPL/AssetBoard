@@ -93,7 +93,7 @@
     const lines = [params[0].axisValue];
     params.forEach((param) => {
       const series = data.series[param.seriesIndex];
-      if (series) lines.push(`${series.name}: ${series.amounts[index]}`);
+      if (series) lines.push(`${series.name}: ${series.amounts[index] || "—"}`);
     });
     const extra = data.tooltips[index] || [];
     if (extra.length) lines.push("", ...extra);
@@ -438,6 +438,9 @@
       revealReportTable(element);
     } else if (kind === "report-rate" && Array.isArray(data.series)) {
       option = lineOptions(data);
+      option.series.forEach((series) => {
+        series.connectNulls = false;
+      });
       revealReportTable(element);
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);

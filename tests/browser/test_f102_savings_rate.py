@@ -1,5 +1,5 @@
-"""The savings-rate report in Chromium (F10.2): the line with a negative value and a gap, the
-rolling line, the table toggle, CSP and phone width."""
+"""The savings-rate report in Chromium (F10.2): the saved/earned line with a zero and a gap,
+the rolling line, the table toggle, CSP and phone width."""
 
 from __future__ import annotations
 
@@ -39,6 +39,7 @@ def _seed(app) -> None:
         categories = {}
         for key, name, kind, treatment in (
             ("food", "Browser Rate Food", "expense", "regular"),
+            ("savings", "Browser Rate Savings", "expense", "savings"),
             ("salary", "Browser Rate Salary", "income", "regular"),
         ):
             category = Category(
@@ -78,6 +79,20 @@ def _seed(app) -> None:
                     category_id=categories["food"],
                     description="Groceries",
                     description_key="groceries",
+                    source="manual",
+                    created_by_user_id=None,
+                )
+            )
+            session.add(
+                Transaction(
+                    workspace_id=workspace.id,
+                    direction="expense",
+                    date=date(2025, month, 7),
+                    amount_minor=180_000,
+                    currency="EUR",
+                    category_id=categories["savings"],
+                    description="Savings",
+                    description_key="savings",
                     source="manual",
                     created_by_user_id=None,
                 )
@@ -183,6 +198,8 @@ def test_the_savings_rate_chart_and_table_in_a_browser(tmp_path: Path) -> None:
               const option = window.echarts.getInstanceByDom(el).getOption();
               return {
                 series: option.series.map((s) => s.name),
+                types: option.series.map((s) => s.type),
+                connect: option.series.map((s) => s.connectNulls),
                 values: option.series[0].data,
                 rolling: option.series[1].data,
                 yMin: option.yAxis[0].min,
@@ -192,15 +209,15 @@ def test_the_savings_rate_chart_and_table_in_a_browser(tmp_path: Path) -> None:
         )
         assert option["series"] == ["Savings rate", "12-month rolling rate"]
         assert option["legend"] == option["series"]
-        assert -400 in option["values"]  # January 2026 is negative
-        assert option["values"][12] == -400
+        assert option["types"] == ["line", "line"]
+        assert option["connect"] == [False, False]
+        assert option["values"][12] == 0  # January 2026 saves nothing
         assert option["values"][13] is None  # February 2026: nothing earned
         assert option["rolling"][:11] == [None] * 11
         assert option["rolling"][11] == 600  # December 2025: the first 12-month point
-        assert option["yMin"] < 0  # the axis goes below zero
 
         january = section.locator("[data-report-rate-row]").filter(has_text="January 2026")
-        expect(january.locator("[data-report-rate] .text-danger")).to_have_text("-40.0%")
+        expect(january.locator("[data-report-rate]")).to_have_text("0.0%")
         february = section.locator("[data-report-rate-row]").filter(has_text="February 2026")
         expect(february.locator("[data-report-rate]")).to_contain_text(
             "Not available: nothing earned"

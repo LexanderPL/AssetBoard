@@ -125,14 +125,14 @@
       <h2 id="reports-rate-heading" class="text-base font-semibold">{{ _("Savings rate") }}</h2>
       <p class="text-sm tabular-nums text-muted" data-report-rate-range>{{ view.range_years }}</p>
     </div>
-    <p class="mt-1 text-sm text-muted">{{ _("The share of earnings that regular spending did not use up: (earned − spent) ÷ earned. Money moved to savings and money left over both count as kept.") }}</p>
+    <p class="mt-1 text-sm text-muted">{{ _("The share of earnings moved to savings and investments: saved ÷ earned, the same measure as the Month page.") }}</p>
 
     <div class="mt-4" data-chart="report-rate"{% if view.rate_chart %} data-chart-source="reports-rate-data"{% endif %}>
       {% if view.rate_chart %}
       <script type="application/json" id="reports-rate-data">{{ view.rate_chart|tojson }}</script>
       <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
       {% else %}
-      <p class="text-sm text-muted" data-chart-empty>{{ _("No savings rate: nothing was earned in this range.") }}</p>
+      <p class="text-sm text-muted" data-chart-empty>{{ _("No savings rate for the charted entries.") }}</p>
       {% endif %}
       <div class="mt-4">
         <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-rate-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>

@@ -284,11 +284,13 @@ def _cells(row: str) -> list[str]:
 def _seed_rate_golden(app: OwnerApp) -> None:
     salary = _category(app, "Rate Salary", "income")
     food = _category(app, "Rate Food")
+    savings = _category(app, "Rate Savings", "expense", "savings")
     for month in range(1, 13):
         _tx(app, salary, date(2025, month, 5), 300_000, direction="income")
         _tx(app, food, date(2025, month, 6), 120_000)
+        _tx(app, savings, date(2025, month, 7), 180_000)  # 60.0 % saved
     _tx(app, salary, date(2026, 1, 5), 300_000, direction="income")
-    _tx(app, food, date(2026, 1, 6), 420_000)  # -40.0 %
+    _tx(app, food, date(2026, 1, 6), 420_000)  # saved 0: 0.0 %
     _tx(app, food, date(2026, 2, 6), 10_000)  # nothing earned: no rate
 
 
@@ -310,34 +312,30 @@ def test_the_rate_line_table_and_rolling_rate(reports: OwnerApp) -> None:
     assert data["series"][1]["values"][:11] == [None] * 11
     assert data["series"][1]["values"][11] == 600
     assert data["series"][0]["values"][11] == 600
-    # January 2026 is negative and February has no rate, so the line has a gap.
-    assert data["series"][0]["values"][12] == -400
+    # January 2026 saves nothing (0.0 %) and February has no rate, so the line has a gap.
+    assert data["series"][0]["values"][12] == 0
     assert data["series"][0]["values"][13] is None
-    # The axis goes below zero and every tick is formatted on the server.
-    assert data["y_min"] < 0
-    assert data["y_labels"]["-400"] == "-40.0%"
+    assert data["y_labels"]["0"] == "0.0%"
     assert data["series"][0]["amounts"][13] == ""
 
     january = _rate_row(html, "January 2026")
-    assert _cells(january) == ["-40.0%", "51.7%"]
-    assert "text-danger" in january
+    assert _cells(january) == ["0.0%", "55.0%"]
     february = _rate_row(html, "February 2026")
     assert _cells(february)[0] == "—Not available: nothing earned"
     # The rolling window still has earnings even though February itself has none.
-    assert _cells(february)[1] == "50.6%"
+    assert _cells(february)[1] == "54.5%"
 
     total = re.search(r"<tr [^>]*data-report-rate-total.*?</tr>", html, re.DOTALL)
     assert total is not None
-    assert "52.1%" in total.group(0)  # 3 900 000 - 1 870 000 over 3 900 000
+    assert "55.4%" in total.group(0)  # 2 160 000 saved over 3 900 000 earned
 
 
 def test_a_yearly_rate_comes_from_the_year_sums(reports: OwnerApp) -> None:
     salary = _category(reports, "Rate Salary", "income")
-    food = _category(reports, "Rate Food")
+    savings = _category(reports, "Rate Savings", "expense", "savings")
     _tx(reports, salary, date(2026, 1, 5), 400_000, direction="income")
-    _tx(reports, food, date(2026, 1, 6), 200_000)
+    _tx(reports, savings, date(2026, 1, 6), 200_000)
     _tx(reports, salary, date(2026, 2, 5), 100_000, direction="income")
-    _tx(reports, food, date(2026, 2, 6), 100_000)
 
     html = _page(reports, "from=2026&to=2026&step=year")
     data = _rate_data(html)
@@ -355,8 +353,9 @@ def test_a_range_without_earnings_has_no_rate_chart(reports: OwnerApp) -> None:
     _tx(reports, food, date(2026, 3, 6), 10_000)
     html = _page(reports, "from=2026&to=2026&step=month")
     assert "data-report-rate-section" in html
-    assert "No savings rate: nothing was earned in this range." in html
+    assert "No savings rate for the charted entries." in html
     assert 'id="reports-rate-data"' not in html
     assert "Not available: nothing earned" in html
+    assert "data-report-rolling-rate" not in html  # fewer than 12 months
     total = re.search(r"<tr [^>]*data-report-rate-total.*?</tr>", html, re.DOTALL)
     assert total is not None and "—" in total.group(0)

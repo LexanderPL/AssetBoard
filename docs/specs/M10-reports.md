@@ -127,17 +127,18 @@ conventions). Golden test against services.summary.month_summary; property tests
 **Story:** I see whether I keep a larger share of what I earn than I used to.
 
 **Acceptance**
-- Uses F10.1's series. Savings rate per period `= (earned - spent) / earned` (00-overview
-  §3.3), from the period's summed integers; a **yearly rate is computed from the year's sums,
-  never as an average of monthly rates**.
+- Uses F10.1's series. Savings rate per period `= saved / earned` (00-overview §3.3, owner
+  decision 2026-10-24), from the period's summed integers; a **yearly rate is computed from the
+  year's sums, never as an average of monthly rates**. This is the same measure as F2.4's KPI.
 - Kept as basis points and tenths of a percent, each rounded once from the exact ratio (F2.4's
   rule); a period with `earned = 0` has no rate (a gap in the line, "—" in the table, "Not
   available: nothing earned" for screen readers).
 - Chart: line of the rate per period; with `step=month` also a 12-month rolling rate (from the
   rolling 12-month sums, not averaged rates), shown from the 12th month of the range.
-- Negative rates are shown as such (the axis goes below zero).
-- Golden tests: the F2.4 example month gives −43.3%; a year whose months are 50% and 0% with
-  earnings 4 000.00 and 1 000.00 gives 40.0% (not 25.0%).
+- A negative rate, if present in the data, is shown below zero.
+- Golden tests: the F2.4 example month (saved 0 of 3 400.00 earned) gives 0.0%, not the old
+  −43.3% left-over measure; a month with 800.00 saved of 3 000.00 earned gives 26.7%; a year
+  whose months save 2 000.00 of 4 000.00 (50%) and 0 of 1 000.00 (0%) gives 40.0%, not 25.0%.
 
 **Agent prompt**
 ```
@@ -147,22 +148,20 @@ rounded once as in F2.4, with gaps for zero earnings; chart and table on /report
 ```
 
 **As built (F10.2):**
-- `domain.reports.savings_rate(earned, spent)` returns a `SavingsRate(bp, tenths)`; both values
+- `domain.reports.savings_rate(earned, saved)` returns a `SavingsRate(bp, tenths)`; both values
   are rounded once by F2.4's `savings_rate_bp` / `savings_rate_tenths` (shared, not copied).
   `PeriodTotals.savings_rate` applies it to a period's exact sums;
-  `rolling_savings_rates(series, months=12)` computes each window's rate from its summed
-  integers in one pass and returns `None` before the 12th month.
+  `rolling_savings_rates(series, months=12)` computes each window's saved/earned rate from its
+  summed integers in one pass and returns an unavailable rate before the 12th month.
 - The page adds a second section with a line chart (ECharts `line` options through the report
   chart module) and its own table: period, rate, and — monthly with at least 12 months — the
   rolling rate, plus a total row from the exact range sums. A missing point is `null` in the
   chart JSON (a gap, never zero); the table shows “—” with an sr-only reason. The rate axis
-  includes zero and extends below it for negative values. The monthly table rows keep the same
-  month links as F10.1; the shared filters, currency selector and notes are unchanged.
-- **Formula note / deviation:** §3.3's KPI became `saved / earned` on 2026-10-24, but F10.2's
-  acceptance and golden example require `(earned - spent) / earned` (the older definition). The
-  report therefore keeps that wider measure — money moved to savings and money left over both
-  count as kept — and the page/user guide say so explicitly. It is not F2.4's KPI and is not
-  described as such. This is flagged in the PR.
+  includes zero and can extend below it for a negative rate. The monthly table rows keep the
+  same month links as F10.1; the shared filters, currency selector and notes are unchanged.
+- The earlier F10.2 draft used the pre-2026-10-24 `(earned - spent) / earned` formula. The owner
+  changed the KPI to `saved / earned` in the overview and M2; this feature follows that decision
+  so the report matches F2.4, and the stale acceptance/goldens were corrected in this PR.
 - No migration and no new dependency: the feature reads F10.1's `ledger_series` only.
 
 ---
