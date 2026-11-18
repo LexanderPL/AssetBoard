@@ -209,6 +209,57 @@
     };
   }
 
+  function reportBarsOptions(data) {
+    const ink = token("ink");
+    const surface = token("surface");
+    const line = token("line");
+    return {
+      animation: false,
+      aria: { enabled: false }, // the adjacent table is the accessible version
+      legend: {
+        top: 0,
+        textStyle: { color: ink },
+        data: data.series.map((series) => series.name),
+      },
+      grid: { left: 8, right: 16, top: 42, bottom: 8, containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        renderMode: "richText",
+        backgroundColor: surface,
+        borderColor: line,
+        textStyle: { color: ink },
+        formatter: (params) => {
+          if (!Array.isArray(params) || params.length === 0) return "";
+          return [data.labels[params[0].dataIndex], ...(data.tooltips[params[0].dataIndex] || [])].join("\n");
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: data.labels,
+        axisLabel: { color: ink },
+        axisLine: { lineStyle: { color: line } },
+      },
+      yAxis: {
+        type: "value",
+        min: data.y_min,
+        max: data.y_max,
+        interval: data.y_interval,
+        // Every tick is formatted on the server; the browser only looks the integer up.
+        axisLabel: { color: ink, formatter: (value) => data.y_labels[String(value)] || "" },
+        splitLine: { lineStyle: { color: line } },
+      },
+      series: data.series.map((series) => ({
+        name: series.name,
+        type: "bar",
+        data: series.values,
+        barMaxWidth: 28,
+        itemStyle: { color: token(series.color) },
+        emphasis: { focus: "series" },
+      })),
+    };
+  }
+
   function markLineData(data, ink) {
     const line = token("line");
     return (data.markers || []).map((marker) => ({
@@ -370,6 +421,11 @@
       element.querySelector("[data-chart-table]")?.classList.add("sr-only");
     } else if (kind === "line" && Array.isArray(data.series)) {
       option = lineOptions(data);
+    } else if (kind === "report-bars" && Array.isArray(data.series)) {
+      option = reportBarsOptions(data);
+      element.querySelector("[data-chart-table]")?.classList.add("sr-only");
+      const toggle = element.querySelector("[data-chart-table-toggle]");
+      if (toggle) toggle.hidden = false;
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
     } else if (kind === "loan-payments" && Array.isArray(data.series)) {
@@ -400,7 +456,18 @@
 
   function drawAll() {
     disposeDetached();
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"]').forEach(draw);
+  }
+
+  function toggleTable(button) {
+    const chart = button.closest("[data-chart]");
+    const table = chart ? chart.querySelector("[data-chart-table]") : null;
+    if (!table) return;
+    const hidden = table.classList.toggle("sr-only");
+    button.setAttribute("aria-expanded", hidden ? "false" : "true");
+    button.textContent = hidden
+      ? button.getAttribute("data-show-label") || ""
+      : button.getAttribute("data-hide-label") || "";
   }
 
   function start() {
@@ -415,6 +482,10 @@
     for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap", "htmx:load"]) {
       document.addEventListener(eventName, drawAll);
     }
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest("[data-chart-table-toggle]") : null;
+      if (target) toggleTable(target);
+    });
     let pending = 0;
     window.addEventListener("resize", () => {
       window.cancelAnimationFrame(pending);

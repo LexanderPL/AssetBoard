@@ -4979,6 +4979,9 @@ msgstr ""
 msgid "History"
 msgstr ""
 
+msgid "Reports"
+msgstr ""
+
 msgid "Upcoming"
 msgstr ""
 
@@ -4987,6 +4990,51 @@ msgstr ""
 
 msgid "FIRE projection"
 msgstr ""
+
+msgid "The first year must be the same as or before the last year."
+msgstr ""
+
+msgid "Choose at most 30 years."
+msgstr ""
+
+msgid "Income vs expenses"
+msgstr ""
+
+msgid "No entries in this range."
+msgstr ""
+
+msgid "so far"
+msgstr ""
+
+msgid "Income, expenses and savings by period"
+msgstr ""
+
+msgid "The range ends with the current month."
+msgstr ""
+
+msgid "Earned"
+msgstr ""
+
+msgid "Spent"
+msgstr ""
+
+msgid "Saved"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+#, python-format
+msgid "%(num)d entry is dated after today and is not charted."
+msgid_plural "%(num)d entries are dated after today and are not charted."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(num)d entry in another currency is left out; reports do not convert."
+msgid_plural "%(num)d entries in another currency are left out; reports do not convert."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "on Monday"
 msgstr ""
@@ -8043,9 +8091,6 @@ msgstr ""
 msgid "Paid on"
 msgstr ""
 
-msgid "Net"
-msgstr ""
-
 msgid "You receive"
 msgstr ""
 
@@ -10766,12 +10811,6 @@ msgstr ""
 msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr ""
 
-msgid "Earned"
-msgstr ""
-
-msgid "Spent"
-msgstr ""
-
 msgid "Left"
 msgstr ""
 
@@ -11309,6 +11348,37 @@ msgstr ""
 msgid "Reminder"
 msgstr ""
 
+msgid "From year"
+msgstr ""
+
+msgid "To year"
+msgstr ""
+
+msgid "Granularity"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "Yearly"
+msgstr ""
+
+msgid "Show report"
+msgstr ""
+
+#, python-format
+msgid "Amounts in %(currency)s."
+msgstr ""
+
+msgid "Fix the filters to see the report."
+msgstr ""
+
+msgid "Show as table"
+msgstr ""
+
+msgid "Hide table"
+msgstr ""
+
 msgid "Edit recurring item"
 msgstr ""
 
@@ -11366,9 +11436,6 @@ msgstr ""
 msgid "On one or more days of the week"
 msgstr ""
 
-msgid "Monthly"
-msgstr ""
-
 msgid "On the same day each month"
 msgstr ""
 
@@ -11376,9 +11443,6 @@ msgid "Every few months"
 msgstr ""
 
 msgid "Every 2, 3, 6… months, like a quarterly bill"
-msgstr ""
-
-msgid "Yearly"
 msgstr ""
 
 msgid "On the same date each year"

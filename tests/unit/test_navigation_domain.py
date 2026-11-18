@@ -46,6 +46,7 @@ def test_custom_order_and_visibility_are_kept() -> None:
         "month",
         "history",
         "transactions",
+        "reports",
         "upcoming",
         "recurring",
         "income",
@@ -135,10 +136,12 @@ def test_malformed_values_fall_back_to_defaults(raw: object) -> None:
 @pytest.mark.parametrize(
     ("key", "direction", "expected"),
     [
-        ("loans", "up", ["home", "month", "transactions", "history", "upcoming", "recurring",
-                         "income", "taxes", "net_worth", "loans", "investments", "fire"]),
-        ("loans", "down", ["home", "month", "transactions", "history", "upcoming", "recurring",
-                           "income", "taxes", "net_worth", "investments", "fire", "loans"]),
+        ("loans", "up", ["home", "month", "transactions", "history", "reports", "upcoming",
+                         "recurring", "income", "taxes", "net_worth", "loans", "investments",
+                         "fire"]),
+        ("loans", "down", ["home", "month", "transactions", "history", "reports", "upcoming",
+                           "recurring", "income", "taxes", "net_worth", "investments", "fire",
+                           "loans"]),
         ("month", "up", list(CANONICAL_KEYS)),  # Home blocks the move to the top
         ("fire", "down", list(CANONICAL_KEYS)),  # already last
         ("unknown", "up", list(CANONICAL_KEYS)),
@@ -170,6 +173,7 @@ def test_serialize_round_trips_through_normalize() -> None:
         {"key": "month", "visible": True},
         {"key": "transactions", "visible": True},
         {"key": "history", "visible": True},
+        {"key": "reports", "visible": True},
         {"key": "upcoming", "visible": True},
         {"key": "recurring", "visible": True},
         {"key": "taxes", "visible": True},

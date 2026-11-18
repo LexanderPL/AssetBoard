@@ -30,6 +30,7 @@ HOOKS = {
     "month": "month",
     "transactions": "transactions",
     "history": "history",
+    "reports": "reports",
     "upcoming": "upcoming",
     "recurring": "recurring",
     "income": "income",
@@ -143,8 +144,8 @@ def test_the_sidebar_save_button_is_distinct_from_the_profile_save_button(owner:
 
 
 def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
-    order = ["home", "investments", "month", "transactions", "history", "upcoming", "recurring",
-             "income", "taxes", "net_worth", "loans", "fire"]  # fmt: skip
+    order = ["home", "investments", "month", "transactions", "history", "reports", "upcoming",
+             "recurring", "income", "taxes", "net_worth", "loans", "fire"]  # fmt: skip
     visible = [key for key in order if key not in {"history", "taxes"}]
     response = post_sidebar(owner, order=order, visible=visible)
     assert response.status_code == 303
@@ -155,6 +156,7 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
         {"key": "month", "visible": True},
         {"key": "transactions", "visible": True},
         {"key": "history", "visible": False},
+        {"key": "reports", "visible": True},
         {"key": "upcoming", "visible": True},
         {"key": "recurring", "visible": True},
         {"key": "income", "visible": True},
@@ -175,6 +177,7 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
         "investments",
         "month",
         "transactions",
+        "reports",
         "upcoming",
         "recurring",
         "income",
@@ -192,8 +195,8 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
 def test_move_up_and_down_by_posting(owner: OwnerApp) -> None:
     moved = post_sidebar(owner, move="income:up")
     assert moved.status_code == 303, moved.text
-    custom = ["home", "month", "transactions", "history", "upcoming", "income", "recurring",
-              "taxes", "net_worth", "investments", "loans", "fire"]  # fmt: skip
+    custom = ["home", "month", "transactions", "history", "reports", "upcoming", "income",
+              "recurring", "taxes", "net_worth", "investments", "loans", "fire"]  # fmt: skip
     assert [entry["key"] for entry in saved(owner) or []] == custom
     back = post_sidebar(owner, order=custom, move="income:down")
     assert back.status_code == 303
@@ -304,7 +307,7 @@ def test_the_saved_sidebar_follows_the_user_across_workspaces(owner: OwnerApp) -
     assert switched.status_code == 303
     # The preference belongs to the user, not to the workspace they are in.
     assert nav_hooks(owner.client.get("/").text) == [
-        "home", "loans", "month", "transactions", "upcoming", "recurring",
+        "home", "loans", "month", "transactions", "reports", "upcoming", "recurring",
         "income", "net-worth", "investments", "fire",
     ]  # fmt: skip
     assert panel_keys(owner.client.get("/account").text) == order
@@ -398,6 +401,7 @@ def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:
         "month",
         "transactions",
         "history",
+        "reports",
         "upcoming",
         "recurring",
         "income",

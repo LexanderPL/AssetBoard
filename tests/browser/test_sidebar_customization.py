@@ -123,8 +123,8 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         page.locator('[data-sidebar-move="income:up"]').click()
         assert page.url == f"{base}/account"
         assert _form_keys(page) == [
-            "home", "month", "transactions", "history", "upcoming", "income", "recurring",
-            "taxes", "net_worth", "investments", "loans", "fire",
+            "home", "month", "transactions", "history", "reports", "upcoming", "income",
+            "recurring", "taxes", "net_worth", "investments", "loans", "fire",
         ]  # fmt: skip
         assert _nav(page).index("income") > _nav(page).index("recurring")
         assert page.locator("[data-sidebar-notice]").count() == 0
@@ -139,8 +139,8 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         fields = parse_qs(save_request.value.post_data or "")
         assert "move" not in fields
         assert fields["item"] == [
-            "home", "month", "transactions", "history", "upcoming", "income", "recurring",
-            "taxes", "net_worth", "investments", "loans", "fire",
+            "home", "month", "transactions", "history", "reports", "upcoming", "income",
+            "recurring", "taxes", "net_worth", "investments", "loans", "fire",
         ]  # fmt: skip
         page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
         expect(settings.locator('[role="status"]')).to_contain_text("Your sidebar is saved.")
@@ -158,14 +158,14 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         page.keyboard.press("Enter")
         assert page.url == f"{base}/account"
         assert _form_keys(page) == [
-            "home", "month", "transactions", "history", "upcoming", "recurring", "income",
-            "taxes", "net_worth", "investments", "loans", "fire",
+            "home", "month", "transactions", "history", "reports", "upcoming", "recurring",
+            "income", "taxes", "net_worth", "investments", "loans", "fire",
         ]  # fmt: skip
         assert page.evaluate("document.activeElement?.dataset?.sidebarMove") == "income:down"
         # The local keyboard move has not changed the order saved above.
         assert [entry["key"] for entry in _stored_sidebar(app) or []] == [
-            "home", "month", "transactions", "history", "upcoming", "income", "recurring",
-            "taxes", "net_worth", "investments", "loans", "fire",
+            "home", "month", "transactions", "history", "reports", "upcoming", "income",
+            "recurring", "taxes", "net_worth", "investments", "loans", "fire",
         ]  # fmt: skip
         _actions_are_inline(page)
         page.locator("[data-sidebar-save]").click()
@@ -199,14 +199,14 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         page.goto(f"{base}/", wait_until="networkidle")
         _open_menu(page)
         assert _nav(page) == [
-            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "home", "month", "transactions", "history", "reports", "upcoming", "recurring",
             "income", "net-worth", "investments", "loans", "fire",
         ]  # fmt: skip
         assert page.evaluate(NO_OVERFLOW)
         page.set_viewport_size({"width": 1440, "height": 900})
         page.goto(f"{base}/", wait_until="networkidle")
         assert _nav(page) == [
-            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "home", "month", "transactions", "history", "reports", "upcoming", "recurring",
             "income", "net-worth", "investments", "loans", "fire",
         ]  # fmt: skip
 
@@ -289,7 +289,7 @@ def test_the_customiser_works_without_javascript(tmp_path: Path) -> None:
         page.wait_for_url(f"{base}/account?sidebar=reset#sidebar-settings")
         page.goto(f"{base}/", wait_until="networkidle")
         assert _nav(page) == [
-            "home", "month", "transactions", "history", "upcoming", "recurring",
+            "home", "month", "transactions", "history", "reports", "upcoming", "recurring",
             "income", "net-worth", "investments", "loans", "fire",
         ]  # fmt: skip
         assert page.evaluate(NO_OVERFLOW)

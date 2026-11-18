@@ -62,8 +62,8 @@ def test_default_is_null_and_saving_the_canonical_list_stores_null(db: Workspace
 
 def test_save_custom_order_and_visibility(db: WorkspaceDb) -> None:
     user_id = add_member(db)
-    order = ["home", "loans", "month", "transactions", "history", "upcoming", "recurring",
-             "income", "taxes", "net_worth", "investments", "fire"]  # fmt: skip
+    order = ["home", "loans", "month", "transactions", "history", "reports", "upcoming",
+             "recurring", "income", "taxes", "net_worth", "investments", "fire"]  # fmt: skip
     visible = [key for key in order if key not in {"history", "taxes"}]
     result = save_sidebar(db.factory, user_id=user_id, order=order, visible=visible)
     assert [item.key for item in result] == order
@@ -73,6 +73,7 @@ def test_save_custom_order_and_visibility(db: WorkspaceDb) -> None:
         {"key": "month", "visible": True},
         {"key": "transactions", "visible": True},
         {"key": "history", "visible": False},
+        {"key": "reports", "visible": True},
         {"key": "upcoming", "visible": True},
         {"key": "recurring", "visible": True},
         {"key": "income", "visible": True},
@@ -92,7 +93,7 @@ def test_hidden_items_keep_their_position(db: WorkspaceDb) -> None:
         visible=[key for key in DEFAULT_ORDER if key != "loans"],
     )
     entries = stored(db, user_id) or []
-    assert entries[10] == {"key": "loans", "visible": False}
+    assert entries[11] == {"key": "loans", "visible": False}
 
 
 def test_missing_keys_are_appended_visible(db: WorkspaceDb) -> None:
@@ -112,11 +113,12 @@ def test_move_is_applied_after_normalisation(db: WorkspaceDb) -> None:
         move="income:up",
     )
     assert [item.key for item in result] == [
-        "home", "month", "transactions", "history", "upcoming", "income", "recurring",
-        "taxes", "net_worth", "investments", "loans", "fire",
+        "home", "month", "transactions", "history", "reports", "upcoming", "income",
+        "recurring", "taxes", "net_worth", "investments", "loans", "fire",
     ]  # fmt: skip
-    assert [entry["key"] for entry in stored(db, user_id) or []][:7] == [
-        "home", "month", "transactions", "history", "upcoming", "income", "recurring",
+    assert [entry["key"] for entry in stored(db, user_id) or []][:8] == [
+        "home", "month", "transactions", "history", "reports", "upcoming", "income",
+        "recurring",
     ]  # fmt: skip
 
 
