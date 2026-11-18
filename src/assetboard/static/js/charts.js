@@ -1,6 +1,7 @@
-// The category donuts (F2.7) and net-worth line chart (F5.9). Every [data-chart] element holds
-// its data in a <script type="application/json"> block (amounts in minor units with labels
-// formatted by the server). With ECharts available the chart is drawn in [data-chart-canvas];
+// The category donuts (F2.7), net-worth line chart (F5.9) and the report charts
+// (F10.1/F10.2). Every [data-chart] element holds its data in a
+// <script type="application/json"> block (amounts in minor units with labels formatted by the
+// server). With ECharts available the chart is drawn in [data-chart-canvas];
 // otherwise the table stays visible. Donut legends are HTML under the chart ([data-chart-legend],
 // shown with it), so they wrap onto several lines; the line chart's legend is ECharts' own and
 // toggles series. Colours come from the CSS colour tokens (read at runtime). Charts re-render
@@ -407,6 +408,17 @@
     };
   }
 
+  function revealReportTable(element) {
+    const table = element.querySelector("[data-chart-table]");
+    const toggle = element.querySelector("[data-chart-table-toggle]");
+    if (toggle instanceof HTMLElement && toggle.hidden) {
+      // First draw: hide the no-JS table and reveal its toggle. A redraw (theme change, HTMX
+      // swap) keeps whatever the visitor chose, including the button's aria-expanded state.
+      table?.classList.add("sr-only");
+      toggle.hidden = false;
+    }
+  }
+
   function draw(element) {
     const echarts = window.echarts;
     const canvas = element.querySelector("[data-chart-canvas]");
@@ -423,14 +435,10 @@
       option = lineOptions(data);
     } else if (kind === "report-bars" && Array.isArray(data.series)) {
       option = reportBarsOptions(data);
-      const table = element.querySelector("[data-chart-table]");
-      const toggle = element.querySelector("[data-chart-table-toggle]");
-      if (toggle instanceof HTMLElement && toggle.hidden) {
-        // First draw: hide the no-JS table and reveal its toggle. A redraw (theme change, HTMX
-        // swap) keeps whatever the visitor chose, including the button's aria-expanded state.
-        table?.classList.add("sr-only");
-        toggle.hidden = false;
-      }
+      revealReportTable(element);
+    } else if (kind === "report-rate" && Array.isArray(data.series)) {
+      option = lineOptions(data);
+      revealReportTable(element);
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
     } else if (kind === "loan-payments" && Array.isArray(data.series)) {
@@ -461,7 +469,7 @@
 
   function drawAll() {
     disposeDetached();
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"], [data-chart="report-rate"]').forEach(draw);
   }
 
   function toggleTable(button) {

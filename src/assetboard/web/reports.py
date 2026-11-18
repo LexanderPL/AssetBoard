@@ -1,10 +1,10 @@
-"""The Reports page's view model (F10.1): formatted rows, chart JSON and notes.
+"""The Reports page's view model (F10.1/F10.2): formatted rows, chart JSON and notes.
 
-Amounts and labels are formatted here by the server's locale helpers; the browser only draws
-the integers it receives. Chart colours are CSS token names (read by ``static/js/charts.js``),
-so both themes keep their contrast. The data block is the same JSON shape every chart uses
-(``<script type="application/json">`` read by the static module); the table carries the same
-figures for assistive technology and for visitors without JavaScript.
+Amounts, rates and labels are formatted here by the server's locale helpers; the browser only
+draws the integers it receives. Chart colours are CSS token names (read by
+``static/js/charts.js``), so both themes keep their contrast. The data block is the same JSON
+shape every chart uses (``<script type="application/json">`` read by the static module); each
+table carries the same figures for assistive technology and for visitors without JavaScript.
 """
 
 from __future__ import annotations
@@ -17,12 +17,21 @@ from fastapi import Request
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.domain.reports import PeriodKey, PeriodTotals, ReportStep, ReportTotals
+from assetboard.domain.reports import (
+    REPORT_ROLLING_MONTHS,
+    PeriodKey,
+    PeriodTotals,
+    ReportStep,
+    ReportTotals,
+    SavingsRate,
+    rolling_savings_rates,
+    savings_rate,
+)
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_month
-from assetboard.i18n.numbers import format_money
+from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.reports import FilterError, ReportsData
-from assetboard.web.chart_axis import money_axis
+from assetboard.web.chart_axis import money_axis, rate_axis
 from assetboard.web.rendering import scoped_url
 
 
@@ -45,6 +54,16 @@ EARNED = _("Earned")
 SPENT = _("Spent")
 SAVED = _("Saved")
 NET = _("Net")
+SAVINGS_RATE = _("Savings rate")
+SAVINGS_RATE_CAPTION = _("Savings rate by period")
+SAVINGS_RATE_EXPLANATION = _(
+    "The share of earnings that regular spending did not use up: (earned − spent) ÷ earned. "
+    "Money moved to savings and money left over both count as kept."
+)
+ROLLING_RATE = _("12-month rolling rate")
+NO_RATE = _("No savings rate: nothing was earned in this range.")
+NOT_AVAILABLE = _("Not available: nothing earned")
+NOT_ENOUGH_HISTORY = _("Not available: fewer than 12 months of data.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,12 +89,40 @@ class ReportTotal:
 
 
 @dataclass(frozen=True, slots=True)
+class RateRow:
+    """One period's savings rate and (for monthly steps) its rolling 12-month rate.
+
+    ``rate``/``rolling`` are ``None`` when the figure is undefined; ``rolling_note`` says why
+    for screen readers ("nothing earned" or "fewer than 12 months of data").
+    """
+
+    label: str
+    href: str | None
+    so_far: bool
+    rate: str | None
+    rate_tenths: int | None
+    rolling: str | None
+    rolling_note: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RateTotal:
+    label: str
+    rate: str | None
+    rate_tenths: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class ReportsView:
     data: ReportsData
     errors: dict[str, str]
     rows: tuple[ReportRow, ...]
     total: ReportTotal
     chart: dict[str, Any] | None
+    rate_rows: tuple[RateRow, ...]
+    rate_total: RateTotal
+    rate_chart: dict[str, Any] | None
+    show_rolling: bool
     notes: tuple[str, ...]
     range_years: str
 
@@ -135,6 +182,125 @@ def _period_row(
         net=net,
         net_minor=net_minor,
     )
+
+
+def _rate_text(rate: SavingsRate | None, locale: str) -> str | None:
+    if rate is None or rate.tenths is None:
+        return None
+    return format_rate_tenths(rate.tenths, locale)
+
+
+def _rolling_rates(data: ReportsData) -> tuple[SavingsRate | None, ...]:
+    if data.filters.step is not ReportStep.MONTH or not data.series:
+        return (None,) * len(data.series)
+    return rolling_savings_rates(data.series)
+
+
+def _rate_rows(
+    data: ReportsData,
+    rolling: tuple[SavingsRate | None, ...],
+    *,
+    show_rolling: bool,
+    locale: str,
+    request: Request,
+) -> tuple[RateRow, ...]:
+    rows: list[RateRow] = []
+    for index, period in enumerate(data.series):
+        rate = period.savings_rate
+        rolling_rate = rolling[index] if show_rolling else None
+        rolling_text: str | None = None
+        rolling_note: str | None = None
+        if show_rolling:
+            rolling_text = _rate_text(rolling_rate, locale)
+            if rolling_text is None:
+                rolling_note = gettext(
+                    NOT_ENOUGH_HISTORY if index < REPORT_ROLLING_MONTHS - 1 else NOT_AVAILABLE,
+                    locale,
+                )
+        href = None
+        if data.filters.step is ReportStep.MONTH:
+            assert isinstance(period.period, YearMonth)
+            href = scoped_url(request, "month", month=str(period.period))
+        rows.append(
+            RateRow(
+                label=_period_label(period.period, data.filters.step, locale),
+                href=href,
+                so_far=_is_so_far(period.period, data.filters.step, data.today),
+                rate=_rate_text(rate, locale),
+                rate_tenths=rate.tenths,
+                rolling=rolling_text,
+                rolling_note=rolling_note,
+            )
+        )
+    return tuple(rows)
+
+
+def _rate_total(data: ReportsData, locale: str) -> RateTotal:
+    rate = savings_rate(data.totals.earned.amount_minor, data.totals.spent.amount_minor)
+    return RateTotal(TOTAL, _rate_text(rate, locale), rate.tenths)
+
+
+def _rate_chart(
+    data: ReportsData,
+    rolling: tuple[SavingsRate | None, ...],
+    *,
+    show_rolling: bool,
+    locale: str,
+) -> dict[str, Any] | None:
+    if not data.has_data or not data.series:
+        return None
+    rates = [period.savings_rate for period in data.series]
+    values = [rate.tenths for rate in rates if rate.tenths is not None]
+    rolling_values = (
+        [rate.tenths for rate in rolling if rate is not None and rate.tenths is not None]
+        if show_rolling
+        else []
+    )
+    available = [*values, *rolling_values]
+    if not available:
+        return None
+    low, high, step, axis_labels = rate_axis(available, locale)
+    labels = [_period_label(period.period, data.filters.step, locale) for period in data.series]
+    tooltips: list[list[str]] = []
+    for period, rate in zip(data.series, rates, strict=True):
+        lines: list[str] = []
+        if rate.tenths is None:
+            lines.append(gettext(NOT_AVAILABLE, locale))
+        if _is_so_far(period.period, data.filters.step, data.today):
+            lines.append(gettext(SO_FAR, locale))
+        tooltips.append(lines)
+
+    def text(rate: SavingsRate | None) -> str:
+        return _rate_text(rate, locale) or ""
+
+    series: list[dict[str, Any]] = [
+        {
+            "key": "rate",
+            "name": gettext(SAVINGS_RATE, locale),
+            "color": "primary-ink",
+            "values": [rate.tenths for rate in rates],
+            "amounts": [text(rate) for rate in rates],
+        }
+    ]
+    if show_rolling:
+        series.append(
+            {
+                "key": "rolling",
+                "name": gettext(ROLLING_RATE, locale),
+                "color": "muted",
+                "values": [rate.tenths if rate is not None else None for rate in rolling],
+                "amounts": [text(rate) for rate in rolling],
+            }
+        )
+    return {
+        "labels": labels,
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "series": series,
+        "tooltips": tooltips,
+    }
 
 
 def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
@@ -232,12 +398,20 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         if data.filters.start_year != data.filters.end_year
         else str(data.filters.start_year)
     )
+    rolling = _rolling_rates(data)
+    show_rolling = step is ReportStep.MONTH and len(data.series) >= REPORT_ROLLING_MONTHS
     return ReportsView(
         data=data,
         errors=errors,
         rows=rows,
         total=total,
         chart=_chart(data, locale),
+        rate_rows=_rate_rows(
+            data, rolling, show_rolling=show_rolling, locale=locale, request=request
+        ),
+        rate_total=_rate_total(data, locale),
+        rate_chart=_rate_chart(data, rolling, show_rolling=show_rolling, locale=locale),
+        show_rolling=show_rolling,
         notes=_notes(data, locale),
         range_years=range_years,
     )

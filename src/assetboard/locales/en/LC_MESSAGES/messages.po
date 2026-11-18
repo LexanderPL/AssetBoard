@@ -5021,6 +5021,30 @@ msgstr ""
 msgid "Net"
 msgstr ""
 
+msgid "Savings rate"
+msgstr ""
+
+msgid "Savings rate by period"
+msgstr ""
+
+msgid ""
+"The share of earnings that regular spending did not use up: (earned − "
+"spent) ÷ earned. Money moved to savings and money left over both count as"
+" kept."
+msgstr ""
+
+msgid "12-month rolling rate"
+msgstr ""
+
+msgid "No savings rate: nothing was earned in this range."
+msgstr ""
+
+msgid "Not available: nothing earned"
+msgstr ""
+
+msgid "Not available: fewer than 12 months of data."
+msgstr ""
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."

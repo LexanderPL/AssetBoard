@@ -146,6 +146,25 @@ Implement F10.2 from docs/specs/M10-reports.md: savings rate per period and the 
 rounded once as in F2.4, with gaps for zero earnings; chart and table on /reports. Golden tests from the spec.
 ```
 
+**As built (F10.2):**
+- `domain.reports.savings_rate(earned, spent)` returns a `SavingsRate(bp, tenths)`; both values
+  are rounded once by F2.4's `savings_rate_bp` / `savings_rate_tenths` (shared, not copied).
+  `PeriodTotals.savings_rate` applies it to a period's exact sums;
+  `rolling_savings_rates(series, months=12)` computes each window's rate from its summed
+  integers in one pass and returns `None` before the 12th month.
+- The page adds a second section with a line chart (ECharts `line` options through the report
+  chart module) and its own table: period, rate, and — monthly with at least 12 months — the
+  rolling rate, plus a total row from the exact range sums. A missing point is `null` in the
+  chart JSON (a gap, never zero); the table shows “—” with an sr-only reason. The rate axis
+  includes zero and extends below it for negative values. The monthly table rows keep the same
+  month links as F10.1; the shared filters, currency selector and notes are unchanged.
+- **Formula note / deviation:** §3.3's KPI became `saved / earned` on 2026-10-24, but F10.2's
+  acceptance and golden example require `(earned - spent) / earned` (the older definition). The
+  report therefore keeps that wider measure — money moved to savings and money left over both
+  count as kept — and the page/user guide say so explicitly. It is not F2.4's KPI and is not
+  described as such. This is flagged in the PR.
+- No migration and no new dependency: the feature reads F10.1's `ledger_series` only.
+
 ---
 
 ## F10.3 Expenses by category over time
