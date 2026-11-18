@@ -1,0 +1,124 @@
+{# The Reports page (F10.1). The filters are a plain GET form (bookmarkable, no JavaScript).
+   The chart's data travels in a JSON block read by static/js/charts.js; the table beside it has
+   the same figures, stays visible without JavaScript, and is the accessible version. No inline
+   script or style. #}
+{% extends "base.html" %}
+{% set label_class = "block text-sm font-medium" %}
+{% set input_class = "form-control w-full px-2.5 py-1.5" %}
+{% set error_class = "mt-1 text-xs text-danger" %}
+
+{% macro field_error(name) -%}
+{% if view.errors.get(name) %}<p id="report-{{ name }}-error" class="{{ error_class }}" data-field-error>{{ view.errors.get(name) }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro invalid(name) -%}
+{% if view.errors.get(name) %} aria-invalid="true" aria-describedby="report-{{ name }}-error"{% endif %}
+{%- endmacro %}
+
+{% block title %}{{ _("Reports") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Reports") }}{% endblock %}
+{% block scripts %}{% if view.chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl space-y-6" data-reports>
+  <section class="panel p-4 sm:p-6" aria-labelledby="reports-filters-heading">
+    <h2 id="reports-filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
+    <form method="get" action="{{ scoped_url(request, 'reports') }}" class="mt-4 grid gap-4 sm:grid-cols-4 sm:items-end" novalidate data-report-filters>
+      <div>
+        <label for="report-from" class="{{ label_class }}">{{ _("From year") }}</label>
+        <input id="report-from" name="from" type="number" min="1900" max="2199" step="1" inputmode="numeric" value="{{ view.data.filters.from_text }}"{{ invalid("from") }} class="{{ input_class }}">
+        {{ field_error("from") }}
+      </div>
+      <div>
+        <label for="report-to" class="{{ label_class }}">{{ _("To year") }}</label>
+        <input id="report-to" name="to" type="number" min="1900" max="2199" step="1" inputmode="numeric" value="{{ view.data.filters.to_text }}"{{ invalid("to") }} class="{{ input_class }}">
+        {{ field_error("to") }}
+      </div>
+      <div>
+        <label for="report-step" class="{{ label_class }}">{{ _("Granularity") }}</label>
+        <select id="report-step" name="step" class="form-select w-full py-1.5 pl-2.5">
+          <option value="month"{% if view.data.filters.step.value == "month" %} selected{% endif %}>{{ _("Monthly") }}</option>
+          <option value="year"{% if view.data.filters.step.value == "year" %} selected{% endif %}>{{ _("Yearly") }}</option>
+        </select>
+      </div>
+      {% if view.show_currency_selector %}
+      <div>
+        <label for="report-currency" class="{{ label_class }}">{{ _("Currency") }}</label>
+        <select id="report-currency" name="currency" class="form-select w-full py-1.5 pl-2.5">
+          {% for code in view.data.available_currencies %}<option value="{{ code }}"{% if code == view.data.filters.currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="flex flex-wrap items-center gap-3 sm:col-span-4">
+        <button type="submit" class="btn-primary">{{ _("Show report") }}</button>
+        {% if not view.show_currency_selector %}<p class="text-xs text-muted">{{ _("Amounts in %(currency)s.", currency=view.data.filters.currency) }}</p>{% endif %}
+      </div>
+    </form>
+    {% if not view.valid %}
+    <p class="mt-3 text-sm text-danger" role="alert" data-report-invalid>{{ _("Fix the filters to see the report.") }}</p>
+    {% endif %}
+  </section>
+
+  {% if view.valid %}
+  <section class="panel p-4 sm:p-6" aria-labelledby="reports-chart-heading" data-report-section>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="reports-chart-heading" class="text-base font-semibold">{{ _("Income vs expenses") }}</h2>
+      <p class="text-sm tabular-nums text-muted" data-report-range>{{ view.range_years }}</p>
+    </div>
+    {% if view.notes %}
+    <ul class="mt-2 space-y-1 text-xs text-muted" data-report-notes>
+      {% for note in view.notes %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <div data-chart="report-bars"{% if view.chart %} data-chart-source="reports-data"{% endif %}>
+      {% if view.chart %}
+      <script type="application/json" id="reports-data">{{ view.chart|tojson }}</script>
+      <div class="mt-4 h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
+      {% else %}
+      <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No earned, spent or saved amounts in this range.") }}</p>
+      {% endif %}
+      <div class="mt-4">
+        <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>
+        <div id="reports-table" class="relative overflow-x-auto" data-chart-table>
+          <table class="sheet w-full text-sm">
+            <caption class="sr-only">{{ _("Income, expenses and savings by period") }}</caption>
+            <thead>
+              <tr class="text-left text-xs text-muted">
+                <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Period") }}</th>
+                <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Earned") }}</th>
+                <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Spent") }}</th>
+                <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Saved") }}</th>
+                <th scope="col" class="py-1.5 text-right font-medium">{{ _("Net") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in view.rows %}
+              <tr data-report-row>
+                <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+                  {% if row.href %}<a href="{{ row.href }}" class="text-primary-ink underline" data-report-period>{{ row.label }}</a>{% else %}<span data-report-period>{{ row.label }}</span>{% endif %}
+                  {% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-so-far>{{ _("so far") }}</span>{% endif %}
+                </th>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.earned }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.spent }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.saved }}</td>
+                <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-net>{% if row.net_minor < 0 %}<span class="text-danger">{{ row.net }}</span>{% elif row.net_minor > 0 %}<span class="text-success-strong">{{ row.net }}</span>{% else %}{{ row.net }}{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-line font-semibold" data-report-total>
+                <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+                <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.total.earned }}</td>
+                <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.total.spent }}</td>
+                <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.total.saved }}</td>
+                <td class="whitespace-nowrap py-2 text-right tabular-nums">{% if view.total.net_minor < 0 %}<span class="text-danger">{{ view.total.net }}</span>{% elif view.total.net_minor > 0 %}<span class="text-success-strong">{{ view.total.net }}</span>{% else %}{{ view.total.net }}{% endif %}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

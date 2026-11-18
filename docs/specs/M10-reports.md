@@ -101,6 +101,25 @@ through the scoped TransactionRepository (no SQL aggregates), the income vs expe
 conventions). Golden test against services.summary.month_summary; property tests; the performance benchmark.
 ```
 
+**As built (F10.1):**
+- `/reports` is in the sidebar after History; every member, viewers included, may open it. The
+  filters are one plain GET form; unknown parameters are ignored.
+- Defaults follow the open questions: the current year and the two before, monthly for a range
+  up to 3 years and yearly beyond. The currency selector is hidden when only one currency occurs
+  (always the base in v1). Withdrawals are not a series. There is no per-table CSV in this
+  feature; F9.2 owns report CSV.
+- The range ends with the current month in the workspace's time zone; a `to` year later than the
+  current one is kept in the form and the chart stops at the current month with a note. Entries
+  dated after today are excluded and counted in a note. Amounts in another currency than the
+  selected one are excluded and counted, never converted.
+- The service reads the categories, one distinct currency lookup and one column-only stream of
+  transactions (`TransactionRepository.iter_ledger_columns`) per request; the table's total row is
+  the exact integer sum of the periods. The performance test holds 10 years × 5 000 rows to
+  2 s (a 4× margin over the 500 ms target on CI).
+- The chart is a new `report-bars` kind of the F2.7 chart module: grouped bars, ECharts' legend
+  hides a series, server-formatted labels, token colours, and an sr-only table with a
+  “Show as table” control. User guide: [Reports](../reports.md).
+
 ---
 
 ## F10.2 Savings rate per month and per year

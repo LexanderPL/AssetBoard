@@ -22,6 +22,7 @@ CANONICAL_KEYS: tuple[str, ...] = (
     "month",
     "transactions",
     "history",
+    "reports",
     "upcoming",
     "recurring",
     "income",

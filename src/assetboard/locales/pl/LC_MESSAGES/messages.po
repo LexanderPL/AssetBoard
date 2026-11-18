@@ -5375,6 +5375,9 @@ msgstr "Strona główna"
 msgid "History"
 msgstr "Historia"
 
+msgid "Reports"
+msgstr "Raporty"
+
 msgid "Upcoming"
 msgstr "Nadchodzące"
 
@@ -5383,6 +5386,56 @@ msgstr "Cykliczne"
 
 msgid "FIRE projection"
 msgstr "Prognoza FIRE"
+
+msgid "The first year must be the same as or before the last year."
+msgstr "Pierwszy rok musi być taki sam jak ostatni lub wcześniejszy."
+
+msgid "Choose at most 30 years."
+msgstr "Wybierz najwyżej 30 lat."
+
+msgid "Income vs expenses"
+msgstr "Dochody i wydatki"
+
+msgid "so far"
+msgstr "jak dotąd"
+
+msgid "Income, expenses and savings by period"
+msgstr "Dochody, wydatki i oszczędności według okresu"
+
+msgid "The range ends with the current month."
+msgstr "Zakres kończy się na bieżącym miesiącu."
+
+msgid "Earned"
+msgstr "Zarobione"
+
+msgid "Spent"
+msgstr "Wydane"
+
+msgid "Saved"
+msgstr "Zaoszczędzone"
+
+msgid "Net"
+msgstr "Netto"
+
+#, python-format
+msgid "%(num)d entry is dated after today and is not charted."
+msgid_plural "%(num)d entries are dated after today and are not charted."
+msgstr[0] "%(num)d wpis ma datę po dniu dzisiejszym i nie jest pokazany na wykresie."
+msgstr[1] "%(num)d wpisy mają daty po dniu dzisiejszym i nie są pokazane na wykresie."
+msgstr[2] "%(num)d wpisów ma daty po dniu dzisiejszym i nie są pokazane na wykresie."
+
+#, python-format
+msgid "%(num)d entry in another currency is left out; reports do not convert."
+msgid_plural "%(num)d entries in another currency are left out; reports do not convert."
+msgstr[0] ""
+"%(num)d wpis w innej walucie został pominięty; raporty nie przeliczają "
+"walut."
+msgstr[1] ""
+"%(num)d wpisy w innych walutach zostały pominięte; raporty nie "
+"przeliczają walut."
+msgstr[2] ""
+"%(num)d wpisów w innych walutach zostało pominiętych; raporty nie "
+"przeliczają walut."
 
 msgid "on Monday"
 msgstr "w poniedziałek"
@@ -8848,9 +8901,6 @@ msgstr "Miesiąc pracy"
 msgid "Paid on"
 msgstr "Data wypłaty"
 
-msgid "Net"
-msgstr "Netto"
-
 msgid "You receive"
 msgstr "Otrzymujesz"
 
@@ -11842,12 +11892,6 @@ msgstr ""
 msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
 
-msgid "Earned"
-msgstr "Zarobione"
-
-msgid "Spent"
-msgstr "Wydane"
-
 msgid "Left"
 msgstr "Zostało"
 
@@ -12465,6 +12509,40 @@ msgstr "Kanał"
 msgid "Reminder"
 msgstr "Przypomnienie"
 
+msgid "From year"
+msgstr "Od roku"
+
+msgid "To year"
+msgstr "Do roku"
+
+msgid "Granularity"
+msgstr "Szczegółowość"
+
+msgid "Monthly"
+msgstr "Co miesiąc"
+
+msgid "Yearly"
+msgstr "Co rok"
+
+msgid "Show report"
+msgstr "Pokaż raport"
+
+#, python-format
+msgid "Amounts in %(currency)s."
+msgstr "Kwoty w %(currency)s."
+
+msgid "Fix the filters to see the report."
+msgstr "Popraw filtry, aby zobaczyć raport."
+
+msgid "No earned, spent or saved amounts in this range."
+msgstr "W tym zakresie nie ma kwot zarobionych, wydanych ani zaoszczędzonych."
+
+msgid "Show as table"
+msgstr "Pokaż jako tabelę"
+
+msgid "Hide table"
+msgstr "Ukryj tabelę"
+
 msgid "Edit recurring item"
 msgstr "Edytuj pozycję cykliczną"
 
@@ -12524,9 +12602,6 @@ msgstr "Co tydzień"
 msgid "On one or more days of the week"
 msgstr "W jeden lub kilka dni tygodnia"
 
-msgid "Monthly"
-msgstr "Co miesiąc"
-
 msgid "On the same day each month"
 msgstr "Tego samego dnia co miesiąc"
 
@@ -12535,9 +12610,6 @@ msgstr "Co kilka miesięcy"
 
 msgid "Every 2, 3, 6… months, like a quarterly bill"
 msgstr "Co 2, 3, 6… miesięcy, jak rachunek kwartalny"
-
-msgid "Yearly"
-msgstr "Co rok"
 
 msgid "On the same date each year"
 msgstr "Tego samego dnia co roku"

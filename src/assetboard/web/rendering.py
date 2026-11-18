@@ -38,6 +38,7 @@ SIDEBAR_LABELS: dict[str, str] = {
     "month": _("Month"),
     "transactions": _("Transactions"),
     "history": _("History"),
+    "reports": _("Reports"),
     "upcoming": _("Upcoming"),
     "recurring": _("Recurring"),
     "income": _("Income"),
@@ -52,6 +53,7 @@ SIDEBAR_GLYPHS: dict[str, str] = {
     "month": "◷",
     "transactions": "≡",
     "history": "⌕",
+    "reports": "▦",
     "upcoming": "◔",
     "recurring": "↻",
     "income": "¤",
@@ -173,6 +175,9 @@ def sidebar_links(request: Request, nav: WorkspaceNav | None) -> tuple[SidebarLi
             href = transactions_href
         elif key == "history":
             href = scoped_url(request, "history")
+            current = path == href or path.startswith(href + "/")
+        elif key == "reports":
+            href = scoped_url(request, "reports")
             current = path == href or path.startswith(href + "/")
         elif key == "upcoming":
             href = scoped_url(request, "scheduled_upcoming")

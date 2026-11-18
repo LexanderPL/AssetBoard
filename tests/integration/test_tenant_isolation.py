@@ -1361,6 +1361,14 @@ def test_transaction_queries_stay_in_their_workspace(
     assert in_b.recent_expenses() == []
     assert [r.id for r in in_a.by_ids([a_row.id])] == [a_row.id]
     assert in_b.by_ids([a_row.id]) == []
+    window_start, window_end = date(2026, 10, 1), date(2026, 10, 31)
+    assert [
+        (row.category_id, row.amount_minor)
+        for row in in_a.iter_ledger_columns(start=window_start, end=window_end)
+    ] == [(food_a.id, 1250)]
+    assert list(in_b.iter_ledger_columns(start=window_start, end=window_end)) == []
+    assert in_a.currencies_in_window(start=window_start, end=window_end) == ("EUR",)
+    assert in_b.currencies_in_window(start=window_start, end=window_end) == ()
     assert (
         in_a.regular_window_totals(
             direction="expense", start=date(2025, 10, 1), end=date(2026, 9, 30)

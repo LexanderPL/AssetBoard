@@ -107,6 +107,7 @@ from assetboard.web.provider_routes import router as provider_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.pwa_routes import router as pwa_router
 from assetboard.web.rendering import render_template
+from assetboard.web.report_routes import router as report_router
 from assetboard.web.routes import router as web_router
 from assetboard.web.scheduled_routes import router as scheduled_router
 from assetboard.web.security import CsrfFailed, web_session
@@ -424,6 +425,7 @@ def create_app(
     app.include_router(transaction_router)
     app.include_router(transaction_list_router)
     app.include_router(transactions_page_router)
+    app.include_router(report_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
     app.include_router(proxy_router)

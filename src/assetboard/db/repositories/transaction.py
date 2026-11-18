@@ -88,6 +88,17 @@ class DescriptionMatch:
     last_date: date
 
 
+@dataclass(frozen=True, slots=True)
+class LedgerColumn:
+    """The columns a ledger report reads from one non-deleted transaction (F10.1)."""
+
+    day: date
+    direction: str
+    amount_minor: int
+    currency: str
+    category_id: UUID
+
+
 class TransactionRepository(ScopedRepository[Transaction]):
     """Rows are soft-deleted (``deleted_at``), never removed: generic ``delete`` is unsupported.
 
@@ -287,6 +298,54 @@ class TransactionRepository(ScopedRepository[Transaction]):
             statement = statement.where(Transaction.direction == direction)
         statement = statement.order_by(Transaction.date, Transaction.created_at, Transaction.id)
         return list(self._session.scalars(statement))
+
+    def iter_ledger_columns(
+        self, *, start: date, end: date, batch: int = 1000
+    ) -> Iterator[LedgerColumn]:
+        """Non-deleted rows dated in ``[start, end]``, one column-only stream in date order.
+
+        Reports need only these five columns; no ORM entity is loaded and no aggregate or
+        ``DecimalType`` column is touched in SQL (F10.1). ``batch`` bounds the rows fetched per
+        round trip.
+        """
+        statement = (
+            select(
+                Transaction.date,
+                Transaction.direction,
+                Transaction.amount_minor,
+                Transaction.currency,
+                Transaction.category_id,
+            )
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+                Transaction.date >= start,
+                Transaction.date <= end,
+            )
+            .order_by(Transaction.date, Transaction.created_at, Transaction.id)
+        )
+        rows = self._session.execute(statement.execution_options(yield_per=batch))
+        for day, direction, amount_minor, currency, category_id in rows:
+            yield LedgerColumn(day, direction, int(amount_minor), currency, category_id)
+
+    def currencies_in_window(self, *, start: date, end: date) -> tuple[str, ...]:
+        """The distinct currencies of non-deleted rows dated in ``[start, end]``, sorted.
+
+        The reports page lists them in the currency selector (plus the workspace's base
+        currency); a currency string is ordered in SQL, never a ``DecimalType`` value.
+        """
+        statement = (
+            select(Transaction.currency)
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+                Transaction.date >= start,
+                Transaction.date <= end,
+            )
+            .distinct()
+            .order_by(Transaction.currency)
+        )
+        return tuple(self._session.scalars(statement))
 
     def counts_by_category(self) -> dict[UUID, CategoryCounts]:
         """Per category: all rows (deleted included) and non-deleted rows."""
