@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.3](https://github.com/LexanderPL/AssetBoard/compare/v0.8.2...v0.8.3) (2026-11-18)
+
+
+### Features
+
+* **dashboard:** split portfolio history and add net worth range (F9.1) ([#386](https://github.com/LexanderPL/AssetBoard/issues/386)) ([b13d91d](https://github.com/LexanderPL/AssetBoard/commit/b13d91da82266bec4e2f2087161c769906beaef2))
+* **pwa:** add installable web app (F9.10) ([#389](https://github.com/LexanderPL/AssetBoard/issues/389)) ([78d9430](https://github.com/LexanderPL/AssetBoard/commit/78d9430d8feb42276e829e480e0935f4953aac51))
+* **reports:** income vs expenses report (F10.1) ([#390](https://github.com/LexanderPL/AssetBoard/issues/390)) ([a2cb51f](https://github.com/LexanderPL/AssetBoard/commit/a2cb51fb0dcb62048b77d3946eab46eb290b03be))
+* **reports:** savings rate per month and year (F10.2) ([#391](https://github.com/LexanderPL/AssetBoard/issues/391)) ([d26ea8d](https://github.com/LexanderPL/AssetBoard/commit/d26ea8d923ea0f39912588d972876a6c2ebeb026))
+* **security:** complete F9.6 security hardening ([#388](https://github.com/LexanderPL/AssetBoard/issues/388)) ([0a410f1](https://github.com/LexanderPL/AssetBoard/commit/0a410f1d454d925b414d43abcd93be236785a1e6))
+
 ## [0.8.2](https://github.com/LexanderPL/AssetBoard/compare/v0.8.1...v0.8.2) (2026-11-17)
 
 
