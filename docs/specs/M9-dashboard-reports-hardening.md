@@ -388,12 +388,15 @@ keep going through the existing Apprise channels (F3.6); web push is out of scop
   that version. Only versioned `/static/` assets and `GET /offline` are cached. Navigations are
   network-first and fall back to the translated, data-free offline page; fragments, exports and
   every other workspace response are network-only. `worker-src 'self'` was added to the CSP.
-- Sign-in, sign-out and OIDC redirects already stay on the app's URLs (OIDC uses a local `next`),
-  so they return to the installed app when the scope covers the root path. A real install and an
-  Authelia/OIDC round trip on physical Android and iOS devices cannot be automated here; the
-  [Install on your phone](../install-on-your-phone.md) guide covers the manual check, and the
-  Chromium test exercises the standalone viewport, manifest, registration, cache rules and
-  offline page. The update notice and version are served in the (never cached) HTML.
+- With AssetBoard at the origin root, sign-in, sign-out and OIDC redirects already stay on the
+  app's URLs (OIDC uses a local `next`), so they return to the installed app. A subpath (ASGI
+  root path) is honoured by the manifest, worker and offline page, but not yet by the auth
+  redirects, so the guide scopes installation to a root deployment; that is a recorded follow-up.
+  A real install and an Authelia/OIDC round trip on physical Android and iOS devices cannot be
+  automated here; the [Install on your phone](../install-on-your-phone.md) guide covers the
+  manual check, and the Chromium test covers the phone viewport, manifest, registration, cache
+  rules, the offline page and its working retry. The update notice and version are served in the
+  (never cached) HTML.
 
 **Agent prompt**
 ```

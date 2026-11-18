@@ -121,8 +121,8 @@ def test_signed_out_pages_link_the_manifest_and_apple_icon(owner: OwnerApp) -> N
     matching = (
         '<link rel="manifest" href="/manifest.webmanifest"',
         '<link rel="apple-touch-icon" sizes="180x180"',
-        'name="theme-color" media="(prefers-color-scheme: light)"',
-        'name="theme-color" media="(prefers-color-scheme: dark)"',
+        f'name="theme-color" media="(prefers-color-scheme: light)" content="{LIGHT_THEME_COLOR}"',
+        f'name="theme-color" media="(prefers-color-scheme: dark)" content="{DARK_THEME_COLOR}"',
         'name="apple-mobile-web-app-capable" content="yes"',
     )
     for snippet in matching:
@@ -145,7 +145,8 @@ def test_manifest_and_links_respect_the_root_path(web: WebHarness) -> None:
     assert worker.headers["service-worker-allowed"] == "/money/"
     assert 'href="/money/manifest.webmanifest"' in login.text
     assert 'href="/money/static/img/apple-touch-icon.png?v=' in login.text
-    assert 'href="/money/offline"' in offline.text
+    # Try again reloads the URL the worker substituted; Go to Home keeps the root path.
+    assert '<a class="btn-primary" href="">' in offline.text
     assert 'href="/money/"' in offline.text
 
 

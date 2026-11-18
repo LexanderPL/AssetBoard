@@ -14,8 +14,10 @@ in AssetBoard; web push is not used.
   means a valid certificate that the phone trusts, served by your reverse proxy or tunnel — an
   `http://` address on your LAN is not enough. (Browsers treat `localhost` as secure, but a phone
   is not localhost.) The same HTTPS requirement applies to OIDC sign-in.
-- Use the exact public address configured in `ASSETBOARD_BASE_URL`, including any subpath. If you
-  sign in through Authelia, a tunnel or another identity provider, use that same address so the
+- Use the exact public address configured in `ASSETBOARD_BASE_URL`. Serve AssetBoard at the
+  origin root: the manifest, service worker and offline page honour an ASGI root path, but the
+  sign-in, sign-out and OIDC redirects currently assume the app is mounted at `/`. If you sign
+  in through Authelia, a tunnel or another identity provider, use that same address so the
   redirect after sign-in returns to the installed app.
 - Do not use a private/incognito window: install prompts are hidden there.
 - iOS 16.4 or later is required for the standalone experience. Android Chrome (or another
@@ -40,9 +42,9 @@ in incognito mode.
 4. Open AssetBoard from the new icon. It opens in standalone mode.
 
 On iOS, use Safari for the installation. Other browsers may offer their own "Add to Home
-Screen", but only Safari's produces the standalone app experience. Sign-in, sign-out and OIDC
-redirects return to the installed app; if an identity provider insists on opening a browser tab,
-complete the sign-in there and return to the AssetBoard icon.
+Screen", but only Safari's produces the standalone app experience. With AssetBoard at the origin
+root, sign-in, sign-out and OIDC redirects return to the installed app; if an identity provider
+insists on opening a browser tab, complete the sign-in there and return to the AssetBoard icon.
 
 ## Signing in, signing out and updates
 
@@ -59,13 +61,14 @@ complete the sign-in there and return to the AssetBoard icon.
 The service worker caches only versioned static files (CSS, JavaScript, icons) and the one
 translated offline page. It never caches HTML pages, HTMX fragments, exports or workspace data.
 When the phone is offline, opening the app shows **You are offline** with a retry link and no
-financial data.
+financial data. The offline page and the manifest's language follow the browser's
+`Accept-Language` when the app is installed or updated, not a profile language chosen later.
 
 ## Troubleshooting
 
 - **No install option:** confirm the page is HTTPS, not incognito, and reload. On iOS, use Safari.
 - **The icon opens a browser tab:** the app's scope may not match the address you installed from.
-  Reinstall from the exact `ASSETBOARD_BASE_URL`, including any subpath.
+  Reinstall from the exact `ASSETBOARD_BASE_URL` at the origin root.
 - **Stale styles or scripts after an upgrade:** close and reopen the app, or reload the page. A
   release changes the service worker and its cache automatically.
 - **Sign-in does not return to the app:** use the same host name in `ASSETBOARD_BASE_URL` and in

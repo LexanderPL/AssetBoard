@@ -169,7 +169,7 @@ def test_the_app_installs_offline_and_never_caches_workspace_data(tmp_path: Path
             # violation; the cached CSS and icons make it render as the app.
             context.set_offline(True)
             try:
-                page.goto(f"{base}/m/2026-01", wait_until="domcontentloaded")
+                page.goto(f"{base}/categories", wait_until="domcontentloaded")
                 expect(page.get_by_role("heading", name="You are offline")).to_be_visible()
                 expect(
                     page.get_by_text(
@@ -184,6 +184,12 @@ def test_the_app_installs_offline_and_never_caches_workspace_data(tmp_path: Path
                 assert page.evaluate("window.__cspViolations") == []
             finally:
                 context.set_offline(False)
+
+            # "Try again" reloads the URL the worker substituted, so it reaches the real page
+            # once the connection is back rather than the cached offline notice.
+            page.get_by_role("link", name="Try again").click()
+            page.wait_for_url(f"{base}/categories")
+            expect(page.get_by_role("heading", name="Categories", exact=True)).to_be_visible()
 
             # The version footer and normal navigation work again after the release.
             page.goto(f"{base}/", wait_until="networkidle")

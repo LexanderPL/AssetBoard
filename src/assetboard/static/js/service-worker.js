@@ -10,11 +10,15 @@
 
 "use strict";
 
-const CACHE_PREFIX = "assetboard-pwa-";
+const SCOPE = self.registration.scope;
+// Two instances under different subpaths share an origin; keeping the scope in the prefix stops
+// one instance's activation from deleting the other's cache.
+const SCOPE_KEY =
+  new URL(SCOPE).pathname.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "root";
+const CACHE_PREFIX = `assetboard-pwa-${SCOPE_KEY}-`;
 const rawVersion = new URL(self.location.href).searchParams.get("v") || "dev";
 const VERSION = /^[A-Za-z0-9._+-]{1,64}$/.test(rawVersion) ? rawVersion : "dev";
 const CACHE_NAME = `${CACHE_PREFIX}${VERSION}`;
-const SCOPE = self.registration.scope;
 const OFFLINE_URL = new URL("offline", SCOPE).href;
 const STATIC_PATH = new URL("static/", SCOPE).pathname;
 
@@ -36,8 +40,6 @@ function versionedAsset(path) {
   return url.href;
 }
 
-const PRECACHE_URLS = [OFFLINE_URL, ...PRECACHE_PATHS.map(versionedAsset)];
-
 function isVersionedStatic(url) {
   return (
     url.origin === self.location.origin &&
@@ -50,16 +52,27 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      // One failed asset must not stop the worker: the rest of the app still works, and the
-      // next online visit caches what it loads. The offline page is retried on the next install
-      // after an upgrade.
+      // The offline page is the reason this worker exists: if it cannot be fetched, fail the
+      // install so the previous worker and its complete cache stay active. A static-asset
+      // failure is tolerated; the next online visit caches what it loads.
+      const offline = await fetch(OFFLINE_URL, { cache: "reload" });
+      if (
+        !offline.ok ||
+        offline.redirected ||
+        !(offline.headers.get("content-type") || "").startsWith("text/html")
+      ) {
+        throw new Error("offline page unavailable");
+      }
+      await cache.put(OFFLINE_URL, offline);
       await Promise.all(
-        PRECACHE_URLS.map(async (url) => {
+        PRECACHE_PATHS.map(async (path) => {
           try {
+            const url = versionedAsset(path);
             const response = await fetch(url, { cache: "reload" });
             if (response.ok) await cache.put(url, response);
           } catch {
-            // Offline during installation: keep what was cached and finish.
+            // Offline or a missing asset: the rest of the app still works and the next online
+            // visit caches what it loads.
           }
         }),
       );
