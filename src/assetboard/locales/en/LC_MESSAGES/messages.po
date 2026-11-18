@@ -2849,16 +2849,16 @@ msgstr ""
 msgid "The portfolio value, gain and allocation."
 msgstr ""
 
-msgid "Portfolio value over time"
-msgstr ""
-
-msgid "Value and invested capital over the chosen range."
-msgstr ""
-
 msgid "Portfolio changes"
 msgstr ""
 
 msgid "Changes since yesterday and this month, with the largest movers."
+msgstr ""
+
+msgid "Portfolio value over time"
+msgstr ""
+
+msgid "Value and invested capital over the chosen range."
 msgstr ""
 
 msgid "Loans"
@@ -6317,7 +6317,7 @@ msgstr ""
 msgid "Net worth chart range"
 msgstr ""
 
-msgid "Portfolio chart range"
+msgid "Portfolio value-over-time range"
 msgstr ""
 
 #, fuzzy, python-format
@@ -14861,5 +14861,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Value over time"
+#~ msgstr ""
+
+#~ msgid "Portfolio chart range"
 #~ msgstr ""
 

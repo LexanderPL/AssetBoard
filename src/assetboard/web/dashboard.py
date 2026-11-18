@@ -577,15 +577,6 @@ WIDGETS: tuple[Widget, ...] = (
         build_portfolio,
     ),
     Widget(
-        "portfolio-history",
-        _("Portfolio value over time"),
-        _("Value and invested capital over the chosen range."),
-        "dashboard/widgets/portfolio_history.html",
-        "full",
-        _route_url("investments_performance"),
-        build_portfolio_history,
-    ),
-    Widget(
         "portfolio-changes",
         _("Portfolio changes"),
         _("Changes since yesterday and this month, with the largest movers."),
@@ -593,6 +584,15 @@ WIDGETS: tuple[Widget, ...] = (
         "half",
         _route_url("investments_portfolio"),
         build_portfolio_changes,
+    ),
+    Widget(
+        "portfolio-history",
+        _("Portfolio value over time"),
+        _("Value and invested capital over the chosen range."),
+        "dashboard/widgets/portfolio_history.html",
+        "full",
+        _route_url("investments_performance"),
+        build_portfolio_history,
     ),
     Widget(
         "loans",

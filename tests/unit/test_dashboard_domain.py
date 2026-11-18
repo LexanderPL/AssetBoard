@@ -30,7 +30,8 @@ def test_default_keys_are_the_catalogue_in_order() -> None:
     assert DEFAULT_WIDGET_KEYS == WIDGET_KEYS
     assert len(set(WIDGET_KEYS)) == len(WIDGET_KEYS)
     assert WIDGET_KEYS[0] == "month-in-out"
-    assert WIDGET_KEYS.index("portfolio") + 1 == WIDGET_KEYS.index("portfolio-history")
+    assert WIDGET_KEYS.index("portfolio") < WIDGET_KEYS.index("portfolio-changes")
+    assert WIDGET_KEYS.index("portfolio-changes") + 1 == WIDGET_KEYS.index("portfolio-history")
     assert "missing-data" in WIDGET_KEYS
 
 

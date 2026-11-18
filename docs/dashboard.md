@@ -15,8 +15,8 @@ widgets appear and in what order; the choice is saved separately for each worksp
 | Upcoming payments | Overdue items and payments due in the Upcoming window; editors and owners can confirm or skip them |
 | Net worth | The current net worth and its trend over the chosen range |
 | Portfolio | The portfolio value, gain and allocation by asset class |
-| Portfolio value over time | The current value and invested capital over the chosen range |
 | Portfolio changes | The change since yesterday and since the start of the month, plus the largest movers |
+| Portfolio value over time | The current value and invested capital over the chosen range |
 | Loans | The remaining principal, payoff date and repaid share of up to three active loans |
 | FIRE | Plan progress and the FIRE age from the workspace's FIRE plan |
 | Missing data | Stale prices, missing work logs and imports that are planned but not applied |

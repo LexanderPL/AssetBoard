@@ -3013,17 +3013,17 @@ msgstr "Portfel"
 msgid "The portfolio value, gain and allocation."
 msgstr "Wartość portfela, zysk i alokacja."
 
-msgid "Portfolio value over time"
-msgstr "Wartość portfela w czasie"
-
-msgid "Value and invested capital over the chosen range."
-msgstr "Wartość i zainwestowany kapitał w wybranym zakresie."
-
 msgid "Portfolio changes"
 msgstr "Zmiany portfela"
 
 msgid "Changes since yesterday and this month, with the largest movers."
 msgstr "Zmiany od wczoraj i od początku miesiąca oraz największe ruchy."
+
+msgid "Portfolio value over time"
+msgstr "Wartość portfela w czasie"
+
+msgid "Value and invested capital over the chosen range."
+msgstr "Wartość i zainwestowany kapitał w wybranym zakresie."
 
 msgid "Loans"
 msgstr "Kredyty"
@@ -6854,8 +6854,8 @@ msgstr "Od %(min)d do %(max)d; pozostałe pozostaną na stronie Nadchodzące."
 msgid "Net worth chart range"
 msgstr "Zakres wykresu majątku netto"
 
-msgid "Portfolio chart range"
-msgstr "Zakres wykresu portfela"
+msgid "Portfolio value-over-time range"
+msgstr "Zakres wykresu wartości portfela w czasie"
 
 #, python-format
 msgid "%(num)d widget selected"
@@ -15785,4 +15785,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Value over time"
 #~ msgstr "Wartość w czasie"
+
+#~ msgid "Portfolio chart range"
+#~ msgstr "Zakres wykresu portfela"
 

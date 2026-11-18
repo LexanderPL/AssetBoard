@@ -55,7 +55,7 @@
           </select>
         </div>
         <div class="space-y-1.5">
-          <label for="customise-portfolio-range" class="block text-sm font-medium">{{ _("Portfolio chart range") }}</label>
+          <label for="customise-portfolio-range" class="block text-sm font-medium">{{ _("Portfolio value-over-time range") }}</label>
           <select id="customise-portfolio-range" name="portfolio_range" class="form-select w-full" data-customise-portfolio-range>
             {% for value, label in view.portfolio_range_options %}
             <option value="{{ value }}"{% if value == view.portfolio_range %} selected{% endif %}>{{ label }}</option>

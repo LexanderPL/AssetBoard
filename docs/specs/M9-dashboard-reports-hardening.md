@@ -34,9 +34,9 @@ and orders them. A widget is the same thing as a "card" in the rest of this spec
     the workspace's Upcoming window setting);
   - **Net worth** (value + trend over the chosen range);
   - **Portfolio** (value, gain %, allocation mini-donut);
-  - **Portfolio value over time** (value and invested capital over the chosen range);
   - **Portfolio changes** (change in value since the previous day and since the start of the
     month, in money and %, plus the largest movers);
+  - **Portfolio value over time** (value and invested capital over the chosen range);
   - **Loans** (remaining principal, payoff date, % repaid);
   - **FIRE** (progress, FIRE age of the default scenario);
   - **Missing data** (stale prices, missing work logs, imports planned but not applied).
@@ -78,7 +78,7 @@ ignored; defaults and newly shipped widgets follow the rules above; reordering w
 - Home is a shell of ordered widget placeholders; each widget is its own lazy HTMX fragment
   (`GET /dashboard/widgets/{key}`). The widgets and their keys are:
   `month-in-out`, `month-expenses`, `month-income`, `month-plan`, `upcoming`, `net-worth`,
-  `portfolio`, `portfolio-history`, `portfolio-changes`, `loans`, `fire`, `missing-data`.
+  `portfolio`, `portfolio-changes`, `portfolio-history`, `loans`, `fire`, `missing-data`.
 - `DashboardPreference` stores the ordered enabled keys per (workspace, user). No row means the
   default catalogue (all shipped widgets). A saved row keeps later widgets off until chosen;
   unknown or corrupt stored keys are ignored.
