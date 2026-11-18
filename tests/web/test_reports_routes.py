@@ -1,4 +1,5 @@
-"""The Reports page over HTTP (F10.1): default range, filters, chart/table, notes and access."""
+"""The Reports page over HTTP (F10.1/F10.2): default range, filters, charts/tables, notes and
+access."""
 
 from __future__ import annotations
 
@@ -253,3 +254,108 @@ def test_viewers_may_open_the_page(reports: OwnerApp) -> None:
     html = _page(reports)
     assert ">Reports</h1>" in html
     assert re.search(r'<a class="nav-link" href="/reports"', _sidebar(html))
+
+
+# F10.2 savings rate
+
+
+def _rate_data(html: str) -> dict:
+    match = re.search(
+        r'<script type="application/json" id="reports-rate-data">(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    assert match is not None
+    return json.loads(match.group(1))
+
+
+def _rate_row(html: str, label: str) -> str:
+    for row in re.findall(r"<tr data-report-rate-row>.*?</tr>", html, re.DOTALL):
+        if re.search(r"data-report-rate-period>" + re.escape(label) + "<", row):
+            return row
+    raise AssertionError(label)
+
+
+def _cells(row: str) -> list[str]:
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
+    return [re.sub(r"<[^>]+>", "", cell).strip() for cell in cells]
+
+
+def _seed_rate_golden(app: OwnerApp) -> None:
+    salary = _category(app, "Rate Salary", "income")
+    food = _category(app, "Rate Food")
+    savings = _category(app, "Rate Savings", "expense", "savings")
+    for month in range(1, 13):
+        _tx(app, salary, date(2025, month, 5), 300_000, direction="income")
+        _tx(app, food, date(2025, month, 6), 120_000)
+        _tx(app, savings, date(2025, month, 7), 180_000)  # 60.0 % saved
+    _tx(app, salary, date(2026, 1, 5), 300_000, direction="income")
+    _tx(app, food, date(2026, 1, 6), 420_000)  # saved 0: 0.0 %
+    _tx(app, food, date(2026, 2, 6), 10_000)  # nothing earned: no rate
+
+
+def test_the_rate_line_table_and_rolling_rate(reports: OwnerApp) -> None:
+    _seed_rate_golden(reports)
+    html = _page(reports, "from=2025&to=2026&step=month")
+    assert 'data-chart="report-rate"' in html
+    assert "data-report-rate-section" in html
+    assert "Savings rate by period" in html
+    assert "12-month rolling rate" in html
+
+    data = _rate_data(html)
+    assert [series["key"] for series in data["series"]] == ["rate", "rolling"]
+    assert [series["name"] for series in data["series"]] == [
+        "Savings rate",
+        "12-month rolling rate",
+    ]
+    # The rolling line starts at the 12th month of the range (December 2025).
+    assert data["series"][1]["values"][:11] == [None] * 11
+    assert data["series"][1]["values"][11] == 600
+    assert data["series"][0]["values"][11] == 600
+    # January 2026 saves nothing (0.0 %) and February has no rate, so the line has a gap.
+    assert data["series"][0]["values"][12] == 0
+    assert data["series"][0]["values"][13] is None
+    assert data["y_labels"]["0"] == "0.0%"
+    assert data["series"][0]["amounts"][13] == ""
+
+    january = _rate_row(html, "January 2026")
+    assert _cells(january) == ["0.0%", "55.0%"]
+    february = _rate_row(html, "February 2026")
+    assert _cells(february)[0] == "—Not available: nothing earned"
+    # The rolling window still has earnings even though February itself has none.
+    assert _cells(february)[1] == "54.5%"
+
+    total = re.search(r"<tr [^>]*data-report-rate-total.*?</tr>", html, re.DOTALL)
+    assert total is not None
+    assert "55.4%" in total.group(0)  # 2 160 000 saved over 3 900 000 earned
+
+
+def test_a_yearly_rate_comes_from_the_year_sums(reports: OwnerApp) -> None:
+    salary = _category(reports, "Rate Salary", "income")
+    savings = _category(reports, "Rate Savings", "expense", "savings")
+    _tx(reports, salary, date(2026, 1, 5), 400_000, direction="income")
+    _tx(reports, savings, date(2026, 1, 6), 200_000)
+    _tx(reports, salary, date(2026, 2, 5), 100_000, direction="income")
+
+    html = _page(reports, "from=2026&to=2026&step=year")
+    data = _rate_data(html)
+    assert [series["key"] for series in data["series"]] == ["rate"]
+    assert data["series"][0]["values"] == [400]
+    assert data["y_labels"]["400"] == "40.0%"
+    assert "data-report-rolling-rate" not in html
+    row = _rate_row(html, "2026")
+    assert _cells(row) == ["40.0%"]
+    assert "25.0%" not in html
+
+
+def test_a_range_without_earnings_has_no_rate_chart(reports: OwnerApp) -> None:
+    food = _category(reports, "Rate Food")
+    _tx(reports, food, date(2026, 3, 6), 10_000)
+    html = _page(reports, "from=2026&to=2026&step=month")
+    assert "data-report-rate-section" in html
+    assert "No savings rate for the charted entries." in html
+    assert 'id="reports-rate-data"' not in html
+    assert "Not available: nothing earned" in html
+    assert "data-report-rolling-rate" not in html  # fewer than 12 months
+    total = re.search(r"<tr [^>]*data-report-rate-total.*?</tr>", html, re.DOTALL)
+    assert total is not None and "—" in total.group(0)

@@ -1,4 +1,5 @@
-"""Ledger reports (F10.1): income, spending and savings per month or year.
+"""Ledger reports (F10.1/F10.2): income, spending and savings per month or year, and the
+savings-rate trend.
 
 Pure: no I/O, no clock. Amounts are integer minor units (``Money``) in the report's currency.
 The treatment rules are F2.4's (docs/specs/00-overview.md §3.3): ``earned`` is income/regular,
@@ -9,11 +10,17 @@ The series has **no gaps**: every month or year from ``start`` through ``end`` a
 calendar order, with zeros when nothing happened. Entries outside the range or in another
 currency are ignored here (the service counts the latter for its note); an entry whose category
 is unknown raises ``ValueError``, as the month summary does.
+
+**Savings rate (F10.2).** The report's rate is ``saved / earned``, the same measure as F2.4's
+Month-page KPI: the share of earnings moved to savings and investments. It is kept as integer
+basis points and tenths of a percent, each rounded **once** from the exact ratio with F2.4's
+half-away-from-zero rule; a period with ``earned = 0`` has no rate. A yearly rate is computed
+from the year's summed integers, never averaged from monthly rates.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -21,7 +28,7 @@ from uuid import UUID
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.domain.summary import block_of
+from assetboard.domain.summary import block_of, savings_rate_bp, savings_rate_tenths
 
 
 class ReportStep(StrEnum):
@@ -51,6 +58,22 @@ class LedgerEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class SavingsRate:
+    """A report savings rate, rounded once in each representation.
+
+    ``bp`` is basis points (1 bp = 0.01%), ``tenths`` tenths of a percent (for the "43.3%"
+    display). Both are ``None`` when nothing was earned, because the ratio is undefined.
+    """
+
+    bp: int | None
+    tenths: int | None
+
+    @property
+    def available(self) -> bool:
+        return self.bp is not None
+
+
+@dataclass(frozen=True, slots=True)
 class PeriodTotals:
     """One period's earned, spent and saved amounts and the resulting net.
 
@@ -72,6 +95,11 @@ class PeriodTotals:
             and self.spent.amount_minor == 0
             and self.saved.amount_minor == 0
         )
+
+    @property
+    def savings_rate(self) -> SavingsRate:
+        """``saved / earned`` from this period's exact integer sums."""
+        return savings_rate(self.earned.amount_minor, self.saved.amount_minor)
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +183,47 @@ def ledger_series(
     return result
 
 
+REPORT_ROLLING_MONTHS = 12
+
+
+def savings_rate(earned: int, saved: int) -> SavingsRate:
+    """``saved / earned``, each representation rounded once (F2.4's rule).
+
+    ``None`` in both fields when ``earned`` is 0. The rounding lives in F2.4's
+    ``savings_rate_bp`` / ``savings_rate_tenths`` (shared with the month summary), so the
+    report and the Month KPI use the same definition: the share of earnings moved to savings
+    and investments, not money merely left over.
+    """
+    return SavingsRate(
+        bp=savings_rate_bp(earned, saved),
+        tenths=savings_rate_tenths(earned, saved),
+    )
+
+
+def rolling_savings_rates(
+    series: Sequence[PeriodTotals], *, months: int = REPORT_ROLLING_MONTHS
+) -> tuple[SavingsRate | None, ...]:
+    """The rolling ``months``-period rate at each point of a **monthly** series.
+
+    Every point is computed from that window's summed integers, never by averaging the monthly
+    rates. The first ``months - 1`` points are ``None`` (not enough history); afterwards a
+    ``None`` rate means the window earned nothing. The running sums make this one pass.
+    """
+    if months < 1:
+        raise ValueError("months must be at least 1")
+    result: list[SavingsRate | None] = []
+    earned = saved = 0
+    for index, period in enumerate(series):
+        earned += period.earned.amount_minor
+        saved += period.saved.amount_minor
+        if index >= months:
+            leaving = series[index - months]
+            earned -= leaving.earned.amount_minor
+            saved -= leaving.saved.amount_minor
+        result.append(savings_rate(earned, saved) if index >= months - 1 else None)
+    return tuple(result)
+
+
 def totals_of(series: Iterable[PeriodTotals], *, currency: str) -> ReportTotals:
     """The exact integer sum of a series, as the table's total row."""
     earned = spent = saved = 0
@@ -171,13 +240,17 @@ def totals_of(series: Iterable[PeriodTotals], *, currency: str) -> ReportTotals:
 
 
 __all__ = [
+    "REPORT_ROLLING_MONTHS",
     "LedgerEntry",
     "PeriodKey",
     "PeriodTotals",
     "ReportCategory",
     "ReportStep",
     "ReportTotals",
+    "SavingsRate",
     "ledger_series",
     "period_keys",
+    "rolling_savings_rates",
+    "savings_rate",
     "totals_of",
 ]

@@ -54,6 +54,29 @@ JavaScript the table is visually hidden beside the drawn chart; **Show as table*
 Without JavaScript the table stays visible in place of the chart. An empty range shows an empty
 state and a table of zeros.
 
+## Savings rate
+
+The savings-rate chart shows the share of earnings moved to savings and investments:
+
+`rate = saved / earned`
+
+This is the same measure as the Month page's savings-rate KPI.
+
+A yearly rate is computed from the year's summed amounts, never as an average of monthly rates.
+Each rate is rounded once, half away from zero: the page keeps it as integer basis points and as
+tenths of a percent for display. The total row uses the exact sums for the whole range.
+
+A period with no earnings has no rate: the line has a gap, the table shows “—” and screen readers
+hear “Not available: nothing earned”. A negative rate, if the data contains one, is drawn below
+the zero line.
+
+With monthly granularity and at least 12 months in the range, a second line shows the **12-month
+rolling rate**. It is computed from the same integers over the last twelve months, not by
+averaging monthly rates, and starts at the 12th month of the range.
+
+Money merely left over is not savings: only expense categories with the `savings` treatment
+count. See [Months](months.md) for the same KPI in the monthly summary.
+
 ## Limits
 
 Phase A reports read only the ledger: net worth and portfolio history come in later phases. The

@@ -169,8 +169,9 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             _seed(app)
 
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
-            # The current month row says "so far"; February is a closed past month.
-            expect(page.locator("[data-report-so-far]")).to_have_count(1)
+            # The current month row says "so far"; February is a closed past month. The rate
+            # section has its own "so far" badge, so scope to the income/expenses section.
+            expect(page.locator("[data-report-section] [data-report-so-far]")).to_have_count(1)
             chart = page.locator('[data-chart="report-bars"]')
             expect(chart.locator("[data-chart-empty]")).to_have_count(0)
             expect(chart).to_have_attribute("data-chart-ready", "true")
@@ -230,7 +231,7 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator('[data-chart="report-bars"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
-            expect(page.locator("[data-chart-canvas]")).to_be_visible()
+            expect(page.locator('[data-chart="report-bars"] [data-chart-canvas]')).to_be_visible()
 
             assert page.evaluate("window.__cspViolations") == []
             assert console_errors == []

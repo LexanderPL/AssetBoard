@@ -5417,6 +5417,18 @@ msgstr "Zaoszczędzone"
 msgid "Net"
 msgstr "Netto"
 
+msgid "Savings rate"
+msgstr "Stopa oszczędności"
+
+msgid "12-month rolling rate"
+msgstr "12-miesięczna stopa krocząca"
+
+msgid "Not available: nothing earned"
+msgstr "Niedostępne: brak zarobków"
+
+msgid "Not available: fewer than 12 months of data."
+msgstr "Niedostępne: mniej niż 12 miesięcy danych."
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."
@@ -12543,6 +12555,19 @@ msgstr "Pokaż jako tabelę"
 msgid "Hide table"
 msgstr "Ukryj tabelę"
 
+msgid ""
+"The share of earnings moved to savings and investments: saved ÷ earned, "
+"the same measure as the Month page."
+msgstr ""
+"Udział zarobków przeniesionych do oszczędności i inwestycji: oszczędności"
+" ÷ zarobki, ta sama miara co na stronie miesiąca."
+
+msgid "No savings rate for the charted entries."
+msgstr "Brak stopy oszczędności dla uwzględnionych wpisów."
+
+msgid "Savings rate by period"
+msgstr "Stopa oszczędności według okresu"
+
 msgid "Edit recurring item"
 msgstr "Edytuj pozycję cykliczną"
 
@@ -15876,4 +15901,18 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Portfolio chart range"
 #~ msgstr "Zakres wykresu portfela"
+
+#~ msgid ""
+#~ "The share of earnings that regular "
+#~ "spending did not use up: (earned −"
+#~ " spent) ÷ earned. Money moved to "
+#~ "savings and money left over both "
+#~ "count as kept."
+#~ msgstr ""
+#~ "Udział zarobków, którego nie wykorzystały "
+#~ "regularne wydatki: (zarobki − wydatki) ÷"
+#~ " zarobki. Pieniądze przeniesione do "
+#~ "oszczędności i pieniądze, które po "
+#~ "prostu zostały, liczą się jako "
+#~ "zatrzymane."
 

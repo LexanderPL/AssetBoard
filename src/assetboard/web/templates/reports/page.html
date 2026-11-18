@@ -1,7 +1,7 @@
-{# The Reports page (F10.1). The filters are a plain GET form (bookmarkable, no JavaScript).
-   The chart's data travels in a JSON block read by static/js/charts.js; the table beside it has
-   the same figures, stays visible without JavaScript, and is the accessible version. No inline
-   script or style. #}
+{# The Reports page (F10.1/F10.2). The filters are a plain GET form (bookmarkable, no
+   JavaScript). Each chart's data travels in a JSON block read by static/js/charts.js; the table
+   beside it has the same figures, stays visible without JavaScript, and is the accessible
+   version. No inline script or style. #}
 {% extends "base.html" %}
 {% set label_class = "block text-sm font-medium" %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
@@ -112,6 +112,73 @@
                 <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.total.spent }}</td>
                 <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.total.saved }}</td>
                 <td class="whitespace-nowrap py-2 text-right tabular-nums">{% if view.total.net_minor < 0 %}<span class="text-danger">{{ view.total.net }}</span>{% elif view.total.net_minor > 0 %}<span class="text-success-strong">{{ view.total.net }}</span>{% else %}{{ view.total.net }}{% endif %}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="reports-rate-heading" data-report-rate-section>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="reports-rate-heading" class="text-base font-semibold">{{ _("Savings rate") }}</h2>
+      <p class="text-sm tabular-nums text-muted" data-report-rate-range>{{ view.range_years }}</p>
+    </div>
+    <p class="mt-1 text-sm text-muted">{{ _("The share of earnings moved to savings and investments: saved ÷ earned, the same measure as the Month page.") }}</p>
+
+    <div class="mt-4" data-chart="report-rate"{% if view.rate_chart %} data-chart-source="reports-rate-data"{% endif %}>
+      {% if view.rate_chart %}
+      <script type="application/json" id="reports-rate-data">{{ view.rate_chart|tojson }}</script>
+      <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
+      {% else %}
+      <p class="text-sm text-muted" data-chart-empty>{{ _("No savings rate for the charted entries.") }}</p>
+      {% endif %}
+      <div class="mt-4">
+        <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-rate-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>
+        <div id="reports-rate-table" class="relative overflow-x-auto" data-chart-table>
+          <table class="sheet w-full text-sm">
+            <caption class="sr-only">{{ _("Savings rate by period") }}</caption>
+            <thead>
+              <tr class="text-left text-xs text-muted">
+                <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Period") }}</th>
+                <th scope="col" class="py-1.5 {% if view.show_rolling %}pr-2 {% endif %}text-right font-medium">{{ _("Savings rate") }}</th>
+                {% if view.show_rolling %}<th scope="col" class="py-1.5 text-right font-medium">{{ _("12-month rolling rate") }}</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in view.rate_rows %}
+              <tr data-report-rate-row>
+                <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+                  {% if row.href %}<a href="{{ row.href }}" class="text-primary-ink underline" data-report-rate-period>{{ row.label }}</a>{% else %}<span data-report-rate-period>{{ row.label }}</span>{% endif %}
+                  {% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-so-far>{{ _("so far") }}</span>{% endif %}
+                </th>
+                <td class="whitespace-nowrap py-1.5 {% if view.show_rolling %}pr-2 {% endif %}text-right tabular-nums" data-report-rate>
+                  {% if row.rate is not none %}
+                    {% if row.rate_tenths is not none and row.rate_tenths < 0 %}<span class="text-danger">{{ row.rate }}</span>{% else %}{{ row.rate }}{% endif %}
+                  {% else %}
+                    <span aria-hidden="true">—</span><span class="sr-only">{{ _("Not available: nothing earned") }}</span>
+                  {% endif %}
+                </td>
+                {% if view.show_rolling %}
+                <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-rolling-rate>
+                  {% if row.rolling is not none %}{{ row.rolling }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ row.rolling_note }}</span>{% endif %}
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-line font-semibold" data-report-rate-total>
+                <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+                <td class="whitespace-nowrap py-2 {% if view.show_rolling %}pr-2 {% endif %}text-right tabular-nums">
+                  {% if view.rate_total.rate is not none %}
+                    {% if view.rate_total.rate_tenths is not none and view.rate_total.rate_tenths < 0 %}<span class="text-danger">{{ view.rate_total.rate }}</span>{% else %}{{ view.rate_total.rate }}{% endif %}
+                  {% else %}
+                    <span aria-hidden="true">—</span><span class="sr-only">{{ _("Not available: nothing earned") }}</span>
+                  {% endif %}
+                </td>
+                {% if view.show_rolling %}<td class="py-2"></td>{% endif %}
               </tr>
             </tfoot>
           </table>
