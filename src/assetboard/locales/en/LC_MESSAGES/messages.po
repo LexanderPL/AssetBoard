@@ -5045,19 +5045,32 @@ msgstr ""
 msgid "No expenses or savings in this range."
 msgstr ""
 
-msgid "Leave empty to show the 8 largest categories and the rest as Other."
+msgid "No spending for the selected categories."
+msgstr ""
+
+msgid ""
+"Leave empty to show the 8 largest categories and the rest as Other "
+"(combined)."
 msgstr ""
 
 msgid "Showing the selected categories only."
 msgstr ""
 
-msgid "The 8 largest categories are shown; the rest are combined as Other."
+msgid ""
+"The 8 largest categories are shown; the rest are combined as Other "
+"(combined)."
 msgstr ""
 
 msgid "Include saved / invested"
 msgstr ""
 
 msgid "Saved and invested amounts get their own category series."
+msgstr ""
+
+msgid "Other (combined)"
+msgstr ""
+
+msgid "archived"
 msgstr ""
 
 #, python-format
@@ -7732,9 +7745,6 @@ msgid "closed"
 msgstr ""
 
 msgid "Automatically posted"
-msgstr ""
-
-msgid "archived"
 msgstr ""
 
 msgid "First"
@@ -15006,5 +15016,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "No savings rate: nothing was earned in this range."
+#~ msgstr ""
+
+#~ msgid "Leave empty to show the 8 largest categories and the rest as Other."
+#~ msgstr ""
+
+#~ msgid "The 8 largest categories are shown; the rest are combined as Other."
 #~ msgstr ""
 

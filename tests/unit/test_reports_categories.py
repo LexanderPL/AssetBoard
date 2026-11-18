@@ -412,3 +412,17 @@ def test_property_the_combined_pass_matches_the_individual_series(
         currency="EUR",
         include_savings=include_savings,
     )
+
+
+def test_selecting_a_category_in_a_future_only_range_keeps_the_series_empty() -> None:
+    empty = category_series(
+        [],
+        CATEGORIES,
+        start=date(2027, 1, 1),
+        end=date(2026, 12, 31),
+        step=ReportStep.YEAR,
+        currency="EUR",
+    )
+    assert empty.periods == () and empty.rows == ()
+    narrowed = select_categories(empty, CATEGORIES, selected=(FOOD.id,))
+    assert narrowed.periods == () and narrowed.rows == () and narrowed.total.amount_minor == 0

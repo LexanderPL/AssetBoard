@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.ledger import Category, Transaction
@@ -465,14 +465,14 @@ def test_the_category_filter_is_repeatable_and_shows_no_other(reports: OwnerApp)
         "Filter Category 3",
         "Filter Category 1",
     ]
-    assert "Other" not in [series["name"] for series in data["series"]]
+    assert "Other (combined)" not in [series["name"] for series in data["series"]]
     assert "Showing the selected categories only." in html
     assert "The 8 largest categories are shown" not in html
 
     # A selected category without spending still gets a zero table row; the chart is empty.
     empty = _category(reports, "Filter Empty")
     html = _page(reports, f"from=2026&to=2026&step=month&category={empty}")
-    assert "No expenses in this range." in html
+    assert "No spending for the selected categories." in html
     assert 'id="reports-category-data"' not in html
     assert ">Other</th>" not in html
     assert _category_cells(_category_row(html, "Filter Empty"))[-1] == "€0.00"
@@ -489,12 +489,12 @@ def test_unknown_category_ids_are_ignored_and_top_eight_gets_other(reports: Owne
     )
     data = _category_data(html)
     assert len(data["series"]) == 9
-    assert data["series"][-1]["name"] == "Other"
+    assert data["series"][-1]["name"] == "Other (combined)"
     assert data["series"][-1]["values"][0] == 3_000  # the two smallest: 1 000 + 2 000
-    assert "The 8 largest categories are shown; the rest are combined as Other." in html
+    assert "The 8 largest categories are shown; the rest are combined as Other (combined)." in html
     rows = re.findall(r"<tr data-report-category-row>", html)
     assert len(rows) == 9
-    assert _category_cells(_category_row(html, "Other"))[-1] == "€30.00"
+    assert _category_cells(_category_row(html, "Other (combined)"))[-1] == "€30.00"
 
 
 def test_an_archived_category_appears_with_its_name(reports: OwnerApp) -> None:
@@ -504,9 +504,9 @@ def test_an_archived_category_appears_with_its_name(reports: OwnerApp) -> None:
 
     html = _page(reports, "from=2026&to=2026&step=month")
     data = _category_data(html)
-    assert [series["name"] for series in data["series"]] == ["Archived Food"]
+    assert [series["name"] for series in data["series"]] == ["Archived Food (archived)"]
     assert "Archived Empty" not in html
-    assert f'<option value="{old}">Archived Food</option>' in html
+    assert f'<option value="{old}">Archived Food (archived)</option>' in html
     assert f'<option value="{empty}">' not in html
 
 
@@ -520,3 +520,65 @@ def test_a_range_without_spending_shows_the_category_empty_state(reports: OwnerA
 
     with_savings = _page(reports, "from=2026&to=2026&step=month&savings=1")
     assert "No expenses or savings in this range." in with_savings
+
+
+def test_a_real_category_named_other_does_not_collide_with_the_combined_row(
+    reports: OwnerApp,
+) -> None:
+    with reports.db() as session:
+        real_other = (
+            session.scalars(
+                select(Category).where(Category.name == "Other", Category.kind == "expense")
+            )
+            .one()
+            .id
+        )
+    others = [_category(reports, f"Other Collision {index}") for index in range(1, 9)]
+    _tx(reports, real_other, date(2026, 1, 10), 100_000)
+    for index, category in enumerate(others, start=1):
+        _tx(reports, category, date(2026, 1, 10), index * 1_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month")
+    names = [series["name"] for series in _category_data(html)["series"]]
+    assert "Other" in names
+    assert "Other (combined)" in names
+    assert len(names) == len(set(names))
+    assert _category_cells(_category_row(html, "Other"))[-1] == "€1,000.00"
+    assert _category_cells(_category_row(html, "Other (combined)"))[-1] == "€10.00"
+
+
+def test_an_active_and_an_archived_category_with_the_same_name_are_distinct(
+    reports: OwnerApp,
+) -> None:
+    active = _category(reports, "Duplicate Name")
+    archived = _category(reports, "Duplicate Name", archived=True)
+    _tx(reports, active, date(2026, 1, 10), 10_000)
+    _tx(reports, archived, date(2026, 1, 11), 20_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month")
+    names = [series["name"] for series in _category_data(html)["series"]]
+    assert names == ["Duplicate Name (archived)", "Duplicate Name"]
+    assert f'<option value="{archived}">Duplicate Name (archived)</option>' in html
+    assert f'<option value="{active}">Duplicate Name</option>' in html
+
+
+def test_a_selected_archived_category_without_spending_stays_in_the_filter(
+    reports: OwnerApp,
+) -> None:
+    archived = _category(reports, "Old Filter", archived=True)
+    _tx(reports, archived, date(2025, 1, 10), 10_000)
+    html = _page(
+        reports,
+        f"from=2026&to=2026&step=month&category={archived}",
+    )
+    assert f'<option value="{archived}" selected>Old Filter (archived)</option>' in html
+    assert "No spending for the selected categories." in html
+
+
+def test_a_future_only_category_filter_has_no_zero_column_table(reports: OwnerApp) -> None:
+    food = _category(reports, "Future Category")
+    html = _page(
+        reports,
+        f"from=2027&to=2027&step=year&category={food}",
+    )
+    assert "data-report-category-row" not in html

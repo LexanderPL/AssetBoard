@@ -66,13 +66,19 @@ CATEGORY_CHART_TITLE = _("Expenses by category over time")
 CATEGORY_TABLE_CAPTION = _("Spending by category and period")
 CATEGORY_EMPTY = _("No expenses in this range.")
 CATEGORY_EMPTY_SAVINGS = _("No expenses or savings in this range.")
+CATEGORY_EMPTY_SELECTED = _("No spending for the selected categories.")
 CATEGORY_FILTER = _("Categories")
-CATEGORY_FILTER_HELP = _("Leave empty to show the 8 largest categories and the rest as Other.")
+CATEGORY_FILTER_HELP = _(
+    "Leave empty to show the 8 largest categories and the rest as Other (combined)."
+)
 CATEGORY_FILTER_ACTIVE = _("Showing the selected categories only.")
-CATEGORY_TOP_NOTE = _("The 8 largest categories are shown; the rest are combined as Other.")
+CATEGORY_TOP_NOTE = _(
+    "The 8 largest categories are shown; the rest are combined as Other (combined)."
+)
 INCLUDE_SAVINGS = _("Include saved / invested")
 INCLUDE_SAVINGS_HELP = _("Saved and invested amounts get their own category series.")
-OTHER = _("Other")
+OTHER = _("Other (combined)")
+ARCHIVED = _("archived")
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +159,7 @@ class CategoryOptionView:
     id: UUID
     name: str
     selected: bool
+    archived: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -420,7 +427,12 @@ def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
 
 
 def _category_name(row: CategorySpend, locale: str) -> str:
-    return gettext(OTHER, locale) if row.other else row.name
+    if row.other:
+        return gettext(OTHER, locale)
+    name = row.name
+    if row.archived:
+        name = f"{name} ({gettext(ARCHIVED, locale)})"
+    return name
 
 
 def _category_columns(
@@ -513,6 +525,7 @@ def _category_options(data: ReportsData) -> tuple[CategoryOptionView, ...]:
             id=option.id,
             name=option.name,
             selected=option.id in selected,
+            archived=option.archived,
         )
         for option in options
     )
@@ -569,7 +582,12 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
     )
     rolling = _rolling_rates(data)
     show_rolling = step is ReportStep.MONTH and len(data.series) >= REPORT_ROLLING_MONTHS
-    category_empty = CATEGORY_EMPTY_SAVINGS if data.filters.savings else CATEGORY_EMPTY
+    if data.filters.category_ids:
+        category_empty = CATEGORY_EMPTY_SELECTED
+    elif data.filters.savings:
+        category_empty = CATEGORY_EMPTY_SAVINGS
+    else:
+        category_empty = CATEGORY_EMPTY
     return ReportsView(
         data=data,
         errors=errors,

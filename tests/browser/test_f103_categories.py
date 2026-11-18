@@ -156,7 +156,7 @@ def test_the_category_chart_filter_and_table_in_a_browser(tmp_path: Path) -> Non
                 series: option.series.map((s) => s.name),
                 stacks: [...new Set(option.series.map((s) => s.stack))],
                 legend: option.legend[0].data,
-                other: option.series.find((s) => s.name === "Other").data[0],
+                other: option.series.find((s) => s.name === "Other (combined)").data[0],
                 colour: option.series.find((s) => s.name === "Browser Category 10")
                   .itemStyle.color,
               };
@@ -171,7 +171,7 @@ def test_the_category_chart_filter_and_table_in_a_browser(tmp_path: Path) -> Non
             "Browser Category 06",
             "Browser Category 05",
             "Browser Category 04",
-            "Other",
+            "Other (combined)",
         ]
         assert option["stacks"] == ["spending"]
         assert option["legend"] == option["series"]
@@ -181,7 +181,7 @@ def test_the_category_chart_filter_and_table_in_a_browser(tmp_path: Path) -> Non
         rows = section.locator("[data-report-category-row]")
         expect(rows).to_have_count(9)
         expect(
-            rows.filter(has_text="Other").locator("[data-report-category-row-total]")
+            rows.filter(has_text="Other (combined)").locator("[data-report-category-row-total]")
         ).to_have_text("€60.00")
 
         table = section.locator("[data-chart-table]")
@@ -192,7 +192,21 @@ def test_the_category_chart_filter_and_table_in_a_browser(tmp_path: Path) -> Non
         expect(toggle).to_have_text("Hide table")
         assert "sr-only" not in (table.get_attribute("class") or "").split()
 
-        # A filter narrows the chart to exactly the chosen categories and drops Other.
+        # The default chart carries nine series; a scrollable legend keeps it readable at phone
+        # width without covering the plot.
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload(wait_until="networkidle")
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        legend_type = page.evaluate(
+            """() => {
+              const chart = document.querySelector('[data-chart="report-category-bars"]');
+              const el = chart.querySelector("[data-chart-canvas]");
+              return window.echarts.getInstanceByDom(el).getOption().legend[0].type;
+            }"""
+        )
+        assert legend_type == "scroll"
+
+        # A filter narrows the chart to exactly the chosen categories and drops the combined row.
         filtered = (
             f"{base}/reports?from=2026&to=2026&step=month"
             f"&category={categories['Browser Category 01']}"

@@ -91,9 +91,10 @@ category's own colour, and archived categories keep their name and history when 
 in the range.
 
 By default the eight categories with the largest total in the range are shown separately and all
-others are combined into **Other**. Choose one or more categories in the **Categories** filter
-(the URL carries one `category=<id>` parameter per choice) to show exactly those categories and
-no Other. An unknown category id, a category of another workspace, or one that does not fit the
+others are combined into **Other (combined)**. A real category named “Other” stays a separate
+series, so the two never collide in the legend or table. Choose one or more categories in the
+**Categories** filter (the URL carries one `category=<id>` parameter per choice) to show exactly
+those categories and no combined row. An unknown category id, a category of another workspace, or one that does not fit the
 current option is ignored, so an old bookmark still opens.
 
 **Include saved / invested** (`savings=1`) adds expense categories with the `savings` treatment
@@ -101,7 +102,7 @@ as their own series, so the chart covers everything the ledger counted as saved 
 
 The table has a row per category and a column per period, with row and column totals. Without a
 category filter the column totals equal the income-vs-expenses report's **spent** for the same
-period, plus **saved** when the option is on; **Other** takes the remainder. With a category
+period, plus **saved** when the option is on; **Other (combined)** takes the remainder. With a category
 filter the column totals are the sum of the chosen categories.
 
 ## Limits

@@ -224,6 +224,9 @@
       animation: false,
       aria: { enabled: false }, // the adjacent table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
@@ -298,6 +301,9 @@
       animation: false,
       aria: { enabled: false }, // the adjacent table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
@@ -374,6 +380,9 @@
       animation: false,
       aria: { enabled: false }, // the plotted-data table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),

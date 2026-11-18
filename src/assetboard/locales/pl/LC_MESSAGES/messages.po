@@ -5441,24 +5441,37 @@ msgstr "W tym zakresie nie ma wydatków."
 msgid "No expenses or savings in this range."
 msgstr "W tym zakresie nie ma wydatków ani oszczędności."
 
-msgid "Leave empty to show the 8 largest categories and the rest as Other."
+msgid "No spending for the selected categories."
+msgstr "Brak wydatków dla wybranych kategorii."
+
+msgid ""
+"Leave empty to show the 8 largest categories and the rest as Other "
+"(combined)."
 msgstr ""
-"Pozostaw puste, aby pokazać 8 największych kategorii, a resztę jako "
-"„Inne”."
+"Pozostaw puste, aby pokazać 8 największych kategorii, a resztę jako „Inne"
+" (połączone)”."
 
 msgid "Showing the selected categories only."
 msgstr "Pokazywane są tylko wybrane kategorie."
 
-msgid "The 8 largest categories are shown; the rest are combined as Other."
+msgid ""
+"The 8 largest categories are shown; the rest are combined as Other "
+"(combined)."
 msgstr ""
 "Pokazywanych jest 8 największych kategorii; reszta jest łączona jako "
-"„Inne”."
+"„Inne (połączone)”."
 
 msgid "Include saved / invested"
 msgstr "Uwzględnij oszczędności / inwestycje"
 
 msgid "Saved and invested amounts get their own category series."
 msgstr "Oszczędności i inwestycje otrzymują własne serie kategorii."
+
+msgid "Other (combined)"
+msgstr "Inne (połączone)"
+
+msgid "archived"
+msgstr "zarchiwizowana"
 
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
@@ -8505,9 +8518,6 @@ msgstr "zamknięty"
 
 msgid "Automatically posted"
 msgstr "Automatycznie zaksięgowano"
-
-msgid "archived"
-msgstr "zarchiwizowana"
 
 msgid "First"
 msgstr "Pierwsza"

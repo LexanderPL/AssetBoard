@@ -59,6 +59,7 @@ class ReportCategory:
     treatment: str
     name: str = ""
     color: str = ""
+    archived: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,8 +132,9 @@ class CategorySpend:
     """One category's spending per period.
 
     ``category_id`` is ``None`` for the combined remainder that ``top_categories`` builds; the
-    UI names that row "Other" and gives it a theme colour. ``name`` and ``color`` are copied from
-    ``ReportCategory`` (empty on the remainder), so the view model needs no second lookup.
+    UI names that row "Other (combined)" and gives it a theme colour. ``name``, ``color`` and
+    ``archived`` are copied from ``ReportCategory`` (empty/false on the remainder), so the view
+    model needs no second lookup.
     """
 
     category_id: UUID | None
@@ -140,6 +142,7 @@ class CategorySpend:
     color: str
     amounts: tuple[Money, ...]
     total: Money
+    archived: bool = False
 
     @property
     def other(self) -> bool:
@@ -334,6 +337,7 @@ def _selected_rows(
                 color=category.color,
                 amounts=tuple(Money(value, currency) for value in values),
                 total=Money(sum(values), currency),
+                archived=category.archived,
             )
         )
     if wanted_ids is not None:
@@ -353,6 +357,7 @@ def _selected_rows(
                     color=category.color,
                     amounts=zeros,
                     total=Money(0, currency),
+                    archived=category.archived,
                 )
             )
     rows.sort(key=lambda row: (-row.total.amount_minor, row.name.casefold(), str(row.category_id)))
@@ -488,7 +493,7 @@ def select_categories(
     are ignored. The result's totals are the chosen categories' sums.
     """
     wanted_ids = set(selected)
-    if not wanted_ids:
+    if not wanted_ids or not series.periods:
         return series
     amounts = {
         row.category_id: [amount.amount_minor for amount in row.amounts]
@@ -510,7 +515,8 @@ def top_categories(series: CategorySeries, *, limit: int = TOP_CATEGORIES) -> Ca
     """Keep the ``limit`` rows with the largest range totals and combine the rest as "Other".
 
     The remainder has no category id, name or colour; the view names it with the translated
-    "Other" label and a theme colour. The per-period and range totals are unchanged, so the
+    "Other (combined)" label and a theme colour. The per-period and range totals are unchanged,
+    so the
     chart's stacked column totals still equal the ledger's spending.
     """
     if limit < 1:

@@ -51,9 +51,9 @@
       <div class="sm:col-span-2">
         <label for="report-category" class="{{ label_class }}">{{ _("Categories") }}</label>
         <select id="report-category" name="category" multiple size="6" class="form-select w-full py-1.5 pl-2.5">
-          {% for option in view.category_options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.name }}</option>{% endfor %}
+          {% for option in view.category_options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.name }}{% if option.archived %} ({{ _("archived") }}){% endif %}</option>{% endfor %}
         </select>
-        <p class="mt-1 text-xs text-muted">{{ _("Leave empty to show the 8 largest categories and the rest as Other.") }}</p>
+        <p class="mt-1 text-xs text-muted">{{ _("Leave empty to show the 8 largest categories and the rest as Other (combined).") }}</p>
       </div>
       <div class="sm:col-span-2">
         <label class="flex items-center gap-2 text-sm font-medium">
@@ -230,7 +230,7 @@
                 <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
                 {% for column in view.category_table.columns %}
                 <th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">
-                  {% if column.href %}<a href="{{ column.href }}" class="text-primary-ink underline">{{ column.label }}</a>{% else %}{{ column.label }}{% endif %}{% if column.so_far %}<span class="sr-only"> ({{ _("so far") }})</span>{% endif %}
+                  {% if column.href %}<a href="{{ column.href }}" class="text-primary-ink underline">{{ column.label }}</a>{% else %}{{ column.label }}{% endif %}{% if column.so_far %}<span class="ml-2 inline-block rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink">{{ _("so far") }}</span>{% endif %}
                 </th>
                 {% endfor %}
                 <th scope="col" class="py-1.5 text-right font-medium">{{ _("Total") }}</th>

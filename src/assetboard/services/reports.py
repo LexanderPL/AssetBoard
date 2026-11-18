@@ -243,7 +243,14 @@ def reports_data(
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         ordered = CategoryRepository(session, ctx).ordered()
         categories = {
-            row.id: ReportCategory(row.id, row.kind, row.treatment, row.name, row.color)
+            row.id: ReportCategory(
+                row.id,
+                row.kind,
+                row.treatment,
+                row.name,
+                row.color,
+                archived=row.archived_at is not None,
+            )
             for row in ordered
         }
         filters = _resolve_filters(raw_from=from_year, raw_to=to_year, raw_step=step, today=today)
@@ -326,7 +333,8 @@ def reports_data(
         category_options = tuple(
             CategoryOption(row.id, row.name, archived=row.archived_at is not None)
             for row in ordered
-            if row.id in eligible_ids and (row.archived_at is None or row.id in spending_ids)
+            if row.id in eligible_ids
+            and (row.archived_at is None or row.id in spending_ids or row.id in chosen)
         )
     return ReportsData(
         filters=filters,
