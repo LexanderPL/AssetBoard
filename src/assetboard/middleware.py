@@ -17,8 +17,8 @@ _REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
 SECURITY_HEADERS = {
     "content-security-policy": (
         "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
-        "object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-        "font-src 'self'; connect-src 'self'"
+        "object-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'"
     ),
     "permissions-policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
     "x-content-type-options": "nosniff",

@@ -17,6 +17,7 @@ from assetboard.domain.navigation import DEFAULT_SIDEBAR, HOME_KEY
 from assetboard.i18n import gettext, translations_for
 from assetboard.i18n.dates import format_day, format_time
 from assetboard.i18n.numbers import format_money, format_price
+from assetboard.web.pwa import DARK_THEME_COLOR, LIGHT_THEME_COLOR
 from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
 if TYPE_CHECKING:
@@ -97,6 +98,8 @@ def templates_for(locale: str) -> Jinja2Templates:
         sidebar_links=sidebar_links,
         sidebar_labels=sidebar_labels(locale),
         sidebar_glyphs=SIDEBAR_GLYPHS,
+        theme_color_light=LIGHT_THEME_COLOR,
+        theme_color_dark=DARK_THEME_COLOR,
     )
     return templates
 

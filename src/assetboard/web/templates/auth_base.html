@@ -4,11 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="{{ theme_color_light }}">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="{{ theme_color_dark }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ app_name }}">
   <meta name="referrer" content="{% block referrer %}same-origin{% endblock %}">
   {# Subresources never carry the page URL (it may hold an invitation token, ADR-0013). The page
      policy stays same-origin so form POSTs keep their Origin. Every page links the icon, so the
-     browser makes no implicit /favicon.ico request. #}
+     browser makes no implicit /favicon.ico request. Signed-out pages link the manifest and icon
+     (F9.10); app.js registers the service worker after sign-in, so install from a signed-in
+     page. #}
   <link rel="icon" type="image/svg+xml" href="{{ static_url(request, 'img/favicon.svg') }}" referrerpolicy="no-referrer">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ static_url(request, 'img/apple-touch-icon.png') }}" referrerpolicy="no-referrer">
+  <link rel="manifest" href="{{ scoped_url(request, 'manifest') }}" referrerpolicy="no-referrer">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}" referrerpolicy="no-referrer">

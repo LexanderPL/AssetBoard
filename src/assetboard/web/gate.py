@@ -41,7 +41,18 @@ from assetboard.web.security import (
 )
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
+# The installable web app's three files are read before sign-in (the manifest is also linked
+# from the signed-out login page, and the browser fetches the worker and offline page without a
+# session of its own). None of them reads workspace data.
+ALWAYS_OPEN = frozenset(
+    {
+        "/healthz",
+        "/readyz",
+        "/manifest.webmanifest",
+        "/service-worker.js",
+        "/offline",
+    }
+)
 SIGNED_OUT_PATHS = frozenset(
     {
         "/login",

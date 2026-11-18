@@ -1,4 +1,4 @@
-.PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile licenses licenses-check
+.PHONY: setup dev check test css icons migrate revision i18n-extract i18n-update i18n-compile licenses licenses-check
 
 UV := uv
 # Parallel test workers for make check/test (pytest-xdist); PYTEST_WORKERS=0 runs serially.
@@ -52,6 +52,10 @@ css:
 	"$$cache" --config tailwind.config.js \
 		--input src/assetboard/static/css/input.css \
 		--output src/assetboard/static/css/app.css --minify
+
+# Regenerate the committed PWA icons from the SVG favicon (Chromium for Playwright required).
+icons:
+	$(UV) run python scripts/generate_pwa_icons.py
 
 migrate:
 	$(UV) run assetboard migrate

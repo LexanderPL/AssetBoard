@@ -157,13 +157,13 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-filters-open]").click()
             page.get_by_role("button", name="Show entries").click()
             expect(page).to_have_url(re.compile(r"/history\?.*q=%C5%BBAB"))  # bookmarkable
-            assert _descriptions(page) == ["Żabka"]
+            expect(page.locator("[data-results] [data-description]")).to_have_text(["Żabka"])
             page.get_by_label("Search descriptions").fill("")
             expect(page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
             page.locator("[data-filters-open]").click()
             page.get_by_label("Kind", exact=True).select_option("income")
             page.get_by_role("button", name="Show entries").click()
-            assert _descriptions(page) == ["March pay"]
+            expect(page.locator("[data-results] [data-description]")).to_have_text(["March pay"])
             # Amount range in the user's format, smallest first.
             page.goto(f"{base}/history")
             page.locator("[data-filters-open]").click()
@@ -171,7 +171,9 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             page.get_by_label("Largest amount").fill("12,5")
             page.get_by_label("Order", exact=True).select_option("amount")
             page.get_by_role("button", name="Show entries").click()
-            assert _descriptions(page) == ["Bakery", "Żabka"]
+            expect(page.locator("[data-results] [data-description]")).to_have_text(
+                ["Bakery", "Żabka"]
+            )
             # An invalid filter is marked on its field.
             page.locator("[data-filters-open]").click()
             page.get_by_label("Largest amount").fill("abc")
