@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 import socket
-import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -77,8 +76,6 @@ def _provider_front(idp: FakeIdp, logouts: list[dict[str, list[str]]]) -> FastAP
     async def end_session(request: Request) -> RedirectResponse:
         query = parse_qs(urlsplit(str(request.url)).query)
         logouts.append(query)
-        sys.stderr.write(f"PROVIDER_LOGOUT {request.url}\n")
-        sys.stderr.flush()
         return RedirectResponse(query["post_logout_redirect_uri"][0], status_code=302)
 
     return front
@@ -192,32 +189,9 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             assert "code=" not in page.url
 
             page.locator("details summary").click()
-            sys.stderr.write(f"END_SESSION {app.state.oidc.end_session_url()}\n")
-            sys.stderr.flush()
-
-            def debug_response(response):
-                if response.url.endswith("/logout"):
-                    sys.stderr.write(f"LOGOUT_RESPONSE {response.status} {response.headers}\n")
-                    try:
-                        sys.stderr.write(f"LOGOUT_BODY {response.text()[:800]}\n")
-                    except Exception as exc:
-                        sys.stderr.write(f"LOGOUT_BODY_ERR {exc}\n")
-                    sys.stderr.flush()
-
-            page.on("response", debug_response)
-            page.on(
-                "request",
-                lambda request: (
-                    sys.stderr.write(f"REQ {request.method} {request.url}\n"),
-                    sys.stderr.flush(),
-                ),
-            )
             page.get_by_role("button", name="Sign out", exact=True).click()
             # The interstitial continues to the provider, which sends the browser back.
             page.wait_for_url(f"{base}/login")
-            sys.stderr.write(f"DEBUG_URL {page.url} LOGOUTS {logouts}\n")
-            sys.stderr.write(f"DEBUG_HTML {page.content()[:300]}\n")
-            sys.stderr.flush()
             assert len(logouts) == 1
             assert logouts[0]["client_id"] == [CLIENT_ID]
             assert logouts[0]["post_logout_redirect_uri"] == [f"{base}/login"]
