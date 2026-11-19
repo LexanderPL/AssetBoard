@@ -210,6 +210,10 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image-name.outputs.image }}
+          # metadata-action adds `latest` automatically for stable semver tags. Disable that
+          # implicit rule so the explicit raw tag below is the only source; otherwise the
+          # verifier sees `latest` twice and the publish fails.
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }},enable=${{ !contains(inputs.tag || github.ref_name, '-') }}
@@ -322,12 +326,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          previous=$(gh release list --exclude-drafts --exclude-pre-releases --limit 30 \
-            --json tagName --jq '.[].tagName' \
-            | grep -vxF "$RELEASE_TAG" | head -n 1 || true)
+          # The previous release is the highest stable release below the tag being published,
+          # not simply the newest release. A workflow_dispatch may backfill an older tag after
+          # a newer release exists; picking the newest would try to "upgrade" backwards.
+          release_tags=$(gh release list --exclude-drafts --exclude-pre-releases --limit 100 \
+            --json tagName --jq '.[].tagName' || true)
+          previous=$(
+            { printf '%s\n' "$RELEASE_TAG"; printf '%s\n' "$release_tags"; } \
+              | sed '/^$/d' \
+              | sort -V \
+              | awk -v current="$RELEASE_TAG" '$0 == current { print prev; exit } { prev=$0 }'
+          )
           if [[ -z $previous ]]; then
-            previous=$(git tag --list 'v*' --sort=-version:refname \
-              | grep -vxF "$RELEASE_TAG" | head -n 1 || true)
+            previous=$(
+              { printf '%s\n' "$RELEASE_TAG"; git tag --list 'v*'; } \
+                | sed '/^$/d' \
+                | sort -V \
+                | awk -v current="$RELEASE_TAG" '$0 == current { print prev; exit } { prev=$0 }'
+            )
           fi
           echo "tag=$previous" >> "$GITHUB_OUTPUT"
 
