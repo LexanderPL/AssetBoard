@@ -47,14 +47,37 @@ printf '==> Generating CycloneDX SBOM\n'
 (cd "$checkout" && uvx --from cyclonedx-bom==8.0.1 cyclonedx-py requirements \
   "$out/$requirements" --pyproject pyproject.toml --output-format JSON \
   --output-file "$out/$app-$version-sbom.cdx.json" >/dev/null)
+(cd "$checkout" && uv run --no-project python - \
+  "$out/$app-$version-sbom.cdx.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as sbom_file:
+    sbom = json.load(sbom_file)
+assert sbom.get("bomFormat") == "CycloneDX", sbom.get("bomFormat")
+assert sbom.get("components"), "the SBOM has no components"
+PY
+)
 
 install -m 0644 "$here/systemd/$app.service" "$out/$app.service"
 install -m 0644 "$here/$app.env.example" "$out/$app.env.example"
 install -m 0644 "$checkout/THIRD_PARTY_LICENSES" "$out/THIRD_PARTY_LICENSES"
 install -m 0755 "$here/install-debian.sh" "$out/install-debian.sh"
 
-(cd "$out" && sha256sum "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
-  "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh >SHA256SUMS)
+built=$(printf '%s\n' "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
+  "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh)
+(cd "$out" && printf '%s\n' "$built" | xargs sha256sum >SHA256SUMS)
+(cd "$out" && sha256sum --check --strict SHA256SUMS >/dev/null)
+# Both directions: every generated file is listed and nothing stale or unlisted is shipped.
+# uv writes a .gitignore into its output directory; it is not a release file.
+listed=$(awk '{print $2}' "$out/SHA256SUMS" | sed 's/^\*//' | sort)
+actual=$(find "$out" -maxdepth 1 -type f ! -name SHA256SUMS ! -name .gitignore \
+  -printf '%f\n' | sort)
+if [[ $listed != "$(printf '%s\n' "$built" | sort)" || $actual != "$listed" ]]; then
+  echo "error: SHA256SUMS does not match the files in $out" >&2
+  diff <(printf '%s\n' "$listed") <(printf '%s\n' "$actual") >&2 || true
+  exit 1
+fi
 
 printf '==> Done\n'
 ls -l "$out"
