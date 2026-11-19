@@ -284,6 +284,7 @@ def _body_context(
     edit_category_errors: dict[str, str] | None = None,
     bulk_text: str = "",
     bulk_preview: BulkPreview | None = None,
+    bulk_error: str | None = None,
     link_options: tuple[LinkOption, ...] = (),
     categories_open: bool = False,
 ) -> dict[str, object]:
@@ -337,6 +338,7 @@ def _body_context(
         "categories_open": categories_open or edit_category is not None,
         "bulk_text": bulk_text,
         "bulk_preview": bulk_preview,
+        "bulk_error": _t(request, bulk_error) if bulk_error else None,
         "bulk_error_labels": {code: _t(request, label) for code, label in BULK_ERRORS.items()},
         "bulk_warning_labels": {code: _t(request, label) for code, label in BULK_WARNINGS.items()},
         "max_item_name_length": MAX_ITEM_NAME_LENGTH,
@@ -1070,7 +1072,7 @@ async def networth_bulk_preview(
                 ctx,
                 side=selected,
                 status_code=400,
-                error=ERRORS.get(code, FALLBACK_ERROR),
+                bulk_error=ERRORS.get(code, FALLBACK_ERROR),
                 bulk_text=text,
             )
         )
@@ -1111,7 +1113,7 @@ async def networth_bulk_create(
                 ctx,
                 side=selected,
                 status_code=400,
-                error=ERRORS.get(code, FALLBACK_ERROR),
+                bulk_error=ERRORS.get(code, FALLBACK_ERROR),
                 bulk_text=text,
             )
         )
