@@ -216,6 +216,12 @@ jobs:
             type=semver,pattern={{major}},value=${{ inputs.tag || github.ref_name }},enable=${{ !contains(inputs.tag || github.ref_name, '-') && !startsWith(inputs.tag || github.ref_name, 'v0.') }}
             type=raw,value=latest,enable=${{ !contains(inputs.tag || github.ref_name, '-') }}
 
+      - name: Verify the release image tags
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 scripts/verify_release_tags.py --tag "$RELEASE_TAG" <<< "$IMAGE_TAGS"
+
       - name: Build and push multi-arch release image
         id: image
         uses: docker/build-push-action@v7
@@ -253,3 +259,89 @@ jobs:
             echo '```'
             echo 'Platforms: linux/amd64, linux/arm64'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Post-publish checks against the registry image itself: a fresh install from the published
+  # tag, an upgrade from the previous release, a backup/restore round trip and the tag/platform
+  # policy. These cannot run before the publish job because they pull what was just pushed.
+  release-checks:
+    needs: [publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.publish) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize image name
+        id: image
+        shell: bash
+        run: |
+          {
+            echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}"
+            echo "tag=${RELEASE_TAG#v}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify multi-arch tags after publish
+        run: |
+          scripts/release_checks.sh verify-tags \
+            "${{ steps.image.outputs.repository }}" "$RELEASE_TAG"
+
+      - name: Find the previous stable release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=$(gh release list --exclude-drafts --exclude-pre-releases --limit 30 \
+            --json tagName --jq '.[].tagName' \
+            | grep -vxF "$RELEASE_TAG" | head -n 1 || true)
+          if [[ -z $previous ]]; then
+            previous=$(git tag --list 'v*' --sort=-version:refname \
+              | grep -vxF "$RELEASE_TAG" | head -n 1 || true)
+          fi
+          echo "tag=$previous" >> "$GITHUB_OUTPUT"
+
+      - name: Fresh install from the published image
+        run: |
+          scripts/release_checks.sh fresh-install \
+            "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}"
+
+      - name: Upgrade from the previous published release
+        if: steps.previous.outputs.tag != ''
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+        run: |
+          scripts/release_checks.sh upgrade \
+            "${{ steps.image.outputs.repository }}:${PREVIOUS_TAG#v}" \
+            "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}"
+
+      # v0.8.2 predates the newest migration shipped by 1.0 and stays published on GHCR. The
+      # check fails if the two images somehow share a revision, so it cannot pass vacuously.
+      - name: Forward-only migration from an older schema
+        env:
+          MIGRATION_FROM_TAG: v0.8.2
+        run: |
+          scripts/release_checks.sh upgrade \
+            "${{ steps.image.outputs.repository }}:${MIGRATION_FROM_TAG#v}" \
+            "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}" \
+            --require-migration
+
+      - name: Backup and restore round trip
+        run: |
+          scripts/release_checks.sh backup-restore \
+            "${{ steps.image.outputs.repository }}:${{ steps.image.outputs.tag }}"

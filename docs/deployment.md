@@ -432,8 +432,10 @@ proxy.
 ## Image tags
 
 For stable `v0.1.0`, the published tags are `0.1.0`, `0.1`, and `latest`. Stable `v1.2.3` publishes
-`1.2.3`, `1.2`, `1`, and `latest`. The major-only tag is omitted for 0.x releases. Prerelease
-`v1.0.0-rc.1` publishes only `1.0.0-rc.1`; prereleases do not move `latest`.
+`1.2.3`, `1.2`, `1`, and `latest`. The first stable 1.x release, `v1.0.0`, therefore publishes
+`1.0.0`, `1.0`, `1`, and `latest`. The major-only tag is omitted for 0.x releases. Prerelease
+`v1.0.0-rc.1` publishes only `1.0.0-rc.1`; prereleases do not move `latest`. The Docker workflow
+checks the actual `docker/metadata-action` output against this rule before pushing.
 
 ## Rehearsing a release image
 
@@ -442,7 +444,51 @@ tag, and leave **Publish the image to GHCR** unchecked. The workflow builds and 
 architectures without logging in to GHCR or publishing. Check **Publish the image to GHCR** only
 when you intend to upload the image and its release tags.
 
+## Release checks on a tag
+
+After a tag is published, the Docker workflow's `release-checks` job pulls the registry image and
+runs `scripts/release_checks.sh`: a fresh install through `compose.example.yaml`, an upgrade from
+the previous GitHub release with a populated demo database, a forward-only migration check from
+the older `v0.8.2` schema, a backup/restore round trip and the tag/platform policy. It also
+verifies that the expected image tags exist, share one manifest digest and carry `linux/amd64`
+and `linux/arm64`. The workflow job log is the evidence; the operator records the result in
+`docs/release-checklist.md`, which also gives the same commands for a local rehearsal.
+
+The release checks use disposable Docker volumes. They never mount or touch an existing data
+directory. They need Docker, `curl` and Python 3 on the host. `verify-tags` needs a registry login
+for a private package; the workflow logs in with its own token.
+
+## Releasing 1.0
+
+`release-please-config.json` uses `bump-patch-for-minor-pre-major`, so ordinary `feat` commits
+after 0.8.3 produce a 0.8.x release. To make the milestone release, include a
+`Release-As: 1.0.0` footer in a conventional commit on `main` (for example
+`chore: release 1.0.0`) and let Release Please rebuild its pull request. Do not hand-edit the
+generated version files. The tag is `v1.0.0`; the image tags are the four listed above. The full
+pre-tag and post-publish sequence, including the operator-only tag and publish step, is
+[Release checklist — v1.0.0](release-checklist.md).
+
 ## Upgrading
+
+### Upgrading to 1.0.0
+
+- **Back up first.** Stop the app and copy the whole data directory (the database with its
+  `-wal`/`-shm` files and `secret_key`), or use the in-app backup before upgrading. See
+  [Backups](#backups) and [Backups and restore](backup.md).
+- **Migrations run on the first start.** `ASSETBOARD_AUTO_MIGRATE` is `true` by default and in
+  `compose.example.yaml`. The log shows `database migrations applied at startup: <from> -> <to>`
+  when the schema changes, and `/readyz` returns `{"status":"ok","database":"ready"}` when it is
+  done. A 1.0 database cannot be used by 0.8.x; to go back, restore the backup instead of
+  downgrading the image.
+- **The 1.0 image tags are `1.0.0`, `1.0`, `1`, and `latest`.** The major-only tag appears for
+  the first time with this release; `latest` follows only stable releases.
+- **The release checks cover the upgrade path.** The tag workflow starts 1.0 with a populated
+  database created by the previous release, restores a backup into a clean volume and checks
+  that an older image refuses the newer schema. See
+  [Release checklist — v1.0.0](release-checklist.md) for the commands and the operator-only
+  tag/publish step.
+- **No new required setting** was added for 1.0; every setting added since 0.8.3 has a default.
+  Review the release notes for optional features and any changed defaults.
 
 ### Unreleased: opt-in update check and account menu (ADR-0023)
 

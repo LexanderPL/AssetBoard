@@ -47,6 +47,17 @@ printf '==> Generating CycloneDX SBOM\n'
 (cd "$checkout" && uvx --from cyclonedx-bom==8.0.1 cyclonedx-py requirements \
   "$out/$requirements" --pyproject pyproject.toml --output-format JSON \
   --output-file "$out/$app-$version-sbom.cdx.json" >/dev/null)
+(cd "$checkout" && uv run --no-project python - \
+  "$out/$app-$version-sbom.cdx.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as sbom_file:
+    sbom = json.load(sbom_file)
+assert sbom.get("bomFormat") == "CycloneDX", sbom.get("bomFormat")
+assert sbom.get("components"), "the SBOM has no components"
+PY
+)
 
 install -m 0644 "$here/systemd/$app.service" "$out/$app.service"
 install -m 0644 "$here/$app.env.example" "$out/$app.env.example"
@@ -55,6 +66,7 @@ install -m 0755 "$here/install-debian.sh" "$out/install-debian.sh"
 
 (cd "$out" && sha256sum "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
   "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh >SHA256SUMS)
+(cd "$out" && sha256sum --check --strict SHA256SUMS >/dev/null)
 
 printf '==> Done\n'
 ls -l "$out"

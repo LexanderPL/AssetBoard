@@ -73,3 +73,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" dist/release/* --clobber
+
+      # The release is not complete until every generated file, including the SBOM and the
+      # wheel, is attached to this tag's release. The upload step is brand-neutral; this one
+      # also fails if a new build output is ever not attached.
+      - name: Verify the attached release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t built < <(find dist/release -maxdepth 1 -type f -printf '%f\n' | sort)
+          built_list=$RUNNER_TEMP/release-files.txt
+          printf '%s\n' "${built[@]}" > "$built_list"
+          uploaded=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          for file in "${built[@]}"; do
+            if ! grep -qxF "$file" <<< "$uploaded"; then
+              echo "Release $TAG is missing the attached file: $file" >&2
+              exit 1
+            fi
+          done
+          grep -q -- '-sbom.cdx.json$' "$built_list" || {
+            echo "No CycloneDX SBOM was built for $TAG" >&2
+            exit 1
+          }
+          grep -qxF 'SHA256SUMS' "$built_list" || {
+            echo "No SHA256SUMS was built for $TAG" >&2
+            exit 1
+          }
+          (cd dist/release && sha256sum --check --strict SHA256SUMS >/dev/null)
+          python3 -c 'import json,glob; [json.load(open(p, encoding="utf-8")) for p in glob.glob("dist/release/*-sbom.cdx.json")]'
+          echo "All $((${#built[@]})) release files are attached to $TAG."
