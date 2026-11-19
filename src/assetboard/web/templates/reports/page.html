@@ -27,7 +27,10 @@
         <caption class="sr-only">{{ series.caption }}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">
-            {% for column in series.columns %}<th scope="col" class="py-1.5 pr-2 font-medium{% if not loop.first %} text-right{% endif %}">{{ column }}</th>{% endfor %}
+            {% for column in series.columns %}
+            {% if loop.first %}<th scope="col" class="py-1.5 pr-2 font-medium">{{ column }}</th>
+            {% else %}<th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ column }}</th>{% endif %}
+            {% endfor %}
           </tr>
         </thead>
         <tbody>

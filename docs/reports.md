@@ -2,8 +2,9 @@
 
 Reports (`/reports`) show how much came in and went out over a range of years, month by month or
 year by year, where the spending went by category, how categories trend, how a year compares
-with the one before and how often actual spending beat its plan. Every member of a workspace,
-viewers included, can open the page: it only reads what they can already see in the ledger.
+with the one before, how often actual spending beat its plan, and how net worth and the portfolio
+moved over the same range. Every member of a workspace, viewers included, can open the page: it
+only reads what they can already see in the ledger.
 
 Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
 [desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
@@ -33,7 +34,9 @@ selector; the other sections always use the whole ledger. An unknown or malforme
 `yoy_category` is ignored and the default is used, so an old bookmark still opens.
 
 The **Report year** selector chooses the year of the year-overview grid and the year-over-year
-comparison. It does not change the range of the first three sections.
+comparison. It does not change the range of the first three sections. The **Net worth over time**
+and **Portfolio value over time** sections follow **From year**, **To year** and **Granularity**,
+ignore the category/savings filters, and are shown only in the workspace base currency.
 
 A range is at most 30 years. A malformed year, `from` after `to`, or a longer range is marked on
 the field and no chart is drawn. The range always ends with the current month in the workspace's
