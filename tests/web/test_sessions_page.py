@@ -6,7 +6,6 @@ import hashlib
 import io
 import logging
 import re
-import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -16,8 +15,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker
 
+from assetboard.app import TOUCH_BUSY_TIMEOUT_MS
 from assetboard.clock import FixedClock
-from assetboard.db.engine import create_database_engine, immediate_transaction
+from assetboard.db.engine import (
+    SQLITE_BUSY_TIMEOUT_MS,
+    create_database_engine,
+    immediate_transaction,
+)
 from assetboard.db.models.identity import AuthThrottle, User, UserSession
 from assetboard.services.auth import session_id_hash
 from assetboard.services.hash_gate import HashGateBusy
@@ -269,16 +273,22 @@ def test_session_activity_write_is_best_effort_when_the_database_is_locked(
     locker = create_database_engine(app.state.settings.database_url)  # type: ignore[attr-defined]
     try:
         with immediate_transaction(sessionmaker(locker, info={"clock": app.state.clock})):  # type: ignore[attr-defined]
-            started = time.monotonic()
             response = signed_in.get("/")
-            elapsed = time.monotonic() - started
     finally:
         locker.dispose()
     assert response.status_code == 200
-    assert elapsed < 3  # the touch waits ~250 ms, never the 5 s request lock timeout
     with app.state.session_factory() as session:  # type: ignore[attr-defined]
         row = session.get(UserSession, id_hash)
         assert row is not None and abs((row.last_seen_at - stale).total_seconds()) < 1
+
+
+def test_session_activity_touch_uses_a_short_lock_wait(signed_in: TestClient) -> None:
+    app = signed_in.app
+    with app.state.touch_factory() as session:  # type: ignore[attr-defined]
+        timeout = session.connection().exec_driver_sql("PRAGMA busy_timeout").scalar_one()
+    assert timeout == TOUCH_BUSY_TIMEOUT_MS
+    # The request engine may wait 5 s; the best-effort touch must not hold the request that long.
+    assert 0 < TOUCH_BUSY_TIMEOUT_MS < SQLITE_BUSY_TIMEOUT_MS
 
 
 def test_throttle_uses_the_client_address_and_ignores_forwarded_headers(web: WebHarness) -> None:
