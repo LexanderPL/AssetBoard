@@ -316,6 +316,21 @@ msgstr "Kredyt samochodowy"
 msgid "Renovation loan"
 msgstr "Kredyt remontowy"
 
+msgid "Home renovation"
+msgstr "Remont domu"
+
+msgid "Higher household costs"
+msgstr "Wyższe koszty gospodarstwa domowego"
+
+msgid "Save more after the raise"
+msgstr "Odkładaj więcej po podwyżce"
+
+msgid "Inheritance"
+msgstr "Spadek"
+
+msgid "Reduced working hours"
+msgstr "Krótszy czas pracy"
+
 msgid "Rent"
 msgstr "Czynsz"
 

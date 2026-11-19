@@ -27,7 +27,7 @@ from typing import Literal
 
 from assetboard.domain.money import Money
 
-DEMO_DATASET_VERSION: int = 2
+DEMO_DATASET_VERSION: int = 3
 
 CURRENCY_FACTORS: MappingProxyType[str, Decimal] = MappingProxyType(
     {
@@ -50,9 +50,6 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "LoanScenario": "scenarios are user what-ifs, not sample data",
         "LoanPayment": "actual payments are user records, not sample data",
         "InstallmentPlan": "installment plans are user records, not sample data",
-        "FireScenario": "the FIRE plan is a user what-if, not sample data",
-        "FireEvent": "FIRE adjustments belong to a user's plan",
-        "FireLoanSetting": "a FIRE loan choice belongs to a user's plan",
         "NetWorthSnapshot": (
             "snapshots are legacy data; net-worth history is derived from valuations"
         ),
@@ -85,6 +82,15 @@ def convert_amount(eur_amount: Decimal, currency: str, *, whole: bool = False) -
     if whole:
         value = value.quantize(Decimal(1), rounding=ROUND_HALF_UP)
     return Money.from_decimal(value, currency.upper())
+
+
+def convert_signed_amount(eur_amount: Decimal, currency: str, *, whole: bool = False) -> Money:
+    """Like :func:`convert_amount` but keeps the sign (FIRE events are signed)."""
+    if not eur_amount.is_finite():
+        raise ValueError("amount must be a finite Decimal")
+    sign = -1 if eur_amount < 0 else 1
+    amount = convert_amount(abs(eur_amount), currency, whole=whole)
+    return Money(sign * amount.amount_minor, amount.currency)
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +286,37 @@ class DemoRiskPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class DemoFireEvent:
+    """One saved FIRE adjustment; ``year_offset`` is relative to ``T``'s year."""
+
+    year_offset: int
+    kind: Literal["cash", "expense_change", "income_change", "saving_override"]
+    amount: Money  # signed: positive saves/adds, negative spends/reduces
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class DemoFirePlan:
+    """The one live FIRE plan and its events; event years are relative to ``T``'s year."""
+
+    reference_year: int
+    birth_year: int
+    stop_working_age: int
+    horizon_age: int
+    inflation_bp: int
+    real_return_bp: int
+    income_growth_bp: int
+    rule: Literal["returns_cover_expenses", "swr", "lasts_to_horizon"]
+    swr_bp: int | None
+    income: Money
+    expenses: Money
+    portfolio: Money
+    events: tuple[DemoFireEvent, ...]
+    # Translated name of the loan the sample plan leaves out of the projection.
+    ignored_loan: str
+
+
+@dataclass(frozen=True, slots=True)
 class DemoCsvRow:
     day: date
     direction: Literal["income", "expense"]
@@ -311,6 +348,7 @@ class DemoPlan:
     csv_rows: tuple[DemoCsvRow, ...]
     reference_rates: tuple[DemoReferenceRate, ...]
     loans: tuple[DemoLoan, ...]
+    fire: DemoFirePlan
 
 
 # ---------------------------------------------------------------------------
@@ -610,6 +648,7 @@ def build_plan(
 
     csv_rows = _csv_rows(reference_date, currency, translate)
     reference_rates, demo_loans = _loan_plan(reference_date, currency, translate)
+    fire = _fire_plan(reference_date, currency, translate)
 
     return DemoPlan(
         version=DEMO_DATASET_VERSION,
@@ -635,6 +674,7 @@ def build_plan(
         csv_rows=csv_rows,
         reference_rates=reference_rates,
         loans=demo_loans,
+        fire=fire,
     )
 
 
@@ -773,6 +813,62 @@ def _loan_plan(
         ),
     )
     return reference_rates, (mortgage, car, renovation)
+
+
+def _fire_plan(reference: date, currency: str, translate: Translate) -> DemoFirePlan:
+    """A conservative plan that leaves one short loan out of the projection."""
+    current_year = reference.year
+    events = (
+        DemoFireEvent(
+            year_offset=-1,
+            kind="cash",
+            amount=convert_signed_amount(Decimal("-4000"), currency, whole=True),
+            label=translate(_("Home renovation")),
+        ),
+        DemoFireEvent(
+            year_offset=1,
+            kind="expense_change",
+            amount=convert_signed_amount(Decimal("1800"), currency, whole=True),
+            label=translate(_("Higher household costs")),
+        ),
+        DemoFireEvent(
+            year_offset=2,
+            kind="saving_override",
+            amount=convert_signed_amount(Decimal("7200"), currency, whole=True),
+            label=translate(_("Save more after the raise")),
+        ),
+        DemoFireEvent(
+            year_offset=3,
+            kind="cash",
+            amount=convert_signed_amount(Decimal("25000"), currency, whole=True),
+            label=translate(_("Inheritance")),
+        ),
+        DemoFireEvent(
+            year_offset=4,
+            kind="income_change",
+            amount=convert_signed_amount(Decimal("-1200"), currency, whole=True),
+            label=translate(_("Reduced working hours")),
+        ),
+    )
+    events = tuple(
+        sorted(events, key=lambda row: (current_year + row.year_offset, row.kind, row.label))
+    )
+    return DemoFirePlan(
+        reference_year=current_year,
+        birth_year=current_year - 38,
+        stop_working_age=60,
+        horizon_age=88,
+        inflation_bp=250,
+        real_return_bp=500,
+        income_growth_bp=300,
+        rule="swr",
+        swr_bp=400,
+        income=convert_amount(Decimal("100000"), currency, whole=True),
+        expenses=convert_amount(Decimal("70000"), currency, whole=True),
+        portfolio=convert_amount(Decimal("285000"), currency, whole=True),
+        events=events,
+        ignored_loan=translate(_("Car loan")),
+    )
 
 
 def _recurring_plan(reference: date, currency: str, translate: Translate) -> list[DemoRecurring]:

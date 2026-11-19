@@ -45,6 +45,9 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FireEventRepository,
+    FireLoanSettingRepository,
+    FireScenarioRepository,
     FxRateRepository,
     ImportBatchRepository,
     ImportCategoryMappingRepository,
@@ -80,6 +83,7 @@ from assetboard.db.repositories import (
 from assetboard.domain.categories import name_key
 from assetboard.domain.demo import (
     DemoBondTerms,
+    DemoFirePlan,
     DemoIncomeSource,
     DemoLoan,
     DemoPlan,
@@ -573,14 +577,15 @@ def _write_networth(
     return items, valuations
 
 
-def _write_loans(session: Session, ctx: Context, plan: DemoPlan) -> None:
+def _write_loans(session: Session, ctx: Context, plan: DemoPlan) -> dict[str, UUID]:
     """Write the demo reference rates and loans through the scoped repositories.
 
-    The public loan service opens its own transaction per call, so the demo writer composes the
-    repositories directly, like the other in-session seams. The plan is synthetic and already
-    validated by its fixed values and the coverage test.
+    The public loan service opens its own transaction per call, so the writer composes the
+    repositories directly, like the other in-session seams; returns ids by translated name key
+    so the FIRE loan choice can point at the car loan.
     """
     rate_ids: dict[str, UUID] = {}
+    loan_ids: dict[str, UUID] = {}
     for rate in plan.reference_rates:
         _use(session, ctx)
         row = ReferenceRateRepository(session, ctx).create(
@@ -594,10 +599,11 @@ def _write_loans(session: Session, ctx: Context, plan: DemoPlan) -> None:
                 value_bp=value_bp,
             )
     for demo in plan.loans:
-        _write_loan(session, ctx, demo, rate_ids)
+        loan_ids[name_key(demo.name)] = _write_loan(session, ctx, demo, rate_ids)
+    return loan_ids
 
 
-def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[str, UUID]) -> None:
+def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[str, UUID]) -> UUID:
     loan = LoanRepository(session, ctx).create(
         name=demo.name,
         kind=demo.kind,
@@ -663,6 +669,51 @@ def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[s
             amount_minor=amount.amount_minor,
             note=note,
         )
+    return loan.id
+
+
+def _write_fire(
+    session: Session, ctx: Context, plan: DemoFirePlan, loan_ids: dict[str, UUID]
+) -> tuple[int, int, int]:
+    """Write the one live FIRE plan, its adjustments and its loan choice."""
+    _use(session, ctx)
+    scenario = FireScenarioRepository(session, ctx).create(
+        currency=ctx.workspace.base_currency,
+        birth_year=plan.birth_year,
+        stop_working_age=plan.stop_working_age,
+        horizon_age=plan.horizon_age,
+        inflation_bp=plan.inflation_bp,
+        real_return_bp=plan.real_return_bp,
+        income_growth_bp=plan.income_growth_bp,
+        rule=plan.rule,
+        swr_bp=plan.swr_bp,
+        income_minor=plan.income.amount_minor,
+        expenses_minor=plan.expenses.amount_minor,
+        portfolio_minor=plan.portfolio.amount_minor,
+        needs_review=False,
+        is_live=True,
+        legacy=None,
+    )
+    events = 0
+    for event in plan.events:
+        FireEventRepository(session, ctx).create(
+            scenario_id=scenario.id,
+            year=plan.reference_year + event.year_offset,
+            kind=event.kind,
+            amount_minor=event.amount.amount_minor,
+            label=event.label,
+        )
+        events += 1
+    settings = 0
+    loan_id = loan_ids.get(name_key(plan.ignored_loan))
+    if loan_id is not None:
+        FireLoanSettingRepository(session, ctx).create(
+            scenario_id=scenario.id,
+            loan_id=loan_id,
+            included=False,
+        )
+        settings = 1
+    return 1, events, settings
 
 
 def _write_investments(
@@ -927,6 +978,9 @@ _COUNT_REPOSITORIES: tuple[tuple[str, type[ScopedRepository[Any]]], ...] = (
     ("loan_cost_components", LoanCostComponentRepository),
     ("loan_overpayments", LoanOverpaymentRepository),
     ("loan_balance_checkpoints", LoanBalanceCheckpointRepository),
+    ("fire_scenarios", FireScenarioRepository),
+    ("fire_events", FireEventRepository),
+    ("fire_loan_settings", FireLoanSettingRepository),
     ("asset_classes", AssetClassRepository),
     ("instruments", InstrumentRepository),
     ("instrument_allocations", InstrumentAllocationRepository),
@@ -977,7 +1031,8 @@ def build_demo_workspace_in_session(
         _write_recurring(session, tctx, plan, lookup, horizon_months=horizon_months)
         _write_income(session, tctx, plan, lookup)
         _write_networth(session, tctx, plan, lookup)
-        _write_loans(session, tctx, plan)
+        loan_ids = _write_loans(session, tctx, plan)
+        _write_fire(session, tctx, plan.fire, loan_ids)
         _write_investments(session, tctx, plan, lookup)
         _import_batches, upload_path = _write_import(session, tctx, plan, data_dir)
 

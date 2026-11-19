@@ -303,6 +303,21 @@ msgstr ""
 msgid "Renovation loan"
 msgstr ""
 
+msgid "Home renovation"
+msgstr ""
+
+msgid "Higher household costs"
+msgstr ""
+
+msgid "Save more after the raise"
+msgstr ""
+
+msgid "Inheritance"
+msgstr ""
+
+msgid "Reduced working hours"
+msgstr ""
+
 msgid "Rent"
 msgstr ""
 
