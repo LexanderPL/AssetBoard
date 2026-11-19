@@ -15,9 +15,38 @@
 {% if view.errors.get(name) %} aria-invalid="true" aria-describedby="report-{{ name }}-error"{% endif %}
 {%- endmacro %}
 
+{% macro series_section(key, series) -%}
+<section class="panel p-4 sm:p-6" aria-labelledby="reports-{{ key }}-heading" data-report-series="{{ key }}">
+  <h2 id="reports-{{ key }}-heading" class="text-base font-semibold">{{ series.title }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ series.description }}</p>
+  <div class="mt-4" data-chart="{{ series.chart_type }}" data-chart-source="reports-{{ key }}-data">
+    <script type="application/json" id="reports-{{ key }}-data">{{ series.chart|tojson }}</script>
+    <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
+    <div class="mt-3 relative overflow-x-auto" data-chart-table>
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ series.caption }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            {% for column in series.columns %}<th scope="col" class="py-1.5 pr-2 font-medium{% if not loop.first %} text-right{% endif %}">{{ column }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in series.rows %}
+          <tr data-report-series-row>
+            <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">{{ row.label }}</th>
+            {% for cell in row.cells %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ cell }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{%- endmacro %}
+
 {% block title %}{{ _("Reports") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Reports") }}{% endblock %}
-{% block scripts %}{% if view.chart or view.category_chart or view.trend_chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
+{% block scripts %}{% if view.chart or view.category_chart or view.trend_chart or view.net_worth or view.portfolio %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
 {% block content %}
 <div class="mx-auto max-w-4xl space-y-6" data-reports>
   <section class="panel p-4 sm:p-6" aria-labelledby="reports-filters-heading">
@@ -468,5 +497,8 @@
     <p class="mt-2 text-xs text-muted">{{ _("A month counts as over when actual spending is greater than the plan. Only planned regular expense categories are included.") }}</p>
   </section>
   {% endif %}
+
+  {% if view.net_worth %}{{ series_section("net-worth", view.net_worth) }}{% endif %}
+  {% if view.portfolio %}{{ series_section("portfolio", view.portfolio) }}{% endif %}
 </div>
 {% endblock %}

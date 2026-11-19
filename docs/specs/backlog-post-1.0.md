@@ -8,25 +8,6 @@ workspace. (Workspace deletion was pulled forward on 2026-10-24, see ADR-0020.)
 
 ---
 
-## Reports: net worth and portfolio value over time (F10.4/F10.5)
-
-Deferred from 1.0 by the owner on 2026-11-18. The Net worth Summary already has a derived
-monthly trend (`1y/3y/5y/all`, assets/liabilities/net) and the Investments Performance page plus
-the Home portfolio widget already show value and invested capital over time. Adding both to
-`/reports` would duplicate those charts unless the feature is redefined.
-
-**If picked up**
-- Reuse F5.9's derived history and F6.7's `portfolio_series`; do not read stored snapshots and do
-  not add new valuation math.
-- Drive both from the Reports year range and month/year step, with year-step points taken from
-  the last available point of each year and gaps left as gaps.
-- Hide a section when the workspace has no values/transactions, and keep the base-currency and
-  non-base-item warnings.
-- Decide whether the value is a full chart or a compact year-step summary linking to the module
-  page; avoid a second full copy of the existing charts.
-
----
-
 ## Administrator password reset from the Users page
 
 Today an administrator can reset someone's password only on the command line

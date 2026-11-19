@@ -20,7 +20,7 @@ eligible expense category, the chart falls back to its default (the largest eigh
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -60,6 +60,8 @@ from assetboard.domain.reports import (
 )
 from assetboard.domain.summary import block_of
 from assetboard.services.context import Context, Role, require_role
+from assetboard.services.networth_history import NetWorthHistoryData, networth_history
+from assetboard.services.performance import PerformancePage, performance_page
 
 DEFAULT_YEARS = 3
 MAX_YEARS = 30
@@ -124,6 +126,8 @@ class ReportsData:
     today: date
     series_start: date | None
     series_end: date | None
+    net_worth: NetWorthHistoryData | None = None
+    portfolio: PerformancePage | None = None
 
     @property
     def category_filter_active(self) -> bool:
@@ -321,6 +325,97 @@ def _entries(
         if in_notes and category is not None and _counts(category):
             stats.counted += 1
         yield LedgerEntry(row.day, row.category_id, Money(row.amount_minor, row.currency))
+
+
+def _last_per_period[T](
+    points: Iterable[T],
+    *,
+    day_of: Callable[[T], date],
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    today: date,
+) -> tuple[T, ...]:
+    """The last point of each month/year in the report range, in source order.
+
+    Points after today are ignored, as are points before the range. A period with no point is
+    simply absent; nothing is interpolated.
+    """
+    start = date(start_year, 1, 1)
+    end = min(date(end_year, 12, 31), today)
+    chosen: dict[tuple[int, ...], T] = {}
+    for point in points:
+        point_day = day_of(point)
+        if not start <= point_day <= end:
+            continue
+        key = (point_day.year,) if step is ReportStep.YEAR else (point_day.year, point_day.month)
+        chosen[key] = point
+    return tuple(chosen.values())
+
+
+def net_worth_report(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    currency: str,
+) -> NetWorthHistoryData | None:
+    """F10.4: the derived net-worth series at the report's period ends.
+
+    Reuses F5.9's ``networth_history`` in its all-time form and keeps the last point of each
+    period. Only the workspace base currency is available; the section is absent otherwise.
+    """
+    if currency != ctx.workspace.base_currency:
+        return None
+    data = networth_history(factory, ctx, "all")
+    points = _last_per_period(
+        data.points,
+        day_of=lambda point: point.as_of,
+        start_year=start_year,
+        end_year=end_year,
+        step=step,
+        today=data.today,
+    )
+    if not points or not data.has_values:
+        return None
+    return replace(data, points=points)
+
+
+def portfolio_report(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    currency: str,
+) -> PerformancePage | None:
+    """F10.5: portfolio value and invested capital at the report's period ends.
+
+    Reuses F6.7's ``performance_page`` in its all-time form; no portfolio math is repeated.
+    Only the workspace base currency is available; the section is absent otherwise.
+    """
+    if currency != ctx.workspace.base_currency:
+        return None
+    page = performance_page(factory, ctx, range_code="all", with_periods=False)
+    points = _last_per_period(
+        page.chart,
+        day_of=lambda point: point.date,
+        start_year=start_year,
+        end_year=end_year,
+        step=step,
+        today=page.today,
+    )
+    if not points:
+        return None
+    return replace(
+        page,
+        chart=points,
+        periods=(),
+        incomplete_points=sum(1 for point in points if point.incomplete),
+    )
 
 
 def reports_data(
@@ -580,6 +675,22 @@ def reports_data(
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
+        net_worth=net_worth_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
+        ),
+        portfolio=portfolio_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
+        ),
     )
 
 

@@ -35,8 +35,12 @@ from assetboard.domain.reports import (
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_month, short_month_names
 from assetboard.i18n.numbers import format_money, format_rate_tenths
+from assetboard.services.networth_history import NetWorthHistoryData
+from assetboard.services.performance import PerformancePage
 from assetboard.services.reports import CategoryOption, FilterError, ReportsData
 from assetboard.web.chart_axis import money_axis, rate_axis
+from assetboard.web.charts import build_performance_chart
+from assetboard.web.networth_history import build_trend_view
 from assetboard.web.rendering import scoped_url
 
 
@@ -80,6 +84,15 @@ CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data
 YEAR_OVER_YEAR_TOTAL = _("Total (all categories)")
 YEAR_OVER_YEAR_NO_PREVIOUS = _("Not available: nothing spent in the previous year.")
 YEAR_OVER_YEAR_PARTIAL = _("The current year is compared through %(month)s in both years.")
+NET_WORTH_TITLE = _("Net worth over time")
+NET_WORTH_DESCRIPTION = _(
+    "Assets, liabilities and net worth at the end of each period, from your saved values."
+)
+NET_WORTH_CAPTION = _("Net worth by period")
+PORTFOLIO_TITLE = _("Portfolio value over time")
+PORTFOLIO_DESCRIPTION = _("Portfolio value and invested capital at the end of each period.")
+PORTFOLIO_CAPTION = _("Portfolio value by period")
+PERIOD = _("Period")
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +265,23 @@ class PlanAccuracyView:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportSeriesRow:
+    label: str
+    cells: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ReportSeriesView:
+    title: str
+    description: str
+    caption: str
+    chart_type: str
+    columns: tuple[str, ...]
+    rows: tuple[ReportSeriesRow, ...]
+    chart: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class ReportsView:
     data: ReportsData
     errors: dict[str, str]
@@ -275,6 +305,8 @@ class ReportsView:
     yoy_category_options: tuple[CategoryOptionView, ...]
     notes: tuple[str, ...]
     range_years: str
+    net_worth: ReportSeriesView | None
+    portfolio: ReportSeriesView | None
 
     @property
     def valid(self) -> bool:
@@ -905,6 +937,82 @@ def _notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     return tuple(notes)
 
 
+def _series_label(day: date, step: ReportStep, locale: str) -> str:
+    if step is ReportStep.MONTH:
+        return format_month(YearMonth.from_date(day), locale)
+    return str(day.year)
+
+
+def _net_worth_series(
+    data: NetWorthHistoryData | None, step: ReportStep, locale: str
+) -> ReportSeriesView | None:
+    if data is None:
+        return None
+    trend = build_trend_view(data, locale)
+    if trend.chart is None:
+        return None
+    rows = tuple(
+        ReportSeriesRow(
+            label=_series_label(point.as_of, step, locale),
+            cells=(
+                format_money(point.net, locale),
+                format_money(point.assets, locale),
+                format_money(point.liabilities, locale),
+            ),
+        )
+        for point in data.points
+    )
+    return ReportSeriesView(
+        title=gettext(NET_WORTH_TITLE, locale),
+        description=gettext(NET_WORTH_DESCRIPTION, locale),
+        caption=gettext(NET_WORTH_CAPTION, locale),
+        chart_type="line",
+        columns=(
+            gettext(PERIOD, locale),
+            gettext("Net worth", locale),
+            gettext("Assets", locale),
+            gettext("Liabilities", locale),
+        ),
+        rows=rows,
+        chart=trend.chart,
+    )
+
+
+def _portfolio_series(
+    page: PerformancePage | None, step: ReportStep, locale: str
+) -> ReportSeriesView | None:
+    if page is None:
+        return None
+    chart = build_performance_chart(page, locale)
+    if chart is None:
+        return None
+    rows = tuple(
+        ReportSeriesRow(
+            label=_series_label(point.date, step, locale),
+            cells=(
+                format_money(point.value, locale),
+                format_money(point.net_invested, locale),
+                format_money(point.value - point.net_invested, locale),
+            ),
+        )
+        for point in page.chart
+    )
+    return ReportSeriesView(
+        title=gettext(PORTFOLIO_TITLE, locale),
+        description=gettext(PORTFOLIO_DESCRIPTION, locale),
+        caption=gettext(PORTFOLIO_CAPTION, locale),
+        chart_type="performance",
+        columns=(
+            gettext(PERIOD, locale),
+            gettext("Value", locale),
+            gettext("Invested capital", locale),
+            gettext("Gain", locale),
+        ),
+        rows=rows,
+        chart=chart,
+    )
+
+
 def build_reports_view(request: Request, data: ReportsData, locale: str) -> ReportsView:
     """The formatted page from the service's data."""
     step = data.filters.step
@@ -952,4 +1060,6 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         yoy_category_options=_yoy_category_options(data),
         notes=_notes(data, locale),
         range_years=range_years,
+        net_worth=_net_worth_series(data.net_worth, step, locale),
+        portfolio=_portfolio_series(data.portfolio, step, locale),
     )

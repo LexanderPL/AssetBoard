@@ -184,8 +184,29 @@ same counts across all category-months. Open and closed months count alike, and 
 months are outside the report range. Amounts are compared in the selected currency; plans in
 another currency are left out, never converted.
 
+## Net worth over time
+
+The net-worth section shows assets, liabilities and net worth at the end of each month or year
+in the report range. It reuses the same derived history as the Net worth Summary page: saved
+values, linked items and prices are calculated on read, and the last point of each period is
+shown. There is no interpolation between periods.
+
+The section appears only when the workspace has net-worth values and the selected currency is
+the workspace base currency. It is absent otherwise. The chart and table carry the same figures;
+the table is the accessible version and works without JavaScript.
+
+## Portfolio value over time
+
+The portfolio section shows the portfolio value, invested capital and gain at the end of each
+month or year in the report range. It uses the same valuation series as the Investments
+Performance page and the Home portfolio widget; no portfolio math is repeated.
+
+The section appears only when the workspace has investment transactions and the selected currency
+is the workspace base currency. It is absent otherwise. The chart and table carry the same
+figures; the table is the accessible version and works without JavaScript.
+
 ## Limits
 
-Phase A reports read only the ledger: net worth and portfolio history come in later phases. The
-year overview is the only table with a CSV download in this version; CSV export of ledger entries
-lives on the [History](transactions.md) page.
+Reports read the ledger, the derived net-worth history and the portfolio valuation series. The
+year overview is the only table with a CSV download; CSV export of ledger entries lives on the
+[History](transactions.md) page.

@@ -224,10 +224,6 @@ multi-select and the savings option, and the category x period table. Property t
 
 ## F10.4 Net worth over time (Phase B, depends on M5)
 
-**Deferred after 1.0 (owner, 2026-11-18).** The Net worth Summary already has the derived
-monthly trend with 1/3/5-year and all-time ranges. Keeping this feature out of 1.0 avoids a
-second copy of the same chart; see the post-1.0 backlog.
-
 **Acceptance**
 - Shown only when the workspace has net-worth values (F5.9); before M5 exists the section is
   absent, not disabled.
@@ -245,13 +241,15 @@ Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports 
 service (last point per period, gaps not interpolated), hidden when there are no values. Do not read stored snapshots.
 ```
 
+**As built (2026-11-19).** `services.reports.net_worth_report` calls F5.9's `networth_history`
+in its all-time form and keeps the last point of each report month/year. The `/reports` section
+reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
+the chart and accessible table. The section is absent without values or outside the base
+currency. Tests cover year/month selection, the base-currency rule and the empty workspace.
+
 ---
 
 ## F10.5 Portfolio value over time (Phase B, depends on M6)
-
-**Deferred after 1.0 (owner, 2026-11-18).** The Investments Performance page and the Home
-portfolio widget already show value and invested capital over time. Keeping this feature out of
-1.0 avoids a second copy of the same chart; see the post-1.0 backlog.
 
 **Acceptance**
 - Shown only when the workspace has investment transactions (M6).
@@ -266,6 +264,11 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F10.5 from docs/specs/M10-reports.md: portfolio value and invested capital over time on /reports from F6.7's
 portfolio_series, hidden without investment data. No new portfolio math.
 ```
+
+**As built (2026-11-19).** `services.reports.portfolio_report` calls F6.7's `performance_page`
+in its all-time form and keeps the last point of each report month/year; `web.charts.build_performance_chart` supplies the same chart JSON as the Performance page and Home widget.
+The section is absent without investment transactions or outside the base currency. Tests cover
+year/month selection, the base-currency rule and the empty workspace.
 
 ---
 
