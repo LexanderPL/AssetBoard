@@ -737,3 +737,15 @@ Implement F9.8 from docs/specs/M9-dashboard-reports-hardening.md: write docs/rel
 (compose-based, run in CI on tags), and, if a rename is decided, the rename migration with deprecation handling for the old env prefix.
 Do not tag or publish anything yourself; produce the checklist and scripts.
 ```
+
+**As built (2026-11-19).** [docs/release-checklist.md](../release-checklist.md) is the ordered
+pre-tag and post-publish checklist, including the operator-only tag/publish step. The repeatable
+parts are `scripts/release_checks.sh` (`fresh-install`, `upgrade`, `backup-restore`,
+`verify-tags`; `all` runs the first three) and `scripts/verify_release_tags.py` for the
+`docker/metadata-action` output. The Docker workflow verifies the four stable tags before
+pushing and runs the published-image checks after a tag; the release workflow verifies that
+every file built by `deploy/build-release.sh`, including the CycloneDX SBOM, is attached to the
+GitHub release. The app name is already **AssetBoard**, so no rename migration or old-prefix
+deprecation was needed. F9.7 (docs, screenshots and the i18n completeness report) is a separate
+pre-tag dependency and is not implemented here. Nothing in this change creates a tag, publishes
+an image or records a check as passed; those remain operator actions.
