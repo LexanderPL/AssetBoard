@@ -25,10 +25,8 @@ from assetboard.db.repositories import (
     PricePointRepository,
 )
 from assetboard.domain.dashboard import WIDGET_KEYS
-from assetboard.domain.money import Money
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.demo import build_demo_workspace, plan_for_workspace
-from assetboard.services.fire_scenarios import FirePlanInput, create_fire_plan
 from assetboard.services.investments import create_instrument
 from assetboard.services.performance import VALUE_RANGES
 from assetboard.web import dashboard as dashboard_module
@@ -678,16 +676,6 @@ def test_a_demo_workspace_renders_every_widget_with_data(owner: OwnerApp) -> Non
         plan,
         data_dir=owner.app.state.settings.data_dir,
         horizon_months=owner.app.state.settings.recurrence_horizon_months,
-    )
-    create_fire_plan(
-        owner.app.state.session_factory,
-        ctx,
-        FirePlanInput(
-            birth_year=1988,
-            income=Money(6_000_000, "EUR"),
-            expenses=Money(4_000_000, "EUR"),
-            portfolio=Money(10_000_000, "EUR"),
-        ),
     )
     _planned_import(owner)
     owner.app.state.clock = FixedClock("2026-11-20T12:00:00+00:00")
