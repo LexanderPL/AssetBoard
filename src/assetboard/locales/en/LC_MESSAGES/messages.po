@@ -11160,7 +11160,7 @@ msgstr ""
 msgid "No items yet"
 msgstr ""
 
-msgid "Use Add item above, or paste a list of items below."
+msgid "Use Add item or Bulk add items above."
 msgstr ""
 
 msgid "Add an item"
@@ -15156,5 +15156,8 @@ msgstr ""
 #~ "Leave empty to show the 8 largest"
 #~ " categories and the rest as Other "
 #~ "(combined)."
+#~ msgstr ""
+
+#~ msgid "Use Add item above, or paste a list of items below."
 #~ msgstr ""
 

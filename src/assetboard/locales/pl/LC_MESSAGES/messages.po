@@ -12273,8 +12273,8 @@ msgstr "Pozycje bez obowiązującej wartości nie są wliczane do sumy częścio
 msgid "No items yet"
 msgstr "Nie ma jeszcze pozycji"
 
-msgid "Use Add item above, or paste a list of items below."
-msgstr "Użyj przycisku „Dodaj pozycję” powyżej lub wklej listę pozycji poniżej."
+msgid "Use Add item or Bulk add items above."
+msgstr "Użyj przycisku „Dodaj pozycję” lub „Dodaj pozycje zbiorczo” powyżej."
 
 msgid "Add an item"
 msgstr "Dodaj pozycję"

@@ -499,6 +499,9 @@ def test_bulk_limits_show_a_form_error(owner: OwnerApp) -> None:
     response = _htmx(owner, "/net-worth/bulk/preview", {"side": "asset", "text": too_many})
     assert response.status_code == 400
     assert "Paste at most 500 lines." in response.text
+    assert "data-bulk-error" in response.text
+    opening = re.search(r'<dialog id="bulk-dialog"[^>]*>', response.text)
+    assert opening is not None and " open" in opening.group(0)
     too_large = "Car; 1; Vehicles\n" + "x" * (64 * 1024)
     response = _htmx(owner, "/net-worth/bulk/preview", {"side": "asset", "text": too_large})
     assert response.status_code == 400

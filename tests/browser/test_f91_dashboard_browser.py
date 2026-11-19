@@ -127,6 +127,36 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             )
             assert columns >= 2
 
+            # Make one widget in a pair taller, so the test fails if the partner panel does not
+            # stretch to the row height.
+            probe: dict[str, float] = page.evaluate(
+                """() => {
+                  const sections = [...document.querySelectorAll('[data-home-widgets] > section')];
+                  const rows = new Map();
+                  for (const section of sections) {
+                    const y = Math.round(section.getBoundingClientRect().y);
+                    if (!rows.has(y)) rows.set(y, []);
+                    rows.get(y).push(section);
+                  }
+                  const pair = [...rows.values()].find((row) => row.length > 1);
+                  const tall = pair && pair[0];
+                  const other = pair && pair[1];
+                  const tallPanel = tall && tall.querySelector(':scope > .panel');
+                  const otherPanel = other && other.querySelector(':scope > .panel');
+                  if (!tallPanel || !otherPanel) {
+                    return {before: 0, injected: false, pairs: rows.size};
+                  }
+                  const before = otherPanel.getBoundingClientRect().height;
+                  const spacer = document.createElement('div');
+                  spacer.dataset.heightProbe = '1';
+                  spacer.style.height = '320px';
+                  tallPanel.appendChild(spacer);
+                  return {before, injected: true};
+                }"""
+            )
+            assert probe["injected"]
+            page.wait_for_timeout(100)
+
             # Widgets sharing a row have the same height, and their panel fills the row.
             sections: list[dict[str, Any]] = page.locator(
                 "[data-home-widgets] > section"
@@ -148,6 +178,25 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
                     panel = section["panel"]
                     assert panel is not None
                     assert abs(float(panel) - float(section["height"])) <= 1, section
+
+            stretched: dict[str, float] = page.evaluate(
+                """() => {
+                  const spacer = document.querySelector('[data-height-probe]');
+                  const section = spacer.closest('[data-widget]');
+                  const partner = [...section.parentElement.querySelectorAll(':scope > section')]
+                    .find((el) => el !== section &&
+                      Math.round(el.getBoundingClientRect().y) ===
+                        Math.round(section.getBoundingClientRect().y));
+                  const panel = partner && partner.querySelector(':scope > .panel');
+                  if (!panel) return {panel: 0, section: 0};
+                  return {
+                    panel: panel.getBoundingClientRect().height,
+                    section: partner.getBoundingClientRect().height,
+                  };
+                }"""
+            )
+            assert stretched["panel"] > probe["before"] + 200, (probe, stretched)
+            assert abs(stretched["panel"] - stretched["section"]) <= 1, stretched
 
             # Phone: Home does not scroll sideways and Customise stays below the widgets.
             page.set_viewport_size({"width": 390, "height": 844})
