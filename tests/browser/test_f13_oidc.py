@@ -178,6 +178,10 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             page.goto(f"{base}/login", wait_until="networkidle")
             page.get_by_role("link", name="Continue with Fake IdP").click()
             page.wait_for_url(f"{base}/")
+            # Let the lazy Home widgets finish before signing out: revoking the session while
+            # one is still in flight makes its redirect race the logout navigation, so the
+            # browser can leave for /login before the provider end-session page loads.
+            page.wait_for_load_state("networkidle")
             # Auto-created with its own workspace, named after the person.
             expect(page.locator("[data-current-workspace]")).to_have_text("Olga OIDC")
             # The callback answered with a redirect, never a page.

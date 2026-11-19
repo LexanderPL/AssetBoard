@@ -1,4 +1,4 @@
-{# The Reports page (F10.1/F10.2). The filters are a plain GET form (bookmarkable, no
+{# The Reports page (F10.1–F10.3). The filters are a plain GET form (bookmarkable, no
    JavaScript). Each chart's data travels in a JSON block read by static/js/charts.js; the table
    beside it has the same figures, stays visible without JavaScript, and is the accessible
    version. No inline script or style. #}
@@ -17,7 +17,7 @@
 
 {% block title %}{{ _("Reports") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Reports") }}{% endblock %}
-{% block scripts %}{% if view.chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
+{% block scripts %}{% if view.chart or view.category_chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
 {% block content %}
 <div class="mx-auto max-w-4xl space-y-6" data-reports>
   <section class="panel p-4 sm:p-6" aria-labelledby="reports-filters-heading">
@@ -48,6 +48,20 @@
         </select>
       </div>
       {% endif %}
+      <div class="sm:col-span-2">
+        <label for="report-category" class="{{ label_class }}">{{ _("Categories") }}</label>
+        <select id="report-category" name="category" multiple size="6" class="form-select w-full py-1.5 pl-2.5">
+          {% for option in view.category_options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.name }}{% if option.archived %} ({{ _("archived") }}){% endif %}</option>{% endfor %}
+        </select>
+        <p class="mt-1 text-xs text-muted">{{ _("Leave empty to show the 8 largest categories and the rest as Other (combined).") }}</p>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" name="savings" value="1"{% if view.include_savings %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary">
+          {{ _("Include saved / invested") }}
+        </label>
+        <p class="mt-1 text-xs text-muted">{{ _("Saved and invested amounts get their own category series.") }}</p>
+      </div>
       <div class="flex flex-wrap items-center gap-3 sm:col-span-4">
         <button type="submit" class="btn-primary">{{ _("Show report") }}</button>
         {% if not view.show_currency_selector %}<p class="text-xs text-muted">{{ _("Amounts in %(currency)s.", currency=view.data.filters.currency) }}</p>{% endif %}
@@ -184,6 +198,66 @@
           </table>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="reports-category-heading" data-report-category-section>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="reports-category-heading" class="text-base font-semibold">{{ _("Expenses by category over time") }}</h2>
+      <p class="text-sm tabular-nums text-muted">{{ view.range_years }}</p>
+    </div>
+    {% if view.category_notes %}
+    <ul class="mt-2 space-y-1 text-xs text-muted" data-report-category-notes>
+      {% for note in view.category_notes %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="mt-4" data-chart="report-category-bars"{% if view.category_chart %} data-chart-source="reports-category-data"{% endif %}>
+      {% if view.category_chart %}
+      <script type="application/json" id="reports-category-data">{{ view.category_chart|tojson }}</script>
+      <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
+      {% else %}
+      <p class="text-sm text-muted" data-chart-empty>{{ view.category_empty }}</p>
+      {% endif %}
+      {% if view.category_has_data %}
+      <div class="mt-4">
+        <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-category-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>
+        <div id="reports-category-table" class="relative overflow-x-auto" data-chart-table>
+          <table class="sheet w-full text-sm">
+            <caption class="sr-only">{{ _("Spending by category and period") }}</caption>
+            <thead>
+              <tr class="text-left text-xs text-muted">
+                <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
+                {% for column in view.category_table.columns %}
+                <th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">
+                  {% if column.href %}<a href="{{ column.href }}" class="text-primary-ink underline">{{ column.label }}</a>{% else %}{{ column.label }}{% endif %}{% if column.so_far %}<span class="ml-2 inline-block rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink">{{ _("so far") }}</span>{% endif %}
+                </th>
+                {% endfor %}
+                <th scope="col" class="py-1.5 text-right font-medium">{{ _("Total") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in view.category_table.rows %}
+              <tr data-report-category-row>
+                <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">
+                  {% if row.color %}<svg class="mr-2 inline h-3 w-3 align-baseline" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="6" fill="{{ row.color }}"/></svg>{% endif %}{{ row.label }}
+                </th>
+                {% for cell in row.cells %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ cell }}</td>{% endfor %}
+                <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-category-row-total>{{ row.total }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-line font-semibold" data-report-category-totals>
+                <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+                {% for cell in view.category_table.totals %}<td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ cell }}</td>{% endfor %}
+                <td class="whitespace-nowrap py-2 text-right tabular-nums">{{ view.category_table.total }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </section>
   {% endif %}

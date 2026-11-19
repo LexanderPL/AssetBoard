@@ -1,20 +1,26 @@
-"""The Reports page's data (F10.1): filters, one ledger read and the income/expense series.
+"""The Reports page's data (F10.1–F10.3): filters, one ledger read, the income/expense series
+and the category breakdown.
 
-Every member, viewers included, may read the page. The service resolves the year range and the
-granularity, reads the workspace's categories, the currencies present in the range and one
-column-only stream of transactions through the scoped ``TransactionRepository``, then runs the
-pure ``domain.reports.ledger_series``. Amounts stay integer minor units; no SQL aggregate or
-``DecimalType`` column is involved and nothing is converted between currencies.
+Every member, viewers included, may read the page. The service resolves the year range, the
+granularity, the category filter and the savings option, reads the workspace's categories, the
+currencies present in the range and one column-only stream of transactions through the scoped
+``TransactionRepository``, then runs the pure ``domain.reports`` functions. Amounts stay integer
+minor units; no SQL aggregate or ``DecimalType`` column is involved and nothing is converted
+between currencies.
 
 Open and closed months count alike. Rows dated after today (in the workspace's time zone) are
 never charted; their count is returned for the page's note. Rows in another currency than the
 selected one are left out and counted too (Phase A never converts).
+
+The category filter is repeatable and bookmarkable (``?category=<id>&category=<id>``). Unknown
+ids and ids from another workspace are ignored; if none of the requested ids belong to an
+eligible expense category, the chart falls back to its default (the largest eight and Other).
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -30,12 +36,15 @@ from assetboard.db.repositories import (
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, MIN_YEAR
 from assetboard.domain.reports import (
+    CategorySeries,
     LedgerEntry,
     PeriodTotals,
     ReportCategory,
     ReportStep,
     ReportTotals,
-    ledger_series,
+    ledger_and_category_series,
+    select_categories,
+    top_categories,
     totals_of,
 )
 from assetboard.domain.summary import block_of
@@ -66,7 +75,18 @@ class ReportFilters:
     currency: str
     from_text: str
     to_text: str
+    category_ids: tuple[UUID, ...] = ()
+    savings: bool = False
     errors: Mapping[str, FilterError] = field(default_factory=dict[str, FilterError])
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryOption:
+    """One expense category the category chart can show or filter by."""
+
+    id: UUID
+    name: str
+    archived: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +94,8 @@ class ReportsData:
     filters: ReportFilters
     series: tuple[PeriodTotals, ...]
     totals: ReportTotals
+    category_series: CategorySeries
+    category_options: tuple[CategoryOption, ...]
     available_currencies: tuple[str, ...]
     show_currency_selector: bool
     future_count: int
@@ -82,6 +104,11 @@ class ReportsData:
     today: date
     series_start: date | None
     series_end: date | None
+
+    @property
+    def category_filter_active(self) -> bool:
+        """Whether a valid category filter narrowed the category chart."""
+        return bool(self.filters.category_ids)
 
 
 @dataclass(slots=True)
@@ -147,6 +174,27 @@ def _select_currency(requested: str, available: tuple[str, ...], base_currency: 
     return base_currency
 
 
+def _parse_category_ids(raw: Iterable[str]) -> tuple[UUID, ...]:
+    """The distinct UUIDs among the repeatable ``category`` parameters (junk is ignored)."""
+    ids: list[UUID] = []
+    for value in raw:
+        try:
+            category_id = UUID(value)
+        except ValueError:
+            continue
+        if category_id not in ids:
+            ids.append(category_id)
+    return tuple(ids)
+
+
+def _category_blocks(include_savings: bool) -> set[str]:
+    return {"expense", "saved"} if include_savings else {"expense"}
+
+
+def _empty_category_series(currency: str) -> CategorySeries:
+    return CategorySeries((), (), (), Money(0, currency))
+
+
 def _counts(category: ReportCategory) -> bool:
     """Whether an entry of this category contributes to earned, spent or saved."""
     return block_of(category.kind, category.treatment) in {"expense", "saved", "income"}
@@ -184,22 +232,35 @@ def reports_data(
     to_year: str = "",
     step: str = "",
     currency: str = "",
+    category: Iterable[str] = (),
+    savings: str = "",
 ) -> ReportsData:
     """The Reports page's filters and series for the current workspace."""
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
+    include_savings = savings == "1"
     with factory() as session:
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        ordered = CategoryRepository(session, ctx).ordered()
         categories = {
-            row.id: ReportCategory(row.id, row.kind, row.treatment)
-            for row in CategoryRepository(session, ctx).ordered()
+            row.id: ReportCategory(
+                row.id,
+                row.kind,
+                row.treatment,
+                row.name,
+                row.color,
+                archived=row.archived_at is not None,
+            )
+            for row in ordered
         }
         filters = _resolve_filters(raw_from=from_year, raw_to=to_year, raw_step=step, today=today)
         if filters.errors:
             return ReportsData(
-                filters=replace(filters, currency=base_currency),
+                filters=replace(filters, currency=base_currency, savings=include_savings),
                 series=(),
                 totals=totals_of((), currency=base_currency),
+                category_series=_empty_category_series(base_currency),
+                category_options=(),
                 available_currencies=(base_currency,),
                 show_currency_selector=False,
                 future_count=0,
@@ -221,8 +282,8 @@ def reports_data(
             else ()
         )
         available = tuple(dict.fromkeys((base_currency, *observed)))
-        selected = _select_currency(currency, available, base_currency)
-        filters = replace(filters, currency=selected)
+        selected_currency = _select_currency(currency, available, base_currency)
+        filters = replace(filters, currency=selected_currency, savings=include_savings)
         stats = _StreamStats()
         stream = _entries(
             TransactionRepository(session, ctx),
@@ -230,26 +291,57 @@ def reports_data(
             start=read_start,
             end=read_end,
             today=today,
-            currency=selected,
+            currency=selected_currency,
             stats=stats,
         )
-        series = ledger_series(
+        # One read and one pure pass feed both reports: no second iteration over the rows.
+        series, all_categories = ledger_and_category_series(
             stream,
             categories,
             start=series_start,
             end=series_end,
             step=filters.step,
-            currency=selected,
+            currency=selected_currency,
+            include_savings=include_savings,
         )
         if not series:
             # A future-only range has no period keys, so the pure function returns before the
             # generator runs; consume it so the future/other-currency notes are still counted.
             for _entry in stream:
                 pass
+        eligible_blocks = _category_blocks(include_savings)
+        eligible_ids = {
+            category_id
+            for category_id, row in categories.items()
+            if block_of(row.kind, row.treatment) in eligible_blocks
+        }
+        requested = _parse_category_ids(category)
+        chosen = tuple(category_id for category_id in requested if category_id in eligible_ids)
+        filters = replace(filters, category_ids=chosen)
+        if chosen:
+            displayed_categories = select_categories(
+                all_categories,
+                categories,
+                include_savings=include_savings,
+                selected=chosen,
+            )
+        else:
+            displayed_categories = top_categories(all_categories)
+        spending_ids = {
+            row.category_id for row in all_categories.rows if row.category_id is not None
+        }
+        category_options = tuple(
+            CategoryOption(row.id, row.name, archived=row.archived_at is not None)
+            for row in ordered
+            if row.id in eligible_ids
+            and (row.archived_at is None or row.id in spending_ids or row.id in chosen)
+        )
     return ReportsData(
         filters=filters,
         series=tuple(series),
-        totals=totals_of(series, currency=selected),
+        totals=totals_of(series, currency=selected_currency),
+        category_series=displayed_categories,
+        category_options=category_options,
         available_currencies=available,
         show_currency_selector=len(available) > 1,
         future_count=stats.future,
@@ -264,6 +356,7 @@ def reports_data(
 __all__ = [
     "DEFAULT_YEARS",
     "MAX_YEARS",
+    "CategoryOption",
     "FilterError",
     "ReportFilters",
     "ReportsData",

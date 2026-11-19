@@ -5,13 +5,14 @@ was saved, where the money went, and later how net worth and the portfolio grew.
 
 **Exit criteria (Phase A):** for any range of years a member sees income vs expenses and the
 savings rate per month and per year, and expenses by category over time, with figures that
-match the month summaries of F2.4 exactly. **Phase B** adds net worth (after M5) and portfolio
-value (after M6) to the same page.
+match the month summaries of F2.4 exactly. **Phase B** (net worth and portfolio value on the
+same page) is deferred after 1.0 by the owner on 2026-11-18; the existing Net worth Summary and
+Investments Performance sections already show that history.
 
 Owner decision, 2026-10-25. The milestone number only follows M9; it is not scheduled after it.
 **Phase A depends on M2 only** (and should follow F2.7, whose chart conventions it reuses) and
 can ship before M5/M6 in any minor release. Phase B features depend on the milestones named in
-each feature.
+each feature; the owner deferred Phase B after 1.0 on 2026-11-18.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -115,7 +116,8 @@ conventions). Golden test against services.summary.month_summary; property tests
 - The service reads the categories, one distinct currency lookup and one column-only stream of
   transactions (`TransactionRepository.iter_ledger_columns`) per request; the table's total row is
   the exact integer sum of the periods. The performance test holds 10 years × 5 000 rows to
-  2 s (a 4× margin over the 500 ms target on CI).
+  2.5 s (a 5× margin over the 500 ms target on CI; F10.3 shares the same read and one pure pass
+  now builds both report series, so the budget was raised from F10.1's original 2 s).
 - The chart is a new `report-bars` kind of the F2.7 chart module: grouped bars, ECharts' legend
   hides a series, server-formatted labels, token colours, and an sr-only table with a
   “Show as table” control. User guide: [Reports](../reports.md).
@@ -176,9 +178,9 @@ rounded once as in F2.4, with gaps for zero earnings; chart and table on /report
   per period (`kind=expense, treatment=regular`), in minor units.
 - Chart: stacked bars per period, one series per category in its colour. By default the 8
   categories with the largest total in the range are shown and the rest are combined as
-  "Other"; a category multi-select (GET parameter `category`, repeatable) shows exactly the
-  chosen ones (no "Other"). Archived categories appear under their name when they have
-  spending in the range.
+  "Other (combined)"; a category multi-select (GET parameter `category`, repeatable) shows
+  exactly the chosen ones (no combined row). Archived categories appear under their name
+  (marked "archived" in the chart/table/filter) when they have spending in the range.
 - Option "Include saved / invested" (`savings=1`) adds the expense/savings categories as their
   own series.
 - Table: category × period with row and column totals; the column totals equal F10.1's `spent`
@@ -193,9 +195,38 @@ multi-select and the savings option, and the category x period table. Property t
 (and saved with the option).
 ```
 
+**As built (F10.3):**
+- `domain.reports.category_series` returns a `CategorySeries` of named/coloured `CategorySpend`
+  rows (one per regular expense category, or per expense/savings category with the option) in
+  integer minor units, ordered by range total. `top_categories` combines everything after the
+  eight largest into one unnamed row that the view labels "Other (combined)"; it keeps every
+  period total. A real category named "Other" and an archived duplicate are disambiguated by the
+  label/archived marker, so ECharts legend names remain unique.
+  A non-empty `selected` shows exactly those categories (zero rows included) and never combines.
+- The service keeps F10.1's single scoped column read and runs one pure pass
+  (`ledger_and_category_series`) that accumulates the ledger totals and the per-category sums
+  together; a category filter narrows the computed series without a second pass. The repeatable
+  `category` parameter is resolved against the workspace's eligible categories, so unknown and
+  other-workspace ids are ignored and fall back to the default when none survive. Archived
+  categories are offered only when they have spending in the range; they keep their current name
+  and colour in the chart and table.
+- The page adds a third section with a stacked-bar chart (new `report-category-bars` kind of the
+  report chart module; the same `report-bars` option builder and a `stack` name), the category
+  multi-select and "Include saved / invested" checkbox in the shared filter form, and the
+  category × period table with row, column and grand totals. Category series use the category's
+  `#rrggbb` colour or a theme token for Other; labels and amounts are server-formatted. A filter
+  with no spending still shows its zero table row and a filter-specific empty state.
+- Column totals equal F10.1's `spent` (and `saved` with the option) for every period without a
+  category filter; the property test proves it against `ledger_series`. No migration and no new
+  dependency. User guide: [Reports](../reports.md).
+
 ---
 
 ## F10.4 Net worth over time (Phase B, depends on M5)
+
+**Deferred after 1.0 (owner, 2026-11-18).** The Net worth Summary already has the derived
+monthly trend with 1/3/5-year and all-time ranges. Keeping this feature out of 1.0 avoids a
+second copy of the same chart; see the post-1.0 backlog.
 
 **Acceptance**
 - Shown only when the workspace has net-worth values (F5.9); before M5 exists the section is
@@ -217,6 +248,10 @@ service (last point per period, gaps not interpolated), hidden when there are no
 ---
 
 ## F10.5 Portfolio value over time (Phase B, depends on M6)
+
+**Deferred after 1.0 (owner, 2026-11-18).** The Investments Performance page and the Home
+portfolio widget already show value and invested capital over time. Keeping this feature out of
+1.0 avoids a second copy of the same chart; see the post-1.0 backlog.
 
 **Acceptance**
 - Shown only when the workspace has investment transactions (M6).

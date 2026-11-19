@@ -117,7 +117,7 @@ Key fields for the shared entities:
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner; v2 rework in [M8-fire-planner-v2.md](M8-fire-planner-v2.md) | M2, M6, M7 | v0.8 |
 | M9 | Dashboard, reports, export/backup, hardening (API deferred) | all | v1.0 |
-| M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
+| M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: v1.0; Phase B: deferred after 1.0 (owner, 2026-11-18) |
 
 F9.11 (demo data builder and demo mode) is pulled forward and lands before M7; every later milestone extends its builder.
 

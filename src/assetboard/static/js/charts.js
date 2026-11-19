@@ -1,5 +1,5 @@
 // The category donuts (F2.7), net-worth line chart (F5.9) and the report charts
-// (F10.1/F10.2). Every [data-chart] element holds its data in a
+// (F10.1–F10.3). Every [data-chart] element holds its data in a
 // <script type="application/json"> block (amounts in minor units with labels formatted by the
 // server). With ECharts available the chart is drawn in [data-chart-canvas];
 // otherwise the table stays visible. Donut legends are HTML under the chart ([data-chart-legend],
@@ -18,6 +18,12 @@
     const value = getComputedStyle(document.documentElement).getPropertyValue(`--color-${name}`).trim();
     if (!value) return undefined;
     return `rgb(${value.split(/\s+/).join(", ")})`;
+  }
+
+  function colour(value) {
+    // Report series carry either a CSS token name (theme colours) or a category's "#rrggbb".
+    if (!value) return undefined;
+    return value.startsWith("#") ? value : token(value);
   }
 
   function readData(element) {
@@ -218,6 +224,9 @@
       animation: false,
       aria: { enabled: false }, // the adjacent table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
@@ -250,14 +259,20 @@
         axisLabel: { color: ink, formatter: (value) => data.y_labels[String(value)] || "" },
         splitLine: { lineStyle: { color: line } },
       },
-      series: data.series.map((series) => ({
-        name: series.name,
-        type: "bar",
-        data: series.values,
-        barMaxWidth: 28,
-        itemStyle: { color: token(series.color) },
-        emphasis: { focus: "series" },
-      })),
+      series: data.series.map((series) => {
+        const bar = {
+          name: series.name,
+          type: "bar",
+          data: series.values,
+          barMaxWidth: data.stack ? 44 : 28,
+          itemStyle: { color: colour(series.color) },
+          emphasis: { focus: "series" },
+        };
+        // A report that names a group draws one combined bar per period; without one the bars
+        // sit side by side (F10.1).
+        if (data.stack) bar.stack = data.stack;
+        return bar;
+      }),
     };
   }
 
@@ -286,6 +301,9 @@
       animation: false,
       aria: { enabled: false }, // the adjacent table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
@@ -362,6 +380,9 @@
       animation: false,
       aria: { enabled: false }, // the plotted-data table is the accessible version
       legend: {
+        // The category report can carry nine series (top 8 + Other); a scrollable single row
+        // never covers the plot on a phone.
+        type: "scroll",
         top: 0,
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
@@ -436,6 +457,9 @@
     } else if (kind === "report-bars" && Array.isArray(data.series)) {
       option = reportBarsOptions(data);
       revealReportTable(element);
+    } else if (kind === "report-category-bars" && Array.isArray(data.series)) {
+      option = reportBarsOptions(data);
+      revealReportTable(element);
     } else if (kind === "report-rate" && Array.isArray(data.series)) {
       option = lineOptions(data);
       option.series.forEach((series) => {
@@ -472,7 +496,7 @@
 
   function drawAll() {
     disposeDetached();
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"], [data-chart="report-rate"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"], [data-chart="report-category-bars"], [data-chart="report-rate"]').forEach(draw);
   }
 
   function toggleTable(button) {
