@@ -83,6 +83,9 @@ jobs:
       - name: Install Playwright browser
         run: uv run --locked playwright install chromium
 
+      - name: Check Polish translation completeness
+        run: uv run --locked make i18n-check
+
       - name: Run project checks
         run: uv run --locked make check
 
