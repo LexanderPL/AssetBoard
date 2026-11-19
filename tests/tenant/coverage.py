@@ -324,6 +324,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in (
             "create",
             "for_month",
+            "for_range",
             "line",
             "usage_by_category",
             "any_exists",

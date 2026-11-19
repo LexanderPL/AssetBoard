@@ -4991,6 +4991,9 @@ msgstr ""
 msgid "FIRE projection"
 msgstr ""
 
+msgid "Fix the filters to export the year overview."
+msgstr ""
+
 msgid "The first year must be the same as or before the last year."
 msgstr ""
 
@@ -5048,11 +5051,6 @@ msgstr ""
 msgid "No spending for the selected categories."
 msgstr ""
 
-msgid ""
-"Leave empty to show the 8 largest categories and the rest as Other "
-"(combined)."
-msgstr ""
-
 msgid "Showing the selected categories only."
 msgstr ""
 
@@ -5071,6 +5069,20 @@ msgid "Other (combined)"
 msgstr ""
 
 msgid "archived"
+msgstr ""
+
+#, python-format
+msgid "Not available: fewer than %(num)d months of data."
+msgstr ""
+
+msgid "Total (all categories)"
+msgstr ""
+
+msgid "Not available: nothing spent in the previous year."
+msgstr ""
+
+#, python-format
+msgid "The current year is compared through %(month)s in both years."
 msgstr ""
 
 #, python-format
@@ -11423,6 +11435,29 @@ msgstr ""
 msgid "Yearly"
 msgstr ""
 
+msgid ""
+"Leave empty for all categories in the year overview and the 8 largest in "
+"the category charts."
+msgstr ""
+
+msgid "Report year"
+msgstr ""
+
+msgid "Used by the year overview and year-over-year sections."
+msgstr ""
+
+msgid "Category trends window"
+msgstr ""
+
+msgid "3-month average"
+msgstr ""
+
+msgid "12-month average"
+msgstr ""
+
+msgid "Year-over-year category"
+msgstr ""
+
 msgid "Show report"
 msgstr ""
 
@@ -11451,6 +11486,87 @@ msgid "No savings rate for the charted entries."
 msgstr ""
 
 msgid "Savings rate by period"
+msgstr ""
+
+msgid "Year overview"
+msgstr ""
+
+msgid ""
+"Spending by category and month. Darker cells mean more spending in that "
+"month."
+msgstr ""
+
+msgid "No spending in this year."
+msgstr ""
+
+msgid "Spending by category and month"
+msgstr ""
+
+msgid "Category trends"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Window: %(num)d months"
+msgstr ""
+
+msgid "Rolling average spending by category."
+msgstr ""
+
+msgid "Choose monthly granularity to see rolling averages."
+msgstr ""
+
+msgid "No rolling average yet: the range is shorter than the window."
+msgstr ""
+
+msgid "Rolling average spending by category"
+msgstr ""
+
+#, python-format
+msgid ""
+"The rolling average uses the previous %(num)d months, including the "
+"selected month."
+msgstr ""
+
+msgid "Year-over-year"
+msgstr ""
+
+msgid "Actual spending in the selected year compared with the year before."
+msgstr ""
+
+msgid "No spending in either year."
+msgstr ""
+
+msgid "Year-over-year comparison"
+msgstr ""
+
+msgid "Planned vs actual accuracy"
+msgstr ""
+
+msgid "How often actual spending exceeded the plan, by category."
+msgstr ""
+
+msgid "No planned regular expenses in this range."
+msgstr ""
+
+msgid "How often actual spending exceeded the plan"
+msgstr ""
+
+msgid "Months planned"
+msgstr ""
+
+msgid "Months over"
+msgstr ""
+
+#, python-format
+msgid "Over %%"
+msgstr ""
+
+msgid "All categories"
+msgstr ""
+
+msgid ""
+"A month counts as over when actual spending is greater than the plan. "
+"Only planned regular expense categories are included."
 msgstr ""
 
 msgid "Edit recurring item"
@@ -11688,9 +11804,6 @@ msgid ""
 msgstr ""
 
 msgid "Add payment"
-msgstr ""
-
-msgid "All categories"
 msgstr ""
 
 msgid "Apply filters"
@@ -15022,5 +15135,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The 8 largest categories are shown; the rest are combined as Other."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Leave empty to show the 8 largest"
+#~ " categories and the rest as Other "
+#~ "(combined)."
 #~ msgstr ""
 
