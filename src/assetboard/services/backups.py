@@ -48,7 +48,7 @@ from assetboard.db.backup_sqlite import (
 from assetboard.db.backup_sqlite import (
     read_revisions as read_sqlite_revisions,
 )
-from assetboard.db.engine import create_database_engine
+from assetboard.db.engine import create_database_engine, run_immediate
 from assetboard.db.migrate import alembic_config, upgrade_database
 from assetboard.db.models.backups import BackupRun
 from assetboard.db.repositories import InstanceNotificationReader
@@ -379,16 +379,23 @@ def _start_run(
     factory: sessionmaker[Session], clock: Clock, origin: str
 ) -> tuple[UUID | None, datetime]:
     started = clock.now()
-    try:
-        run = BackupRun(
-            id=uuid4(),
-            started_at=started,
-            status="running",
-            origin=origin,
+    run_id = uuid4()
+
+    def write(session: Session) -> None:
+        session.add(
+            BackupRun(
+                id=run_id,
+                started_at=started,
+                status="running",
+                origin=origin,
+            )
         )
-        with factory.begin() as session:
-            session.add(run)
-        return run.id, started
+
+    try:
+        # Take the write lock at BEGIN: a deferred read-then-write upgrade can fail at once
+        # when another backup commits between the two, leaving a "running" row behind.
+        run_immediate(factory, write)
+        return run_id, started
     except Exception as exc:  # noqa: BLE001 - a backup must also work when history cannot be written
         logger.error("backup_run_start_failed exception_type=%s", type(exc).__name__)
         return None, started
@@ -406,16 +413,19 @@ def _finish_run(
 ) -> None:
     if run_id is None:
         return
+
+    def write(session: Session) -> None:
+        run = session.get(BackupRun, run_id)
+        if run is None:
+            return
+        run.finished_at = clock.now()
+        run.status = status
+        run.path = path
+        run.size_bytes = size_bytes
+        run.error = error
+
     try:
-        with factory.begin() as session:
-            run = session.get(BackupRun, run_id)
-            if run is None:
-                return
-            run.finished_at = clock.now()
-            run.status = status
-            run.path = path
-            run.size_bytes = size_bytes
-            run.error = error
+        run_immediate(factory, write)
     except Exception as exc:  # noqa: BLE001 - the copy itself may still have succeeded
         logger.error("backup_run_finish_failed exception_type=%s", type(exc).__name__)
 
