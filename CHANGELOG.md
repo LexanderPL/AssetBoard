@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.5](https://github.com/LexanderPL/AssetBoard/compare/v0.8.4...v0.8.5) (2026-11-19)
+
+
+### Features
+
+* **reports:** add net worth and portfolio history (F10.4/F10.5) ([#402](https://github.com/LexanderPL/AssetBoard/issues/402)) ([b68cc3f](https://github.com/LexanderPL/AssetBoard/commit/b68cc3fd6d511823d27831a2127f1a0d6f971ccf))
+* **ui:** bulk add dialog and equal-height paired widgets ([#398](https://github.com/LexanderPL/AssetBoard/issues/398)) ([b18f98e](https://github.com/LexanderPL/AssetBoard/commit/b18f98ee80f58d16865dc912de90edb52d8fab90))
+
+
+### Bug Fixes
+
+* **backups:** take the write lock for history rows ([#400](https://github.com/LexanderPL/AssetBoard/issues/400)) ([c5f9924](https://github.com/LexanderPL/AssetBoard/commit/c5f99245fcedf9c110c7126ba03fbb3befacf069))
+
 ## [0.8.4](https://github.com/LexanderPL/AssetBoard/compare/v0.8.3...v0.8.4) (2026-11-19)
 
 
