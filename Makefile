@@ -1,10 +1,12 @@
-.PHONY: setup dev check test css icons migrate revision i18n-extract i18n-update i18n-compile licenses licenses-check
+.PHONY: setup dev check test css icons migrate revision i18n-extract i18n-update i18n-compile i18n-check licenses licenses-check
 
 UV := uv
 # Parallel test workers for make check/test (pytest-xdist); PYTEST_WORKERS=0 runs serially.
 PYTEST_WORKERS ?= auto
 DEV_HOST ?= 127.0.0.1
 DEV_PORT ?= 8000
+# v1.0 translation gate; the check also fails on any missing or fuzzy Polish entry.
+I18N_MIN_COMPLETENESS ?= 95
 
 setup:
 	$(UV) sync --all-groups
@@ -15,6 +17,7 @@ check: i18n-compile
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
 	$(UV) run pyright
+	$(MAKE) i18n-check
 	$(MAKE) licenses-check
 	$(UV) run pytest -n $(PYTEST_WORKERS)
 	@temp_dir=$$(mktemp -d); \
@@ -76,6 +79,10 @@ i18n-update:
 # Compiled .mo catalogs are build output (gitignored); recompiling is cheap and idempotent.
 i18n-compile:
 	$(UV) run pybabel compile -d src/assetboard/locales
+
+# Report Polish completeness; fail below the v1.0 gate or on missing/fuzzy entries.
+i18n-check:
+	$(UV) run python scripts/check_translations.py --locale pl --threshold $(I18N_MIN_COMPLETENESS)
 
 # Regenerate the third-party notices from the locked runtime dependencies.
 licenses:

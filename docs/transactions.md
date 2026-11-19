@@ -8,6 +8,12 @@ the current month). The page is only for entries: the flow bar and planned value
 **Expenses** and **Income**, with one row per entry, ordered by date and then by the order you
 entered them.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/transactions.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/transactions.jpg) ·
+[phone light](assets/screenshots/phone/light/transactions.jpg) ·
+[phone dark](assets/screenshots/phone/dark/transactions.jpg). See the
+[gallery](screenshots.md#transactions).
+
 Every entry has a date, an amount, an optional description and a category. Amounts are in the
 workspace's base currency (Workspace settings); once an entry exists, the base currency can no
 longer be changed.

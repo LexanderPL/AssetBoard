@@ -62,6 +62,7 @@ def test_demo_seed_builds_an_empty_workspace_and_refuses_a_non_empty_one(
     assert "Built demo workspace" in seeded.output
     assert "2026-11-20" in seeded.output
     assert "transactions=" in seeded.output
+    assert "fire_scenarios=1" in seeded.output
     assert "EUR" not in seeded.output  # counts only, never amounts or currency
     assert "€" not in seeded.output
 

@@ -115,17 +115,22 @@ assetboard demo-seed --workspace <workspace-id> [--date YYYY-MM-DD]
 - a portfolio: a global ETF, an 80/20 fund, a USD stock (sells, quarterly dividends, linked
   income, a 2-for-1 split and a base-settled buy), gold, crypto, a bond-model instrument with
   terms and a currency cash holding, plus 24 months of weekly manual prices and FX rates;
+- one live FIRE plan with every adjustment kind (a cash flow, an expense change, an income
+  change and a saving override), one archived past adjustment and the car loan left out of the
+  projection;
 - one completed CSV import through the real import path, so its history and rollback show.
 
-Nothing is dated after `T` except planned values, scheduled occurrences and the bond maturity.
+Nothing is dated after `T` except planned values, scheduled occurrences, the bond maturity and
+the FIRE plan's future projection years (adjustments are plan years, not ledger dates).
 Notification channels, price-provider keys, provider errors, invitations and other members are
 intentionally not created (see `DEMO_EXCLUDED_MODELS` in `domain/demo.py`).
 
-The dataset is deterministic: the same `T`, locale and base currency produce the same rows
-(compared through the workspace archive), because the pure plan in `domain/demo.py` seeds its
-`random.Random` from `T` and sorts every collection. Amounts are defined once in EUR-scale and
-converted with the fixed factor table in that module. `DEMO_DATASET_VERSION` is bumped whenever
-the contents change; F9.11b's reset job compares it.
+The dataset is deterministic: the same `T`, locale and base currency produce the same rows and
+archive (compared byte-for-byte after normalising random ids), because the pure plan in
+`domain/demo.py` seeds its `random.Random` from `T`, sorts every collection and the writer gives
+each row a stable timestamp within its day. Amounts are defined once in EUR-scale and converted
+with the fixed factor table in that module. `DEMO_DATASET_VERSION` is bumped whenever the
+contents change; F9.11b's reset job compares it.
 
 ### Command
 
@@ -147,5 +152,6 @@ commit.
 
 ## Related
 
+- [Screenshots](screenshots.md) — the gallery and the Playwright capture script use this dataset.
 - [Workspace archive format](archive-format.md) — the round-trip check uses the builder's data.
 - [Import and export](import-export.md) — the generated import exercises this path.

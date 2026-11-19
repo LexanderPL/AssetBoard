@@ -10,6 +10,11 @@ recommendations. The projection assumes constant rates. Income and expenses are 
 recorded in your ledger: income may be gross, and expenses should include the taxes you actually
 pay and your loan payments. The planner does not model taxes separately.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/fire.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/fire.jpg) ·
+[phone light](assets/screenshots/phone/light/fire.jpg) ·
+[phone dark](assets/screenshots/phone/dark/fire.jpg). See the [gallery](screenshots.md#fire).
+
 ## One plan
 
 **FIRE projection** opens the plan. If the workspace has no plan, the page starts the four-step

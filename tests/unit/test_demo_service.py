@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from collections.abc import Iterator
@@ -16,13 +17,19 @@ import pytest
 from sqlalchemy import func, select
 
 from assetboard.clock import FixedClock
+from assetboard.db.models.fire import FireScenario
 from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import BudgetLine, MonthState, Transaction
+from assetboard.db.models.loans import Loan
 from assetboard.db.models.networth import NetWorthSnapshot
 from assetboard.db.models.prices import PricePoint
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
-from assetboard.db.repositories import InvestmentTransactionRepository
+from assetboard.db.repositories import (
+    FireEventRepository,
+    FireLoanSettingRepository,
+    InvestmentTransactionRepository,
+)
 from assetboard.domain.archive import parse_archive
 from assetboard.domain.demo import DEMO_EXCLUDED_MODELS, DemoPlan
 from assetboard.domain.months import YearMonth
@@ -281,6 +288,50 @@ def test_every_workspace_owned_model_is_covered_or_excluded(built: BuiltWorkspac
     assert _count(built.db, ImportBatch) == 1
 
 
+def test_the_builder_creates_one_live_fire_plan_with_events_and_a_loan_choice(
+    built: BuiltWorkspace,
+) -> None:
+    with built.db.factory() as session:
+        plans = list(
+            session.scalars(
+                select(FireScenario).where(FireScenario.workspace_id == built.db.workspace_id)
+            )
+        )
+        assert len(plans) == 1
+        plan = plans[0]
+        assert plan.is_live is True and plan.legacy is None
+        assert plan.currency == built.ctx.workspace.base_currency
+        assert plan.birth_year == REFERENCE.year - 38
+        assert plan.rule == "swr" and plan.swr_bp == 400
+        assert plan.income_minor and plan.expenses_minor and plan.portfolio_minor
+        events = FireEventRepository(session, built.ctx).for_plan(plan.id)
+        assert {event.kind for event in events} == {
+            "cash",
+            "expense_change",
+            "income_change",
+            "saving_override",
+        }
+        assert any(event.year < REFERENCE.year for event in events)  # archived history
+        assert any(
+            event.kind == "saving_override" and event.year > REFERENCE.year for event in events
+        )
+        settings = FireLoanSettingRepository(session, built.ctx).for_plan(plan.id)
+        assert len(settings) == 1
+        ignored = session.get(Loan, settings[0].loan_id)
+        assert ignored is not None and ignored.name == built.plan.fire.ignored_loan
+        assert settings[0].included is False
+
+
+def test_fire_plan_values_load_through_the_service(built: BuiltWorkspace) -> None:
+    from assetboard.services.fire_scenarios import get_fire_plan
+
+    detail = get_fire_plan(built.db.factory, built.ctx)
+    assert detail.plan.rule == "swr"
+    assert detail.plan.event_count == len(built.plan.fire.events)
+    assert len(detail.archived_events) == 1
+    assert len(detail.ignored_loan_ids) == 1
+
+
 def test_the_builder_writes_no_legacy_networth_snapshots(built: BuiltWorkspace) -> None:
     assert _count(built.db, NetWorthSnapshot) == 0
 
@@ -387,6 +438,13 @@ def _canonical_without_ids(
     return files, workspace, rows
 
 
+def _ordered_transactions(content: bytes) -> bytes:
+    """The transactions file with ids normalised but row order preserved."""
+    parsed, errors = parse_archive(content)
+    assert not errors and parsed is not None
+    return _UUID.sub(b"ID", parsed.files["transactions.csv"])
+
+
 def test_two_builds_of_the_same_reference_are_archive_identical(
     built: BuiltWorkspace,
 ) -> None:
@@ -416,6 +474,13 @@ def test_two_builds_of_the_same_reference_are_archive_identical(
     assert set(first_files) == set(second_files)
     for name in first_files:
         assert first_files[name] == second_files[name], name
+    # Screenshots and the archive must not depend on the random UUID tie-break when several
+    # transactions share a day.
+    first_transactions = _ordered_transactions(first).decode().splitlines()
+    second_transactions = _ordered_transactions(second).decode().splitlines()
+    assert first_transactions == second_transactions, "\n".join(
+        list(difflib.unified_diff(first_transactions, second_transactions))[:40]
+    )
 
 
 def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) -> None:
@@ -452,6 +517,13 @@ def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) 
     assert set(first_files) == set(second_files)
     for name in first_files:
         assert first_files[name] == second_files[name], name
+    # Screenshots and the archive must not depend on the random UUID tie-break when several
+    # transactions share a day.
+    first_transactions = _ordered_transactions(first).decode().splitlines()
+    second_transactions = _ordered_transactions(second).decode().splitlines()
+    assert first_transactions == second_transactions, "\n".join(
+        list(difflib.unified_diff(first_transactions, second_transactions))[:40]
+    )
 
 
 def test_demo_archive_round_trips_byte_identically_into_a_fresh_database(

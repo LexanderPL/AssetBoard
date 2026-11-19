@@ -13,6 +13,7 @@ from assetboard.domain.demo import (
     DEMO_EXCLUDED_MODELS,
     build_plan,
     convert_amount,
+    convert_signed_amount,
 )
 
 
@@ -112,9 +113,6 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         "LoanScenario",
         "LoanPayment",
         "InstallmentPlan",
-        "FireScenario",
-        "FireEvent",
-        "FireLoanSetting",
         "NetWorthSnapshot",
         "DashboardPreference",
     }
@@ -122,9 +120,6 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
     assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"
     assert (
         DEMO_EXCLUDED_MODELS["LoanPayment"] == "actual payments are user records, not sample data"
-    )
-    assert (
-        DEMO_EXCLUDED_MODELS["FireScenario"] == "the FIRE plan is a user what-if, not sample data"
     )
     assert DEMO_EXCLUDED_MODELS["NetWorthSnapshot"] == (
         "snapshots are legacy data; net-worth history is derived from valuations"
@@ -179,3 +174,36 @@ def test_the_plan_contains_both_loan_entry_paths_and_a_reference_rate() -> None:
     assert all(
         row.principal_original and row.principal_original.currency == "PLN" for row in plan.loans
     )
+
+
+def test_the_plan_has_a_live_fire_plan_with_events_and_a_loan_choice() -> None:
+    reference = date(2026, 11, 20)
+    plan = _plan(reference, currency="PLN")
+    fire = plan.fire
+    assert fire.reference_year == reference.year
+    assert fire.birth_year == reference.year - 38
+    assert fire.birth_year + fire.horizon_age > reference.year + 30
+    assert fire.rule == "swr" and fire.swr_bp == 400
+    assert {event.kind for event in fire.events} == {
+        "cash",
+        "expense_change",
+        "income_change",
+        "saving_override",
+    }
+    assert [event.year_offset for event in fire.events] == sorted(
+        event.year_offset for event in fire.events
+    )
+    assert list(fire.events) == sorted(
+        fire.events, key=lambda event: (event.year_offset, event.kind, event.label)
+    )
+    assert any(event.amount.amount_minor < 0 for event in fire.events)
+    assert any(event.year_offset < 0 for event in fire.events)  # archived history
+    assert fire.income.currency == "PLN"
+    assert fire.ignored_loan == "Car loan"
+
+
+def test_signed_conversion_keeps_the_sign() -> None:
+    positive = convert_signed_amount(Decimal("25"), "PLN", whole=True)
+    negative = convert_signed_amount(Decimal("-25"), "PLN", whole=True)
+    assert (positive.amount_minor, positive.currency) == (10800, "PLN")
+    assert (negative.amount_minor, negative.currency) == (-10800, "PLN")

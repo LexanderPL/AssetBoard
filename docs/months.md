@@ -2,6 +2,11 @@
 
 Your money is tracked month by month. The main navigation starts with four pages:
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/month.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/month.jpg) ·
+[phone light](assets/screenshots/phone/light/month.jpg) ·
+[phone dark](assets/screenshots/phone/dark/month.jpg). See the [gallery](screenshots.md#month).
+
 - **Home** (`/`): how the current month is going. The flow bar described below, a donut of
   the month's expenses by category next to a donut of its income by category, and up to ten
   upcoming recurring items (overdue ones, highlighted, and those due within the Upcoming

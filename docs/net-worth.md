@@ -5,6 +5,12 @@ three tabs: **Summary**, **Assets** and **Liabilities**. The two lists group ite
 categories and show a subtotal for every category. Everyone in the workspace can read them;
 editors and owners can add, change and archive things.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/net-worth.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/net-worth.jpg) ·
+[phone light](assets/screenshots/phone/light/net-worth.jpg) ·
+[phone dark](assets/screenshots/phone/dark/net-worth.jpg). See the
+[gallery](screenshots.md#net-worth).
+
 ## Values are positive
 
 Every value is a positive amount in the item's currency. An asset's value is what it is worth; a

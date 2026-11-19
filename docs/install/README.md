@@ -42,3 +42,5 @@ troubleshooting.
   **Check for updates** under Instance settings: one request a day to the GitHub releases API,
   nothing else sent ([Update check](../deployment.md#update-check)). The running version is
   shown at the bottom of the sidebar.
+- **Something does not work?** [Troubleshooting](../troubleshooting.md) starts with the log and
+  health endpoints and links to the detailed guide for each symptom.

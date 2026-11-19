@@ -5,6 +5,11 @@ year by year, where the spending went by category, how categories trend, how a y
 with the one before and how often actual spending beat its plan. Every member of a workspace,
 viewers included, can open the page: it only reads what they can already see in the ledger.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
+[phone light](assets/screenshots/phone/light/reports.jpg) ·
+[phone dark](assets/screenshots/phone/dark/reports.jpg). See the [gallery](screenshots.md#reports).
+
 ## Filters
 
 The filters are a plain GET form, so every view is a bookmarkable address and works without
