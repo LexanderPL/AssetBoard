@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.6](https://github.com/LexanderPL/AssetBoard/compare/v0.8.5...v0.8.6) (2026-11-19)
+
+
+### Bug Fixes
+
+* **release:** stop duplicating the latest image tag ([#403](https://github.com/LexanderPL/AssetBoard/issues/403)) ([803dbea](https://github.com/LexanderPL/AssetBoard/commit/803dbea6d874fe9e94091b494fb35a742c4e106c))
+
 ## [0.8.5](https://github.com/LexanderPL/AssetBoard/compare/v0.8.4...v0.8.5) (2026-11-19)
 
 
