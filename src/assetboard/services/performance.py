@@ -263,6 +263,7 @@ def performance_page(
     asset_class_id: UUID | None = None,
     ranges: tuple[str, ...] = RANGES,
     with_periods: bool = True,
+    dates: Sequence[date] | None = None,
 ) -> PerformancePage:
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -294,7 +295,7 @@ def performance_page(
     range_start = _range_start(chosen_range, today, first_date)
     step = _step_for(chosen_range, range_start, today)
     period_starts = {_period_start(code, today, first_date) for code in PERIODS}
-    chart_dates = set(step_dates(range_start, today, step))
+    chart_dates = set(dates) if dates is not None else set(step_dates(range_start, today, step))
     observation_dates = chart_dates | period_starts | {today}
 
     prices = price_observations(price_rows, dated_rows)
@@ -331,6 +332,7 @@ def performance_page(
             range_start,
             today,
             step,
+            dates=dates,
             base_currency=base,
             allocations=allocation_map,
             asset_class_id=class_scope.id if class_scope is not None else None,

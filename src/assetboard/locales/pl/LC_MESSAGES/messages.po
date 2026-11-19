@@ -5498,6 +5498,28 @@ msgstr "Niedostępne: brak wydatków w poprzednim roku."
 msgid "The current year is compared through %(month)s in both years."
 msgstr "Bieżący rok jest porównywany do %(month)s w obu latach."
 
+msgid "Net worth over time"
+msgstr "Wartość netto w czasie"
+
+msgid ""
+"Assets, liabilities and net worth at the end of each period, from your "
+"saved values."
+msgstr ""
+"Aktywa, zobowiązania i wartość netto na koniec każdego okresu, na "
+"podstawie zapisanych wartości."
+
+msgid "Net worth by period"
+msgstr "Wartość netto według okresu"
+
+msgid "Portfolio value and invested capital at the end of each period."
+msgstr "Wartość portfela i zainwestowany kapitał na koniec każdego okresu."
+
+msgid "Portfolio value by period"
+msgstr "Wartość portfela według okresu"
+
+msgid "Period"
+msgstr "Okres"
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."
@@ -5517,6 +5539,30 @@ msgstr[1] ""
 msgstr[2] ""
 "%(num)d wpisów w innych walutach zostało pominiętych; raporty nie "
 "przeliczają walut."
+
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] "%(count)s transakcja bez daty nie jest uwzględniona w serii."
+msgstr[1] "%(count)s transakcje bez daty nie są uwzględnione w serii."
+msgstr[2] "%(count)s transakcji bez daty nie jest uwzględnionych w serii."
+
+#, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
+"lub kursu walutowego."
+msgstr[1] ""
+"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
+"ceny lub kursu walutowego."
+msgstr[2] ""
+"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
+"mają ceny lub kursu walutowego."
 
 msgid "on Monday"
 msgstr "w poniedziałek"
@@ -7116,23 +7162,6 @@ msgstr "Żadna pozycja nie zmieniła się od wczoraj."
 msgid "No portfolio history yet. Add investment transactions and prices."
 msgstr "Brak historii portfela. Dodaj transakcje inwestycyjne i ceny."
 
-#, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
-"lub kursu walutowego."
-msgstr[1] ""
-"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
-"ceny lub kursu walutowego."
-msgstr[2] ""
-"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
-"mają ceny lub kursu walutowego."
-
 msgid "Plotted data"
 msgstr "Dane wykresu"
 
@@ -7412,9 +7441,6 @@ msgid ""
 msgstr ""
 "Linie przerywane oznaczają FIRE, koniec dochodów i wyczerpanie portfela. "
 "Punkt FIRE jest przypięty."
-
-msgid "Net worth over time"
-msgstr "Wartość netto w czasie"
 
 msgid "Amounts are nominal: each year's own money, not adjusted for inflation."
 msgstr "Kwoty są nominalne: pieniądze z danego roku, bez korekty o inflację."
@@ -9503,13 +9529,6 @@ msgstr "Filtr klasy"
 msgid "Show"
 msgstr "Pokaż"
 
-#, python-format
-msgid "%(count)s undated legacy transaction is not included in the series."
-msgid_plural "%(count)s undated legacy transactions are not included in the series."
-msgstr[0] "%(count)s transakcja bez daty nie jest uwzględniona w serii."
-msgstr[1] "%(count)s transakcje bez daty nie są uwzględnione w serii."
-msgstr[2] "%(count)s transakcji bez daty nie jest uwzględnionych w serii."
-
 msgid "Open transactions"
 msgstr "Otwórz transakcje"
 
@@ -9551,9 +9570,6 @@ msgstr ""
 
 msgid "Performance by period"
 msgstr "Wyniki według okresów"
-
-msgid "Period"
-msgstr "Okres"
 
 msgid "Change"
 msgstr "Zmiana"

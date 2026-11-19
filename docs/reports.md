@@ -2,8 +2,9 @@
 
 Reports (`/reports`) show how much came in and went out over a range of years, month by month or
 year by year, where the spending went by category, how categories trend, how a year compares
-with the one before and how often actual spending beat its plan. Every member of a workspace,
-viewers included, can open the page: it only reads what they can already see in the ledger.
+with the one before, how often actual spending beat its plan, and how net worth and the portfolio
+moved over the same range. Every member of a workspace, viewers included, can open the page: it
+only reads what they can already see in the ledger.
 
 Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
 [desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
@@ -33,7 +34,9 @@ selector; the other sections always use the whole ledger. An unknown or malforme
 `yoy_category` is ignored and the default is used, so an old bookmark still opens.
 
 The **Report year** selector chooses the year of the year-overview grid and the year-over-year
-comparison. It does not change the range of the first three sections.
+comparison. It does not change the range of the first three sections. The **Net worth over time**
+and **Portfolio value over time** sections follow **From year**, **To year** and **Granularity**,
+ignore the category/savings filters, and are shown only in the workspace base currency.
 
 A range is at most 30 years. A malformed year, `from` after `to`, or a longer range is marked on
 the field and no chart is drawn. The range always ends with the current month in the workspace's
@@ -184,8 +187,29 @@ same counts across all category-months. Open and closed months count alike, and 
 months are outside the report range. Amounts are compared in the selected currency; plans in
 another currency are left out, never converted.
 
+## Net worth over time
+
+The net-worth section shows assets, liabilities and net worth at the end of each month or year
+in the report range. It reuses the same derived history as the Net worth Summary page: saved
+values, linked items and prices are calculated on read, and the last point of each period is
+shown. There is no interpolation between periods.
+
+The section appears only when the workspace has net-worth values and the selected currency is
+the workspace base currency. It is absent otherwise. The chart and table carry the same figures;
+the table is the accessible version and works without JavaScript.
+
+## Portfolio value over time
+
+The portfolio section shows the portfolio value, invested capital and gain at the end of each
+month or year in the report range. It uses the same valuation series as the Investments
+Performance page and the Home portfolio widget; no portfolio math is repeated.
+
+The section appears only when the workspace has investment transactions and the selected currency
+is the workspace base currency. It is absent otherwise. The chart and table carry the same
+figures; the table is the accessible version and works without JavaScript.
+
 ## Limits
 
-Phase A reports read only the ledger: net worth and portfolio history come in later phases. The
-year overview is the only table with a CSV download in this version; CSV export of ledger entries
-lives on the [History](transactions.md) page.
+Reports read the ledger, the derived net-worth history and the portfolio valuation series. The
+year overview is the only table with a CSV download; CSV export of ledger entries lives on the
+[History](transactions.md) page.

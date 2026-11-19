@@ -1,4 +1,4 @@
-"""The Reports page (F10.1–F10.3 and F9.2): ``/reports`` and the year-overview CSV.
+"""The Reports page (F10.1–F10.5 and F9.2): ``/reports`` and the year-overview CSV.
 
 A plain GET form: every view is a bookmarkable URL and works without JavaScript. The category
 filter is repeatable (``?category=<id>&category=<id>``). The CSV is a GET with the same filters,
@@ -85,6 +85,7 @@ async def reports_year_overview_csv(
             year=year,
             trend=trend,
             yoy_category=yoy_category,
+            with_phase_b=False,
         )
     )
     if data.filters.errors:

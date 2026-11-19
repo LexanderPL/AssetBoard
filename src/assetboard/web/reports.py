@@ -1,4 +1,4 @@
-"""The Reports page's view model (F10.1–F10.3): formatted rows, chart JSON and notes.
+"""The Reports page's view model (F10.1–F10.5): formatted rows, chart JSON and notes.
 
 Amounts, rates and labels are formatted here by the server's locale helpers; the browser only
 draws the integers it receives. Chart colours are CSS token names (read by
@@ -35,8 +35,12 @@ from assetboard.domain.reports import (
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_month, short_month_names
 from assetboard.i18n.numbers import format_money, format_rate_tenths
+from assetboard.services.networth_history import NetWorthHistoryData
+from assetboard.services.performance import PerformancePage
 from assetboard.services.reports import CategoryOption, FilterError, ReportsData
 from assetboard.web.chart_axis import money_axis, rate_axis
+from assetboard.web.charts import build_performance_chart
+from assetboard.web.networth_history import build_trend_view
 from assetboard.web.rendering import scoped_url
 
 
@@ -80,6 +84,15 @@ CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data
 YEAR_OVER_YEAR_TOTAL = _("Total (all categories)")
 YEAR_OVER_YEAR_NO_PREVIOUS = _("Not available: nothing spent in the previous year.")
 YEAR_OVER_YEAR_PARTIAL = _("The current year is compared through %(month)s in both years.")
+NET_WORTH_TITLE = _("Net worth over time")
+NET_WORTH_DESCRIPTION = _(
+    "Assets, liabilities and net worth at the end of each period, from your saved values."
+)
+NET_WORTH_CAPTION = _("Net worth by period")
+PORTFOLIO_TITLE = _("Portfolio value over time")
+PORTFOLIO_DESCRIPTION = _("Portfolio value and invested capital at the end of each period.")
+PORTFOLIO_CAPTION = _("Portfolio value by period")
+PERIOD = _("Period")
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +265,26 @@ class PlanAccuracyView:
 
 
 @dataclass(frozen=True, slots=True)
+class ReportSeriesRow:
+    label: str
+    cells: tuple[str, ...]
+    notes: tuple[str, ...] = ()
+    so_far: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ReportSeriesView:
+    title: str
+    description: str
+    caption: str
+    chart_type: str
+    columns: tuple[str, ...]
+    rows: tuple[ReportSeriesRow, ...]
+    chart: dict[str, Any]
+    notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ReportsView:
     data: ReportsData
     errors: dict[str, str]
@@ -275,6 +308,8 @@ class ReportsView:
     yoy_category_options: tuple[CategoryOptionView, ...]
     notes: tuple[str, ...]
     range_years: str
+    net_worth: ReportSeriesView | None
+    portfolio: ReportSeriesView | None
 
     @property
     def valid(self) -> bool:
@@ -905,6 +940,124 @@ def _notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     return tuple(notes)
 
 
+def _series_label(day: date, step: ReportStep, locale: str) -> str:
+    if step is ReportStep.MONTH:
+        return format_month(YearMonth.from_date(day), locale)
+    return str(day.year)
+
+
+def _series_is_partial(day: date, step: ReportStep, today: date) -> bool:
+    if step is ReportStep.MONTH:
+        return YearMonth.from_date(day) == YearMonth.from_date(today)
+    return day.year == today.year
+
+
+def _net_worth_series(
+    data: NetWorthHistoryData | None, step: ReportStep, locale: str, today: date
+) -> ReportSeriesView | None:
+    if data is None:
+        return None
+    labels = [_series_label(point.as_of, step, locale) for point in data.points]
+    trend = build_trend_view(data, locale, labels=labels)
+    if trend.chart is None:
+        return None
+    rows = tuple(
+        ReportSeriesRow(
+            label=label,
+            cells=(row.net, row.assets, row.liabilities),
+            notes=(
+                (*row.not_counted, row.estimated_note) if row.estimated_note else row.not_counted
+            ),
+            so_far=_series_is_partial(point.as_of, step, today),
+        )
+        for point, row, label in zip(data.points, trend.rows, labels, strict=True)
+    )
+    return ReportSeriesView(
+        title=gettext(NET_WORTH_TITLE, locale),
+        description=gettext(NET_WORTH_DESCRIPTION, locale),
+        caption=gettext(NET_WORTH_CAPTION, locale),
+        chart_type="line",
+        columns=(
+            gettext(PERIOD, locale),
+            gettext("Net worth", locale),
+            gettext("Assets", locale),
+            gettext("Liabilities", locale),
+        ),
+        rows=rows,
+        chart=trend.chart,
+    )
+
+
+def _portfolio_series(
+    page: PerformancePage | None, step: ReportStep, locale: str, today: date
+) -> ReportSeriesView | None:
+    if page is None:
+        return None
+    labels = [_series_label(point.date, step, locale) for point in page.chart]
+    chart = build_performance_chart(page, locale, labels=labels)
+    if chart is None:
+        return None
+    incomplete_note = gettext("Incomplete: an instrument has no price or FX rate.", locale)
+    rows = tuple(
+        ReportSeriesRow(
+            label=label,
+            cells=(
+                (
+                    "—",
+                    "—",
+                    "—",
+                )
+                if point.incomplete
+                else (
+                    format_money(point.value, locale),
+                    format_money(point.net_invested, locale),
+                    format_money(point.value - point.net_invested, locale),
+                )
+            ),
+            notes=(incomplete_note,) if point.incomplete else (),
+            so_far=_series_is_partial(point.date, step, today),
+        )
+        for point, label in zip(page.chart, labels, strict=True)
+    )
+    notes: list[str] = []
+    if page.undated_count:
+        notes.append(
+            ngettext(
+                "%(count)s undated legacy transaction is not included in the series.",
+                "%(count)s undated legacy transactions are not included in the series.",
+                page.undated_count,
+                locale,
+            )
+            % {"count": page.undated_count}
+        )
+    if page.incomplete_points:
+        notes.append(
+            ngettext(
+                "%(num)d chart point is incomplete because an instrument has no price or FX rate.",
+                "%(num)d chart points are incomplete because an instrument has no price "
+                "or FX rate.",
+                page.incomplete_points,
+                locale,
+            )
+            % {"num": page.incomplete_points}
+        )
+    return ReportSeriesView(
+        title=gettext(PORTFOLIO_TITLE, locale),
+        description=gettext(PORTFOLIO_DESCRIPTION, locale),
+        caption=gettext(PORTFOLIO_CAPTION, locale),
+        chart_type="performance",
+        columns=(
+            gettext(PERIOD, locale),
+            gettext("Value", locale),
+            gettext("Invested capital", locale),
+            gettext("Gain", locale),
+        ),
+        rows=rows,
+        chart=chart,
+        notes=tuple(notes),
+    )
+
+
 def build_reports_view(request: Request, data: ReportsData, locale: str) -> ReportsView:
     """The formatted page from the service's data."""
     step = data.filters.step
@@ -952,4 +1105,6 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         yoy_category_options=_yoy_category_options(data),
         notes=_notes(data, locale),
         range_years=range_years,
+        net_worth=_net_worth_series(data.net_worth, step, locale, data.today),
+        portfolio=_portfolio_series(data.portfolio, step, locale, data.today),
     )

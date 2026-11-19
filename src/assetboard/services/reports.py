@@ -1,5 +1,5 @@
-"""The Reports page's data (F10.1–F10.3): filters, one ledger read, the income/expense series
-and the category breakdown.
+"""The Reports page's data (F10.1–F10.5): filters, the ledger series, category reports and
+the Phase B net-worth/portfolio adapters.
 
 Every member, viewers included, may read the page. The service resolves the year range, the
 granularity, the category filter and the savings option, reads the workspace's categories, the
@@ -15,12 +15,15 @@ selected one are left out and counted too (Phase A never converts).
 The category filter is repeatable and bookmarkable (``?category=<id>&category=<id>``). Unknown
 ids and ids from another workspace are ignored; if none of the requested ids belong to an
 eligible expense category, the chart falls back to its default (the largest eight and Other).
+
+Phase B calls the existing derived net-worth and portfolio services in their all-time form and
+keeps the last point of each report period; it never reimplements their valuation math.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -60,6 +63,8 @@ from assetboard.domain.reports import (
 )
 from assetboard.domain.summary import block_of
 from assetboard.services.context import Context, Role, require_role
+from assetboard.services.networth_history import NetWorthHistoryData, networth_history
+from assetboard.services.performance import PerformancePage, performance_page
 
 DEFAULT_YEARS = 3
 MAX_YEARS = 30
@@ -124,6 +129,8 @@ class ReportsData:
     today: date
     series_start: date | None
     series_end: date | None
+    net_worth: NetWorthHistoryData | None = None
+    portfolio: PerformancePage | None = None
 
     @property
     def category_filter_active(self) -> bool:
@@ -323,6 +330,123 @@ def _entries(
         yield LedgerEntry(row.day, row.category_id, Money(row.amount_minor, row.currency))
 
 
+def _last_per_period[T](
+    points: Iterable[T],
+    *,
+    day_of: Callable[[T], date],
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    today: date,
+) -> tuple[T, ...]:
+    """The last point of each month/year in the report range, in source order.
+
+    Points after today are ignored, as are points before the range. A period with no point is
+    simply absent; nothing is interpolated.
+    """
+    start = date(start_year, 1, 1)
+    end = min(date(end_year, 12, 31), today)
+    chosen: dict[tuple[int, ...], T] = {}
+    for point in points:
+        point_day = day_of(point)
+        if not start <= point_day <= end:
+            continue
+        key = (point_day.year,) if step is ReportStep.YEAR else (point_day.year, point_day.month)
+        chosen[key] = point
+    return tuple(chosen.values())
+
+
+def net_worth_report(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    currency: str,
+) -> NetWorthHistoryData | None:
+    """F10.4: the derived net-worth series at the report's period ends.
+
+    Reuses F5.9's ``networth_history`` in its all-time form and keeps the last point of each
+    period. Only the workspace base currency is available; the section is absent otherwise.
+    """
+    if currency != ctx.workspace.base_currency:
+        return None
+    today = ctx.clock.today(ctx.workspace.timezone)
+    if start_year > today.year:
+        return None
+    data = networth_history(factory, ctx, "all")
+    points = _last_per_period(
+        data.points,
+        day_of=lambda point: point.as_of,
+        start_year=start_year,
+        end_year=end_year,
+        step=step,
+        today=data.today,
+    )
+    if not points or not data.has_values:
+        return None
+    return replace(data, points=points)
+
+
+def _period_end_dates(
+    start_year: int, end_year: int, step: ReportStep, today: date
+) -> tuple[date, ...]:
+    """The last day of each report month/year, capped at today.
+
+    The current month/year ends at today, so its row is explicitly partial rather than a
+    future date with no data.
+    """
+    start = date(start_year, 1, 1)
+    end = min(date(end_year, 12, 31), today)
+    if start > end:
+        return ()
+    if step is ReportStep.YEAR:
+        return tuple(min(date(year, 12, 31), today) for year in range(start.year, end.year + 1))
+    dates: list[date] = []
+    month = YearMonth.from_date(start)
+    last = YearMonth.from_date(end)
+    while month <= last:
+        day = min(month.last_day, today)
+        if start <= day <= end:
+            dates.append(day)
+        next_month = month.next()
+        if next_month is None:
+            break
+        month = next_month
+    return tuple(dates)
+
+
+def portfolio_report(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    start_year: int,
+    end_year: int,
+    step: ReportStep,
+    currency: str,
+) -> PerformancePage | None:
+    """F10.5: portfolio value and invested capital at the report's period ends.
+
+    Reuses F6.7's ``performance_page`` in its all-time form; no portfolio math is repeated.
+    Only the workspace base currency is available; the section is absent otherwise.
+    """
+    if currency != ctx.workspace.base_currency:
+        return None
+    today = ctx.clock.today(ctx.workspace.timezone)
+    dates = _period_end_dates(start_year, end_year, step, today)
+    if not dates:
+        return None
+    page = performance_page(factory, ctx, range_code="all", with_periods=False, dates=dates)
+    if not page.chart:
+        return None
+    return replace(
+        page,
+        periods=(),
+        incomplete_points=sum(1 for point in page.chart if point.incomplete),
+    )
+
+
 def reports_data(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -336,6 +460,7 @@ def reports_data(
     year: str = "",
     trend: str = "",
     yoy_category: str = "",
+    with_phase_b: bool = True,
 ) -> ReportsData:
     """The Reports page's filters and every section's data for the current workspace."""
     require_role(ctx, Role.VIEWER)
@@ -580,6 +705,30 @@ def reports_data(
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
+        net_worth=(
+            net_worth_report(
+                factory,
+                ctx,
+                start_year=filters.start_year,
+                end_year=filters.end_year,
+                step=filters.step,
+                currency=selected_currency,
+            )
+            if with_phase_b
+            else None
+        ),
+        portfolio=(
+            portfolio_report(
+                factory,
+                ctx,
+                start_year=filters.start_year,
+                end_year=filters.end_year,
+                step=filters.step,
+                currency=selected_currency,
+            )
+            if with_phase_b
+            else None
+        ),
     )
 
 
@@ -590,5 +739,7 @@ __all__ = [
     "FilterError",
     "ReportFilters",
     "ReportsData",
+    "net_worth_report",
+    "portfolio_report",
     "reports_data",
 ]

@@ -5100,6 +5100,26 @@ msgstr ""
 msgid "The current year is compared through %(month)s in both years."
 msgstr ""
 
+msgid "Net worth over time"
+msgstr ""
+
+msgid ""
+"Assets, liabilities and net worth at the end of each period, from your "
+"saved values."
+msgstr ""
+
+msgid "Net worth by period"
+msgstr ""
+
+msgid "Portfolio value and invested capital at the end of each period."
+msgstr ""
+
+msgid "Portfolio value by period"
+msgstr ""
+
+msgid "Period"
+msgstr ""
+
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."
@@ -5109,6 +5129,22 @@ msgstr[1] ""
 #, python-format
 msgid "%(num)d entry in another currency is left out; reports do not convert."
 msgid_plural "%(num)d entries in another currency are left out; reports do not convert."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -6564,16 +6600,6 @@ msgstr ""
 msgid "No portfolio history yet. Add investment transactions and prices."
 msgstr ""
 
-#, fuzzy, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-msgstr[1] ""
-
 msgid "Plotted data"
 msgstr ""
 
@@ -6813,9 +6839,6 @@ msgstr ""
 msgid ""
 "Dashed lines mark FIRE, the income stop and depletion. The FIRE point is "
 "pinned."
-msgstr ""
-
-msgid "Net worth over time"
 msgstr ""
 
 msgid "Amounts are nominal: each year's own money, not adjusted for inflation."
@@ -8644,12 +8667,6 @@ msgstr ""
 msgid "Show"
 msgstr ""
 
-#, python-format
-msgid "%(count)s undated legacy transaction is not included in the series."
-msgid_plural "%(count)s undated legacy transactions are not included in the series."
-msgstr[0] ""
-msgstr[1] ""
-
 #, fuzzy
 msgid "Open transactions"
 msgstr ""
@@ -8682,9 +8699,6 @@ msgid ""
 msgstr ""
 
 msgid "Performance by period"
-msgstr ""
-
-msgid "Period"
 msgstr ""
 
 msgid "Change"

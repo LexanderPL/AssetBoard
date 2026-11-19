@@ -195,6 +195,7 @@ def portfolio_series(
     end: date,
     step: Step | str,
     *,
+    dates: Sequence[date] | None = None,
     base_currency: str,
     allocations: Mapping[UUID, Sequence[PortfolioAllocation]] | None = None,
     asset_class_id: UUID | None = None,
@@ -208,7 +209,8 @@ def portfolio_series(
     held instrument has no price or FX; that instrument is omitted from both lines there.
     ``backfill_leading`` values a leading gap (no observation on or before the point) from the
     earliest later observation. Carry-forward stays the primary rule; genuinely missing data
-    stays incomplete.
+    stays incomplete. ``dates`` overrides the step dates for callers that need exact period
+    ends; dates outside ``[start, end]`` are ignored.
     """
     if start > end:
         raise ValueError("start must not be after end")
@@ -236,7 +238,12 @@ def portfolio_series(
     pointer = 0
 
     points: list[SeriesPoint] = []
-    for point in step_dates(start, end, wanted_step):
+    point_dates = (
+        tuple(day for day in sorted(set(dates)) if start <= day <= end)
+        if dates is not None
+        else step_dates(start, end, wanted_step)
+    )
+    for point in point_dates:
         while pointer < len(dated):
             row = dated[pointer]
             row_date = row.date

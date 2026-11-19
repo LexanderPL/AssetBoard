@@ -3,16 +3,16 @@
 **Goal:** one Reports page with charts over the years: how much came in and went out, how much
 was saved, where the money went, and later how net worth and the portfolio grew.
 
-**Exit criteria (Phase A):** for any range of years a member sees income vs expenses and the
-savings rate per month and per year, and expenses by category over time, with figures that
-match the month summaries of F2.4 exactly. **Phase B** (net worth and portfolio value on the
-same page) is deferred after 1.0 by the owner on 2026-11-18; the existing Net worth Summary and
-Investments Performance sections already show that history.
+**Exit criteria (Phase A and B):** for any range of years a member sees income vs expenses and
+the savings rate per month and per year, expenses by category over time, and net worth and
+portfolio value over the same range, with figures that match the month summaries of F2.4 and the
+existing module series exactly. Phase A shipped in v1.0; Phase B shipped after 1.0 on
+2026-11-19, reusing the Net worth Summary and Investments Performance services.
 
 Owner decision, 2026-10-25. The milestone number only follows M9; it is not scheduled after it.
 **Phase A depends on M2 only** (and should follow F2.7, whose chart conventions it reuses) and
 can ship before M5/M6 in any minor release. Phase B features depend on the milestones named in
-each feature; the owner deferred Phase B after 1.0 on 2026-11-18.
+each feature and shipped after 1.0 on 2026-11-19.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -224,10 +224,6 @@ multi-select and the savings option, and the category x period table. Property t
 
 ## F10.4 Net worth over time (Phase B, depends on M5)
 
-**Deferred after 1.0 (owner, 2026-11-18).** The Net worth Summary already has the derived
-monthly trend with 1/3/5-year and all-time ranges. Keeping this feature out of 1.0 avoids a
-second copy of the same chart; see the post-1.0 backlog.
-
 **Acceptance**
 - Shown only when the workspace has net-worth values (F5.9); before M5 exists the section is
   absent, not disabled.
@@ -245,19 +241,22 @@ Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports 
 service (last point per period, gaps not interpolated), hidden when there are no values. Do not read stored snapshots.
 ```
 
+**As built (2026-11-19).** `services.reports.net_worth_report` calls F5.9's `networth_history`
+in its all-time form and keeps the last point of each report month/year. The `/reports` section
+reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
+the chart and accessible table. The section is absent without values or outside the base
+currency. Tests cover year/month selection, the base-currency rule and the empty workspace.
+
 ---
 
 ## F10.5 Portfolio value over time (Phase B, depends on M6)
 
-**Deferred after 1.0 (owner, 2026-11-18).** The Investments Performance page and the Home
-portfolio widget already show value and invested capital over time. Keeping this feature out of
-1.0 avoids a second copy of the same chart; see the post-1.0 backlog.
-
 **Acceptance**
 - Shown only when the workspace has investment transactions (M6).
 - Line chart of portfolio value and net invested capital per period, from F6.7's
-  `portfolio_series(..., step=month)` (year step: the last month of each year). No new
-  portfolio math; quantities and prices stay `Decimal` and are aggregated in Python.
+  `portfolio_series` with explicit report period-end dates (month-end or year-end, capped at
+  today). No new portfolio math; quantities and prices stay `Decimal` and are aggregated in
+  Python.
 - Values in the filter currency (the base currency; F6.3 FX rules apply).
 
 **Agent prompt**
@@ -266,6 +265,11 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F10.5 from docs/specs/M10-reports.md: portfolio value and invested capital over time on /reports from F6.7's
 portfolio_series, hidden without investment data. No new portfolio math.
 ```
+
+**As built (2026-11-19).** `services.reports.portfolio_report` calls F6.7's `performance_page`
+with explicit report period-end dates (month/year end, capped at today); `web.charts.build_performance_chart` supplies the same chart JSON as the Performance page and Home widget.
+The section is absent without investment transactions or outside the base currency. Tests cover
+year/month selection, the base-currency rule and the empty workspace.
 
 ---
 
