@@ -404,6 +404,27 @@
   .cell-button {
     @apply block w-full rounded-none bg-primary px-2 py-1.5 text-center text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-on-primary;
   }
+
+}
+
+/* The Reports year-overview heat shading (F9.2): four steps of the primary soft token, so both
+   themes keep the same hue and the ink text keeps its contrast. Plain CSS outside the Tailwind
+   layers because the class name is chosen from data, so the content scanner never sees it; the
+   classes are still classes, not inline styles (the CSP forbids style attributes). */
+.heat-1 {
+  background-color: rgb(var(--color-primary-soft) / 0.35);
+}
+
+.heat-2 {
+  background-color: rgb(var(--color-primary-soft) / 0.55);
+}
+
+.heat-3 {
+  background-color: rgb(var(--color-primary-soft) / 0.75);
+}
+
+.heat-4 {
+  background-color: rgb(var(--color-primary-soft));
 }
 
 /* Progressive disclosure (app.js applyHiddenWhen): the hidden attribute wins over display
