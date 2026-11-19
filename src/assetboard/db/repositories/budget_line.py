@@ -50,6 +50,20 @@ class BudgetLineRepository(ScopedRepository[BudgetLine]):
         )
         return list(self._session.scalars(statement))
 
+    def for_range(self, start: YearMonth, end: YearMonth) -> list[BudgetLine]:
+        """Lines of every month in ``[start, end]``, by month then category (F9.2 reports).
+
+        One scoped read of the raw lines: the planner-accuracy report counts and sums them in
+        Python, never with a SQL aggregate. The (workspace, month, category) unique index serves
+        the workspace and month range.
+        """
+        statement = (
+            self._scoped_select()
+            .where(BudgetLine.month >= start.first_day, BudgetLine.month <= end.last_day)
+            .order_by(BudgetLine.month, BudgetLine.category_id)
+        )
+        return list(self._session.scalars(statement))
+
     def line(self, month: YearMonth, category_id: UUID) -> BudgetLine | None:
         statement = self._scoped_select().where(
             BudgetLine.month == month.first_day, BudgetLine.category_id == category_id

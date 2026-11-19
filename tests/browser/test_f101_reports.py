@@ -18,7 +18,7 @@ from assetboard.app import create_app
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import Workspace
-from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
@@ -56,6 +56,30 @@ def _seed(app) -> None:
             session.add(category)
             session.flush()
             categories[key] = category.id
+        session.add(
+            Transaction(
+                workspace_id=workspace.id,
+                direction="expense",
+                date=date(2025, 1, 10),
+                amount_minor=100_000,
+                currency="EUR",
+                category_id=categories["food"],
+                description="Last year",
+                description_key="last year",
+                source="manual",
+                created_by_user_id=None,
+            )
+        )
+        for month, planned in ((1, 100_000), (2, 50_000)):
+            session.add(
+                BudgetLine(
+                    workspace_id=workspace.id,
+                    month=date(2026, month, 1),
+                    category_id=categories["food"],
+                    planned_minor=planned,
+                    currency="EUR",
+                )
+            )
         for month in (1, 2):
             session.add(
                 Transaction(
@@ -222,6 +246,44 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             toggle.click()
             expect(toggle).to_have_text("Show as table")
             assert "sr-only" in (table.get_attribute("class") or "").split()
+
+            # F9.2: the year grid has twelve heat-shaded month columns and a CSV link.
+            grid = page.locator("[data-report-year-overview]")
+            expect(grid).to_be_visible()
+            expect(grid.locator("[data-report-grid-row]")).to_have_count(1)
+            expect(grid.locator("[data-report-grid-cell]")).to_have_count(12)
+            expect(grid.locator("[data-report-grid-cell]").first).to_have_text("€1,200.00")
+            expect(grid).to_contain_text("Jan")
+            expect(grid).to_contain_text("Dec")
+            heat_classes = grid.locator("[data-report-grid-cell]").evaluate_all(
+                "(cells) => cells.map((cell) => cell.className)"
+            )
+            assert any("heat-" in value for value in heat_classes)
+            csv_link = grid.locator("[data-report-year-csv]")
+            expect(csv_link).to_be_visible()
+            assert "/reports/year-overview.csv" in (csv_link.get_attribute("href") or "")
+
+            # The rolling-average chart reuses the report line module and reveals its table.
+            trend = page.locator('[data-chart="report-trend"]')
+            expect(trend).to_have_attribute("data-chart-ready", "true")
+            expect(trend.locator("[data-chart-canvas]")).to_be_visible()
+            trend_option = page.evaluate(
+                """() => {
+                  const root = document.querySelector('[data-chart="report-trend"]');
+                  const el = root.querySelector("[data-chart-canvas]");
+                  const option = window.echarts.getInstanceByDom(el).getOption();
+                  return {series: option.series.map((s) => s.name)};
+                }"""
+            )
+            assert trend_option["series"] == ["Browser Food"]
+
+            # Year-over-year and plan accuracy read the section year and the plans.
+            expect(page.locator("[data-report-yoy-row]")).to_be_visible()
+            expect(page.locator("[data-report-yoy-percent]")).to_contain_text("140.0%")
+            accuracy = page.locator("[data-report-accuracy-row]")
+            expect(accuracy).to_have_count(1)
+            expect(accuracy.locator("[data-report-accuracy-planned]")).to_have_text("2")
+            expect(accuracy.locator("[data-report-accuracy-over]")).to_have_text("2")
 
             # Phone width: one column, no sideways page scroll.
             page.set_viewport_size({"width": 390, "height": 844})

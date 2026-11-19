@@ -5387,6 +5387,9 @@ msgstr "Cykliczne"
 msgid "FIRE projection"
 msgstr "Prognoza FIRE"
 
+msgid "Fix the filters to export the year overview."
+msgstr "Popraw filtry, aby wyeksportować przegląd roczny."
+
 msgid "The first year must be the same as or before the last year."
 msgstr "Pierwszy rok musi być taki sam jak ostatni lub wcześniejszy."
 
@@ -5444,13 +5447,6 @@ msgstr "W tym zakresie nie ma wydatków ani oszczędności."
 msgid "No spending for the selected categories."
 msgstr "Brak wydatków dla wybranych kategorii."
 
-msgid ""
-"Leave empty to show the 8 largest categories and the rest as Other "
-"(combined)."
-msgstr ""
-"Pozostaw puste, aby pokazać 8 największych kategorii, a resztę jako „Inne"
-" (połączone)”."
-
 msgid "Showing the selected categories only."
 msgstr "Pokazywane są tylko wybrane kategorie."
 
@@ -5472,6 +5468,16 @@ msgstr "Inne (połączone)"
 
 msgid "archived"
 msgstr "zarchiwizowana"
+
+#, python-format
+msgid "Not available: fewer than %(num)d months of data."
+msgstr "Niedostępne: mniej niż %(num)d mies. danych."
+
+msgid "Total (all categories)"
+msgstr "Razem (wszystkie kategorie)"
+
+msgid "Not available: nothing spent in the previous year."
+msgstr "Niedostępne: brak wydatków w poprzednim roku."
 
 #, python-format
 msgid "%(num)d entry is dated after today and is not charted."
@@ -12577,6 +12583,31 @@ msgstr "Co miesiąc"
 msgid "Yearly"
 msgstr "Co rok"
 
+msgid ""
+"Leave empty for all categories in the year overview and the 8 largest in "
+"the category charts."
+msgstr ""
+"Pozostaw puste, aby pokazać wszystkie kategorie w przeglądzie rocznym i 8"
+" największych na wykresach kategorii."
+
+msgid "Report year"
+msgstr "Rok raportu"
+
+msgid "Used by the year overview and year-over-year sections."
+msgstr "Używany w przeglądzie rocznym i porównaniu rok do roku."
+
+msgid "Category trends window"
+msgstr "Okno trendów kategorii"
+
+msgid "3-month average"
+msgstr "Średnia 3-miesięczna"
+
+msgid "12-month average"
+msgstr "Średnia 12-miesięczna"
+
+msgid "Year-over-year category"
+msgstr "Kategoria porównania rok do roku"
+
 msgid "Show report"
 msgstr "Pokaż raport"
 
@@ -12608,6 +12639,88 @@ msgstr "Brak stopy oszczędności dla uwzględnionych wpisów."
 
 msgid "Savings rate by period"
 msgstr "Stopa oszczędności według okresu"
+
+msgid "Year overview"
+msgstr "Przegląd roczny"
+
+msgid ""
+"Spending by category and month. Darker cells mean more spending in that "
+"month."
+msgstr ""
+"Wydatki według kategorii i miesiąca. Ciemniejsze komórki oznaczają "
+"większe wydatki w danym miesiącu."
+
+msgid "No spending in this year."
+msgstr "Brak wydatków w tym roku."
+
+msgid "Spending by category and month"
+msgstr "Wydatki według kategorii i miesiąca"
+
+msgid "Category trends"
+msgstr "Trendy kategorii"
+
+#, python-format
+msgid "Window: %(num)d months"
+msgstr "Okno: %(num)d mies."
+
+msgid "Rolling average spending by category."
+msgstr "Średnia krocząca wydatków według kategorii."
+
+msgid "Choose monthly granularity to see rolling averages."
+msgstr "Wybierz szczegółowość miesięczną, aby zobaczyć średnie kroczące."
+
+msgid "No rolling average yet: the range is shorter than the window."
+msgstr "Brak średniej kroczącej: zakres jest krótszy niż okno."
+
+msgid "Rolling average spending by category"
+msgstr "Średnia krocząca wydatków według kategorii"
+
+#, python-format
+msgid ""
+"The rolling average uses the previous %(num)d months, including the "
+"selected month."
+msgstr "Średnia krocząca obejmuje poprzednie %(num)d mies., w tym wybrany miesiąc."
+
+msgid "Year-over-year"
+msgstr "Rok do roku"
+
+msgid "Actual spending in the selected year compared with the year before."
+msgstr "Rzeczywiste wydatki w wybranym roku w porównaniu z rokiem poprzednim."
+
+msgid "Year-over-year comparison"
+msgstr "Porównanie rok do roku"
+
+msgid "Planned vs actual accuracy"
+msgstr "Dokładność planu i rzeczywistości"
+
+msgid "How often actual spending exceeded the plan, by category."
+msgstr "Jak często rzeczywiste wydatki przekroczyły plan, według kategorii."
+
+msgid "No planned regular expenses in this range."
+msgstr "W tym zakresie nie ma zaplanowanych regularnych wydatków."
+
+msgid "How often actual spending exceeded the plan"
+msgstr "Jak często rzeczywiste wydatki przekroczyły plan"
+
+msgid "Months planned"
+msgstr "Zaplanowane miesiące"
+
+msgid "Months over"
+msgstr "Miesiące przekroczenia"
+
+#, python-format
+msgid "Over %%"
+msgstr "Przekroczenie %%"
+
+msgid "All categories"
+msgstr "Wszystkie kategorie"
+
+msgid ""
+"A month counts as over when actual spending is greater than the plan. "
+"Only planned regular expense categories are included."
+msgstr ""
+"Miesiąc liczy się jako przekroczenie, gdy rzeczywiste wydatki są większe "
+"niż plan. Uwzględniane są tylko zaplanowane regularne kategorie wydatków."
 
 msgid "Edit recurring item"
 msgstr "Edytuj pozycję cykliczną"
@@ -12865,9 +12978,6 @@ msgstr ""
 
 msgid "Add payment"
 msgstr "Dodaj płatność"
-
-msgid "All categories"
-msgstr "Wszystkie kategorie"
 
 msgid "Apply filters"
 msgstr "Zastosuj filtry"
@@ -15956,4 +16066,13 @@ msgstr "Usuń obszar roboczy…"
 #~ "oszczędności i pieniądze, które po "
 #~ "prostu zostały, liczą się jako "
 #~ "zatrzymane."
+
+#~ msgid ""
+#~ "Leave empty to show the 8 largest"
+#~ " categories and the rest as Other "
+#~ "(combined)."
+#~ msgstr ""
+#~ "Pozostaw puste, aby pokazać 8 "
+#~ "największych kategorii, a resztę jako "
+#~ "„Inne (połączone)”."
 

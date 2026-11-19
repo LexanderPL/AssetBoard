@@ -134,6 +134,40 @@ Implement F9.2 from docs/specs/M9-dashboard-reports-hardening.md: the four remai
 Property tests: grid totals equal transaction sums; treatment rules respected. Include an EXPLAIN-based index review in the PR.
 ```
 
+**As built (F9.2):**
+- The four sections are additional panels on M10's `/reports` page, using the same shared
+  filters and treatment rules. A `year` query parameter (default: the report's end year, capped
+  at the current year) drives the year grid and the year-over-year section; `trend=3|12`
+  (default 3) chooses the rolling window; `yoy_category` chooses one category or the total.
+  Unknown/out-of-range years and unknown/other-workspace category ids are ignored.
+- **Year overview:** `domain.reports.year_grid` is F10.3's `category_series` for one calendar
+  year, so the grid is one row per eligible category and twelve month columns, with row/column/
+  grand totals. It follows the category filter and the savings option; transfers, income and
+  withdrawals never count. Heat shading is four CSS classes over the primary-soft token, not
+  inline styles. `GET /reports/year-overview.csv` (fixed `reports-year-overview.csv`) exports the
+  same rows and totals with ISO month headers and plain decimal amounts; it requires the same
+  sign-in and accepts the same filters.
+- **Category trends:** `domain.reports.rolling_category_averages` averages the displayed F10.3
+  series over a trailing 3- or 12-month window, from exact integer sums, and leaves the first
+  `window - 1` points empty (a gap, not zero). The chart reuses the report line module; the
+  table is the accessible version. Yearly granularity shows a prompt to choose monthly.
+- **Year-over-year:** `domain.reports.year_over_year` compares the selected year's total or one
+  category with the year before. Absolute and percent change are exact integers; the percent is
+  `None` when the previous year spent zero. It uses the same yearly category series and savings
+  option as the grid.
+- **Planned vs actual accuracy:** `domain.reports.plan_accuracy` counts planned months and
+  months whose actual was **strictly greater** than the plan per planned regular expense
+  category, with a footer over category-months. The service reads the raw `BudgetLine` rows for
+  the range in one scoped query (`BudgetLineRepository.for_range`) and counts them in Python;
+  transfers, income, savings, categories without plans and other-currency plans are excluded.
+  Open and closed months count alike.
+- **One read:** the service materialises the one column-only transaction stream once, then runs
+  the additional pure aggregations over it; the budget lines are a second scoped read. The
+  existing `ix_transactions_workspace_date` index serves the transaction range and the
+  `(workspace, month, category)` unique index serves the budget-line range; no migration or new
+  index was needed. No SQL aggregate or `DecimalType` ordering is introduced.
+- User guide: [Reports](../../reports.md). No migration and no new runtime dependency.
+
 ---
 
 ## F9.3 Archive completeness, secrets and final round-trip

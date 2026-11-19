@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import Request
@@ -32,7 +33,7 @@ from assetboard.domain.reports import (
     savings_rate,
 )
 from assetboard.i18n import gettext, ngettext
-from assetboard.i18n.dates import format_month
+from assetboard.i18n.dates import format_month, short_month_names
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.reports import CategoryOption, FilterError, ReportsData
 from assetboard.web.chart_axis import money_axis, rate_axis
@@ -67,10 +68,6 @@ CATEGORY_TABLE_CAPTION = _("Spending by category and period")
 CATEGORY_EMPTY = _("No expenses in this range.")
 CATEGORY_EMPTY_SAVINGS = _("No expenses or savings in this range.")
 CATEGORY_EMPTY_SELECTED = _("No spending for the selected categories.")
-CATEGORY_FILTER = _("Categories")
-CATEGORY_FILTER_HELP = _(
-    "Leave empty to show the 8 largest categories and the rest as Other (combined)."
-)
 CATEGORY_FILTER_ACTIVE = _("Showing the selected categories only.")
 CATEGORY_TOP_NOTE = _(
     "The 8 largest categories are shown; the rest are combined as Other (combined)."
@@ -79,6 +76,9 @@ INCLUDE_SAVINGS = _("Include saved / invested")
 INCLUDE_SAVINGS_HELP = _("Saved and invested amounts get their own category series.")
 OTHER = _("Other (combined)")
 ARCHIVED = _("archived")
+CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data.")
+YEAR_OVER_YEAR_TOTAL = _("Total (all categories)")
+YEAR_OVER_YEAR_NO_PREVIOUS = _("Not available: nothing spent in the previous year.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +163,90 @@ class CategoryOptionView:
 
 
 @dataclass(frozen=True, slots=True)
+class YearGridCell:
+    """One year-grid cell: its formatted amount and a heat class (empty for zero)."""
+
+    text: str
+    heat_class: str
+
+
+@dataclass(frozen=True, slots=True)
+class YearGridRow:
+    label: str
+    color: str | None
+    cells: tuple[YearGridCell, ...]
+    total: str
+
+
+@dataclass(frozen=True, slots=True)
+class YearOverview:
+    year: int
+    columns: tuple[str, ...]
+    rows: tuple[YearGridRow, ...]
+    totals: tuple[str, ...]
+    total: str
+    csv_url: str
+    empty: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TrendCell:
+    """One rolling-average cell; ``None`` means the window is not full yet."""
+
+    text: str | None
+    note: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrendRow:
+    label: str
+    color: str | None
+    cells: tuple[TrendCell, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryTrendsView:
+    columns: tuple[CategoryColumn, ...]
+    rows: tuple[TrendRow, ...]
+    months: int
+    year_step: bool
+    empty: bool
+    has_values: bool
+
+
+@dataclass(frozen=True, slots=True)
+class YearOverYearView:
+    label: str
+    color: str | None
+    year_label: str
+    previous_year_label: str
+    current: str
+    previous: str
+    change: str
+    change_minor: int
+    percent: str | None
+    percent_note: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class AccuracyRowView:
+    label: str
+    color: str | None
+    months_planned: int
+    months_over: int
+    percent: str
+
+
+@dataclass(frozen=True, slots=True)
+class PlanAccuracyView:
+    rows: tuple[AccuracyRowView, ...]
+    months_planned: int
+    months_over: int
+    percent: str
+    empty: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ReportsView:
     data: ReportsData
     errors: dict[str, str]
@@ -178,6 +262,12 @@ class ReportsView:
     category_options: tuple[CategoryOptionView, ...]
     category_notes: tuple[str, ...]
     category_empty: str
+    year_overview: YearOverview
+    category_trends: CategoryTrendsView
+    trend_chart: dict[str, Any] | None
+    year_over_year: YearOverYearView | None
+    plan_accuracy: PlanAccuracyView
+    yoy_category_options: tuple[CategoryOptionView, ...]
     notes: tuple[str, ...]
     range_years: str
 
@@ -426,13 +516,16 @@ def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
     }
 
 
+def _display_category_name(name: str, archived: bool, locale: str) -> str:
+    if archived:
+        return f"{name} ({gettext(ARCHIVED, locale)})"
+    return name
+
+
 def _category_name(row: CategorySpend, locale: str) -> str:
     if row.other:
         return gettext(OTHER, locale)
-    name = row.name
-    if row.archived:
-        name = f"{name} ({gettext(ARCHIVED, locale)})"
-    return name
+    return _display_category_name(row.name, row.archived, locale)
 
 
 def _category_columns(
@@ -539,6 +632,238 @@ def _category_notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     return ()
 
 
+def _heat_class(amount_minor: int, maximum_minor: int) -> str:
+    """A four-step heat class for one cell; zero and negative amounts stay unshaded."""
+    if amount_minor <= 0 or maximum_minor <= 0:
+        return ""
+    step = max(1, min(4, (amount_minor * 4 + maximum_minor - 1) // maximum_minor))
+    return f"heat-{step}"
+
+
+def _year_csv_url(data: ReportsData, request: Request) -> str:
+    """The CSV link with the same year, category and currency filters as the page."""
+    filters = data.filters
+    params: list[tuple[str, str]] = [
+        ("from", str(filters.start_year)),
+        ("to", str(filters.end_year)),
+        ("step", filters.step.value),
+        ("currency", filters.currency),
+        ("year", str(filters.year)),
+        ("trend", str(filters.trend_months)),
+    ]
+    if filters.savings:
+        params.append(("savings", "1"))
+    params.extend(("category", str(category_id)) for category_id in filters.category_ids)
+    if filters.yoy_category_id is not None:
+        params.append(("yoy_category", str(filters.yoy_category_id)))
+    return f"{scoped_url(request, 'reports_year_overview_csv')}?{urlencode(params)}"
+
+
+def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOverview:
+    series = data.year_grid
+    month_names = short_month_names(locale)
+    columns = tuple(
+        month_names[period.month - 1] if isinstance(period, YearMonth) else str(period)
+        for period in series.periods
+    )
+    maximum = max(
+        (amount.amount_minor for row in series.rows for amount in row.amounts),
+        default=0,
+    )
+    rows = tuple(
+        YearGridRow(
+            label=_category_name(row, locale),
+            color=row.color or None,
+            cells=tuple(
+                YearGridCell(
+                    text=format_money(amount, locale),
+                    heat_class=_heat_class(amount.amount_minor, maximum),
+                )
+                for amount in row.amounts
+            ),
+            total=format_money(row.total, locale),
+        )
+        for row in series.rows
+    )
+    return YearOverview(
+        year=data.filters.year,
+        columns=columns,
+        rows=rows,
+        totals=tuple(format_money(total, locale) for total in series.totals),
+        total=format_money(series.total, locale),
+        csv_url=_year_csv_url(data, request),
+        empty=not rows,
+    )
+
+
+def _trend_note(months: int, locale: str) -> str:
+    return gettext(CATEGORY_TRENDS_NOT_ENOUGH, locale) % {"num": months}
+
+
+def _category_trends_view(data: ReportsData, locale: str, request: Request) -> CategoryTrendsView:
+    trends = data.category_trends
+    if data.filters.step is not ReportStep.MONTH:
+        return CategoryTrendsView(
+            columns=(),
+            rows=(),
+            months=data.filters.trend_months,
+            year_step=True,
+            empty=True,
+            has_values=False,
+        )
+    columns: list[CategoryColumn] = []
+    for period in trends.periods:
+        columns.append(
+            CategoryColumn(
+                label=_period_label(period, ReportStep.MONTH, locale),
+                href=scoped_url(request, "month", month=str(period)),
+                so_far=_is_so_far(period, ReportStep.MONTH, data.today),
+            )
+        )
+    note = _trend_note(trends.months, locale)
+    rows = tuple(
+        TrendRow(
+            label=(
+                gettext(OTHER, locale)
+                if row.other
+                else _display_category_name(row.name, row.archived, locale)
+            ),
+            color=row.color or None,
+            cells=tuple(
+                TrendCell(
+                    text=format_money(amount, locale) if amount is not None else None,
+                    note=None if amount is not None else note,
+                )
+                for amount in row.averages
+            ),
+        )
+        for row in trends.rows
+    )
+    return CategoryTrendsView(
+        columns=tuple(columns),
+        rows=rows,
+        months=trends.months,
+        year_step=False,
+        empty=not rows,
+        has_values=trends.has_values,
+    )
+
+
+def _trend_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
+    trends = data.category_trends
+    if data.filters.step is not ReportStep.MONTH or not trends.has_values:
+        return None
+    values = [
+        amount.amount_minor for row in trends.rows for amount in row.averages if amount is not None
+    ]
+    if not values:
+        return None
+    currency = data.filters.currency
+    labels = [format_month(period, locale) for period in trends.periods]
+    low, high, step, axis_labels = money_axis(values, currency, locale)
+    tooltips: list[list[str]] = []
+    for period in trends.periods:
+        lines = (
+            [gettext(SO_FAR, locale)] if _is_so_far(period, ReportStep.MONTH, data.today) else []
+        )
+        tooltips.append(lines)
+
+    def text(amount: Money | None) -> str:
+        return format_money(amount, locale) if amount is not None else ""
+
+    return {
+        "labels": labels,
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "series": [
+            {
+                "key": str(row.category_id) if row.category_id is not None else "other",
+                "name": (
+                    gettext(OTHER, locale)
+                    if row.other
+                    else _display_category_name(row.name, row.archived, locale)
+                ),
+                "color": row.color or "line-strong",
+                "values": [
+                    amount.amount_minor if amount is not None else None for amount in row.averages
+                ],
+                "amounts": [text(amount) for amount in row.averages],
+            }
+            for row in trends.rows
+        ],
+        "tooltips": tooltips,
+    }
+
+
+def _year_over_year_view(data: ReportsData, locale: str) -> YearOverYearView | None:
+    yoy = data.yoy
+    if yoy is None:
+        return None
+    if yoy.category_id is None:
+        label = gettext(YEAR_OVER_YEAR_TOTAL, locale)
+        color = None
+    else:
+        label = _display_category_name(yoy.name, yoy.archived, locale)
+        color = yoy.color or None
+    percent = (
+        format_rate_tenths(yoy.change_tenths, locale) if yoy.change_tenths is not None else None
+    )
+    return YearOverYearView(
+        label=label,
+        color=color,
+        year_label=str(yoy.year),
+        previous_year_label=str(yoy.previous_year),
+        current=format_money(yoy.current, locale),
+        previous=format_money(yoy.previous, locale),
+        change=format_money(yoy.change, locale),
+        change_minor=yoy.change.amount_minor,
+        percent=percent,
+        percent_note=None if percent is not None else gettext(YEAR_OVER_YEAR_NO_PREVIOUS, locale),
+    )
+
+
+def _plan_accuracy_view(data: ReportsData, locale: str) -> PlanAccuracyView:
+    accuracy = data.plan_accuracy
+    rows = tuple(
+        AccuracyRowView(
+            label=_display_category_name(row.name, row.archived, locale),
+            color=row.color or None,
+            months_planned=row.months_planned,
+            months_over=row.months_over,
+            percent=(
+                format_rate_tenths(row.over_tenths, locale) if row.over_tenths is not None else "—"
+            ),
+        )
+        for row in accuracy.rows
+    )
+    return PlanAccuracyView(
+        rows=rows,
+        months_planned=accuracy.months_planned,
+        months_over=accuracy.months_over,
+        percent=(
+            format_rate_tenths(accuracy.over_tenths, locale)
+            if accuracy.over_tenths is not None
+            else "—"
+        ),
+        empty=accuracy.empty,
+    )
+
+
+def _yoy_category_options(data: ReportsData) -> tuple[CategoryOptionView, ...]:
+    selected = data.filters.yoy_category_id
+    return tuple(
+        CategoryOptionView(
+            id=option.id,
+            name=option.name,
+            selected=option.id == selected,
+            archived=option.archived,
+        )
+        for option in data.yoy_category_options
+    )
+
+
 def _notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     notes: list[str] = []
     if data.future_count:
@@ -605,6 +930,12 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         category_options=_category_options(data),
         category_notes=_category_notes(data, locale),
         category_empty=gettext(category_empty, locale),
+        year_overview=_year_overview(data, locale, request),
+        category_trends=_category_trends_view(data, locale, request),
+        trend_chart=_trend_chart(data, locale),
+        year_over_year=_year_over_year_view(data, locale),
+        plan_accuracy=_plan_accuracy_view(data, locale),
+        yoy_category_options=_yoy_category_options(data),
         notes=_notes(data, locale),
         range_years=range_years,
     )

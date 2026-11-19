@@ -3,6 +3,8 @@ access."""
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 from datetime import UTC, date, datetime
@@ -12,7 +14,7 @@ import pytest
 from sqlalchemy import insert, select
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from tests.conftest import OwnerApp
 
 NOW = "2026-10-14T12:00:00+00:00"
@@ -95,10 +97,40 @@ def _tx(
         )
 
 
+def _budget_line(app: OwnerApp, category_id: UUID, month: date, minor: int) -> None:
+    with app.db() as session, session.begin():
+        session.execute(
+            insert(BudgetLine),
+            [
+                {
+                    "id": uuid4(),
+                    "workspace_id": app.home_id,
+                    "month": month,
+                    "category_id": category_id,
+                    "planned_minor": minor,
+                    "currency": "EUR",
+                    "import_batch_id": None,
+                    "created_at": STAMP,
+                    "updated_at": STAMP,
+                }
+            ],
+        )
+
+
 def _page(app: OwnerApp, query: str = "") -> str:
     response = app.client.get("/reports" + (f"?{query}" if query else ""))
     assert response.status_code == 200, response.text
     return response.text
+
+
+def _csv_response(app: OwnerApp, query: str = ""):
+    return app.client.get(
+        "/reports/year-overview.csv" + (f"?{query}" if query else ""), follow_redirects=False
+    )
+
+
+def _csv_rows(text: str) -> list[list[str]]:
+    return list(csv.reader(io.StringIO(text)))
 
 
 def _row_labels(html: str) -> list[str]:
@@ -582,3 +614,314 @@ def test_a_future_only_category_filter_has_no_zero_column_table(reports: OwnerAp
         f"from=2027&to=2027&step=year&category={food}",
     )
     assert "data-report-category-row" not in html
+
+
+# F9.2 year overview, category trends, year-over-year and plan accuracy
+
+
+def _seed_grid(app: OwnerApp) -> dict[str, UUID]:
+    categories = {
+        "food": _category(app, "Grid Food"),
+        "rent": _category(app, "Grid Rent", color="#2563eb"),
+        "savings": _category(app, "Grid Savings", "expense", "savings"),
+        "transfer": _category(app, "Grid Transfer", "expense", "transfer"),
+        "salary": _category(app, "Grid Salary", "income"),
+    }
+    _tx(app, categories["food"], date(2026, 1, 10), 12_000)
+    _tx(app, categories["food"], date(2026, 2, 10), 13_000)
+    _tx(app, categories["rent"], date(2026, 1, 11), 90_000)
+    _tx(app, categories["savings"], date(2026, 1, 12), 20_000)
+    _tx(app, categories["transfer"], date(2026, 1, 13), 50_000)
+    _tx(app, categories["salary"], date(2026, 1, 14), 300_000, direction="income")
+    return categories
+
+
+def _grid_row(html: str, label: str) -> str:
+    for row in re.findall(r"<tr data-report-grid-row>.*?</tr>", html, re.DOTALL):
+        header = re.sub(r"<svg.*?</svg>", "", row, flags=re.DOTALL)
+        if re.search(r">\s*" + re.escape(label) + r"\s*</th>", header):
+            return row
+    raise AssertionError(label)
+
+
+def _trend_row(html: str, label: str) -> str:
+    for row in re.findall(r"<tr data-report-trend-row>.*?</tr>", html, re.DOTALL):
+        header = re.sub(r"<svg.*?</svg>", "", row, flags=re.DOTALL)
+        if re.search(r">\s*" + re.escape(label) + r"\s*</th>", header):
+            return row
+    raise AssertionError(label)
+
+
+def _accuracy_row(html: str, label: str) -> str:
+    for row in re.findall(r"<tr data-report-accuracy-row>.*?</tr>", html, re.DOTALL):
+        header = re.sub(r"<svg.*?</svg>", "", row, flags=re.DOTALL)
+        if re.search(r">\s*" + re.escape(label) + r"\s*</th>", header):
+            return row
+    raise AssertionError(label)
+
+
+def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: OwnerApp) -> None:
+    _seed_grid(reports)
+    html = _page(reports, "from=2026&to=2026&step=month&year=2026")
+    assert "data-report-year-overview" in html
+    assert ">Year overview</h2>" in html
+    assert "data-report-grid-year>2026<" in html
+    assert "data-report-year-csv" in html
+    assert "/reports/year-overview.csv" in html
+    for month in (
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ):
+        assert f">{month}</th>" in html
+    # Only the regular expense categories are rows; savings, transfers and income stay out.
+    rows = re.findall(r"<tr data-report-grid-row>", html)
+    assert len(rows) == 2
+    food = _grid_row(html, "Grid Food")
+    assert _cells(food)[:2] == ["€120.00", "€130.00"]
+    assert _cells(food)[-1] == "€250.00"
+    rent = _grid_row(html, "Grid Rent")
+    assert _cells(rent)[0] == "€900.00" and _cells(rent)[-1] == "€900.00"
+    totals = re.search(r"<tr [^>]*data-report-grid-totals.*?</tr>", html, re.DOTALL)
+    assert totals is not None
+    assert _cells(totals.group(0))[:2] == ["€1,020.00", "€130.00"]
+    assert _cells(totals.group(0))[-1] == "€1,150.00"
+    assert "heat-4" in re.search(
+        r'<td class="([^"]*)" data-report-grid-cell>€900\.00</td>', html
+    ).group(1)  # type: ignore[union-attr]
+    assert "heat-1" in re.search(
+        r'<td class="([^"]*)" data-report-grid-cell>€120\.00</td>', html
+    ).group(1)  # type: ignore[union-attr]
+    zero_classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>€0\.00</td>', food)
+    assert zero_classes and all("heat-" not in value for value in zero_classes)
+    assert "Grid Savings" not in html and "Grid Transfer" not in html
+
+    with_savings = _page(reports, "from=2026&to=2026&step=month&year=2026&savings=1")
+    assert "Grid Savings" in with_savings
+    assert _cells(_grid_row(with_savings, "Grid Savings"))[0] == "€200.00"
+
+    ignored = _page(
+        reports,
+        f"from=2026&to=2026&step=month&year=2026&category={uuid4()}&category=junk",
+    )
+    assert "Grid Food" in ignored and "data-report-grid-row" in ignored
+    empty_year = _page(reports, "from=2026&to=2026&step=month&year=2024")
+    assert "No spending in this year." in empty_year
+    unused = _category(reports, "Unused")
+    empty_selection = _page(reports, f"from=2026&to=2026&step=month&year=2026&category={unused}")
+    assert _cells(_grid_row(empty_selection, "Unused"))[-1] == "€0.00"
+
+
+def test_the_year_overview_csv_matches_the_grid(reports: OwnerApp) -> None:
+    categories = _seed_grid(reports)
+    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="reports-year-overview.csv"'
+    )
+    assert response.headers["cache-control"] == "no-store"
+    rows = _csv_rows(response.content.decode("utf-8"))
+    assert rows[0][:3] == ["category_id", "category", "archived"]
+    assert rows[0][3] == "2026-01" and rows[0][-2] == "2026-12" and rows[0][-1] == "total"
+    food = next(row for row in rows if row[1] == "Grid Food")
+    assert food[3:5] == ["120.00", "130.00"]
+    assert food[-1] == "250.00"
+    total = rows[-1]
+    assert total[:3] == ["", "Total", "false"]
+    assert total[3] == "1020.00" and total[-1] == "1150.00"
+
+    filtered = _csv_response(
+        reports,
+        f"from=2026&to=2026&step=month&year=2026&category={categories['food']}",
+    )
+    filtered_rows = _csv_rows(filtered.content.decode("utf-8"))
+    assert [row[1] for row in filtered_rows[1:-1]] == ["Grid Food"]
+    assert filtered_rows[-1][-1] == "250.00"
+
+
+def test_the_year_overview_csv_escapes_names_and_requires_sign_in(reports: OwnerApp) -> None:
+    tricky = _category(reports, 'CSV, "Tricky"')
+    _tx(reports, tricky, date(2026, 3, 4), 1_000)
+    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
+    rows = _csv_rows(response.content.decode("utf-8"))
+    assert any(row[1] == 'CSV, "Tricky"' for row in rows[1:-1])
+
+    bad = _csv_response(reports, "from=2026&to=2025")
+    assert bad.status_code == 400
+    assert "Fix the filters to export the year overview." in bad.text
+
+    reports.client.cookies.clear()
+    anonymous = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
+    assert anonymous.status_code == 303
+    assert anonymous.headers["location"].startswith("/login")
+
+
+def test_a_viewer_can_export_the_year_overview_csv(reports: OwnerApp) -> None:
+    _seed_grid(reports)
+    user_id = reports.add_user("vic")
+    reports.join(user_id, reports.home_id, "viewer")
+    reports.client.cookies.clear()
+    assert (
+        reports.web.sign_in(
+            reports.client, email="vic@example.com", password=reports.web.admin_password
+        ).status_code
+        == 303
+    )
+    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
+    assert response.status_code == 200
+
+
+def test_category_trends_show_three_and_twelve_month_windows(reports: OwnerApp) -> None:
+    food = _category(reports, "Trend Food")
+    rent = _category(reports, "Trend Rent")
+    for month, minor in ((1, 10_000), (2, 20_000), (3, 30_000)):
+        _tx(reports, food, date(2026, month, 10), minor)
+    _tx(reports, rent, date(2026, 1, 10), 5_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month&trend=3")
+    assert "data-report-trends" in html
+    assert ">Category trends</h2>" in html
+    assert "data-report-trend-row" in html
+    food_row = _trend_row(html, "Trend Food")
+    cells = _cells(food_row)
+    assert cells[0].startswith("—") and cells[1].startswith("—")
+    assert cells[2:5] == ["€200.00", "€166.67", "€100.00"]
+    assert "data-report-trend-cell" in food_row
+    data = json.loads(
+        re.search(
+            r'<script type="application/json" id="reports-trend-data">(.*?)</script>',
+            html,
+            re.DOTALL,
+        ).group(1)  # type: ignore[union-attr]
+    )
+    assert data["series"][0]["name"] == "Trend Food"
+    assert data["series"][0]["values"][:5] == [None, None, 20_000, 16_667, 10_000]
+    assert 'data-chart="report-trend"' in html
+    assert 'data-chart-source="reports-trend-data"' in html
+    assert '<option value="3" selected>' in html
+
+    twelve = _page(reports, "from=2025&to=2026&step=month&trend=12")
+    twelve_cells = _cells(_trend_row(twelve, "Trend Food"))
+    assert all(cell.startswith("—") for cell in twelve_cells[:11])
+    assert not twelve_cells[11].startswith("—")
+    assert '<option value="12" selected>' in twelve
+
+    yearly = _page(reports, "from=2025&to=2026&step=year")
+    assert "Choose monthly granularity to see rolling averages." in yearly
+    assert "data-report-trend-row" not in yearly
+
+
+def test_category_trends_follow_the_selected_categories(reports: OwnerApp) -> None:
+    food = _category(reports, "Trend Food")
+    rent = _category(reports, "Trend Rent")
+    _tx(reports, food, date(2026, 1, 10), 10_000)
+    _tx(reports, rent, date(2026, 1, 11), 20_000)
+    html = _page(reports, f"from=2026&to=2026&step=month&category={food}")
+    trend_section = re.search(r"<section [^>]*data-report-trends.*?</section>", html, re.DOTALL)
+    assert trend_section is not None
+    assert "Trend Food" in trend_section.group(0)
+    assert "Trend Rent" not in trend_section.group(0)
+
+
+def test_year_over_year_compares_a_category_or_the_total(reports: OwnerApp) -> None:
+    food = _category(reports, "YOY Food")
+    rent = _category(reports, "YOY Rent")
+    _tx(reports, food, date(2025, 1, 10), 10_000)
+    _tx(reports, food, date(2026, 1, 10), 15_000)
+    _tx(reports, rent, date(2025, 1, 11), 5_000)
+    _tx(reports, rent, date(2026, 1, 11), 2_000)
+
+    html = _page(reports, f"from=2025&to=2026&step=month&year=2026&yoy_category={food}")
+    assert "data-report-year-over-year" in html
+    row = re.search(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
+    assert row is not None
+    assert _cells(row.group(0)) == ["€150.00", "€100.00", "€50.00", "50.0%"]
+    assert "text-danger" in re.search(r'<td class="([^"]*)" data-report-yoy-change>', html).group(1)  # type: ignore[union-attr]
+    assert "YOY Food" in row.group(0)
+
+    total = _page(reports, "from=2025&to=2026&step=month&year=2026")
+    total_row = re.search(r"<tr data-report-yoy-row>.*?</tr>", total, re.DOTALL)
+    assert total_row is not None
+    assert "Total (all categories)" in total_row.group(0)
+    assert _cells(total_row.group(0))[3] == "13.3%"
+
+    ignored = _page(reports, f"from=2025&to=2026&step=month&year=2026&yoy_category={uuid4()}")
+    assert "Total (all categories)" in ignored
+
+    no_previous = _page(reports, f"from=2025&to=2026&step=month&year=2025&yoy_category={rent}")
+    no_previous_row = re.search(r"<tr data-report-yoy-row>.*?</tr>", no_previous, re.DOTALL)
+    assert no_previous_row is not None
+    assert "Not available: nothing spent in the previous year." in no_previous_row.group(0)
+    assert '<option value="2025" selected>' in no_previous
+
+
+def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None:
+    food = _category(reports, "Accuracy Food")
+    rent = _category(reports, "Accuracy Rent")
+    savings = _category(reports, "Accuracy Savings", "expense", "savings")
+    salary = _category(reports, "Accuracy Salary", "income")
+    _tx(reports, food, date(2026, 1, 10), 10_000)
+    _tx(reports, food, date(2026, 2, 10), 20_000)
+    _tx(reports, food, date(2026, 3, 10), 5_000)
+    _tx(reports, rent, date(2026, 1, 10), 30_000)
+    _tx(reports, savings, date(2026, 1, 10), 40_000)
+    _tx(reports, salary, date(2026, 1, 10), 50_000, direction="income")
+    _budget_line(reports, food, date(2026, 1, 1), 10_000)
+    _budget_line(reports, food, date(2026, 2, 1), 15_000)
+    _budget_line(reports, food, date(2026, 3, 1), 10_000)
+    _budget_line(reports, rent, date(2026, 1, 1), 30_000)
+    _budget_line(reports, savings, date(2026, 1, 1), 100)
+    _budget_line(reports, salary, date(2026, 1, 1), 100)
+
+    html = _page(reports, "from=2026&to=2026&step=month")
+    assert "data-report-accuracy" in html
+    assert ">Planned vs actual accuracy</h2>" in html
+    assert "data-report-accuracy-row" in html
+    assert _cells(_accuracy_row(html, "Accuracy Food")) == ["3", "1", "33.3%"]
+    assert _cells(_accuracy_row(html, "Accuracy Rent")) == ["1", "0", "0.0%"]
+    total = re.search(r"<tr [^>]*data-report-accuracy-total.*?</tr>", html, re.DOTALL)
+    assert total is not None
+    assert "All categories" in total.group(0)
+    assert _cells(total.group(0)) == ["4", "1", "25.0%"]
+    assert "A month counts as over when actual spending is greater than the plan." in html
+    assert "Accuracy Savings" not in html and "Accuracy Salary" not in html
+    with_savings = _page(reports, "from=2026&to=2026&step=month&savings=1")
+    accuracy_section = re.search(
+        r"<section [^>]*data-report-accuracy.*?</section>", with_savings, re.DOTALL
+    )
+    assert accuracy_section is not None
+    assert "Accuracy Savings" not in accuracy_section.group(0)
+    assert "Accuracy Salary" not in accuracy_section.group(0)
+    assert "Accuracy Food" in accuracy_section.group(0)
+
+
+def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
+    food = _category(reports, "Polska Food")
+    _tx(reports, food, date(2026, 1, 10), 10_000)
+    _budget_line(reports, food, date(2026, 1, 1), 5_000)
+    reports.client.headers["Accept-Language"] = "pl"
+    html = _page(reports, "from=2026&to=2026&step=month&year=2026")
+    assert "Przegląd roczny" in html
+    assert "Trendy kategorii" in html
+    assert "Rok do roku" in html
+    assert "Dokładność planu i rzeczywistości" in html
+    assert "Okno: 3 mies." in html
+    assert "Zmiana %" in html
+    assert "Przekroczenie %" in html
+
+
+def test_plan_accuracy_is_empty_without_plans(reports: OwnerApp) -> None:
+    food = _category(reports, "No Plan Food")
+    _tx(reports, food, date(2026, 1, 10), 10_000)
+    html = _page(reports, "from=2026&to=2026&step=month")
+    assert "No planned regular expenses in this range." in html

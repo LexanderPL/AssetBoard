@@ -1,5 +1,6 @@
-"""Ledger reports (F10.1–F10.3): income, spending and savings per month or year, the
-savings-rate trend, and spending by category over time.
+"""Ledger reports (F10.1–F10.3 and F9.2): income, spending and savings per month or year, the
+savings-rate trend, spending by category over time, the year grid, rolling category averages,
+year-over-year comparisons and planned-vs-actual accuracy.
 
 Pure: no I/O, no clock. Amounts are integer minor units (``Money``) in the report's currency.
 The treatment rules are F2.4's (docs/specs/00-overview.md §3.3): ``earned`` is income/regular,
@@ -23,6 +24,14 @@ ordered by their range total, largest first; the service keeps the eight largest
 ``top_categories`` combine the rest into one unnamed "Other" row. A category filter selects
 exactly the chosen categories (zeros included). Archived categories are ordinary data here:
 their history keeps counting and the caller supplies their current name and colour.
+
+**F9.2 sections.** ``year_grid`` is the same category series for one calendar year, month by
+month. ``rolling_category_averages`` averages each category's monthly amount over a trailing
+window (3 or 12 months) and leaves the first ``months - 1`` points empty, like F10.2's rolling
+rate. ``year_over_year`` compares the selected year's category-series total (or one category)
+with the year before; the percent change is ``None`` when the previous year spent nothing.
+``plan_accuracy`` counts, per planned regular expense category, the months with a plan and the
+months whose actual was **greater** than the plan; a month with equal amounts is not over.
 """
 
 from __future__ import annotations
@@ -35,7 +44,12 @@ from uuid import UUID
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.domain.summary import block_of, savings_rate_bp, savings_rate_tenths
+from assetboard.domain.summary import (
+    block_of,
+    ratio_tenths,
+    savings_rate_bp,
+    savings_rate_tenths,
+)
 
 
 class ReportStep(StrEnum):
@@ -163,6 +177,114 @@ class CategorySeries:
     rows: tuple[CategorySpend, ...]
     totals: tuple[Money, ...]
     total: Money
+
+
+TREND_MONTHS_DEFAULT = 3
+TREND_MONTH_CHOICES = (3, 12)
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryTrendRow:
+    """One category's rolling average per month.
+
+    ``averages`` is parallel to ``periods``; ``None`` marks a point without a full window yet.
+    ``name``, ``color`` and ``archived`` are copied from ``CategorySpend`` so the view needs no
+    second lookup. The unnamed combined row keeps ``category_id=None``.
+    """
+
+    category_id: UUID | None
+    name: str
+    color: str
+    archived: bool
+    averages: tuple[Money | None, ...]
+
+    @property
+    def other(self) -> bool:
+        """Whether this is the unnamed combined remainder row."""
+        return self.category_id is None
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryTrends:
+    """Rolling category averages for a **monthly** category series.
+
+    ``months`` is the window length; ``rows`` keep the source series' order. A yearly series
+    yields an empty result because a 3- or 12-month window has no meaning there.
+    """
+
+    periods: tuple[YearMonth, ...]
+    months: int
+    rows: tuple[CategoryTrendRow, ...]
+
+    @property
+    def has_values(self) -> bool:
+        """Whether at least one window is complete enough to draw."""
+        return any(amount is not None for row in self.rows for amount in row.averages)
+
+
+@dataclass(frozen=True, slots=True)
+class YearOverYear:
+    """One category's (or the whole category series') selected year against the year before.
+
+    ``change = current - previous`` (positive means more was spent); ``change_tenths`` is the
+    percent change in tenths of a percent, rounded once, or ``None`` when the previous year was
+    zero (the percentage is undefined).
+    """
+
+    year: int
+    previous_year: int
+    category_id: UUID | None
+    name: str
+    color: str
+    archived: bool
+    current: Money
+    previous: Money
+    change: Money
+    change_tenths: int | None
+
+    @property
+    def available(self) -> bool:
+        return self.change_tenths is not None
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedMonth:
+    """One planned value for a category and calendar month, in the report's currency."""
+
+    category_id: UUID
+    month: YearMonth
+    planned: Money
+
+
+@dataclass(frozen=True, slots=True)
+class AccuracyRow:
+    """One planned regular expense category's plan accuracy over the range.
+
+    ``over_tenths`` is ``months_over / months_planned`` in tenths of a percent, rounded once;
+    it is always available because a row only exists for a category with a plan.
+    """
+
+    category_id: UUID
+    name: str
+    color: str
+    archived: bool
+    months_planned: int
+    months_over: int
+    over_tenths: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class PlanAccuracy:
+    """Plan accuracy per category plus the exact totals across category-months."""
+
+    rows: tuple[AccuracyRow, ...]
+    months_planned: int
+    months_over: int
+    over_tenths: int | None
+
+    @property
+    def empty(self) -> bool:
+        return not self.rows
 
 
 def period_keys(start: date, end: date, step: ReportStep | str) -> tuple[PeriodKey, ...]:
@@ -547,6 +669,211 @@ def top_categories(series: CategorySeries, *, limit: int = TOP_CATEGORIES) -> Ca
     )
 
 
+def year_grid(
+    entries: Iterable[LedgerEntry],
+    categories: Mapping[UUID, ReportCategory],
+    *,
+    year: int,
+    currency: str,
+    include_savings: bool = False,
+    selected: Collection[UUID] | None = None,
+) -> CategorySeries:
+    """The F10.3 category series for one calendar year, month by month (F9.2).
+
+    Exactly twelve periods are present, January through December, with zeros for months without
+    entries. The treatment rules are ``category_series``': regular expenses, plus expense/savings
+    when ``include_savings`` is true; income, withdrawals and transfers never count. A
+    non-empty ``selected`` shows exactly those categories (zero rows included) and never
+    combines; unknown or ineligible ids are ignored.
+    """
+    return category_series(
+        entries,
+        categories,
+        start=date(year, 1, 1),
+        end=date(year, 12, 31),
+        step=ReportStep.MONTH,
+        currency=currency,
+        include_savings=include_savings,
+        selected=selected,
+    )
+
+
+def _average_minor(total: int, months: int) -> int:
+    """``total / months`` in minor units, rounded once, half away from zero."""
+    sign = -1 if total < 0 else 1
+    quotient, remainder = divmod(abs(total), months)
+    if 2 * remainder >= months:
+        quotient += 1
+    return sign * quotient
+
+
+def rolling_category_averages(
+    series: CategorySeries, *, months: int = TREND_MONTHS_DEFAULT
+) -> CategoryTrends:
+    """Trailing ``months``-month averages for every row of a monthly category series (F9.2).
+
+    Each point is the exact integer sum of that category's amounts over the window divided by
+    ``months``, rounded once (half away from zero). The first ``months - 1`` points are ``None``
+    because the window is not full yet. A yearly series has no month windows and yields an empty
+    result. No averaging of averages: the running sum is exact.
+    """
+    if months < 1:
+        raise ValueError("months must be at least 1")
+    if not series.periods or not all(isinstance(period, YearMonth) for period in series.periods):
+        return CategoryTrends((), months, ())
+    periods = tuple(period for period in series.periods if isinstance(period, YearMonth))
+    rows: list[CategoryTrendRow] = []
+    for row in series.rows:
+        values: list[Money | None] = []
+        running = 0
+        for index, amount in enumerate(row.amounts):
+            running += amount.amount_minor
+            if index >= months:
+                running -= row.amounts[index - months].amount_minor
+            if index >= months - 1:
+                values.append(Money(_average_minor(running, months), series.total.currency))
+            else:
+                values.append(None)
+        rows.append(
+            CategoryTrendRow(
+                category_id=row.category_id,
+                name=row.name,
+                color=row.color,
+                archived=row.archived,
+                averages=tuple(values),
+            )
+        )
+    return CategoryTrends(periods, months, tuple(rows))
+
+
+def year_over_year(
+    series: CategorySeries, *, year: int, category_id: UUID | None = None
+) -> YearOverYear:
+    """The selected year's spending against the previous year (F9.2).
+
+    ``series`` is a yearly ``CategorySeries`` covering ``year`` and, when it exists, the year
+    before. With ``category_id`` the row's figures are compared; otherwise the series' column
+    totals (the whole category report) are. A missing category row or previous year counts as
+    zero. ``change_tenths`` is ``None`` when the previous amount was zero.
+    """
+    currency = series.total.currency
+    positions = {period: index for index, period in enumerate(series.periods)}
+    current_index = positions.get(year)
+    previous_index = positions.get(year - 1)
+    if category_id is None:
+        current_minor = (
+            series.totals[current_index].amount_minor if current_index is not None else 0
+        )
+        previous_minor = (
+            series.totals[previous_index].amount_minor if previous_index is not None else 0
+        )
+        name = color = ""
+        archived = False
+    else:
+        row = next(
+            (spend for spend in series.rows if spend.category_id == category_id),
+            None,
+        )
+        current_minor = (
+            row.amounts[current_index].amount_minor
+            if row is not None and current_index is not None
+            else 0
+        )
+        previous_minor = (
+            row.amounts[previous_index].amount_minor
+            if row is not None and previous_index is not None
+            else 0
+        )
+        name = row.name if row is not None else ""
+        color = row.color if row is not None else ""
+        archived = row.archived if row is not None else False
+    change_minor = current_minor - previous_minor
+    return YearOverYear(
+        year=year,
+        previous_year=year - 1,
+        category_id=category_id,
+        name=name,
+        color=color,
+        archived=archived,
+        current=Money(current_minor, currency),
+        previous=Money(previous_minor, currency),
+        change=Money(change_minor, currency),
+        change_tenths=ratio_tenths(change_minor, previous_minor),
+    )
+
+
+def plan_accuracy(
+    series: CategorySeries,
+    plans: Iterable[PlannedMonth],
+    categories: Mapping[UUID, ReportCategory],
+) -> PlanAccuracy:
+    """How often actual spending exceeded the plan, per planned regular expense category.
+
+    ``series`` is the monthly category series for the range; only regular expense categories
+    are considered (transfers, income, withdrawals and savings never count, whichever option
+    the page used). A month is planned when a line exists for it, and over when the actual
+    amount is **greater** than the plan; equal amounts are not over. Lines outside the series'
+    periods, in another currency than the series, or for categories without spending still
+    count as planned with an actual of zero. A category without any plan has no row.
+    """
+    positions = {period: index for index, period in enumerate(series.periods)}
+    planned_by_category: dict[UUID, dict[YearMonth, int]] = {}
+    for line in plans:
+        if line.planned.currency != series.total.currency:
+            continue
+        category = categories.get(line.category_id)
+        if category is None:
+            raise ValueError(f"unknown category {line.category_id}")
+        if block_of(category.kind, category.treatment) != "expense":
+            continue
+        if line.month not in positions:
+            continue
+        months = planned_by_category.setdefault(category.id, {})
+        months[line.month] = months.get(line.month, 0) + line.planned.amount_minor
+    rows: list[AccuracyRow] = []
+    for category_id, months in planned_by_category.items():
+        actuals = next(
+            (row.amounts for row in series.rows if row.category_id == category_id),
+            None,
+        )
+        over = 0
+        for month, planned_minor in months.items():
+            position = positions[month]
+            actual_minor = actuals[position].amount_minor if actuals is not None else 0
+            if actual_minor > planned_minor:
+                over += 1
+        months_planned = len(months)
+        category = categories[category_id]
+        rows.append(
+            AccuracyRow(
+                category_id=category_id,
+                name=category.name,
+                color=category.color,
+                archived=category.archived,
+                months_planned=months_planned,
+                months_over=over,
+                over_tenths=ratio_tenths(over, months_planned),
+            )
+        )
+    rows.sort(
+        key=lambda row: (
+            -(row.over_tenths or 0),
+            -row.months_over,
+            -row.months_planned,
+            row.name.casefold(),
+            str(row.category_id),
+        )
+    )
+    total_planned = sum(row.months_planned for row in rows)
+    total_over = sum(row.months_over for row in rows)
+    return PlanAccuracy(
+        rows=tuple(rows),
+        months_planned=total_planned,
+        months_over=total_over,
+        over_tenths=ratio_tenths(total_over, total_planned),
+    )
+
+
 REPORT_ROLLING_MONTHS = 12
 
 
@@ -606,22 +933,34 @@ def totals_of(series: Iterable[PeriodTotals], *, currency: str) -> ReportTotals:
 __all__ = [
     "REPORT_ROLLING_MONTHS",
     "TOP_CATEGORIES",
+    "TREND_MONTH_CHOICES",
+    "TREND_MONTHS_DEFAULT",
+    "AccuracyRow",
     "CategorySeries",
     "CategorySpend",
+    "CategoryTrendRow",
+    "CategoryTrends",
     "LedgerEntry",
     "PeriodKey",
     "PeriodTotals",
+    "PlanAccuracy",
+    "PlannedMonth",
     "ReportCategory",
     "ReportStep",
     "ReportTotals",
     "SavingsRate",
+    "YearOverYear",
     "category_series",
     "ledger_and_category_series",
     "ledger_series",
     "period_keys",
+    "plan_accuracy",
+    "rolling_category_averages",
     "rolling_savings_rates",
     "savings_rate",
     "select_categories",
     "top_categories",
     "totals_of",
+    "year_grid",
+    "year_over_year",
 ]

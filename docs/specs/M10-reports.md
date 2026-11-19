@@ -276,6 +276,14 @@ trend". Those move here (F10.1, F10.2). F9.2's remaining reports (year overview 
 category averages, year-over-year, planned-vs-actual accuracy) are added as further sections of
 this `/reports` page when M9 is built, using the same filters and aggregation rules.
 
+**As built (F9.2):** the page now also has the year overview (a category × month grid for a
+selected `year`, with heat shading and a `GET /reports/year-overview.csv` export), category
+trends (3- or 12-month rolling averages over the displayed F10.3 series, `trend=3|12`),
+year-over-year (`year` plus `yoy_category`, absolute and percent change, no percent when the
+previous year was zero) and planned-vs-actual accuracy (planned regular expense categories,
+months planned/over/strictly greater, from the raw budget lines in one scoped read). Section
+details and assumptions are in M9 F9.2; the user guide is [Reports](../../reports.md).
+
 ## Open questions (for the owner)
 
 1. **Default range and step.** Proposed: the current year and the two before, monthly up to
