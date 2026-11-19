@@ -257,7 +257,7 @@ net-worth chart uses the corrected value the next time the page loads.
 
 ## Bulk add
 
-The **Bulk add items** panel accepts one item per line:
+The **Bulk add items** button opens a dialog that accepts one item per line:
 
 ```
 Name; value; category

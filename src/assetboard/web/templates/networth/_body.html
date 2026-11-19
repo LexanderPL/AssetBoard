@@ -15,6 +15,7 @@
   {% if can_edit and view.categories %}
   <div class="flex flex-wrap items-center gap-2" data-page-actions>
     <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&form=item#item-dialog" data-dialog-open="item-dialog" aria-haspopup="dialog" class="btn-primary" data-add-item>{{ _("Add item") }}</a>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&form=bulk#bulk-dialog" data-dialog-open="bulk-dialog" aria-haspopup="dialog" class="btn" data-bulk-open>{{ _("Bulk add items") }}</a>
   </div>
   {% endif %}
 
@@ -83,7 +84,7 @@
   {% endfor %}
 
   {% if view.categories and not view.groups and not view.archived_groups and not view.archived_items %}
-  <div data-empty-side>{{ empty_state(_("No items yet"), _("Use Add item above, or paste a list of items below."), icon="+") }}</div>
+  <div data-empty-side>{{ empty_state(_("No items yet"), _("Use Add item or Bulk add items above."), icon="+") }}</div>
   {% endif %}
 
   {% if can_edit and view.categories %}
@@ -169,23 +170,29 @@
     </form>
    </div>
   </dialog>
-  {% elif can_edit and not view.categories %}
-  <p class="text-sm text-muted" data-no-active-categories>{{ _("Add an active category before adding items.") }}</p>
-  {% endif %}
-
-  {% if can_edit and view.categories %}
-  <details class="panel p-6 sm:p-7" data-bulk>
-    <summary class="cursor-pointer text-base font-semibold">{{ _("Bulk add items") }}</summary>
+  {# Bulk add sits behind a header action like Add item. Without JavaScript the link opens the
+     page with the dialog rendered open in the page flow; a preview or a refused batch keeps it
+     open. #}
+  <dialog id="bulk-dialog" aria-labelledby="bulk-heading" data-bulk data-dialog-modal class="popup w-[min(92vw,52rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if bulk_text or bulk_preview or bulk_error or request.query_params.get("form") == "bulk" %} open{% endif %}>
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Bulk add items") }}</h2>
+      <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
     <p class="mt-2 text-sm text-muted">{{ _("Paste one item per line as name; value; category. Amounts use the interface number format and the workspace base currency. The whole batch is checked before anything is created.") }}</p>
+    {% if bulk_error %}<p class="mt-3 border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>{% endif %}
     <form {{ htmx_form(scoped_url(request, 'networth_bulk_preview')) }} class="mt-3 space-y-2">
       {{ csrf_input() }}
       <input type="hidden" name="side" value="{{ side_value }}">
       <label for="bulk-text" class="sr-only">{{ _("Items to add") }}</label>
-      <textarea id="bulk-text" name="text" rows="5" maxlength="65536" class="form-control w-full" data-bulk-text>{{ bulk_text }}</textarea>
+      <textarea id="bulk-text" name="text" rows="5" maxlength="65536" class="form-control w-full" data-bulk-text{% if not bulk_preview %} autofocus{% endif %}>{{ bulk_text }}</textarea>
       <button type="submit" class="btn" data-bulk-preview>{{ _("Preview") }}</button>
     </form>
-    {% if bulk_preview %}{{ bulk_preview_panel(bulk_preview) }}{% endif %}
-  </details>
+    {% if bulk_preview %}<div tabindex="-1" autofocus data-bulk-preview-focus>{{ bulk_preview_panel(bulk_preview) }}</div>{% endif %}
+   </div>
+  </dialog>
+  {% elif can_edit and not view.categories %}
+  <p class="text-sm text-muted" data-no-active-categories>{{ _("Add an active category before adding items.") }}</p>
   {% endif %}
 
   {% if view.archived_groups %}

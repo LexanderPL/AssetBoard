@@ -11101,6 +11101,9 @@ msgstr ""
 msgid "Add item"
 msgstr ""
 
+msgid "Bulk add items"
+msgstr ""
+
 msgid "Possible double counting"
 msgstr ""
 
@@ -11157,7 +11160,7 @@ msgstr ""
 msgid "No items yet"
 msgstr ""
 
-msgid "Use Add item above, or paste a list of items below."
+msgid "Use Add item or Bulk add items above."
 msgstr ""
 
 msgid "Add an item"
@@ -11194,12 +11197,6 @@ msgstr ""
 msgid "Enter values as positive amounts. For a liability, enter the amount owed."
 msgstr ""
 
-msgid "Add an active category before adding items."
-msgstr ""
-
-msgid "Bulk add items"
-msgstr ""
-
 msgid ""
 "Paste one item per line as name; value; category. Amounts use the "
 "interface number format and the workspace base currency. The whole batch "
@@ -11207,6 +11204,9 @@ msgid ""
 msgstr ""
 
 msgid "Items to add"
+msgstr ""
+
+msgid "Add an active category before adding items."
 msgstr ""
 
 msgid "Their items still count towards net worth until each item is archived."
@@ -15156,5 +15156,8 @@ msgstr ""
 #~ "Leave empty to show the 8 largest"
 #~ " categories and the rest as Other "
 #~ "(combined)."
+#~ msgstr ""
+
+#~ msgid "Use Add item above, or paste a list of items below."
 #~ msgstr ""
 

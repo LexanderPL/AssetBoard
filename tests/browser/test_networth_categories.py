@@ -70,6 +70,33 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
             expect(item_dialog).to_be_visible()
             item_dialog.get_by_role("link", name="Cancel").click()
             expect(item_dialog).to_be_hidden()
+
+            # Bulk add is a header action too; previews keep the dialog open.
+            bulk_dialog = page.locator("#bulk-dialog")
+            expect(bulk_dialog).to_be_hidden()
+            page.locator("[data-bulk-open]").click()
+            expect(bulk_dialog).to_be_visible()
+            expect(page.locator("#bulk-text")).to_be_focused()
+            bulk_dialog.locator("[data-bulk-text]").fill("Bulk car; 5000; Vehicles")
+            bulk_dialog.locator("button[data-bulk-preview]").click()
+            expect(page.locator("div[data-bulk-preview]")).to_be_visible()
+            expect(page.locator("#bulk-dialog")).to_be_visible()
+            expect(page.locator("[data-bulk-preview-focus]")).to_be_focused()
+            page.locator("#bulk-dialog [data-dialog-close]").click()
+            expect(page.locator("#bulk-dialog")).to_be_hidden()
+
+            # On a phone the limit error is inside the dialog, not hidden behind it.
+            page.set_viewport_size({"width": 390, "height": 600})
+            page.locator("[data-bulk-open]").click()
+            expect(page.locator("#bulk-dialog")).to_be_visible()
+            page.locator("#bulk-text").fill("\n".join("Car; 1; Vehicles" for _ in range(501)))
+            page.locator("#bulk-dialog button[data-bulk-preview]").click()
+            error = page.locator("[data-bulk-error]")
+            expect(error).to_be_visible()
+            expect(error).to_be_in_viewport()
+            expect(error).to_contain_text("Paste at most 500 lines.")
+            page.locator("#bulk-dialog [data-dialog-close]").click()
+            expect(page.locator("#bulk-dialog")).to_be_hidden()
             details = page.locator("[data-categories]")
             expect(details).to_be_visible()
             assert details.evaluate("element => element.open") is False
