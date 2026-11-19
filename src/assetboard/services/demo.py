@@ -25,7 +25,7 @@ import hashlib
 import io
 import os
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -185,14 +185,31 @@ def plan_for_workspace(ctx: Context, reference_date: date) -> DemoPlan:
     )
 
 
-def _fixed_clock(day: date, timezone: str) -> FixedClock:
-    """Noon in the workspace time zone: the date is stable, the timestamp deterministic."""
-    value = datetime(day.year, day.month, day.day, 12, tzinfo=ZoneInfo(timezone))
+def _fixed_clock(day: date, timezone: str, *, offset_seconds: int = 0) -> FixedClock:
+    """Noon plus a stable offset in the workspace time zone.
+
+    The date is stable and the timestamp deterministic. Ledger rows on one day get increasing
+    offsets, so their canonical (date, created_at) order does not fall back to random ids.
+    """
+    value = datetime(day.year, day.month, day.day, 12, tzinfo=ZoneInfo(timezone)) + timedelta(
+        seconds=offset_seconds
+    )
     return FixedClock(value.isoformat())
 
 
+# One build resets this: every demo write gets the next second of its day, so canonical
+# (date, created_at) ordering never falls back to a random UUID.
+_day_offsets: dict[date, int] = {}
+
+
+def _reset_day_offsets() -> None:
+    _day_offsets.clear()
+
+
 def _ctx_at(ctx: Context, day: date) -> Context:
-    return replace(ctx, clock=_fixed_clock(day, ctx.workspace.timezone))
+    offset = _day_offsets.get(day, 0)
+    _day_offsets[day] = offset + 1
+    return replace(ctx, clock=_fixed_clock(day, ctx.workspace.timezone, offset_seconds=offset))
 
 
 def _use(session: Session, ctx: Context) -> None:
@@ -1018,6 +1035,7 @@ def build_demo_workspace_in_session(
     CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
     if not archive.workspace_is_empty(session, ctx):
         raise DemoWorkspaceNotEmpty("the workspace is not empty")
+    _reset_day_offsets()
     tctx = _ctx_at(ctx, plan.reference_date)
     _use(session, tctx)
 

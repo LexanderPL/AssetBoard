@@ -125,11 +125,12 @@ the FIRE plan's future projection years (adjustments are plan years, not ledger 
 Notification channels, price-provider keys, provider errors, invitations and other members are
 intentionally not created (see `DEMO_EXCLUDED_MODELS` in `domain/demo.py`).
 
-The dataset is deterministic: the same `T`, locale and base currency produce the same rows
-(compared through the workspace archive), because the pure plan in `domain/demo.py` seeds its
-`random.Random` from `T` and sorts every collection. Amounts are defined once in EUR-scale and
-converted with the fixed factor table in that module. `DEMO_DATASET_VERSION` is bumped whenever
-the contents change; F9.11b's reset job compares it.
+The dataset is deterministic: the same `T`, locale and base currency produce the same rows and
+archive (compared byte-for-byte after normalising random ids), because the pure plan in
+`domain/demo.py` seeds its `random.Random` from `T`, sorts every collection and the writer gives
+each row a stable timestamp within its day. Amounts are defined once in EUR-scale and converted
+with the fixed factor table in that module. `DEMO_DATASET_VERSION` is bumped whenever the
+contents change; F9.11b's reset job compares it.
 
 ### Command
 

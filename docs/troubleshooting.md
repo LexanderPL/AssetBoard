@@ -24,8 +24,10 @@ problem. Detailed behaviour lives in the linked guides.
   token; a configured token stays the same.
 - **`/setup` returns 404.** Setup is already complete. Go to `/login`; use
   `assetboard reset-password <email>` if the password is lost.
-- **`assetboard create-admin` says a user exists.** It only creates the first administrator.
-  Use **Instance settings → Users** or `assetboard reset-password` instead.
+- **`assetboard create-admin` says a user exists.** That email is already registered; the
+  command never changes an existing account. `create-admin` is a break-glass command that adds
+  another administrator even when users exist, so use a different email. To recover an existing
+  account, use **Instance settings → Users** or `assetboard reset-password <email>`.
 - **The page redirects to `/setup` forever.** Every page redirects while the user table is
   empty. Check that the app points at the database you expect (`ASSETBOARD_DATA_DIR`,
   `ASSETBOARD_DATABASE_URL`) and that the data volume is writable by UID/GID `10001` in the
@@ -34,8 +36,10 @@ problem. Detailed behaviour lives in the linked guides.
 ## Sign-in, sessions and two-factor
 
 - **"Too many attempts" / throttling.** Limits are per email and per client address, and a
-  successful sign-in does not reset them. Wait for the shown delay, or restart with a larger
-  `ASSETBOARD_AUTH_*` allowance only while you recover access. Through a reverse proxy, set
+  successful sign-in does not reset them. Wait for the shown delay. Restarting or raising the
+  `ASSETBOARD_AUTH_*` limits does not clear an existing block because the state is stored in
+  `auth_throttles`. For a locked-out instance, stop the app, back up the database, and run
+  `DELETE FROM auth_throttles;` with `sqlite3` before restarting. Through a reverse proxy, set
   `ASSETBOARD_TRUSTED_PROXIES` or every visitor shares the proxy's address (see
   [Reverse proxies](deployment.md#reverse-proxies)).
 - **Sign-in succeeds, then every page asks again.** Cookies are `Secure` and `__Host-` prefixed
@@ -50,10 +54,11 @@ problem. Detailed behaviour lives in the linked guides.
   a link was sent either way, so check the SMTP settings and the log for `mail_send_failed`
   (the log has the error class, never the message content). Run
   `assetboard mail-test you@example.com`.
-- **OIDC button missing or sign-in fails.** The provider name, issuer URL, client ID and secret
-  must all be set, and the redirect URI must match `<BASE_URL>/auth/oidc/callback` exactly.
-  `email_verified` must be true for a new account. See [OIDC sign-in](auth/oidc.md#logs) for the
-  audit reasons and issuer-change procedure.
+- **OIDC button missing or sign-in fails.** The issuer URL and client ID must be set; the
+  provider name defaults to `SSO`. A client secret is only needed for a confidential client —
+  public clients use PKCE without one. The redirect URI must match
+  `<BASE_URL>/auth/oidc/callback` exactly, and `email_verified` must be true for a new account.
+  See [OIDC sign-in](auth/oidc.md#logs) for the audit reasons and issuer-change procedure.
 - **Proxy sign-in does not work.** The request must arrive from an address in
   `ASSETBOARD_TRUSTED_PROXIES`, and the proxy must overwrite the identity headers. Test with the
   procedure in [proxy authentication](auth/proxy-auth.md#test-it). Headers from other addresses
@@ -98,8 +103,9 @@ problem. Detailed behaviour lives in the linked guides.
 
 ## Imports, archives and months
 
-- **A CSV row is invalid.** The dry-run report names the row and column and lists at most 1 000
-  errors; the counts cover every row. Fix the file or map the category, then upload it again.
+- **A CSV row is invalid.** The dry-run report names the row and column; structural row errors
+  are capped at 1 000, while per-row adapter errors are also listed, so a very large report can
+  be long. The counts cover every row. Fix the file or map the category, then upload it again.
   See [Import and export](import-export.md#the-dry-run-report).
 - **The import disappeared after a restart.** Uploads are temporary and are removed after 24
   hours or when cancelled. Apply the import to keep its transactions.

@@ -27,9 +27,11 @@ LOCALES = ROOT / "src" / "assetboard" / "locales"
 
 def translated(message: Message) -> bool:
     value = message.string
-    if isinstance(value, tuple):
-        return bool(value) and all(part and part.strip() for part in value)
-    return bool(value and value.strip())
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (tuple, list)):
+        return bool(value) and all(isinstance(part, str) and part.strip() for part in value)
+    return False
 
 
 def scan(locale: str) -> tuple[int, int, int, int]:

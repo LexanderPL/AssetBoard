@@ -73,7 +73,7 @@ make check
 - [First run and sign-in](docs/deployment.md#first-run-and-sign-in): the setup token and the first administrator.
 - [Reverse proxies](docs/deployment.md#reverse-proxies): nginx, Caddy and Traefik examples, TLS, trusted proxies and body limits.
 - [OIDC sign-in](docs/auth/oidc.md) and [proxy authentication](docs/auth/proxy-auth.md): SSO and header-based sign-in.
-- [Notifications](docs/deployment.md#notifications): Apprise channels and reminders; [price providers](docs/investments.md#price-providers): NBP, CoinGecko, EODHD and GoldAPI.io.
+- [Notifications](docs/deployment.md#notifications): Apprise channels and reminders; [price providers](docs/investments.md#price-providers): NBP, ECB, CoinGecko, EODHD and GoldAPI.io.
 - [Backups and restore](docs/backup.md) and [Upgrading](docs/deployment.md#upgrading).
 - [Troubleshooting](docs/troubleshooting.md): start with the log and health endpoints for each symptom.
 

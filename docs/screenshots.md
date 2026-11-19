@@ -5,13 +5,23 @@ Every screenshot on this page is generated from the deterministic demo dataset b
 2026-11-20 and a EUR workspace; no real financial data is involved.
 
 ```console
+uv run playwright install chromium
 uv run python scripts/capture_screenshots.py
 ```
 
-The script can also capture a running instance seeded with `assetboard demo-seed`:
+The script can also capture a running instance. The account must have the seeded demo workspace
+as its current workspace (`assetboard demo-seed --workspace <id>`), and the sign-in details are
+passed explicitly:
 
 ```console
-uv run python scripts/capture_screenshots.py --base-url http://127.0.0.1:8000
+uv run python scripts/capture_screenshots.py --base-url http://127.0.0.1:8000 \
+  --email screenshots@example.com --password 'Correct Horse Battery!'
+```
+
+On an instance with public demo mode enabled, use `--demo-login` instead:
+
+```console
+uv run python scripts/capture_screenshots.py --base-url http://127.0.0.1:8000 --demo-login
 ```
 
 Each page is captured in four variants: desktop light (1440 × 900), desktop dark, phone light

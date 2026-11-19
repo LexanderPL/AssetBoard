@@ -80,8 +80,6 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
 | `ASSETBOARD_PROXY_AUTH_AUTO_CREATE` | `false` | App | Proxy-authenticated people without an account get one with their own workspace. |
 | `ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL` | `false` | App | A first proxy sign-in whose email matches an existing account with a password links them after that password is entered once. |
-| `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Positive number of calendar months of recurring occurrences to generate ahead. |
-| `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Run the in-process recurring-item scheduler (daily generation and startup catch-up). The test suite sets `false`. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -464,7 +462,7 @@ Set `ASSETBOARD_TRUSTED_PROXIES=127.0.0.1` (or the proxy's address when it is an
 ```caddyfile
 money.example.com {
     request_body {
-        max_size 20MB
+        max_size 20MiB
     }
     reverse_proxy 127.0.0.1:8000 {
         header_up Host {host}

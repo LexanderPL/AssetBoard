@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, Page, ViewportSize, sync_playwright
 from sqlalchemy import select
 
 from assetboard.app import create_app
@@ -43,7 +43,7 @@ DEFAULT_REFERENCE = date(2026, 11, 20)
 DEFAULT_EMAIL = "screenshots@example.com"
 DEFAULT_PASSWORD = "Correct Horse Battery!"
 
-VIEWPORTS = {
+VIEWPORTS: dict[str, ViewportSize] = {
     "desktop": {"width": 1440, "height": 900},
     "phone": {"width": 390, "height": 844},
 }
@@ -83,6 +83,10 @@ def _seed_instance(data_dir: Path, reference: date) -> tuple[Any, int]:
         secret_key="screenshot-instance-key",
         base_url=base_url,
         scheduler_enabled=False,
+        # Ambient ASSETBOARD_* variables must not change the committed gallery.
+        default_locale="en",
+        default_currency="EUR",
+        demo_enabled=False,
     )
     upgrade_database(settings)
     app = create_app(settings)
@@ -162,7 +166,10 @@ def _sign_in(page: Page, base_url: str, *, demo_login: bool, email: str, passwor
 def _capture(page: Page, base_url: str, output: Path, *, month: str) -> None:
     for slug, template, _title in PAGES:
         path = template.format(month=month)
-        page.goto(f"{base_url}{path}", wait_until="networkidle")
+        response = page.goto(f"{base_url}{path}", wait_until="networkidle")
+        if response is None or not response.ok:
+            status = "no response" if response is None else f"HTTP {response.status}"
+            raise SystemExit(f"{path} did not render for {output.name}: {status}")
         page.locator("main").wait_for(state="visible")
         page.wait_for_timeout(500)  # let ECharts finish its first frame
         page.screenshot(
@@ -251,6 +258,8 @@ def _run(
                         viewport=viewport,
                         color_scheme=theme,
                         device_scale_factor=1,
+                        locale="en-US",
+                        timezone_id="UTC",
                     )
                     page = context.new_page()
                     _sign_in(

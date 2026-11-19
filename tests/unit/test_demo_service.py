@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from collections.abc import Iterator
@@ -437,6 +438,13 @@ def _canonical_without_ids(
     return files, workspace, rows
 
 
+def _ordered_transactions(content: bytes) -> bytes:
+    """The transactions file with ids normalised but row order preserved."""
+    parsed, errors = parse_archive(content)
+    assert not errors and parsed is not None
+    return _UUID.sub(b"ID", parsed.files["transactions.csv"])
+
+
 def test_two_builds_of_the_same_reference_are_archive_identical(
     built: BuiltWorkspace,
 ) -> None:
@@ -466,6 +474,13 @@ def test_two_builds_of_the_same_reference_are_archive_identical(
     assert set(first_files) == set(second_files)
     for name in first_files:
         assert first_files[name] == second_files[name], name
+    # Screenshots and the archive must not depend on the random UUID tie-break when several
+    # transactions share a day.
+    first_transactions = _ordered_transactions(first).decode().splitlines()
+    second_transactions = _ordered_transactions(second).decode().splitlines()
+    assert first_transactions == second_transactions, "\n".join(
+        list(difflib.unified_diff(first_transactions, second_transactions))[:40]
+    )
 
 
 def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) -> None:
@@ -502,6 +517,13 @@ def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) 
     assert set(first_files) == set(second_files)
     for name in first_files:
         assert first_files[name] == second_files[name], name
+    # Screenshots and the archive must not depend on the random UUID tie-break when several
+    # transactions share a day.
+    first_transactions = _ordered_transactions(first).decode().splitlines()
+    second_transactions = _ordered_transactions(second).decode().splitlines()
+    assert first_transactions == second_transactions, "\n".join(
+        list(difflib.unified_diff(first_transactions, second_transactions))[:40]
+    )
 
 
 def test_demo_archive_round_trips_byte_identically_into_a_fresh_database(
