@@ -19,7 +19,7 @@ from assetboard.services.context import Context
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.networth import add_valuation, create_category, create_item
-from assetboard.services.performance import PerformancePage
+from assetboard.services.performance import PerformancePage, performance_page
 from assetboard.services.reports import net_worth_report, portfolio_report, reports_data
 from assetboard.web.reports import _portfolio_series
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -258,3 +258,34 @@ def test_phase_b_is_skipped_for_the_csv_and_empty_future_ranges(team: WorkspaceD
     assert csv.net_worth is None and csv.portfolio is None
     future = _data(team, from_year="2030", to_year="2030")
     assert future.net_worth is None and future.portfolio is None
+
+
+def test_portfolio_dates_are_sorted_deduplicated_and_clipped(team: WorkspaceDb) -> None:
+    _portfolio(team)
+    page = performance_page(
+        team.factory,
+        team.ctx("vic", "viewer"),
+        range_code="all",
+        with_periods=False,
+        dates=(
+            date(2026, 1, 31),
+            date(2025, 12, 31),
+            date(2025, 12, 31),
+            date(2030, 1, 1),
+        ),
+    )
+    assert [point.date for point in page.chart] == [
+        date(2025, 12, 31),
+        date(2026, 1, 31),
+    ]
+
+
+def test_a_future_net_worth_range_does_not_read_the_history(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("networth_history must not run for a future-only range")
+
+    monkeypatch.setattr("assetboard.services.reports.networth_history", fail)
+    data = _data(team, from_year="2030", to_year="2030")
+    assert data.net_worth is None

@@ -254,8 +254,9 @@ currency. Tests cover year/month selection, the base-currency rule and the empty
 **Acceptance**
 - Shown only when the workspace has investment transactions (M6).
 - Line chart of portfolio value and net invested capital per period, from F6.7's
-  `portfolio_series(..., step=month)` (year step: the last month of each year). No new
-  portfolio math; quantities and prices stay `Decimal` and are aggregated in Python.
+  `portfolio_series` with explicit report period-end dates (month-end or year-end, capped at
+  today). No new portfolio math; quantities and prices stay `Decimal` and are aggregated in
+  Python.
 - Values in the filter currency (the base currency; F6.3 FX rules apply).
 
 **Agent prompt**
@@ -266,7 +267,7 @@ portfolio_series, hidden without investment data. No new portfolio math.
 ```
 
 **As built (2026-11-19).** `services.reports.portfolio_report` calls F6.7's `performance_page`
-in its all-time form and keeps the last point of each report month/year; `web.charts.build_performance_chart` supplies the same chart JSON as the Performance page and Home widget.
+with explicit report period-end dates (month/year end, capped at today); `web.charts.build_performance_chart` supplies the same chart JSON as the Performance page and Home widget.
 The section is absent without investment transactions or outside the base currency. Tests cover
 year/month selection, the base-currency rule and the empty workspace.
 

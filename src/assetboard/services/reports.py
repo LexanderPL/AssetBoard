@@ -372,6 +372,9 @@ def net_worth_report(
     """
     if currency != ctx.workspace.base_currency:
         return None
+    today = ctx.clock.today(ctx.workspace.timezone)
+    if start_year > today.year:
+        return None
     data = networth_history(factory, ctx, "all")
     points = _last_per_period(
         data.points,
