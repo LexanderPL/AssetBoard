@@ -4,6 +4,11 @@ Loans are optional. The app stores the terms you enter and keeps every amount in
 base currency; it never converts a loan into another currency. Changing the base currency is
 locked once a loan exists.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/loans.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/loans.jpg) ·
+[phone light](assets/screenshots/phone/light/loans.jpg) ·
+[phone dark](assets/screenshots/phone/dark/loans.jpg). See the [gallery](screenshots.md#loans).
+
 ## Adding a loan
 
 **Loans → Add loan** asks how much you know:

@@ -2,7 +2,8 @@
 
 This is the reference for running AssetBoard: settings, first run, reverse proxies, backups and
 upgrade notes. For step-by-step installation (Docker, native with systemd, Proxmox LXC, Podman),
-start with [the install guides](install/README.md).
+start with [the install guides](install/README.md). If something does not work, see
+[Troubleshooting](troubleshooting.md) or the health endpoints described there.
 
 ## Environment variables
 
@@ -428,6 +429,69 @@ body cap to at least the import limit if imports are enabled (for example nginx
 `client_max_body_size 20m;`, the Traefik `Buffering` middleware's `maxRequestBodyBytes`, or Caddy
 `request_body { max_size 20MB }`). This layered cap applies even when the app is reached without a
 proxy.
+
+### Examples
+
+These are minimal TLS-terminating configurations for the three common proxies. Replace the host
+name and certificate paths, keep the app on loopback (or a private Docker network), and set
+`ASSETBOARD_BASE_URL`, `ASSETBOARD_TRUSTED_PROXIES` and the import body cap together. Add the
+rate limits described above. When proxy authentication is enabled, the identity headers must be
+set and stripped as shown in [proxy authentication](auth/proxy-auth.md#header-stripping-per-proxy).
+
+**nginx** (proxy and app on the same host, app on `127.0.0.1:8000`):
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name money.example.com;
+    ssl_certificate     /etc/letsencrypt/live/money.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/money.example.com/privkey.pem;
+
+    client_max_body_size 20m;
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Set `ASSETBOARD_TRUSTED_PROXIES=127.0.0.1` (or the proxy's address when it is another host).
+
+**Caddy** (TLS is automatic):
+
+```caddyfile
+money.example.com {
+    request_body {
+        max_size 20MB
+    }
+    reverse_proxy 127.0.0.1:8000 {
+        header_up Host {host}
+    }
+}
+```
+
+Caddy sets `X-Forwarded-For` and `X-Forwarded-Proto` itself. Set
+`ASSETBOARD_TRUSTED_PROXIES` to Caddy's address.
+
+**Traefik** (Docker provider labels on the AssetBoard service; TLS through an existing
+`certResolver`):
+
+```yaml
+labels:
+  - traefik.enable=true
+  - traefik.http.routers.assetboard.rule=Host(`money.example.com`)
+  - traefik.http.routers.assetboard.entrypoints=websecure
+  - traefik.http.routers.assetboard.tls.certresolver=letsencrypt
+  - traefik.http.services.assetboard.loadbalancer.server.port=8000
+  - traefik.http.middlewares.assetboard-body.buffering.maxRequestBodyBytes=20971520
+  - traefik.http.routers.assetboard.middlewares=assetboard-body
+```
+
+Traefik sets the forwarded headers. Give the proxy container a fixed address and list only that
+address in `ASSETBOARD_TRUSTED_PROXIES`; a Docker network name is not an address the app can
+verify.
 
 ## Image tags
 

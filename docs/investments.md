@@ -5,6 +5,12 @@ across asset classes. The **Portfolio** tab values what you hold today; the othe
 instruments, asset classes, transactions and price providers. Performance over time arrives in
 a later update.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/investments.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/investments.jpg) ·
+[phone light](assets/screenshots/phone/light/investments.jpg) ·
+[phone dark](assets/screenshots/phone/dark/investments.jpg). See the
+[gallery](screenshots.md#investments).
+
 > **Backups:** investments are not part of the workspace archive yet. An export taken before the
 > investments archive extension does not contain asset classes, instruments, allocations,
 > prices or FX rates.

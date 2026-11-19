@@ -4,6 +4,11 @@ Reports (`/reports`) show how much came in and went out over a range of years, m
 year by year, and where the spending went by category. Every member of a workspace, viewers
 included, can open the page: it only reads what they can already see in the ledger.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
+[phone light](assets/screenshots/phone/light/reports.jpg) ·
+[phone dark](assets/screenshots/phone/dark/reports.jpg). See the [gallery](screenshots.md#reports).
+
 ## Filters
 
 The filters are a plain GET form, so every view is a bookmarkable address and works without

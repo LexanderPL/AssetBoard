@@ -4,6 +4,11 @@ The profile page (`/account`, "Profile" in the account menu) holds your details,
 your language and theme, and the ways you sign in. Password changes, signing out other devices
 and two-factor authentication are on "Account security".
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/account.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/account.jpg) ·
+[phone light](assets/screenshots/phone/light/account.jpg) ·
+[phone dark](assets/screenshots/phone/dark/account.jpg). See the [gallery](screenshots.md#account).
+
 ## Signing in
 
 - A wrong email or password shows "The email or password is not correct." The page never says

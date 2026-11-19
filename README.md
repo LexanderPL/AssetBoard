@@ -42,6 +42,16 @@ gaps.
 The full configuration table, including application defaults, is in the
 [deployment guide](docs/deployment.md#environment-variables).
 
+## Screenshots
+
+| Home | Month | FIRE |
+| --- | --- | --- |
+| ![Home dashboard](docs/assets/screenshots/desktop/light/home.jpg) | ![Month summary](docs/assets/screenshots/desktop/light/month.jpg) | ![FIRE plan](docs/assets/screenshots/desktop/light/fire.jpg) |
+
+The [screenshot gallery](docs/screenshots.md) has every main page in light and dark mode on
+desktop and phone. The images come from the deterministic demo dataset; the
+[capture script](scripts/capture_screenshots.py) regenerates them.
+
 ## Development
 
 ```bash
@@ -53,6 +63,19 @@ make check
 `make dev` builds local CSS, compiles translations, and starts the reload-enabled server at
 `http://127.0.0.1:8000`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and checks, and
 [docs/architecture.md](docs/architecture.md) for the layers and how workspace data is isolated.
+
+## Documentation
+
+**Install and operate**
+
+- [Install guides](docs/install/README.md): Docker Compose, native systemd, Proxmox LXC and rootless Podman.
+- [Deployment guide](docs/deployment.md): the complete environment reference, first run, reverse proxies, backups and upgrading.
+- [First run and sign-in](docs/deployment.md#first-run-and-sign-in): the setup token and the first administrator.
+- [Reverse proxies](docs/deployment.md#reverse-proxies): nginx, Caddy and Traefik examples, TLS, trusted proxies and body limits.
+- [OIDC sign-in](docs/auth/oidc.md) and [proxy authentication](docs/auth/proxy-auth.md): SSO and header-based sign-in.
+- [Notifications](docs/deployment.md#notifications): Apprise channels and reminders; [price providers](docs/investments.md#price-providers): NBP, CoinGecko, EODHD and GoldAPI.io.
+- [Backups and restore](docs/backup.md) and [Upgrading](docs/deployment.md#upgrading).
+- [Troubleshooting](docs/troubleshooting.md): start with the log and health endpoints for each symptom.
 
 ## User guides
 
@@ -66,11 +89,13 @@ make check
 - [Transactions](docs/transactions.md): entering, editing and deleting expenses and income; searching, CSV export and changing the category of many entries.
 - [Reports](docs/reports.md): income against expenses and savings per month or year, the savings-rate trend including a 12-month rolling rate, and spending by category over time with a top-8/Other stack, category filter and optional savings series, all under the shared year, granularity and currency filters.
 - [Net worth](docs/net-worth.md): assets and liabilities, categories, values and value history.
-- [Investments](docs/investments.md): asset classes, instruments and allocation weights.
+- [Investments](docs/investments.md): asset classes, instruments, allocation weights and price providers.
 - [Loans](docs/loans.md): mortgage and loan terms, rates, costs, overpayments and reference rates.
 - [FIRE planner](docs/fire.md): independence scenarios, assumptions, contribution overrides and events.
 - [Backups and restore](docs/backup.md): scheduled copies, retention, restore checks, volume snapshots and off-site advice.
 - [Workspace settings](docs/workspace-settings.md): name, base currency, time zone and formats.
+- [Demo workspace](docs/demo-mode.md): the deterministic sample data, the `demo-seed` command and public demo mode.
+- [Screenshots](docs/screenshots.md): every main page in light/dark mode on desktop and phone.
 
 ## Roadmap
 

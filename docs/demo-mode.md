@@ -115,9 +115,13 @@ assetboard demo-seed --workspace <workspace-id> [--date YYYY-MM-DD]
 - a portfolio: a global ETF, an 80/20 fund, a USD stock (sells, quarterly dividends, linked
   income, a 2-for-1 split and a base-settled buy), gold, crypto, a bond-model instrument with
   terms and a currency cash holding, plus 24 months of weekly manual prices and FX rates;
+- one live FIRE plan with every adjustment kind (a cash flow, an expense change, an income
+  change and a saving override), one archived past adjustment and the car loan left out of the
+  projection;
 - one completed CSV import through the real import path, so its history and rollback show.
 
-Nothing is dated after `T` except planned values, scheduled occurrences and the bond maturity.
+Nothing is dated after `T` except planned values, scheduled occurrences, the bond maturity and
+the FIRE plan's future projection years (adjustments are plan years, not ledger dates).
 Notification channels, price-provider keys, provider errors, invitations and other members are
 intentionally not created (see `DEMO_EXCLUDED_MODELS` in `domain/demo.py`).
 
@@ -147,5 +151,6 @@ commit.
 
 ## Related
 
+- [Screenshots](screenshots.md) — the gallery and the Playwright capture script use this dataset.
 - [Workspace archive format](archive-format.md) — the round-trip check uses the builder's data.
 - [Import and export](import-export.md) — the generated import exercises this path.

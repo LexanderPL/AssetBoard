@@ -28,6 +28,12 @@ compiled `.mo` files are build output and are gitignored: `make setup`, `make de
 `make check` run `make i18n-compile` first, and wheel and image builds compile them too. If you
 run `pytest` directly after editing a `.po` file, run `make i18n-compile` first; the test session
 refuses to start with missing or stale `.mo` files rather than silently showing English.
+`make i18n-check` reports the Polish catalog's completeness (the v1.0 gate is 95%) and fails on
+any missing or fuzzy user-facing entry; `make check` and CI run it as well.
+
+Screenshots: `uv run python scripts/capture_screenshots.py` builds the deterministic demo
+workspace, serves it on loopback and regenerates `docs/assets/screenshots/` (light/dark,
+desktop/phone). Commit the images with the layout change; see [docs/screenshots.md](docs/screenshots.md).
 
 ## Feature workflow
 

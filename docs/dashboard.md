@@ -4,6 +4,11 @@ Home (`/`) is the page you land on after signing in. It is built from **widgets*
 that each show one part of the workspace and link to the module that owns it. You choose which
 widgets appear and in what order; the choice is saved separately for each workspace and account.
 
+Screenshots: [desktop light](assets/screenshots/desktop/light/home.jpg) ·
+[desktop dark](assets/screenshots/desktop/dark/home.jpg) ·
+[phone light](assets/screenshots/phone/light/home.jpg) ·
+[phone dark](assets/screenshots/phone/dark/home.jpg). See the [gallery](screenshots.md#home).
+
 ## The widget catalogue
 
 | Widget | What it shows |
