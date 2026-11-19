@@ -435,11 +435,31 @@ def test_category_edit_stays_open_and_keeps_its_row_in_view(owner: OwnerApp) -> 
     assert marker in saved.text
 
 
+def test_bulk_add_is_a_header_action_that_opens_a_dialog(owner: OwnerApp) -> None:
+    page = owner.client.get("/net-worth").text
+    actions = re.search(
+        r'<div class="flex flex-wrap items-center gap-2" data-page-actions>.*?</div>',
+        page,
+        re.DOTALL,
+    )
+    assert actions is not None
+    assert "data-add-item" in actions.group(0) and "data-bulk-open" in actions.group(0)
+    dialog = re.search(r'<dialog id="bulk-dialog".*?</dialog>', page, re.DOTALL)
+    assert dialog is not None and "data-bulk" in dialog.group(0)
+    opening = re.search(r'<dialog id="bulk-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    opened = owner.client.get("/net-worth?side=asset&form=bulk").text
+    opening = re.search(r'<dialog id="bulk-dialog"[^>]*>', opened)
+    assert opening is not None and " open" in opening.group(0)
+
+
 def test_bulk_preview_and_create(owner: OwnerApp) -> None:
     text = "Car; 12000; Vehicles\nBike; 1 200,50; Electronics"
     preview = _htmx(owner, "/net-worth/bulk/preview", {"side": "asset", "text": text})
     assert preview.status_code == 200
     assert "data-bulk-preview" in preview.text and "data-bulk-create" in preview.text
+    opening = re.search(r'<dialog id="bulk-dialog"[^>]*>', preview.text)
+    assert opening is not None and " open" in opening.group(0)
     assert "1200.50" in preview.text or "1 200,50" in preview.text
     created = _htmx(owner, "/net-worth/bulk", {"side": "asset", "text": text})
     assert created.status_code == 200

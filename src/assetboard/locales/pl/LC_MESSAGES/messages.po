@@ -12203,6 +12203,9 @@ msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 msgid "Add item"
 msgstr "Dodaj pozycję"
 
+msgid "Bulk add items"
+msgstr "Dodaj pozycje zbiorczo"
+
 msgid "Possible double counting"
 msgstr "Możliwe podwójne liczenie"
 
@@ -12314,12 +12317,6 @@ msgstr ""
 "Podawaj wartości jako liczby dodatnie. W przypadku zobowiązania podaj "
 "kwotę zadłużenia."
 
-msgid "Add an active category before adding items."
-msgstr "Dodaj aktywną kategorię, zanim dodasz pozycje."
-
-msgid "Bulk add items"
-msgstr "Dodaj pozycje zbiorczo"
-
 msgid ""
 "Paste one item per line as name; value; category. Amounts use the "
 "interface number format and the workspace base currency. The whole batch "
@@ -12331,6 +12328,9 @@ msgstr ""
 
 msgid "Items to add"
 msgstr "Pozycje do dodania"
+
+msgid "Add an active category before adding items."
+msgstr "Dodaj aktywną kategorię, zanim dodasz pozycje."
 
 msgid "Their items still count towards net worth until each item is archived."
 msgstr ""

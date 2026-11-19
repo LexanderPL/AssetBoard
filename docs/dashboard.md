@@ -66,7 +66,8 @@ range.
 ## Loading and accessibility
 
 Each widget loads independently after the page shell appears, so a slow module does not hold up
-the rest of Home. On a phone the widgets stack in one column in your chosen order. Charts follow
+the rest of Home. On a wide screen two widgets in the same row share that row's height; on a
+phone the widgets stack in one column in your chosen order. Charts follow
 the same rules as the rest of the app: the drawing is hidden from assistive technology and a
 table with the same figures sits next to it, visible without JavaScript. If JavaScript is off,
 each placeholder links directly to its module page.

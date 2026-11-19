@@ -70,6 +70,18 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
             expect(item_dialog).to_be_visible()
             item_dialog.get_by_role("link", name="Cancel").click()
             expect(item_dialog).to_be_hidden()
+
+            # Bulk add is a header action too; previews keep the dialog open.
+            bulk_dialog = page.locator("#bulk-dialog")
+            expect(bulk_dialog).to_be_hidden()
+            page.locator("[data-bulk-open]").click()
+            expect(bulk_dialog).to_be_visible()
+            bulk_dialog.locator("[data-bulk-text]").fill("Bulk car; 5000; Vehicles")
+            bulk_dialog.locator("[data-bulk-preview]").click()
+            expect(page.locator("div[data-bulk-preview]")).to_be_visible()
+            expect(page.locator("#bulk-dialog")).to_be_visible()
+            page.locator("#bulk-dialog [data-dialog-close]").click()
+            expect(page.locator("#bulk-dialog")).to_be_hidden()
             details = page.locator("[data-categories]")
             expect(details).to_be_visible()
             assert details.evaluate("element => element.open") is False

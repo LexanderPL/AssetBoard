@@ -8,6 +8,7 @@ import socket
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
@@ -125,6 +126,28 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
                 "el => getComputedStyle(el).gridTemplateColumns.split(' ').length"
             )
             assert columns >= 2
+
+            # Widgets sharing a row have the same height, and their panel fills the row.
+            sections: list[dict[str, Any]] = page.locator(
+                "[data-home-widgets] > section"
+            ).evaluate_all(
+                "els => els.map(el => { const r = el.getBoundingClientRect();"
+                " const p = el.querySelector(':scope > .panel');"
+                " const pr = p ? p.getBoundingClientRect() : null;"
+                " return {y: r.y, height: r.height, panel: pr ? pr.height : null}; })"
+            )
+            rows: dict[int, list[dict[str, Any]]] = {}
+            for section in sections:
+                rows.setdefault(round(section["y"]), []).append(section)
+            pairs = [row for row in rows.values() if len(row) > 1]
+            assert pairs
+            for row in pairs:
+                heights = [float(section["height"]) for section in row]
+                assert max(heights) - min(heights) <= 1, heights
+                for section in row:
+                    panel = section["panel"]
+                    assert panel is not None
+                    assert abs(float(panel) - float(section["height"])) <= 1, section
 
             # Phone: Home does not scroll sideways and Customise stays below the widgets.
             page.set_viewport_size({"width": 390, "height": 844})

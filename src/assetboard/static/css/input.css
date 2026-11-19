@@ -442,6 +442,15 @@ dialog.popup[data-dialog-modal][open] {
   overflow-y: auto;
 }
 
+/* Two widgets sharing a row on Home keep the row's height, including the panel inside the
+   lazy-load wrapper. Phone keeps natural heights in its single column. */
+@media (min-width: 64rem) {
+  [data-home-widgets] > section,
+  [data-home-widgets] > section > .panel {
+    height: 100%;
+  }
+}
+
 /* Home widget placeholders (F9.1). Kept outside Tailwind's layers because
    ``data-widget-failed`` is added by app.js at runtime, so the utility scanner never sees it. */
 [data-widget-loading] {
