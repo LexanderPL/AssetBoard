@@ -300,7 +300,7 @@
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
-            {% for column in view.year_overview.columns %}<th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ column }}</th>{% endfor %}
+            {% for column in view.year_overview.columns %}<th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ column }}{% if view.year_overview.so_far_month == loop.index %}<span class="ml-1 inline-block rounded-full bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-primary-ink" data-report-grid-so-far>{{ _("so far") }}</span>{% endif %}</th>{% endfor %}
             <th scope="col" class="py-1.5 text-right font-medium">{{ _("Total") }}</th>
           </tr>
         </thead>
@@ -388,7 +388,10 @@
       <p class="text-sm tabular-nums text-muted" data-report-yoy-range>{{ view.year_over_year.year_label if view.year_over_year else view.data.filters.year }}</p>
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Actual spending in the selected year compared with the year before.") }}</p>
-    {% if view.year_over_year %}
+    {% if view.year_over_year and view.year_over_year.partial %}<p class="mt-2 text-sm text-muted" data-report-yoy-partial>{{ view.year_over_year.partial_note }}</p>{% endif %}
+    {% if view.year_over_year and view.year_over_year.empty %}
+    <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No spending in either year.") }}</p>
+    {% elif view.year_over_year %}
     <div class="relative mt-4 overflow-x-auto">
       <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ _("Year-over-year comparison") }}</caption>

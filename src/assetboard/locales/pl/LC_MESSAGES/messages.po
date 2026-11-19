@@ -5480,6 +5480,10 @@ msgid "Not available: nothing spent in the previous year."
 msgstr "Niedostępne: brak wydatków w poprzednim roku."
 
 #, python-format
+msgid "The current year is compared through %(month)s in both years."
+msgstr "Bieżący rok jest porównywany do %(month)s w obu latach."
+
+#, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."
 msgstr[0] "%(num)d wpis ma datę po dniu dzisiejszym i nie jest pokazany na wykresie."
@@ -12686,6 +12690,9 @@ msgstr "Rok do roku"
 
 msgid "Actual spending in the selected year compared with the year before."
 msgstr "Rzeczywiste wydatki w wybranym roku w porównaniu z rokiem poprzednim."
+
+msgid "No spending in either year."
+msgstr "Brak wydatków w obu latach."
 
 msgid "Year-over-year comparison"
 msgstr "Porównanie rok do roku"

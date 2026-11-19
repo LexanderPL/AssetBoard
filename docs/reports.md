@@ -131,8 +131,9 @@ the light and dark themes.
 **Download CSV** exports exactly the grid's rows and totals for the same `year`, `category`,
 `savings` and `currency` filters. The file is `reports-year-overview.csv`: UTF-8, comma separated,
 RFC 4180 quoting, CRLF line ends, ISO month columns (`2026-01`), plain decimal amounts with the
-currency's minor digits and no locale grouping. It is a normal authenticated GET, available to
-every member who can open the report.
+currency's minor digits and no locale grouping. Headers and the total label are stable English
+machine labels, not translated UI; category names are guarded against spreadsheet formula
+execution. It is a normal authenticated GET, available to every member who can open the report.
 
 ## Category trends
 
@@ -157,8 +158,10 @@ is shown as good.
 
 The percent change is `(current - previous) / previous`, rounded once to one decimal place. When
 the previous year spent nothing the percentage is undefined: the table shows “—” and screen
-readers hear why. Like the year overview, the comparison follows the category treatment rules
-and the **Include saved / invested** option; income, withdrawals and transfers never count.
+readers hear why. When the report year is the current year, both years are compared through the
+current month ("so far") rather than a partial year against a full one. Like the year overview,
+the comparison follows the category treatment rules and the **Include saved / invested** option;
+income, withdrawals and transfers never count.
 
 ## Planned vs actual accuracy
 

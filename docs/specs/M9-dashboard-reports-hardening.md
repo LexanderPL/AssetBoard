@@ -139,9 +139,9 @@ Property tests: grid totals equal transaction sums; treatment rules respected. I
   filters and treatment rules. A `year` query parameter (default: the report's end year, capped
   at the current year) drives the year grid and the year-over-year section; `trend=3|12`
   (default 3) chooses the rolling window; `yoy_category` chooses one category or the total.
-  Unknown/out-of-range years and unknown/other-workspace category ids are ignored.
+  Unknown years (not 1900–2199) and unknown/other-workspace category ids are ignored; a year outside the report range is still shown.
 - **Year overview:** `domain.reports.year_grid` is F10.3's `category_series` for one calendar
-  year, so the grid is one row per eligible category and twelve month columns, with row/column/
+  year, so the grid is one row per eligible category with spending in that year (plus explicitly selected zero rows) and twelve month columns, with row/column/
   grand totals. It follows the category filter and the savings option; transfers, income and
   withdrawals never count. Heat shading is four CSS classes over the primary-soft token, not
   inline styles. `GET /reports/year-overview.csv` (fixed `reports-year-overview.csv`) exports the
@@ -166,7 +166,7 @@ Property tests: grid totals equal transaction sums; treatment rules respected. I
   existing `ix_transactions_workspace_date` index serves the transaction range and the
   `(workspace, month, category)` unique index serves the budget-line range; no migration or new
   index was needed. No SQL aggregate or `DecimalType` ordering is introduced.
-- User guide: [Reports](../../reports.md). No migration and no new runtime dependency.
+- User guide: [Reports](../reports.md). No migration and no new runtime dependency.
 
 ---
 

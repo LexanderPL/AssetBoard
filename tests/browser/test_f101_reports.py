@@ -255,6 +255,7 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(grid.locator("[data-report-grid-cell]").first).to_have_text("€1,200.00")
             expect(grid).to_contain_text("Jan")
             expect(grid).to_contain_text("Dec")
+            expect(grid.locator("[data-report-grid-so-far]")).to_be_visible()
             heat_classes = grid.locator("[data-report-grid-cell]").evaluate_all(
                 "(cells) => cells.map((cell) => cell.className)"
             )
@@ -278,6 +279,7 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             assert trend_option["series"] == ["Browser Food"]
 
             # Year-over-year and plan accuracy read the section year and the plans.
+            expect(page.locator("[data-report-yoy-partial]")).to_be_visible()
             expect(page.locator("[data-report-yoy-row]")).to_be_visible()
             expect(page.locator("[data-report-yoy-percent]")).to_contain_text("140.0%")
             accuracy = page.locator("[data-report-accuracy-row]")

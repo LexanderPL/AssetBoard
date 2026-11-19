@@ -79,6 +79,7 @@ ARCHIVED = _("archived")
 CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data.")
 YEAR_OVER_YEAR_TOTAL = _("Total (all categories)")
 YEAR_OVER_YEAR_NO_PREVIOUS = _("Not available: nothing spent in the previous year.")
+YEAR_OVER_YEAR_PARTIAL = _("The current year is compared through %(month)s in both years.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +188,7 @@ class YearOverview:
     total: str
     csv_url: str
     empty: bool
+    so_far_month: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +228,9 @@ class YearOverYearView:
     change_minor: int
     percent: str | None
     percent_note: str | None
+    partial: bool = False
+    partial_note: str | None = None
+    empty: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -693,6 +698,7 @@ def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOver
         total=format_money(series.total, locale),
         csv_url=_year_csv_url(data, request),
         empty=not rows,
+        so_far_month=data.today.month if data.filters.year == data.today.year else None,
     )
 
 
@@ -821,6 +827,14 @@ def _year_over_year_view(data: ReportsData, locale: str) -> YearOverYearView | N
         change_minor=yoy.change.amount_minor,
         percent=percent,
         percent_note=None if percent is not None else gettext(YEAR_OVER_YEAR_NO_PREVIOUS, locale),
+        partial=yoy.partial,
+        partial_note=(
+            gettext(YEAR_OVER_YEAR_PARTIAL, locale)
+            % {"month": format_month(YearMonth(data.today.year, data.today.month), locale)}
+            if yoy.partial
+            else None
+        ),
+        empty=yoy.empty,
     )
 
 

@@ -241,10 +241,16 @@ class YearOverYear:
     previous: Money
     change: Money
     change_tenths: int | None
+    partial: bool = False
 
     @property
     def available(self) -> bool:
         return self.change_tenths is not None
+
+    @property
+    def empty(self) -> bool:
+        """Whether both years have nothing to compare."""
+        return self.current.amount_minor == 0 and self.previous.amount_minor == 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -747,14 +753,19 @@ def rolling_category_averages(
 
 
 def year_over_year(
-    series: CategorySeries, *, year: int, category_id: UUID | None = None
+    series: CategorySeries,
+    *,
+    year: int,
+    category_id: UUID | None = None,
+    partial: bool = False,
 ) -> YearOverYear:
     """The selected year's spending against the previous year (F9.2).
 
     ``series`` is a yearly ``CategorySeries`` covering ``year`` and, when it exists, the year
     before. With ``category_id`` the row's figures are compared; otherwise the series' column
     totals (the whole category report) are. A missing category row or previous year counts as
-    zero. ``change_tenths`` is ``None`` when the previous amount was zero.
+    zero. ``change_tenths`` is ``None`` when the previous amount was zero. ``partial`` says the
+    current year is compared only through today (same months of both years).
     """
     currency = series.total.currency
     positions = {period: index for index, period in enumerate(series.periods)}
@@ -799,6 +810,7 @@ def year_over_year(
         previous=Money(previous_minor, currency),
         change=Money(change_minor, currency),
         change_tenths=ratio_tenths(change_minor, previous_minor),
+        partial=partial,
     )
 
 
@@ -813,8 +825,8 @@ def plan_accuracy(
     are considered (transfers, income, withdrawals and savings never count, whichever option
     the page used). A month is planned when a line exists for it, and over when the actual
     amount is **greater** than the plan; equal amounts are not over. Lines outside the series'
-    periods, in another currency than the series, or for categories without spending still
-    count as planned with an actual of zero. A category without any plan has no row.
+    periods or in another currency than the series are ignored; a category with a plan but no
+    spending still counts with an actual of zero. A category without any plan has no row.
     """
     positions = {period: index for index, period in enumerate(series.periods)}
     planned_by_category: dict[UUID, dict[YearMonth, int]] = {}

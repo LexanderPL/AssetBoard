@@ -460,14 +460,28 @@ def reports_data(
             )
         else:
             displayed_categories = top_categories(all_categories)
+        grid = year_grid(
+            entries,
+            categories,
+            year=filters.year,
+            currency=selected_currency,
+            include_savings=include_savings,
+            selected=chosen or None,
+        )
         spending_ids = {
             row.category_id for row in all_categories.rows if row.category_id is not None
         }
+        grid_spending_ids = {row.category_id for row in grid.rows if row.category_id is not None}
         category_options = tuple(
             CategoryOption(row.id, row.name, archived=row.archived_at is not None)
             for row in ordered
             if row.id in eligible_ids
-            and (row.archived_at is None or row.id in spending_ids or row.id in chosen)
+            and (
+                row.archived_at is None
+                or row.id in spending_ids
+                or row.id in grid_spending_ids
+                or row.id in chosen
+            )
         )
         plans: tuple[PlannedMonth, ...] = ()
         if series and series_end >= series_start:
@@ -482,8 +496,14 @@ def reports_data(
                 for line in BudgetLineRepository(session, ctx).for_range(plan_start, plan_end)
                 if line.currency == selected_currency
             )
+        partial_yoy = filters.year == today.year
+        yoy_entries = (
+            [entry for entry in entries if entry.day.month <= today.month]
+            if partial_yoy
+            else entries
+        )
         yoy_series = category_series(
-            entries,
+            yoy_entries,
             categories,
             start=yoy_start,
             end=yoy_end,
@@ -492,8 +512,17 @@ def reports_data(
             include_savings=include_savings,
             selected=(yoy_id,) if yoy_id is not None else None,
         )
+        yoy_all_series = category_series(
+            yoy_entries,
+            categories,
+            start=yoy_start,
+            end=yoy_end,
+            step=ReportStep.YEAR,
+            currency=selected_currency,
+            include_savings=include_savings,
+        )
         yoy_spending_ids = {
-            row.category_id for row in yoy_series.rows if row.category_id is not None
+            row.category_id for row in yoy_all_series.rows if row.category_id is not None
         }
         yoy_category_options = tuple(
             CategoryOption(row.id, row.name, archived=row.archived_at is not None)
@@ -515,14 +544,6 @@ def reports_data(
             currency=selected_currency,
             include_savings=include_savings,
         )
-    grid = year_grid(
-        entries,
-        categories,
-        year=filters.year,
-        currency=selected_currency,
-        include_savings=include_savings,
-        selected=chosen or None,
-    )
     trends = (
         rolling_category_averages(displayed_categories, months=filters.trend_months)
         if filters.step is ReportStep.MONTH
@@ -537,7 +558,7 @@ def reports_data(
         year_options=_year_options(today, filters),
         year_grid=grid,
         category_trends=trends,
-        yoy=year_over_year(yoy_series, year=filters.year, category_id=yoy_id),
+        yoy=year_over_year(yoy_series, year=filters.year, category_id=yoy_id, partial=partial_yoy),
         plan_accuracy=plan_accuracy(accuracy_series, plans, categories),
         yoy_category_options=yoy_category_options,
         available_currencies=available,

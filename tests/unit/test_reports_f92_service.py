@@ -4,7 +4,7 @@ from one scoped read, with the shared filters and URL-resolved section options."
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,7 +17,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.reports import ReportStep
 from assetboard.services.budget import set_planned
-from assetboard.services.categories import create_category
+from assetboard.services.categories import archive_category, create_category
 from assetboard.services.context import Context
 from assetboard.services.months import close_month
 from assetboard.services.reports import reports_data
@@ -357,3 +357,96 @@ def test_one_transaction_read_covers_section_years_outside_the_range(team: Works
     assert len(transaction_statements) == 2  # the currency lookup and the one column stream
     assert data.year_grid.total == Money(1_000, "EUR")
     assert data.filters.year == 2024
+
+
+def test_the_current_year_yoy_compares_the_same_months_in_both_years(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "YTD Food")
+    for month in range(1, 13):
+        _entry(team, YearMonth(2025, month), food, "100.00")
+    for month in range(1, 11):
+        _entry(team, YearMonth(2026, month), food, "100.00")
+
+    data = _data(team, year="2026", yoy_category=str(food))
+    assert data.yoy is not None
+    assert data.yoy.partial is True
+    assert (data.yoy.current, data.yoy.previous) == (
+        Money(100_000, "EUR"),
+        Money(100_000, "EUR"),
+    )
+    assert data.yoy.change.amount_minor == 0
+    assert data.yoy.change_tenths == 0
+
+
+def test_an_archived_category_that_only_spent_in_the_grid_year_is_still_offered(
+    team: WorkspaceDb,
+) -> None:
+    archived = _category(team, "Old Grid")
+    _entry(team, YearMonth(2024, 3), archived, "10.00")
+    archive_category(team.factory, _editor(team), archived)
+
+    data = _data(team, from_year="2026", to_year="2026", year="2024")
+    assert [row.category_id for row in data.year_grid.rows] == [archived]
+    assert archived in {option.id for option in data.category_options}
+
+
+def test_yoy_options_keep_every_archived_category_with_spending(team: WorkspaceDb) -> None:
+    active = _category(team, "Active YoY")
+    old_a = _category(team, "Old YoY A")
+    old_b = _category(team, "Old YoY B")
+    _entry(team, YearMonth(2025, 1), old_a, "10.00")
+    _entry(team, YearMonth(2025, 2), old_b, "20.00")
+    archive_category(team.factory, _editor(team), old_a)
+    archive_category(team.factory, _editor(team), old_b)
+    _entry(team, YearMonth(2026, 1), active, "30.00")
+
+    data = _data(team, year="2026", yoy_category=str(active))
+    option_ids = {option.id for option in data.yoy_category_options}
+    assert {active, old_a, old_b}.issubset(option_ids)
+
+
+def test_section_years_outside_the_report_range_do_not_skew_the_notes(
+    team: WorkspaceDb,
+) -> None:
+    categories = _seed_year(team)
+    # A future report row in the report range is noted.
+    _entry(team, YearMonth(2026, 11), categories["food"], "10.00")
+    # A USD row in a grid year outside the report range must not be counted in the notes.
+    with team.factory.begin() as session:
+        from assetboard.db.repositories import TransactionRepository
+
+        TransactionRepository(session, _editor(team)).create(
+            direction="expense",
+            day=date(2024, 10, 5),
+            amount_minor=1_000,
+            currency="USD",
+            category_id=categories["food"],
+            description="Old dollars",
+            description_key="old dollars",
+            source="manual",
+            created_by_user_id=None,
+        )
+    data = _data(team, from_year="2026", to_year="2026", year="2024")
+    assert data.future_count == 1  # only the 2026-11 row counts
+    assert data.other_currency_count == 0  # the USD row is outside the report range
+
+
+def test_budget_line_range_query_uses_the_month_index(team: WorkspaceDb) -> None:
+    from sqlalchemy import text
+
+    with team.factory() as session:
+        plan = session.execute(
+            text(
+                "EXPLAIN QUERY PLAN SELECT id FROM budget_lines "
+                "WHERE workspace_id = :workspace AND month >= :start AND month <= :end "
+                "ORDER BY month, category_id"
+            ),
+            {
+                "workspace": str(team.workspace_id),
+                "start": "2026-01-01",
+                "end": "2026-12-31",
+            },
+        ).all()
+    detail = " ".join(str(row[-1]) for row in plan)
+    assert "budget_lines" in detail and "USING INDEX" in detail

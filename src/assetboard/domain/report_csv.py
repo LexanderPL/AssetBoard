@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv
 import io
 
-from assetboard.domain.ledger_csv import plain_signed_amount
+from assetboard.domain.ledger_csv import guard_formula, plain_signed_amount
 from assetboard.domain.reports import CategorySeries
 
 YEAR_OVERVIEW_COLUMNS = ("category_id", "category", "archived")
@@ -42,7 +42,7 @@ def year_overview_csv(series: CategorySeries, *, year: int) -> str:
         writer.writerow(
             [
                 str(row.category_id),
-                row.name,
+                guard_formula(row.name),
                 "true" if row.archived else "false",
                 *(
                     plain_signed_amount(amount.amount_minor, amount.currency)

@@ -282,7 +282,7 @@ trends (3- or 12-month rolling averages over the displayed F10.3 series, `trend=
 year-over-year (`year` plus `yoy_category`, absolute and percent change, no percent when the
 previous year was zero) and planned-vs-actual accuracy (planned regular expense categories,
 months planned/over/strictly greater, from the raw budget lines in one scoped read). Section
-details and assumptions are in M9 F9.2; the user guide is [Reports](../../reports.md).
+details and assumptions are in M9 F9.2; the user guide is [Reports](../reports.md).
 
 ## Open questions (for the owner)
 

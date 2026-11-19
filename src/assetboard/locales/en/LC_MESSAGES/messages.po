@@ -5082,6 +5082,10 @@ msgid "Not available: nothing spent in the previous year."
 msgstr ""
 
 #, python-format
+msgid "The current year is compared through %(month)s in both years."
+msgstr ""
+
+#, python-format
 msgid "%(num)d entry is dated after today and is not charted."
 msgid_plural "%(num)d entries are dated after today and are not charted."
 msgstr[0] ""
@@ -11527,6 +11531,9 @@ msgid "Year-over-year"
 msgstr ""
 
 msgid "Actual spending in the selected year compared with the year before."
+msgstr ""
+
+msgid "No spending in either year."
 msgstr ""
 
 msgid "Year-over-year comparison"

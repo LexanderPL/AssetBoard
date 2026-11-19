@@ -666,6 +666,7 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     assert "data-report-year-overview" in html
     assert ">Year overview</h2>" in html
     assert "data-report-grid-year>2026<" in html
+    assert "data-report-grid-so-far>so far<" in html
     assert "data-report-year-csv" in html
     assert "/reports/year-overview.csv" in html
     for month in (
@@ -682,7 +683,7 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
         "Nov",
         "Dec",
     ):
-        assert f">{month}</th>" in html
+        assert f">{month}" in html
     # Only the regular expense categories are rows; savings, transfers and income stay out.
     rows = re.findall(r"<tr data-report-grid-row>", html)
     assert len(rows) == 2
@@ -843,6 +844,7 @@ def test_year_over_year_compares_a_category_or_the_total(reports: OwnerApp) -> N
 
     html = _page(reports, f"from=2025&to=2026&step=month&year=2026&yoy_category={food}")
     assert "data-report-year-over-year" in html
+    assert "data-report-yoy-partial" in html
     row = re.search(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
     assert row is not None
     assert _cells(row.group(0)) == ["€150.00", "€100.00", "€50.00", "50.0%"]

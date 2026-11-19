@@ -111,3 +111,9 @@ def test_a_combined_row_or_a_non_year_series_is_refused() -> None:
             ),
             year=2026,
         )
+
+
+def test_formula_like_category_names_are_guarded() -> None:
+    row = _row([100] + [0] * 11, name="=SUM(A1:A2)")
+    rows = list(csv.reader(io.StringIO(year_overview_csv(_series(row), year=2026))))
+    assert rows[1][1] == "'=SUM(A1:A2)"
