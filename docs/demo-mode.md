@@ -126,7 +126,7 @@ Notification channels, price-provider keys, provider errors, invitations and oth
 intentionally not created (see `DEMO_EXCLUDED_MODELS` in `domain/demo.py`).
 
 The dataset is deterministic: the same `T`, locale and base currency produce the same rows and
-archive (compared byte-for-byte after normalising random ids), because the pure plan in
+archive contents (compared after normalising random ids and ordering), because the pure plan in
 `domain/demo.py` seeds its `random.Random` from `T`, sorts every collection and the writer gives
 each row a stable timestamp within its day. Amounts are defined once in EUR-scale and converted
 with the fixed factor table in that module. `DEMO_DATASET_VERSION` is bumped whenever the

@@ -1,12 +1,13 @@
 # AssetBoard
 
-**Status: pre-alpha.** AssetBoard is a self-hosted personal-finance web app for tracking monthly
-income and expenses, comparing planned with actual spending, and planning net worth, investments,
-loans, and financial independence. It aims to give homelab users a private, user-controlled
-alternative to spreadsheets and hosted finance services.
+**Status: 1.0 (stable).** AssetBoard is a self-hosted personal-finance web app for tracking
+monthly income and expenses, comparing planned with actual spending, and planning net worth,
+investments, loans, and financial independence. It aims to give homelab users a private,
+user-controlled alternative to spreadsheets and hosted finance services.
 
-**Current state:** local accounts, first-run setup and the app shell work today; finance features
-arrive with their milestones.
+**Current state:** monthly income and expenses with planned-vs-actual, recurring items, variable
+income and taxes, net worth, investments, loans and mortgages, FIRE projection, reports, and
+import/export with backups — with local accounts, OIDC and proxy authentication.
 
 ## Quick start
 
