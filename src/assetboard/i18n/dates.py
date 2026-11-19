@@ -90,6 +90,12 @@ def month_names(locale: str) -> list[str]:
     return [names[index] for index in range(1, 13)]
 
 
+def short_month_names(locale: str) -> list[str]:
+    """Abbreviated month names from January to December (CLDR stand-alone): "Jan", "sty"."""
+    names = get_month_names("abbreviated", context="stand-alone", locale=_locale(locale))
+    return [names[index] for index in range(1, 13)]
+
+
 def format_day_of_month(day: int, locale: str) -> str:
     """A day of the month as an ordinal for sentences: "25th" (English), "25." (others)."""
     if _locale(locale).split("_")[0] != "en":

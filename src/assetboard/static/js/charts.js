@@ -340,8 +340,8 @@
         // A single point has no line; keep its point visible until the series is long.
         showSymbol: data.labels.length <= 24,
         symbolSize: 4,
-        lineStyle: { width: 2, color: token(series.color) },
-        itemStyle: { color: token(series.color) },
+        lineStyle: { width: 2, color: colour(series.color) },
+        itemStyle: { color: colour(series.color) },
         emphasis: { focus: "series" },
         markLine:
           index === 0 && markers.length
@@ -466,6 +466,12 @@
         series.connectNulls = false;
       });
       revealReportTable(element);
+    } else if (kind === "report-trend" && Array.isArray(data.series)) {
+      option = lineOptions(data);
+      option.series.forEach((series) => {
+        series.connectNulls = false;
+      });
+      revealReportTable(element);
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
     } else if (kind === "loan-payments" && Array.isArray(data.series)) {
@@ -496,7 +502,7 @@
 
   function drawAll() {
     disposeDetached();
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"], [data-chart="report-category-bars"], [data-chart="report-rate"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"], [data-chart="report-bars"], [data-chart="report-category-bars"], [data-chart="report-rate"], [data-chart="report-trend"]').forEach(draw);
   }
 
   function toggleTable(button) {

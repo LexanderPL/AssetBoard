@@ -1685,8 +1685,12 @@ def test_budget_line_queries_stay_in_their_workspace(
     assert (in_a.any_exists(), in_b.any_exists()) == (True, False)
     assert [line.id for line in in_a.for_month(october)] == [a_line.id]
     assert in_b.for_month(october) == []
+    assert [line.id for line in in_a.for_range(october, october)] == [a_line.id]
+    assert in_b.for_range(october, october) == []
     assert in_a.line(october, food_a.id) is a_line
     assert in_b.line(october, food_a.id) is None  # another workspace's line is not found
+    assert in_a.for_range(YearMonth(2026, 1), YearMonth(2026, 12)) == [a_line]
+    assert in_b.for_range(YearMonth(2026, 1), YearMonth(2026, 12)) == []
     assert in_a.usage_by_category() == {food_a.id: LineUsage(1, frozenset({october}))}
     assert in_b.usage_by_category() == {}
     # The composite foreign key refuses a line on another workspace's category.
@@ -1695,6 +1699,8 @@ def test_budget_line_queries_stay_in_their_workspace(
     b_line = in_b.create(month=october, category_id=food_b.id, planned_minor=100, currency="EUR")
     assert [line.id for line in in_b.for_month(october)] == [b_line.id]
     assert [line.id for line in in_a.for_month(october)] == [a_line.id]
+    assert [line.id for line in in_b.for_range(october, october)] == [b_line.id]
+    assert [line.id for line in in_a.for_range(october, october)] == [a_line.id]
 
 
 # Method coverage (#11)
