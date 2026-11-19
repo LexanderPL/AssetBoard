@@ -64,9 +64,20 @@ install -m 0644 "$here/$app.env.example" "$out/$app.env.example"
 install -m 0644 "$checkout/THIRD_PARTY_LICENSES" "$out/THIRD_PARTY_LICENSES"
 install -m 0755 "$here/install-debian.sh" "$out/install-debian.sh"
 
-(cd "$out" && sha256sum "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
-  "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh >SHA256SUMS)
+built=$(printf '%s\n' "$wheel" "$requirements" "$app-$version-sbom.cdx.json" \
+  "$app.service" "$app.env.example" THIRD_PARTY_LICENSES install-debian.sh)
+(cd "$out" && printf '%s\n' "$built" | xargs sha256sum >SHA256SUMS)
 (cd "$out" && sha256sum --check --strict SHA256SUMS >/dev/null)
+# Both directions: every generated file is listed and nothing stale or unlisted is shipped.
+# uv writes a .gitignore into its output directory; it is not a release file.
+listed=$(awk '{print $2}' "$out/SHA256SUMS" | sed 's/^\*//' | sort)
+actual=$(find "$out" -maxdepth 1 -type f ! -name SHA256SUMS ! -name .gitignore \
+  -printf '%f\n' | sort)
+if [[ $listed != "$(printf '%s\n' "$built" | sort)" || $actual != "$listed" ]]; then
+  echo "error: SHA256SUMS does not match the files in $out" >&2
+  diff <(printf '%s\n' "$listed") <(printf '%s\n' "$actual") >&2 || true
+  exit 1
+fi
 
 printf '==> Done\n'
 ls -l "$out"

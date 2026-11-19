@@ -82,7 +82,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mapfile -t built < <(find dist/release -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t built < <(find dist/release -maxdepth 1 -type f ! -name .gitignore \
+            -printf '%f\n' | sort)
           built_list=$RUNNER_TEMP/release-files.txt
           printf '%s\n' "${built[@]}" > "$built_list"
           uploaded=$(gh release view "$TAG" --json assets --jq '.assets[].name')
@@ -101,5 +102,15 @@ jobs:
             exit 1
           }
           (cd dist/release && sha256sum --check --strict SHA256SUMS >/dev/null)
+          # Every built file must be checksummed, and every checksum must name a built file.
+          comm -3 \
+            <(find dist/release -maxdepth 1 -type f ! -name SHA256SUMS ! -name .gitignore \
+              -printf '%f\n' | sort) \
+            <(awk '{print $2}' dist/release/SHA256SUMS | sed 's/^\*//' | sort) \
+            | tee "$RUNNER_TEMP/checksum-mismatch.txt"
+          if [[ -s $RUNNER_TEMP/checksum-mismatch.txt ]]; then
+            echo "SHA256SUMS does not list exactly the built release files for $TAG" >&2
+            exit 1
+          fi
           python3 -c 'import json,glob; [json.load(open(p, encoding="utf-8")) for p in glob.glob("dist/release/*-sbom.cdx.json")]'
           echo "All $((${#built[@]})) release files are attached to $TAG."

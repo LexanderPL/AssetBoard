@@ -4,10 +4,10 @@
 # The checks use disposable Docker volumes and never touch a real data directory. They need
 # Docker, curl and Python 3 on the host; the image supplies them for the work inside containers.
 #
-#   scripts/release_checks.sh fresh-install IMAGE
-#   scripts/release_checks.sh upgrade PREVIOUS_IMAGE IMAGE [--require-migration]
-#   scripts/release_checks.sh backup-restore IMAGE
-#   scripts/release_checks.sh all PREVIOUS_IMAGE IMAGE [--require-migration]
+#   scripts/release_checks.sh fresh-install IMAGE [--keep]
+#   scripts/release_checks.sh upgrade PREVIOUS_IMAGE IMAGE [--require-migration] [--keep]
+#   scripts/release_checks.sh backup-restore IMAGE [--keep]
+#   scripts/release_checks.sh all PREVIOUS_IMAGE IMAGE [--require-migration] [--keep]
 #   scripts/release_checks.sh verify-tags IMAGE_REPOSITORY TAG
 #
 # IMAGE may be a local tag (assetboard:local) or a registry image
@@ -24,7 +24,9 @@ repo_root=$(cd -- "$script_dir/.." && pwd)
 compose_file=$repo_root/compose.example.yaml
 
 suffix=${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-$$
+keep=false
 work_dir=
+temp_dirs=()
 container=
 endpoint_base=
 cookie_jar=
@@ -36,10 +38,10 @@ projects=()
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/release_checks.sh fresh-install IMAGE
-  scripts/release_checks.sh upgrade PREVIOUS_IMAGE IMAGE [--require-migration]
-  scripts/release_checks.sh backup-restore IMAGE
-  scripts/release_checks.sh all PREVIOUS_IMAGE IMAGE [--require-migration]
+  scripts/release_checks.sh fresh-install IMAGE [--keep]
+  scripts/release_checks.sh upgrade PREVIOUS_IMAGE IMAGE [--require-migration] [--keep]
+  scripts/release_checks.sh backup-restore IMAGE [--keep]
+  scripts/release_checks.sh all PREVIOUS_IMAGE IMAGE [--require-migration] [--keep]
   scripts/release_checks.sh verify-tags IMAGE_REPOSITORY TAG
 
 IMAGE may be a local tag (assetboard:local) or a registry image. The fresh-install check uses
@@ -47,7 +49,9 @@ compose.example.yaml and a disposable Compose project; the other checks use disp
 volumes. Nothing touches a real data directory. verify-tags inspects an already-published
 repository, requires both linux/amd64 and linux/arm64, and needs a registry login for a private
 package. --require-migration fails when the two images already share a schema revision; use an
-older tag that predates the newest migration for the forward-only check.
+older tag that predates the newest migration for the forward-only check. --keep leaves the
+container, volume and Compose project running for a manual page/sign-in check and prints how to
+remove them.
 EOF
 }
 
@@ -58,6 +62,14 @@ log() {
 fail() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+ensure_image() {
+  local image=$1
+  if [[ $image == */* ]]; then
+    log "Pulling ${image}."
+    docker pull "$image" >/dev/null || fail "cannot pull ${image}"
+  fi
 }
 
 require_commands() {
@@ -96,6 +108,22 @@ cleanup() {
       fi
     done
   fi
+  if [[ $keep == true ]]; then
+    printf '%s\n' "==> Keeping the release containers/volumes for inspection." >&2
+    [[ -n ${container:-} ]] && printf 'container: %s\n' "$container" >&2
+    [[ -n ${endpoint_base:-} ]] && printf 'URL: %s\n' "$endpoint_base" >&2
+    for project in "${projects[@]}"; do
+      printf 'compose project: %s\n' "$project" >&2
+      printf '  remove: ASSETBOARD_IMAGE=assetboard:cleanup ASSETBOARD_HOST_PORT=18000 docker compose -p %s -f %s down --volumes --remove-orphans\n' \
+        "$project" "$compose_file" >&2
+    done
+    for volume in "${volumes[@]}"; do printf 'volume: %s\n' "$volume" >&2; done
+    for dir in "${temp_dirs[@]}"; do printf 'work dir: %s\n' "$dir" >&2; done
+    printf 'Remove with: docker rm -f %s; docker volume rm %s; %s\n' \
+      "${containers[*]:-(none)}" "${volumes[*]:-(none)}" \
+      "$(printf 'rm -rf %q; ' "${temp_dirs[@]}" 2>/dev/null || printf 'true')" >&2
+    exit "$status"
+  fi
   local project name volume
   for project in "${projects[@]}"; do
     ASSETBOARD_IMAGE=assetboard:cleanup ASSETBOARD_HOST_PORT=18000 \
@@ -108,12 +136,17 @@ cleanup() {
   for volume in "${volumes[@]}"; do
     docker volume rm "$volume" >/dev/null 2>&1 || true
   done
-  if [[ -n ${work_dir:-} ]]; then
-    rm -rf "$work_dir"
-  fi
+  for dir in "${temp_dirs[@]}"; do
+    rm -rf "$dir"
+  done
   exit "$status"
 }
 trap cleanup EXIT
+
+new_work_dir() {
+  work_dir=$(mktemp -d "${TMPDIR:-/tmp}/assetboard-release-$1.XXXXXX")
+  temp_dirs+=("$work_dir")
+}
 
 free_port() {
   python3 - <<'PY'
@@ -132,7 +165,7 @@ wait_for_endpoint() {
     if [[ $state == exited || $state == dead ]]; then
       fail "container $container stopped while waiting for ${path}"
     fi
-    if curl --fail --silent "${endpoint_base}${path}" >/dev/null 2>&1; then
+    if curl --fail --silent --connect-timeout 5 --max-time 15 "${endpoint_base}${path}" >/dev/null 2>&1; then
       log "${path} is ready (attempt ${attempt})."
       return 0
     fi
@@ -171,7 +204,7 @@ wait_for_app() {
 }
 
 http_status() {
-  curl --silent --show-error --output "$response_file" --write-out '%{http_code} %{redirect_url}' \
+  curl --silent --show-error --connect-timeout 5 --max-time 15 --output "$response_file" --write-out '%{http_code} %{redirect_url}' \
     --cookie "$cookie_jar" --cookie-jar "$cookie_jar" "$@"
 }
 
@@ -225,6 +258,7 @@ seed_demo_data() {
 }
 
 snapshot_script=$(cat <<'PY'
+import hashlib
 import json
 import sqlite3
 import sys
@@ -240,13 +274,25 @@ try:
             "AND name NOT LIKE 'sqlite_%' AND name != 'alembic_version' ORDER BY name"
         )
     ]
-    counts = {
-        table: db.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
-        for table in tables
-    }
+    counts = {}
+    digests = {}
+    for table in tables:
+        cursor = db.execute(f'SELECT * FROM "{table}"')
+        columns = [column[0] for column in cursor.description]
+        rows = sorted(
+            json.dumps(dict(zip(columns, map(str, row))), sort_keys=True)
+            for row in cursor
+        )
+        counts[table] = len(rows)
+        digests[table] = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
 finally:
     db.close()
-print(json.dumps({"revision": revision[0] if revision else None, "tables": counts}, sort_keys=True))
+print(
+    json.dumps(
+        {"revision": revision[0] if revision else None, "tables": counts, "digests": digests},
+        sort_keys=True,
+    )
+)
 PY
 )
 
@@ -313,6 +359,43 @@ KEY_TABLES = (
     "import_batches",
     "import_category_mappings",
 )
+# Read-only page views may touch login bookkeeping, but never these financial rows.
+CONTENT_TABLES = (
+    "categories",
+    "transactions",
+    "budget_lines",
+    "scheduled_items",
+    "scheduled_occurrences",
+    "income_sources",
+    "income_source_tax_rules",
+    "work_logs",
+    "work_days",
+    "tax_rules",
+    "tax_rule_versions",
+    "networth_categories",
+    "networth_items",
+    "item_valuations",
+    "networth_snapshots",
+    "reference_rates",
+    "reference_rate_values",
+    "asset_classes",
+    "instruments",
+    "instrument_allocations",
+    "investment_transactions",
+    "bond_terms",
+    "price_points",
+    "fx_rates",
+    "risk_target_policies",
+    "loans",
+    "loan_rate_changes",
+    "loan_transfers",
+    "loan_cost_components",
+    "loan_overpayments",
+    "loan_balance_checkpoints",
+    "loan_payments",
+    "fire_scenarios",
+    "fire_events",
+)
 for table in KEY_TABLES:
     if table not in before["tables"]:
         continue
@@ -320,9 +403,14 @@ for table in KEY_TABLES:
     actual = after["tables"].get(table)
     if actual != expected:
         raise SystemExit(f"{label}: {table} rows changed: {expected} -> {actual}")
+for table in CONTENT_TABLES:
+    if table not in before["digests"]:
+        continue
+    if after["digests"].get(table) != before["digests"][table]:
+        raise SystemExit(f"{label}: {table} contents changed")
 if not after.get("revision"):
     raise SystemExit(f"{label}: no Alembic revision in the database")
-print(f"{label}: business rows and schema revision are intact.")
+print(f"{label}: business rows, contents and schema revision are intact.")
 PY
 }
 
@@ -356,7 +444,8 @@ print(hashlib.sha256(Path("/data/secret_key").read_bytes()).hexdigest())
 fresh_install() {
   local image=$1 project port setup_token csrf result icon
   require_commands
-  work_dir=$(mktemp -d "${TMPDIR:-/tmp}/assetboard-release-fresh.XXXXXX")
+  ensure_image "$image"
+  new_work_dir fresh
   cookie_jar=$work_dir/cookies.txt
   response_file=$work_dir/response.html
   project="assetboard-release-fresh-${suffix}"
@@ -434,13 +523,17 @@ PY
 
 upgrade() {
   local previous=$1 image=$2 require_migration=$3
-  local volume old_name new_name before_file after_file before_revision after_revision
+  local volume old_name new_name before_file after_file upgraded_file
+  local before_revision after_revision upgraded_revision
   require_commands
-  work_dir=$(mktemp -d "${TMPDIR:-/tmp}/assetboard-release-upgrade.XXXXXX")
+  ensure_image "$previous"
+  ensure_image "$image"
+  new_work_dir upgrade
   cookie_jar=$work_dir/cookies.txt
   response_file=$work_dir/response.html
   before_file=$work_dir/before.json
   after_file=$work_dir/after.json
+  upgraded_file=$work_dir/upgraded.json
   volume="assetboard-release-upgrade-${suffix}"
   old_name="assetboard-release-old-${suffix}"
   new_name="assetboard-release-new-${suffix}"
@@ -464,11 +557,14 @@ upgrade() {
   start_container "$new_name" "$image" "$volume" true
   wait_for_app
   assert_redirect / /login?next=%2F
+  assert_login release-check@example.com "Release Check Strong Password"
   snapshot_running >"$after_file"
   after_revision=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision"])' \
     "$after_file")
   log "New release schema: ${after_revision}."
   compare_snapshots "$before_file" "$after_file" "upgrade from ${previous}"
+  cp "$after_file" "$upgraded_file"
+  upgraded_revision=$after_revision
 
   if [[ $before_revision == "$after_revision" ]]; then
     log "The two releases already share a schema revision; no migration was applied."
@@ -502,7 +598,9 @@ upgrade() {
     snapshot_volume "$volume" "$image" >"$after_file"
     after_revision=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision"])' \
       "$after_file")
-    compare_snapshots "$before_file" "$after_file" "forward-only check"
+    [[ $after_revision == "$upgraded_revision" ]] \
+      || fail "forward-only check changed the revision: ${upgraded_revision} -> ${after_revision}"
+    compare_snapshots "$upgraded_file" "$after_file" "forward-only check"
     log "The previous release refused the newer schema without changing the revision."
   fi
   log "Upgrade check from ${previous} to ${image} passed."
@@ -512,7 +610,8 @@ backup_restore() {
   local image=$1 source_volume restored_volume source_name restored_name
   local before_file after_file before_secret after_secret
   require_commands
-  work_dir=$(mktemp -d "${TMPDIR:-/tmp}/assetboard-release-restore.XXXXXX")
+  ensure_image "$image"
+  new_work_dir restore
   cookie_jar=$work_dir/cookies.txt
   response_file=$work_dir/response.html
   before_file=$work_dir/before.json
@@ -586,32 +685,14 @@ for name in ("roundtrip.db", "roundtrip.db.secret_key"):
 }
 
 verify_tags() {
-  local repository=$1 tag=$2 name reference manifest digest
-  local -a names
-  local first_digest=""
+  local repository=$1 tag=$2
   require_commands
   repository=${repository%/}
   [[ ${repository##*/} != *:* ]] \
     || fail "pass the image repository without a tag to verify-tags"
-  mapfile -t names < <(python3 "$script_dir/verify_release_tags.py" --tag "$tag" \
-    --print-expected)
-  for name in "${names[@]}"; do
-    reference="${repository}:${name}"
-    manifest=$(docker manifest inspect "$reference") \
-      || fail "cannot inspect ${reference}; log in to the registry first"
-    grep -Fq '"architecture": "amd64"' <<<"$manifest" \
-      || fail "${reference} has no linux/amd64 manifest"
-    grep -Fq '"architecture": "arm64"' <<<"$manifest" \
-      || fail "${reference} has no linux/arm64 manifest"
-    digest=$(printf '%s' "$manifest" | sha256sum | awk '{print $1}')
-    if [[ -z $first_digest ]]; then
-      first_digest=$digest
-    elif [[ $first_digest != "$digest" ]]; then
-      fail "${reference} points to a different manifest than earlier tags"
-    fi
-    log "${reference} has amd64 and arm64 manifests."
-  done
-  log "All expected tags for ${tag} exist and share one manifest digest."
+  python3 "$script_dir/verify_release_tags.py" --tag "$tag" --check-remote "$repository" \
+    || fail "release tag verification failed"
+  log "All expected tags for ${tag} exist with linux/amd64 and linux/arm64 manifests."
 }
 
 mode=${1:-}
@@ -623,8 +704,16 @@ shift
 
 case "$mode" in
   fresh-install)
-    [[ $# -eq 1 ]] || { usage; exit 2; }
-    fresh_install "$1"
+    [[ $# -ge 1 ]] || { usage; exit 2; }
+    image=$1
+    shift
+    for argument in "$@"; do
+      case "$argument" in
+        --keep) keep=true ;;
+        *) fail "unknown option: $argument" ;;
+      esac
+    done
+    fresh_install "$image"
     ;;
   upgrade)
     [[ $# -ge 2 ]] || { usage; exit 2; }
@@ -635,14 +724,23 @@ case "$mode" in
     for argument in "$@"; do
       case "$argument" in
         --require-migration) require_migration=true ;;
+        --keep) keep=true ;;
         *) fail "unknown option: $argument" ;;
       esac
     done
     upgrade "$previous" "$image" "$require_migration"
     ;;
   backup-restore)
-    [[ $# -eq 1 ]] || { usage; exit 2; }
-    backup_restore "$1"
+    [[ $# -ge 1 ]] || { usage; exit 2; }
+    image=$1
+    shift
+    for argument in "$@"; do
+      case "$argument" in
+        --keep) keep=true ;;
+        *) fail "unknown option: $argument" ;;
+      esac
+    done
+    backup_restore "$image"
     ;;
   all)
     [[ $# -ge 2 ]] || { usage; exit 2; }
@@ -653,6 +751,7 @@ case "$mode" in
     for argument in "$@"; do
       case "$argument" in
         --require-migration) require_migration=true ;;
+        --keep) keep=true ;;
         *) fail "unknown option: $argument" ;;
       esac
     done

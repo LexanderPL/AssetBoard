@@ -41,9 +41,11 @@ after 0.8.3 produce a 0.8.x release. To make the milestone release:
       `Release-As: 1.0.0` (for example `chore: release 1.0.0` plus that footer). Let Release
       Please rebuild the PR; do not hand-edit its generated version files.
 - [ ] Review the generated `CHANGELOG.md` entry and the release-please PR diff.
-- [ ] Confirm `release-please-config.json` still updates all four version locations and that
-      `deploy/build-release.sh` still builds the wheel, requirements, CycloneDX SBOM,
-      `THIRD_PARTY_LICENSES`, systemd unit, env example, install script and `SHA256SUMS`.
+- [ ] Confirm `release-please-config.json` still updates all five version locations
+      (`pyproject.toml`, `.release-please-manifest.json`, `uv.lock`, `docs/deployment.md`,
+      `deploy/podman/assetboard.container`) and that `deploy/build-release.sh` still builds the
+      wheel, requirements, CycloneDX SBOM, `THIRD_PARTY_LICENSES`, systemd unit, env example,
+      install script and a `SHA256SUMS` that lists exactly those files.
 
 ## 2. Candidate checks before the tag
 
@@ -75,8 +77,8 @@ docker build --build-arg VERSION=v${VERSION} -t assetboard:release-candidate .
   ```
 
   The previous image creates an administrator and the deterministic demo workspace, then the
-  candidate opens the same disposable volume. The script compares key business-table row counts
-  and the Alembic revision.
+  candidate opens the same disposable volume. The script signs in, compares key business-table
+  row counts, a content digest of the financial tables and the Alembic revision.
 
 - [ ] Backup/restore round trip:
 
@@ -98,7 +100,7 @@ docker build --build-arg VERSION=v${VERSION} -t assetboard:release-candidate .
 
   `--require-migration` fails if the revisions are equal. When they differ, the script also
   starts the older image against the upgraded copy, requires `schema_newer` and verifies the
-  revision and business rows did not change.
+  revision and the financial row counts and contents did not change.
 
 - [ ] The Docker metadata tag policy is unchanged and produces the expected tags for
       `v1.0.0`:
@@ -144,9 +146,14 @@ record them.
   scripts/release_checks.sh fresh-install "$IMAGE:$VERSION"
   ```
 
-- [ ] Confirm the container uses the published image, not a local build:
-      `docker inspect --format '{{.Config.Image}} {{index .Config.Labels "org.opencontainers.image.version"}}' "$CONTAINER"`
-      reports the version tag and `1.0.0`.
+- [ ] Confirm the published image carries the version label, not a local build:
+
+  ```bash
+  docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
+    "$IMAGE:$VERSION"
+  ```
+
+  It reports `1.0.0`.
 
 ## 5. Upgrade from the previous tag with a populated database
 
@@ -159,8 +166,17 @@ record them.
 - [ ] Record the before/after Alembic revisions printed by the script. If they are equal,
       record that no migration was pending between 0.8.3 and 1.0.0; the forward-only check in
       step 6 still exercises the migration path with an older tag.
-- [ ] Start the upgraded app and sign in; confirm the demo workspace, Home, reports, loans and
-      FIRE pages open. The script checks the data counts, not every page.
+- [ ] The script signs in with the original account after the upgrade and compares the data
+      rows; it removes the container on exit. To click through the pages yourself, rerun with
+      `--keep`:
+
+  ```bash
+  scripts/release_checks.sh upgrade "$IMAGE:${PREVIOUS_TAG#v}" "$IMAGE:$VERSION" --keep
+  ```
+
+  Open the URL and sign in as the account the first command created; confirm the demo
+  workspace and the Home, reports, loans and FIRE pages. Remove the printed container,
+  volume and Compose project afterwards — they contain disposable test data.
 
 ## 6. Migrations forward-only on a copy of demo data
 
@@ -171,7 +187,7 @@ record them.
   ```
 
 - [ ] The script must print the applied revision range, `schema_newer` from the older image,
-      and unchanged business rows/revision after the older image is stopped.
+      and unchanged financial rows/contents and revision after the older image is stopped.
 - [ ] No command in this checklist runs `alembic downgrade` against a real database. A
       downgrade is not a supported release path; roll back by restoring the backup taken before
       the upgrade.
@@ -227,7 +243,8 @@ record them.
 
 - [ ] The GitHub release body contains upgrade notes: back up the database and `secret_key`
       before upgrading, migrations run at startup, `/readyz` reports when they finish, a
-      database written by 1.0 cannot be used by 0.8.x, and rollback means restoring the backup.
+      database written by 1.0 cannot be used by a release with an older schema (0.8.2 and
+      earlier; 0.8.3 shares the 1.0 revision), and rollback means restoring the backup.
 - [ ] `docs/deployment.md` has the 1.0 upgrade notes and the image-tag rule. `README.md` and the
       install pages point at the current release.
 - [ ] F9.7's screenshot script has been run against the demo data in light/dark and

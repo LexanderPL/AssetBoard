@@ -704,7 +704,7 @@ Implement F9.8 from docs/specs/M9-dashboard-reports-hardening.md: write docs/rel
 Do not tag or publish anything yourself; produce the checklist and scripts.
 ```
 
-**As built (2026-11-19).** [docs/release-checklist.md](../../release-checklist.md) is the ordered
+**As built (2026-11-19).** [docs/release-checklist.md](../release-checklist.md) is the ordered
 pre-tag and post-publish checklist, including the operator-only tag/publish step. The repeatable
 parts are `scripts/release_checks.sh` (`fresh-install`, `upgrade`, `backup-restore`,
 `verify-tags`; `all` runs the first three) and `scripts/verify_release_tags.py` for the

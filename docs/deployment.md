@@ -478,8 +478,9 @@ pre-tag and post-publish sequence, including the operator-only tag and publish s
 - **Migrations run on the first start.** `ASSETBOARD_AUTO_MIGRATE` is `true` by default and in
   `compose.example.yaml`. The log shows `database migrations applied at startup: <from> -> <to>`
   when the schema changes, and `/readyz` returns `{"status":"ok","database":"ready"}` when it is
-  done. A 1.0 database cannot be used by 0.8.x; to go back, restore the backup instead of
-  downgrading the image.
+  done. A database written by 1.0 cannot be used by a release whose schema revision is older:
+  that is 0.8.2 and earlier (0.8.3 happens to ship the same revision as 1.0.0, so do not rely on
+  downgrades in general). To go back, restore the backup instead of downgrading the image.
 - **The 1.0 image tags are `1.0.0`, `1.0`, `1`, and `latest`.** The major-only tag appears for
   the first time with this release; `latest` follows only stable releases.
 - **The release checks cover the upgrade path.** The tag workflow starts 1.0 with a populated

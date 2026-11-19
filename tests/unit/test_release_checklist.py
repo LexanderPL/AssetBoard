@@ -46,3 +46,28 @@ def test_the_checklist_names_every_published_tag() -> None:
 def test_every_local_markdown_link_exists() -> None:
     for target in re.findall(r"\]\((?!https?://|#)([^)#]+)", text()):
         assert (CHECKLIST.parent / target).resolve().exists(), target
+
+
+def test_the_checklist_has_no_undefined_shell_variables() -> None:
+    document = text()
+    assert "$CONTAINER" not in document
+    assert "--keep" in document
+
+
+def test_operator_only_steps_are_marked() -> None:
+    document = text()
+    assert "## 3. Tag and publish (operator only)" in document
+    assert document.count("**Operator:**") >= 3
+
+
+def test_the_backward_compatibility_claim_matches_the_shipped_revision() -> None:
+    document = " ".join(text().split())
+    assert "0.8.2 and earlier" in document
+    assert "cannot be used by 0.8.x" not in document
+    assert "five version locations" in document
+
+
+def test_the_release_scripts_fail_closed() -> None:
+    script = (SCRIPTS / "release_checks.sh").read_text(encoding="utf-8")
+    assert "--check-remote" in script
+    assert '[[ $after_revision == "$upgraded_revision" ]]' in script
