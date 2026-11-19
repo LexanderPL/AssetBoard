@@ -19,6 +19,11 @@
 <section class="panel p-4 sm:p-6" aria-labelledby="reports-{{ key }}-heading" data-report-series="{{ key }}">
   <h2 id="reports-{{ key }}-heading" class="text-base font-semibold">{{ series.title }}</h2>
   <p class="mt-1 text-sm text-muted">{{ series.description }}</p>
+  {% if series.notes %}
+  <ul class="mt-2 space-y-1 text-xs text-warning-strong" data-report-series-notes>
+    {% for note in series.notes %}<li>{{ note }}</li>{% endfor %}
+  </ul>
+  {% endif %}
   <div class="mt-4" data-chart="{{ series.chart_type }}" data-chart-source="reports-{{ key }}-data">
     <script type="application/json" id="reports-{{ key }}-data">{{ series.chart|tojson }}</script>
     <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
@@ -36,7 +41,10 @@
         <tbody>
           {% for row in series.rows %}
           <tr data-report-series-row>
-            <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">{{ row.label }}</th>
+            <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">
+              {{ row.label }}{% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-series-so-far>{{ _("so far") }}</span>{% endif %}
+              {% for note in row.notes %}<span class="mt-1 block text-xs font-normal text-warning-strong">{{ note }}</span>{% endfor %}
+            </th>
             {% for cell in row.cells %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ cell }}</td>{% endfor %}
           </tr>
           {% endfor %}

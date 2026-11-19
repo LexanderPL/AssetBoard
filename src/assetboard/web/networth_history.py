@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -186,6 +187,7 @@ def _chart(
     *,
     base_currency: str,
     locale: str,
+    labels: Sequence[str] | None = None,
 ) -> dict[str, object] | None:
     if not points:
         return None
@@ -210,7 +212,9 @@ def _chart(
             lines.append(estimated_note)
         tooltips.append(lines)
     return {
-        "labels": [_point_label(point.as_of, locale) for point in points],
+        "labels": list(labels)
+        if labels is not None
+        else [_point_label(point.as_of, locale) for point in points],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -242,7 +246,9 @@ def _chart(
     }
 
 
-def build_trend_view(data: NetWorthHistoryData, locale: str) -> NetWorthTrendView:
+def build_trend_view(
+    data: NetWorthHistoryData, locale: str, *, labels: Sequence[str] | None = None
+) -> NetWorthTrendView:
     rows = tuple(
         TrendRow(
             as_of=point.as_of,
@@ -280,6 +286,7 @@ def build_trend_view(data: NetWorthHistoryData, locale: str) -> NetWorthTrendVie
                 data.categories,
                 base_currency=data.base_currency,
                 locale=locale,
+                labels=labels,
             )
             if data.has_chart
             else None

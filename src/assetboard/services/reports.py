@@ -1,5 +1,5 @@
-"""The Reports page's data (F10.1–F10.3): filters, one ledger read, the income/expense series
-and the category breakdown.
+"""The Reports page's data (F10.1–F10.5): filters, the ledger series, category reports and
+the Phase B net-worth/portfolio adapters.
 
 Every member, viewers included, may read the page. The service resolves the year range, the
 granularity, the category filter and the savings option, reads the workspace's categories, the
@@ -15,6 +15,9 @@ selected one are left out and counted too (Phase A never converts).
 The category filter is repeatable and bookmarkable (``?category=<id>&category=<id>``). Unknown
 ids and ids from another workspace are ignored; if none of the requested ids belong to an
 eligible expense category, the chart falls back to its default (the largest eight and Other).
+
+Phase B calls the existing derived net-worth and portfolio services in their all-time form and
+keeps the last point of each report period; it never reimplements their valuation math.
 """
 
 from __future__ import annotations
@@ -383,6 +386,34 @@ def net_worth_report(
     return replace(data, points=points)
 
 
+def _period_end_dates(
+    start_year: int, end_year: int, step: ReportStep, today: date
+) -> tuple[date, ...]:
+    """The last day of each report month/year, capped at today.
+
+    The current month/year ends at today, so its row is explicitly partial rather than a
+    future date with no data.
+    """
+    start = date(start_year, 1, 1)
+    end = min(date(end_year, 12, 31), today)
+    if start > end:
+        return ()
+    if step is ReportStep.YEAR:
+        return tuple(min(date(year, 12, 31), today) for year in range(start.year, end.year + 1))
+    dates: list[date] = []
+    month = YearMonth.from_date(start)
+    last = YearMonth.from_date(end)
+    while month <= last:
+        day = min(month.last_day, today)
+        if start <= day <= end:
+            dates.append(day)
+        next_month = month.next()
+        if next_month is None:
+            break
+        month = next_month
+    return tuple(dates)
+
+
 def portfolio_report(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -399,22 +430,17 @@ def portfolio_report(
     """
     if currency != ctx.workspace.base_currency:
         return None
-    page = performance_page(factory, ctx, range_code="all", with_periods=False)
-    points = _last_per_period(
-        page.chart,
-        day_of=lambda point: point.date,
-        start_year=start_year,
-        end_year=end_year,
-        step=step,
-        today=page.today,
-    )
-    if not points:
+    today = ctx.clock.today(ctx.workspace.timezone)
+    dates = _period_end_dates(start_year, end_year, step, today)
+    if not dates:
+        return None
+    page = performance_page(factory, ctx, range_code="all", with_periods=False, dates=dates)
+    if not page.chart:
         return None
     return replace(
         page,
-        chart=points,
         periods=(),
-        incomplete_points=sum(1 for point in points if point.incomplete),
+        incomplete_points=sum(1 for point in page.chart if point.incomplete),
     )
 
 
@@ -431,6 +457,7 @@ def reports_data(
     year: str = "",
     trend: str = "",
     yoy_category: str = "",
+    with_phase_b: bool = True,
 ) -> ReportsData:
     """The Reports page's filters and every section's data for the current workspace."""
     require_role(ctx, Role.VIEWER)
@@ -675,21 +702,29 @@ def reports_data(
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
-        net_worth=net_worth_report(
-            factory,
-            ctx,
-            start_year=filters.start_year,
-            end_year=filters.end_year,
-            step=filters.step,
-            currency=selected_currency,
+        net_worth=(
+            net_worth_report(
+                factory,
+                ctx,
+                start_year=filters.start_year,
+                end_year=filters.end_year,
+                step=filters.step,
+                currency=selected_currency,
+            )
+            if with_phase_b
+            else None
         ),
-        portfolio=portfolio_report(
-            factory,
-            ctx,
-            start_year=filters.start_year,
-            end_year=filters.end_year,
-            step=filters.step,
-            currency=selected_currency,
+        portfolio=(
+            portfolio_report(
+                factory,
+                ctx,
+                start_year=filters.start_year,
+                end_year=filters.end_year,
+                step=filters.step,
+                currency=selected_currency,
+            )
+            if with_phase_b
+            else None
         ),
     )
 
@@ -701,5 +736,7 @@ __all__ = [
     "FilterError",
     "ReportFilters",
     "ReportsData",
+    "net_worth_report",
+    "portfolio_report",
     "reports_data",
 ]

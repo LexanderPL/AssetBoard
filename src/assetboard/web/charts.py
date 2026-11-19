@@ -11,6 +11,7 @@ as minor-unit integers with the currency; the browser never parses or rounds mon
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -177,7 +178,9 @@ def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int,
     return low, high, step, labels
 
 
-def build_performance_chart(page: PerformancePage, locale: str) -> dict[str, Any] | None:
+def build_performance_chart(
+    page: PerformancePage, locale: str, *, labels: Sequence[str] | None = None
+) -> dict[str, Any] | None:
     """The value/invested performance chart data, shared by the module page and Home.
 
     Amounts travel as minor units; labels, amounts and tooltips are formatted on the server.
@@ -215,7 +218,9 @@ def build_performance_chart(page: PerformancePage, locale: str) -> dict[str, Any
             ]
         )
     return {
-        "labels": [format_day(point.date, locale) for point in page.chart],
+        "labels": list(labels)
+        if labels is not None
+        else [format_day(point.date, locale) for point in page.chart],
         "y_min": low,
         "y_max": high,
         "y_interval": step,

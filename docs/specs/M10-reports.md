@@ -3,16 +3,16 @@
 **Goal:** one Reports page with charts over the years: how much came in and went out, how much
 was saved, where the money went, and later how net worth and the portfolio grew.
 
-**Exit criteria (Phase A):** for any range of years a member sees income vs expenses and the
-savings rate per month and per year, and expenses by category over time, with figures that
-match the month summaries of F2.4 exactly. **Phase B** (net worth and portfolio value on the
-same page) is deferred after 1.0 by the owner on 2026-11-18; the existing Net worth Summary and
-Investments Performance sections already show that history.
+**Exit criteria (Phase A and B):** for any range of years a member sees income vs expenses and
+the savings rate per month and per year, expenses by category over time, and net worth and
+portfolio value over the same range, with figures that match the month summaries of F2.4 and the
+existing module series exactly. Phase A shipped in v1.0; Phase B shipped after 1.0 on
+2026-11-19, reusing the Net worth Summary and Investments Performance services.
 
 Owner decision, 2026-10-25. The milestone number only follows M9; it is not scheduled after it.
 **Phase A depends on M2 only** (and should follow F2.7, whose chart conventions it reuses) and
 can ship before M5/M6 in any minor release. Phase B features depend on the milestones named in
-each feature; the owner deferred Phase B after 1.0 on 2026-11-18.
+each feature and shipped after 1.0 on 2026-11-19.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 

@@ -5540,6 +5540,30 @@ msgstr[2] ""
 "%(num)d wpisów w innych walutach zostało pominiętych; raporty nie "
 "przeliczają walut."
 
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] "%(count)s transakcja bez daty nie jest uwzględniona w serii."
+msgstr[1] "%(count)s transakcje bez daty nie są uwzględnione w serii."
+msgstr[2] "%(count)s transakcji bez daty nie jest uwzględnionych w serii."
+
+#, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
+"lub kursu walutowego."
+msgstr[1] ""
+"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
+"ceny lub kursu walutowego."
+msgstr[2] ""
+"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
+"mają ceny lub kursu walutowego."
+
 msgid "on Monday"
 msgstr "w poniedziałek"
 
@@ -7137,23 +7161,6 @@ msgstr "Żadna pozycja nie zmieniła się od wczoraj."
 
 msgid "No portfolio history yet. Add investment transactions and prices."
 msgstr "Brak historii portfela. Dodaj transakcje inwestycyjne i ceny."
-
-#, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-"%(num)d punkt wykresu jest niekompletny, ponieważ instrument nie ma ceny "
-"lub kursu walutowego."
-msgstr[1] ""
-"%(num)d punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
-"ceny lub kursu walutowego."
-msgstr[2] ""
-"%(num)d punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
-"mają ceny lub kursu walutowego."
 
 msgid "Plotted data"
 msgstr "Dane wykresu"
@@ -9521,13 +9528,6 @@ msgstr "Filtr klasy"
 
 msgid "Show"
 msgstr "Pokaż"
-
-#, python-format
-msgid "%(count)s undated legacy transaction is not included in the series."
-msgid_plural "%(count)s undated legacy transactions are not included in the series."
-msgstr[0] "%(count)s transakcja bez daty nie jest uwzględniona w serii."
-msgstr[1] "%(count)s transakcje bez daty nie są uwzględnione w serii."
-msgstr[2] "%(count)s transakcji bez daty nie jest uwzględnionych w serii."
 
 msgid "Open transactions"
 msgstr "Otwórz transakcje"

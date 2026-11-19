@@ -94,6 +94,18 @@ def _net_worth(app: OwnerApp) -> None:
         value="200",
         as_of=date(2026, 6, 30),
     )
+    create_item(
+        app.app.state.session_factory,
+        ctx,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Dollar account",
+        value="50",
+        currency="USD",
+        include_in_net_worth=True,
+        as_of=date(2024, 12, 31),
+    )
 
 
 def _portfolio(app: OwnerApp) -> None:

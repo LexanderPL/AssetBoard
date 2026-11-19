@@ -5132,6 +5132,22 @@ msgid_plural "%(num)d entries in another currency are left out; reports do not c
 msgstr[0] ""
 msgstr[1] ""
 
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid ""
+"%(num)d chart point is incomplete because an instrument has no price or "
+"FX rate."
+msgid_plural ""
+"%(num)d chart points are incomplete because an instrument has no price or"
+" FX rate."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "on Monday"
 msgstr ""
 
@@ -6583,16 +6599,6 @@ msgstr ""
 
 msgid "No portfolio history yet. Add investment transactions and prices."
 msgstr ""
-
-#, fuzzy, python-format
-msgid ""
-"%(num)d chart point is incomplete because an instrument has no price or "
-"FX rate."
-msgid_plural ""
-"%(num)d chart points are incomplete because an instrument has no price or"
-" FX rate."
-msgstr[0] ""
-msgstr[1] ""
 
 msgid "Plotted data"
 msgstr ""
@@ -8660,12 +8666,6 @@ msgstr ""
 
 msgid "Show"
 msgstr ""
-
-#, python-format
-msgid "%(count)s undated legacy transaction is not included in the series."
-msgid_plural "%(count)s undated legacy transactions are not included in the series."
-msgstr[0] ""
-msgstr[1] ""
 
 #, fuzzy
 msgid "Open transactions"

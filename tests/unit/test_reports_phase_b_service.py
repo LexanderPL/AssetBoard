@@ -13,12 +13,15 @@ import pytest
 from assetboard.clock import FixedClock
 from assetboard.db.repositories import AssetClassRepository, PricePointRepository
 from assetboard.domain.money import Money
+from assetboard.domain.performance import SeriesPoint
 from assetboard.domain.reports import ReportStep
 from assetboard.services.context import Context
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.networth import add_valuation, create_category, create_item
+from assetboard.services.performance import PerformancePage
 from assetboard.services.reports import net_worth_report, portfolio_report, reports_data
+from assetboard.web.reports import _portfolio_series
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 TODAY = "2026-12-15T12:00:00+00:00"
@@ -167,7 +170,11 @@ def test_portfolio_report_keeps_the_last_point_of_each_year(team: WorkspaceDb) -
     data = _data(team)
     assert data.portfolio is not None
     points = data.portfolio.chart
-    assert [point.date.year for point in points] == [2024, 2025, 2026]
+    assert [point.date for point in points] == [
+        date(2024, 12, 31),
+        date(2025, 12, 31),
+        date(2026, 12, 15),
+    ]
     assert [point.value for point in points] == [
         Money(110_000, "EUR"),
         Money(120_000, "EUR"),
@@ -181,7 +188,12 @@ def test_portfolio_report_month_step_and_base_currency_only(team: WorkspaceDb) -
     monthly = _data(team, from_year="2026", to_year="2026", step="month")
     assert monthly.portfolio is not None
     assert len(monthly.portfolio.chart) == 12
-    assert monthly.portfolio.chart[-1].date == date(2026, 12, 15)
+    assert [point.date for point in monthly.portfolio.chart] == [
+        date(2026, month, 31 if month in (1, 3, 5, 7, 8, 10, 12) else 30)
+        if month != 2
+        else date(2026, 2, 28)
+        for month in range(1, 12)
+    ] + [date(2026, 12, 15)]
     assert (
         portfolio_report(
             team.factory,
@@ -199,3 +211,50 @@ def test_phase_b_sections_are_absent_without_data(team: WorkspaceDb) -> None:
     data = _data(team)
     assert data.net_worth is None and data.portfolio is None
     assert data.filters.step is ReportStep.YEAR
+
+
+def test_an_incomplete_portfolio_point_is_dashed_and_noted() -> None:
+    page = PerformancePage(
+        currency="EUR",
+        today=date(2026, 12, 15),
+        range_code="all",
+        range_start=date(2024, 1, 1),
+        class_scope=None,
+        class_options=(),
+        chart=(
+            SeriesPoint(
+                date=date(2026, 12, 15),
+                value=Money(0, "EUR"),
+                net_invested=Money(100_000, "EUR"),
+                incomplete=True,
+            ),
+        ),
+        periods=(),
+        undated_count=1,
+        incomplete_points=1,
+        first_date=date(2024, 1, 1),
+    )
+    view = _portfolio_series(page, ReportStep.YEAR, "en", date(2026, 12, 15))
+    assert view is not None
+    assert view.rows[0].cells == ("—", "—", "—")
+    assert view.rows[0].so_far is True
+    assert "Incomplete: an instrument has no price or FX rate." in view.rows[0].notes
+    assert any("undated legacy transaction" in note for note in view.notes)
+    assert any("chart point is incomplete" in note for note in view.notes)
+    assert view.chart["value"] == [None]
+
+
+def test_phase_b_is_skipped_for_the_csv_and_empty_future_ranges(team: WorkspaceDb) -> None:
+    _net_worth_item(team)
+    _portfolio(team)
+    csv = reports_data(
+        team.factory,
+        team.ctx("vic", "viewer"),
+        from_year="2024",
+        to_year="2026",
+        step="year",
+        with_phase_b=False,
+    )
+    assert csv.net_worth is None and csv.portfolio is None
+    future = _data(team, from_year="2030", to_year="2030")
+    assert future.net_worth is None and future.portfolio is None
