@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.4](https://github.com/LexanderPL/AssetBoard/compare/v0.8.3...v0.8.4) (2026-11-19)
+
+
+### Features
+
+* **docs:** complete F9.7 docs, demo data, screenshots and i18n gate ([#396](https://github.com/LexanderPL/AssetBoard/issues/396)) ([27c0b6b](https://github.com/LexanderPL/AssetBoard/commit/27c0b6b48ca5cf6a1574aaddced616290be2085b))
+* **release:** prepare v1.0 release checks and checklist (F9.8) ([#395](https://github.com/LexanderPL/AssetBoard/issues/395)) ([337a009](https://github.com/LexanderPL/AssetBoard/commit/337a009289bb79631048e6f41771cc37b5d5ea26))
+* **reports:** add yearly overview, trends, YoY and plan accuracy (F9.2) ([#394](https://github.com/LexanderPL/AssetBoard/issues/394)) ([4bbf58b](https://github.com/LexanderPL/AssetBoard/commit/4bbf58ba7a8943d24801d8c5358db308bcc38571))
+* **reports:** expenses by category over time (F10.3) ([#392](https://github.com/LexanderPL/AssetBoard/issues/392)) ([bf55b6b](https://github.com/LexanderPL/AssetBoard/commit/bf55b6baf2aa021199420f1159ab30cf0c112b96))
+
 ## [0.8.3](https://github.com/LexanderPL/AssetBoard/compare/v0.8.2...v0.8.3) (2026-11-18)
 
 
