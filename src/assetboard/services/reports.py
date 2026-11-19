@@ -431,10 +431,27 @@ def reports_data(
             stats=stats,
         )
         # One scoped read feeds every section. The rows are materialised once, then each pure
-        # aggregation walks them locally; no section re-reads the database.
+        # aggregation walks only the slice it needs; no section re-reads the database. The
+        # section slices keep the year grid and year-over-year passes proportional to their
+        # own years rather than to the whole report range.
         entries = list(stream)
+        report_entries: list[LedgerEntry] = []
+        grid_entries: list[LedgerEntry] = []
+        yoy_entries: list[LedgerEntry] = []
+        for entry in entries:
+            if series_start <= entry.day <= series_end:
+                report_entries.append(entry)
+            if grid_start <= entry.day <= grid_end:
+                grid_entries.append(entry)
+            if yoy_start <= entry.day <= yoy_end:
+                yoy_entries.append(entry)
+        partial_yoy = filters.year == today.year
+        if partial_yoy:
+            # A partial current year is compared with the same months of the previous year,
+            # never with the previous year's full total.
+            yoy_entries = [entry for entry in yoy_entries if entry.day.month <= today.month]
         series, all_categories = ledger_and_category_series(
-            entries,
+            report_entries,
             categories,
             start=series_start,
             end=series_end,
@@ -461,7 +478,7 @@ def reports_data(
         else:
             displayed_categories = top_categories(all_categories)
         grid = year_grid(
-            entries,
+            grid_entries,
             categories,
             year=filters.year,
             currency=selected_currency,
@@ -496,12 +513,6 @@ def reports_data(
                 for line in BudgetLineRepository(session, ctx).for_range(plan_start, plan_end)
                 if line.currency == selected_currency
             )
-        partial_yoy = filters.year == today.year
-        yoy_entries = (
-            [entry for entry in entries if entry.day.month <= today.month]
-            if partial_yoy
-            else entries
-        )
         yoy_series = category_series(
             yoy_entries,
             categories,
@@ -536,7 +547,7 @@ def reports_data(
         accuracy_series = all_categories
     else:
         accuracy_series = category_series(
-            entries,
+            report_entries,
             categories,
             start=series_start,
             end=series_end,
