@@ -404,9 +404,9 @@ def test_busy_hashing_returns_503_with_retry_after_on_every_auth_route(web: WebH
         assert response.status_code == 503, response.text
         assert response.headers["retry-after"] == "5"
         assert "The server is busy" in response.text
-    # Each busy request released what it reserved; the counts left are the successful
-    # sign-in in between (every sign-in attempt counts) and registration's first step.
+    # Each busy request released what it reserved, and the successful sign-in in between
+    # released its own account attempt too (failures only); registration's first step stays.
     account = _throttle(app, "account", web.admin_email)
-    assert account is not None and account.failure_count == 1
+    assert account is not None and account.failure_count == 0
     register_row = _throttle(app, "register", "192.0.2.40/32")
     assert register_row is not None and register_row.failure_count == 1

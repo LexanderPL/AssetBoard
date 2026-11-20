@@ -235,9 +235,9 @@ class LoginOutcome:
 
     Unknown email and wrong password look alike. ``throttled_until`` is set only when the
     attempt was refused by a blocked bucket. The sign-in (``account``) bucket is keyed by the
-    normalized email, counted the same way whether or not an account has it, decays with time
-    only and is never reset by the owner's activity, so it looks the same for every email
-    (ADR-0012, amendment of 2026-10-17).
+    normalized email, counted the same way whether or not an account has it, holds failures
+    only, decays with time and is never reset by the owner's activity, so it looks the same
+    for every email (ADR-0012, amendments of 2026-10-17 and 2026-11-20).
     """
 
     user: User | None = None
@@ -269,7 +269,8 @@ def complete_login_ticket(
 
     An unknown, expired, used-up or no-longer-valid ticket returns a plain ``LoginOutcome()``
     (the caller starts the sign-in over). Every wrong code counts in the sign-in throttle: the
-    first one is the count the password step already reserved, each later one reserves its own.
+    password step released its account attempt when the password proved correct, so the first
+    code reserves the account's failure count, and each later code reserves both buckets.
     """
     if not ticket or len(ticket) > 128:
         return LoginOutcome()
@@ -302,11 +303,12 @@ def complete_login_ticket(
         )
         keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
         first_code_attempt = pending.code_attempts == 0
-        reserved: tuple[ReservedAttempt, ...] = ()
-        if not first_code_attempt:
-            reserved = reserve_attempts(session, slots, now, settings) or ()
-            if not reserved:
-                return LoginOutcome(throttled_until=blocked_until(session, keys, now) or now)
+        # The password step kept its address attempt for this first code; the account attempt
+        # was released. Reserve the account count for the first code and both for later ones.
+        code_slots = slots[:1] if first_code_attempt else slots
+        reserved = reserve_attempts(session, code_slots, now, settings) or ()
+        if not reserved:
+            return LoginOutcome(throttled_until=blocked_until(session, keys, now) or now)
 
         next_path = pending.next_path
         from assetboard.services.totp import verify_sign_in
@@ -336,16 +338,20 @@ def complete_login_ticket(
         session.delete(pending)
         if pending.replacement_password_hash is not None:
             user.password_hash = pending.replacement_password_hash
+        # A correct code (and the password before it) is not a failure: take back this
+        # request's own counts, including the address attempt the password step kept for a
+        # first code attempt.
         release_attempts(
             session,
             (
                 [
+                    *reserved,
                     ReservedAttempt(
                         "ip", pending.ip_key, pending.ip_window_started_at, pending.ip_block_set
-                    )
+                    ),
                 ]
                 if first_code_attempt
-                else [item for item in reserved if item.scope == "ip"]
+                else reserved
             ),
         )
         user.last_login_at = now
@@ -775,11 +781,14 @@ def _confirm_slot(user_id: UUID, settings: Settings) -> ThrottleSlot:
 
 
 def _account_slot(account_key: str, settings: Settings) -> ThrottleSlot:
-    """Sign-in attempts for one normalized email: a fixed window, like the address bucket.
+    """Failed sign-in attempts for one normalized email: a fixed window, like the address
+    bucket.
 
     The window is the address bucket's (``auth_ip_window_minutes``, 60 minutes by default):
-    after it the count starts again, and nothing else resets it. Every attempt counts,
-    successful ones included, so its state never depends on whether a password was right.
+    after it the count starts again, and nothing else resets it. A successful password
+    releases the attempt this request reserved; earlier failures stay counted. The response
+    is the same whether or not the account exists, so the bucket still discloses nothing
+    (ADR-0012, amendment of 2026-11-20).
     """
     return ThrottleSlot(
         "account",
@@ -1056,7 +1065,12 @@ def _login_flow(
         factor = session.get(TotpFactor, user.id) if succeeded and user is not None else None
         if succeeded and user is not None and factor is not None and factor.enabled_at is not None:
             # A correct password on an account with TOTP: no session yet, only a ticket for
-            # the second step (F1.6).
+            # the second step (F1.6). The password is right, so the account's failure
+            # count takes this attempt back; the address attempt stays until a code
+            # succeeds, exactly as if the code were the only remaining step.
+            release_attempts(
+                session, [item for item in candidate.reserved if item.scope == "account"]
+            )
             ticket = secrets.token_urlsafe(32)
             session.execute(delete(LoginTicket).where(LoginTicket.expires_at <= now))
             ip_attempt = next(item for item in candidate.reserved if item.scope == "ip")
@@ -1095,11 +1109,10 @@ def _login_flow(
                 data=reason,
             )
             return LoginOutcome()
-        # Every attempt counts in the account bucket, this successful one too: taking it back
-        # (or resetting the bucket) would make the outcome of a verify visible to others
-        # probing the same email, and only a known email can succeed. The address bucket,
-        # keyed by the requester, takes back this request's attempt as before.
-        release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
+        # This request verified the password, so neither bucket keeps its attempt. Earlier
+        # failures stay counted, and the uniform response means the outcome of one attempt is
+        # never visible to others probing the same email.
+        release_attempts(session, candidate.reserved)
         user.last_login_at = now
         if existing_session_id:
             session.execute(
@@ -1356,23 +1369,22 @@ def create_user_session(
     return session_id
 
 
-def get_valid_session(
-    session: Session,
-    session_id: str,
-    *,
-    settings: Settings,
-    clock: Clock,
-) -> UserSession | None:
-    session_row = session.get(UserSession, session_id_hash(session_id))
-    if session_row is None:
-        return None
+def prune_user_sessions(session: Session, clock: Clock, settings: Settings) -> int:
+    """Delete sessions past their absolute or idle expiry (F11.11, daily job).
+
+    ``read_web_session`` refuses expired sessions without writing, so nothing else removes
+    their stored hash, address prefix and user agent. The idle cutoff is computed here rather
+    than as SQL date arithmetic, keeping the delete portable to PostgreSQL.
+    """
     now = clock.now()
-    idle_expiry = session_row.last_seen_at + timedelta(days=settings.session_idle_timeout_days)
-    user = session.get(User, session_row.user_id)
-    if session_row.expires_at <= now or idle_expiry <= now or user is None or not user.is_active:
-        session.delete(session_row)
-        return None
-    return session_row
+    idle_cutoff = now - timedelta(days=settings.session_idle_timeout_days)
+    deleted = session.scalars(
+        delete(UserSession)
+        .where(or_(UserSession.expires_at <= now, UserSession.last_seen_at <= idle_cutoff))
+        .returning(UserSession.id_hash)
+        .execution_options(synchronize_session=False)
+    ).all()
+    return len(deleted)
 
 
 def touch_session(session_row: UserSession, clock: Clock) -> bool:

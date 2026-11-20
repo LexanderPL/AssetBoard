@@ -108,7 +108,7 @@ def test_the_category_chart_filter_and_table_in_a_browser(tmp_path: Path) -> Non
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser-categories.db'}",
-            secret_key="browser-categories-test-key",
+            secret_key="test-key-2a2c1b06e6fd164beca169d",
         )
     )
     app.state.clock = FixedClock(datetime(2026, 10, 14, 12, tzinfo=UTC).isoformat())

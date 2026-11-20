@@ -74,7 +74,7 @@ def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path)
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
-            secret_key="browser-test-key",
+            secret_key="test-key-5d364b22dfd4d0ff6f63873",
             # Next month's day-20 entry must fall inside the Upcoming window on any date.
             upcoming_days=90,
         )

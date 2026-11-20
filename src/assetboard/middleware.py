@@ -47,6 +47,9 @@ SAME_ORIGIN_REFERRER_PATHS = frozenset(
 # same holds for proxy sign-in (``/auth/proxy?next=…`` and its pages, ADR-0015).
 NO_REFERRER_PREFIXES = ("/auth/oidc/", "/auth/proxy")
 _PATH_TOKEN = re.compile(r"(/invite/|/register/complete/|/password/reset/)[^/?#]+")
+# C0 and C1 controls plus the Unicode line/paragraph separators. A decoded ``%0a`` or ESC
+# sequence must never start a new physical line or drive a terminal (SEC-03).
+_CONTROL_CHARACTERS = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 # The TCP peer's address (or None), recorded by ``PeerMiddleware`` before forwarded headers are
 # applied. Proxy authentication trusts only this value (ADR-0015).
 PEER_SCOPE_KEY = "assetboard.peer"
@@ -140,8 +143,17 @@ class RequestBodyLimitMiddleware:
 
 def redact_path(path: str) -> str:
     """The request path as logged: invitation, registration and reset tokens are replaced
-    with ``[redacted]``."""
-    return _PATH_TOKEN.sub(r"\1[redacted]", path)
+    with ``[redacted]``, and control characters (including a decoded newline or ESC) become
+    printable ``\\xNN``/``\\uNNNN`` escapes so one request stays on one log line."""
+    redacted = _PATH_TOKEN.sub(r"\1[redacted]", path)
+    return _CONTROL_CHARACTERS.sub(
+        lambda match: (
+            f"\\x{ord(match.group()):02x}"
+            if ord(match.group()) <= 0xFF
+            else f"\\u{ord(match.group()):04x}"
+        ),
+        redacted,
+    )
 
 
 def route_path(scope: Scope) -> str:

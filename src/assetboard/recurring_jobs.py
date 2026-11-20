@@ -17,6 +17,7 @@ from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.domain.backups import BACKUP_HOUR_UTC, BACKUP_MINUTE_UTC
+from assetboard.services.auth import prune_user_sessions
 from assetboard.services.backups import run_scheduled_backup
 from assetboard.services.demo_mode import reset_demo_instance
 from assetboard.services.imports import cleanup_expired_imports
@@ -237,6 +238,19 @@ class RecurringJobs:
                     exc_info=True,
                 )
 
+    def prune_sessions(self) -> None:
+        """Daily (F11.11): delete sessions past their absolute or idle expiry."""
+        try:
+            with self.factory.begin() as session:
+                removed = prune_user_sessions(session, self.clock(), self.settings)
+            if removed:
+                self.logger.info("user_sessions_pruned count=%d", removed)
+        except Exception as exc:  # noqa: BLE001 - the next run retries
+            self.logger.error(
+                "user_session_prune_failed exception_type=%s; next run will retry",
+                type(exc).__name__,
+            )
+
     def backup(self, *, force: bool = True) -> None:
         """Scheduled database backup (F9.4); failures are recorded and notified by the service."""
         if not self.backup_enabled:
@@ -429,6 +443,15 @@ class RecurringJobs:
             id="import-upload-cleanup",
             coalesce=True,
             max_instances=1,
+        )
+        self.scheduler.add_job(
+            self.prune_sessions,
+            CronTrigger(hour=4, minute=10, timezone="UTC"),
+            id="session-prune",
+            replace_existing=True,
+            coalesce=True,
+            max_instances=1,
+            misfire_grace_time=None,
         )
         if self.backup_enabled:
             self.scheduler.add_job(

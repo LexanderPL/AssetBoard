@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def test_request_id_is_validated_and_returned() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret"))
+    app = create_app(Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91"))
 
     with TestClient(app) as client:
         valid = client.get("/healthz", headers={"x-request-id": "trace-abc_123"})
@@ -145,7 +145,7 @@ def test_content_length_over_limit_is_rejected_without_reading() -> None:
 
 
 def test_request_body_limit_sits_inside_the_response_security_layers() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret"))
+    app = create_app(Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91"))
     names = [
         str(getattr(middleware.cls, "__name__", middleware.cls))
         for middleware in app.user_middleware
@@ -161,7 +161,7 @@ def test_request_body_limit_sits_inside_the_response_security_layers() -> None:
 
 
 def test_request_log_has_safe_path_status_duration_and_request_id() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret"))
+    app = create_app(Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91"))
     logger: logging.Logger = app.state.logger
     output = io.StringIO()
     handler = logging.StreamHandler(output)

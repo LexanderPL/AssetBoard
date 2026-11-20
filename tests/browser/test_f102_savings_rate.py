@@ -155,7 +155,7 @@ def test_the_savings_rate_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser-rate.db'}",
-            secret_key="browser-rate-test-key",
+            secret_key="test-key-30550073ec4fde15c15c11d",
         )
     )
     app.state.clock = FixedClock(datetime(2026, 10, 14, 12, tzinfo=UTC).isoformat())

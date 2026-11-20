@@ -78,7 +78,7 @@ def team(db: WorkspaceDb) -> WorkspaceDb:
     return db
 
 
-SETTINGS = Settings(_env_file=None, secret_key="test-secret")
+SETTINGS = Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91")
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "providers"
 
 

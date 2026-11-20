@@ -24,7 +24,7 @@ from assetboard.services.providers.transport import (
 from tests.fake_provider_http import FakeProviderHttpClient, FakeTime
 
 NOW = FixedClock("2026-03-02T12:00:00+00:00")
-SETTINGS = Settings(_env_file=None, secret_key="test-secret")
+SETTINGS = Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91")
 
 
 def test_urllib_client_refuses_plain_http_without_touching_the_network() -> None:

@@ -32,6 +32,12 @@
     <button type="submit" class="btn-primary">{{ _("Download archive") }}</button>
   </form>
 </section>
+{% if demo_session %}
+<section class="panel mt-6 max-w-2xl p-6">
+  <h2 class="text-lg font-semibold">{{ _("Import ledger data") }}</h2>
+  <p class="mt-2 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
+</section>
+{% else %}
 <section class="panel mt-6 max-w-2xl p-6">
   <h2 class="text-lg font-semibold">{{ _("Import ledger data") }}</h2>
   <form method="post" enctype="multipart/form-data" action="{{ scoped_url(request, 'workspace_data_import') }}" class="mt-4 space-y-4">
@@ -397,5 +403,6 @@
   <p class="mt-2 text-sm text-muted">{{ _("The import report is not available.") }}</p>
   {% endif %}
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}

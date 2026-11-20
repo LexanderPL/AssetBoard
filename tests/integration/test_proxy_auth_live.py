@@ -53,7 +53,7 @@ def test_identity_headers_count_only_from_the_trusted_tcp_peer(tmp_path: Path) -
     settings = Settings(
         _env_file=None,
         data_dir=tmp_path,
-        secret_key="live-proxy-test",
+        secret_key="test-key-856fc952a59bbed0e46f61f",
         trusted_proxies=f"{TRUSTED_PEER}/32",
         proxy_auth_enabled=True,
         proxy_auth_user_header="Remote-User",

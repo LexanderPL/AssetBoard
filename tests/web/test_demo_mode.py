@@ -350,7 +350,8 @@ def test_demo_workspace_pages_hide_member_and_settings_controls(
 
         data = client.get("/workspace/data")
         assert data.status_code == 200
-        assert "/workspace/data/import" in data.text
+        assert "/workspace/data/import" not in data.text
+        assert "Not available in the demo workspace." in data.text
 
 
 def test_demo_notification_and_provider_controls_are_absent(web: WebHarness) -> None:

@@ -65,7 +65,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
-            secret_key="browser-test-key",
+            secret_key="test-key-5d364b22dfd4d0ff6f63873",
         )
     )
     with live_server(app) as base:

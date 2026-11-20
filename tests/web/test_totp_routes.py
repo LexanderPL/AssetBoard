@@ -614,7 +614,7 @@ def test_password_confirmed_identity_linking_cannot_bypass_totp(owner: OwnerApp)
 
 def test_recovery_still_works_if_the_instance_key_changes(owner: OwnerApp) -> None:
     secret, codes = _enable(owner)
-    owner.app.state.settings.secret_key = "replacement-instance-secret"
+    owner.app.state.settings.secret_key = "replacement-instance-secret-0123456789abcdef"
     client = TestClient(owner.app)
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
     assert (
@@ -935,7 +935,7 @@ def test_secret_is_bound_to_its_account_and_key_change_logs_a_warning(
         assert totp.decrypt_secret(settings, other_id, token) is None
     assert "not bound to its account" in caplog.text
     caplog.clear()
-    settings.secret_key = "replacement-instance-secret"
+    settings.secret_key = "replacement-instance-secret-0123456789abcdef"
     with caplog.at_level("WARNING"):
         assert totp.decrypt_secret(settings, owner.admin_id, token) is None
     warnings = [record for record in caplog.records if record.levelname == "WARNING"]
@@ -1170,9 +1170,12 @@ def test_wrong_codes_hit_the_sign_in_throttle_and_keep_the_ticket(owner: OwnerAp
     assert _password_step(owner, client).status_code == 303
     ticket = client.cookies["assetboard_login_ticket"]
     statuses = []
-    for _ in range(3):
+    # The correct password no longer leaves a failure behind, so the first wrong code is the
+    # first count; the third sets the block and the fourth request reports Retry-After.
+    for _ in range(4):
         response = _code_step(client, owner, "000000")
         statuses.append((response.status_code, response.headers.get("retry-after")))
+    assert statuses[0][1] is None and statuses[1][1] is None and statuses[2][1] is None
     assert statuses[-1][0] == 401 and statuses[-1][1] is not None, statuses
     assert client.cookies.get("assetboard_login_ticket") == ticket
     # Throttled: even the right code is refused without consuming the ticket.

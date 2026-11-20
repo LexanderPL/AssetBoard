@@ -172,6 +172,17 @@ def create_app(
                 "address.",
                 network,
             )
+    else:
+        # No identity headers involved, but forwarded addresses are still trusted from every
+        # host in the range: one reachable host there can bypass per-address throttles and
+        # poison audit address prefixes (SEC-06).
+        for network in settings.broad_trusted_proxies():
+            logger.warning(
+                "TRUSTED_PROXIES entry %s is wider than IPv4 /24 or IPv6 /64; every host in it "
+                "can spoof its forwarded address and bypass per-address throttles. List only "
+                "the reverse proxy's own address.",
+                network,
+            )
     # SECRET_KEY, or the key generated once and persisted under DATA_DIR. Only purpose-specific
     # subkeys leave this function; a restart reads the same file, so tokens stay valid.
     secret_key = settings.ensure_secret_key()

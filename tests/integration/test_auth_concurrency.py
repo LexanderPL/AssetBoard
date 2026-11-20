@@ -603,10 +603,10 @@ def test_busy_gate_skips_the_rehash_and_the_login_still_succeeds(
     )
     assert outcome.succeeded
     assert _stored_hash(factory, user.id) == before  # unchanged; the next login retries
-    # The successful attempt stays counted (every sign-in attempt does); the address takes
-    # its attempt back.
+    # A successful sign-in releases its own account attempt (failures only); the address
+    # takes its attempt back as well.
     account = _throttle(factory, "account", "admin@example.com")
-    assert account is not None and account.failure_count == 1
+    assert account is not None and account.failure_count == 0
     ip_row = _throttle(factory, "ip", "192.0.2.5/32")
     assert ip_row is not None and ip_row.failure_count == 0
 
@@ -911,15 +911,19 @@ def test_a_sign_in_in_flight_looks_the_same_for_known_and_unknown_emails(
 
     known = scenario("victim@example.com", "192.0.2")
     unknown = scenario("nobody@example.com", "198.51.100")
-    assert known == unknown
     during, after, _count, _blocked = known
+    assert during == unknown[0]  # while it is in flight, the outcome is invisible
+    assert isinstance(during, LoginOutcome) and during.throttled_until is not None
+    assert known[2:] == unknown[2:]  # both end at the same count and block time
     if in_flight_ends == "verified":
-        # The in-flight attempt is the sixth: it set the block when it was reserved, and it
-        # stays counted whatever its verify says.
-        assert isinstance(during, LoginOutcome) and during.throttled_until is not None
-        assert after == during
+        # A successful sign-in releases only its own attempt (SEC-02), so the known email's
+        # next probe counts and sets the block, while the unknown email's is already refused.
+        assert after == LoginOutcome()
+        assert isinstance(unknown[1], LoginOutcome)
+        assert unknown[1].throttled_until is not None
     else:
         # Turned away before any verify outcome: the whole attempt is taken back, alike.
+        assert after == unknown[1]
         assert isinstance(after, LoginOutcome) and after.throttled_until is None
 
 

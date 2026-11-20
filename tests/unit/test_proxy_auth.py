@@ -466,7 +466,9 @@ def test_a_missing_peer_record_trusts_nothing_and_logs_one_error(tmp_path: Path)
 
 def test_startup_warns_about_every_trusted_proxy_wider_than_one_address(tmp_path: Path) -> None:
     settings = proxy_settings(
-        tmp_path, trusted_proxies="172.20.0.2,172.20.1.0/24,fd00:20::/64", secret_key="k"
+        tmp_path,
+        trusted_proxies="172.20.0.2,172.20.1.0/24,fd00:20::/64",
+        secret_key="test-key-8254c329a92850f6d539dd3",
     )
     with app_log() as log:
         create_app(settings)
@@ -476,13 +478,62 @@ def test_startup_warns_about_every_trusted_proxy_wider_than_one_address(tmp_path
     assert not any("172.20.0.2 " in line for line in warnings)
 
 
-def test_startup_is_quiet_about_trusted_proxies_without_proxy_auth(tmp_path: Path) -> None:
+def test_startup_warns_about_a_broad_trusted_proxy_without_proxy_auth(tmp_path: Path) -> None:
     settings = Settings(
-        _env_file=None, data_dir=tmp_path, trusted_proxies="10.0.0.0/8", secret_key="k"
+        _env_file=None,
+        data_dir=tmp_path,
+        trusted_proxies="10.0.0.0/8",
+        secret_key="test-secret-key-0123456789abcdef",
+    )
+    with app_log() as log:
+        create_app(settings)
+    warnings = [line for line in log.at(logging.WARNING) if "TRUSTED_PROXIES" in line]
+    assert len(warnings) == 1
+    assert "10.0.0.0/8 is wider than IPv4 /24 or IPv6 /64" in warnings[0]
+    assert "bypass per-address throttles" in warnings[0]
+
+
+def test_startup_is_quiet_about_a_narrow_trusted_proxy_without_proxy_auth(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        trusted_proxies="192.0.2.0/24,2001:db8:1::/64",
+        secret_key="test-secret-key-0123456789abcdef",
     )
     with app_log() as log:
         create_app(settings)
     assert not [line for line in log.at(logging.WARNING) if "TRUSTED_PROXIES" in line]
+
+
+def test_a_forwarded_header_from_an_untrusted_peer_does_not_change_the_throttle_key(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        trusted_proxies="192.0.2.0/24",
+        secret_key="test-secret-key-0123456789abcdef",
+    )
+    app = serve_app(_recorder, settings)
+    seen = _call(
+        app,
+        {
+            "type": "http",
+            "scheme": "http",
+            "path": "/",
+            "headers": [
+                (b"host", b"money.example.test"),
+                (b"x-forwarded-for", b"198.51.100.7"),
+                (b"x-forwarded-proto", b"https"),
+            ],
+            "client": ("203.0.113.5", 4000),
+        },
+    )["seen"]
+    # The peer is outside TRUSTED_PROXIES, so the forwarded values are ignored everywhere,
+    # including the per-address throttle key.
+    assert seen == ("203.0.113.5", 4000, "http", "203.0.113.5/32", "203.0.113.5")
 
 
 def test_proxy_request_identity_is_none_unless_the_peer_is_trusted(tmp_path: Path) -> None:

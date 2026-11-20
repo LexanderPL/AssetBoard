@@ -43,7 +43,7 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(
         _env_file=None,
         data_dir=tmp_path / "data",
-        secret_key="f93-test-secret-key",
+        secret_key="test-key-1ce63290dee8aded1f6448b",
     )
 
 
@@ -191,7 +191,7 @@ def test_restore_requires_and_uses_the_passphrase(tmp_path: Path) -> None:
             target_settings = Settings(
                 _env_file=None,
                 data_dir=tmp_path / "target-data",
-                secret_key="f93-different-target-key",
+                secret_key="test-key-8881905e1d1af007f25fe2e",
             )
             batch_id = upload_import(
                 db.factory,

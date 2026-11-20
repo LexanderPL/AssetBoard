@@ -164,10 +164,10 @@ def test_backup_is_a_verified_standalone_sqlite_file_and_records_the_run(env: En
 
 def test_backup_copies_the_stored_secret_key_beside_it(env: Env) -> None:
     key_file = env.settings.data_dir / "secret_key"
-    key_file.write_text("stored-key", encoding="utf-8")
+    key_file.write_text("stored-key-0123456789abcdefghijklmn", encoding="utf-8")
     result = create_backup(env.factory, env.settings, env.clock, origin="manual")
     sidecar = result.path.with_name(result.path.name + ".secret_key")
-    assert sidecar.read_text(encoding="utf-8") == "stored-key"
+    assert sidecar.read_text(encoding="utf-8") == "stored-key-0123456789abcdefghijklmn"
     assert os.stat(sidecar).st_mode & 0o777 == 0o600
 
 
@@ -182,7 +182,7 @@ def test_a_configured_secret_key_is_not_written_to_the_backup_directory(
         _env_file=None,
         data_dir=data_dir,
         database_url=f"sqlite:///{database}",
-        secret_key="configured-key",
+        secret_key="test-key-62c8ae2b244d92b6e809309",
     )
     engine = create_database_engine(settings.database_url or "")
     clock = FixedClock("2026-03-01T12:00:00+00:00")
@@ -408,13 +408,13 @@ def test_restore_round_trip_saves_a_pre_restore_copy(env: Env) -> None:
 
 def test_restore_restores_the_secret_key_sidecar(env: Env) -> None:
     key_file = env.settings.data_dir / "secret_key"
-    key_file.write_text("backup-key", encoding="utf-8")
+    key_file.write_text("backup-key-0123456789abcdefghijklmn", encoding="utf-8")
     backup = create_backup(env.factory, env.settings, env.clock, origin="manual")
     env.engine.dispose()
-    key_file.write_text("replacement-key", encoding="utf-8")
+    key_file.write_text("replacement-key-0123456789abcdefghijklmn", encoding="utf-8")
     result = restore_backup(env.settings, backup.path, env.clock)
     assert "secret_key_restored" in result.warnings
-    assert key_file.read_text(encoding="utf-8") == "backup-key"
+    assert key_file.read_text(encoding="utf-8") == "backup-key-0123456789abcdefghijklmn"
 
 
 def test_restore_refuses_postgres_corrupt_and_newer_backups(env: Env, tmp_path: Path) -> None:
@@ -504,8 +504,10 @@ def test_backup_copies_the_key_generated_at_startup(env: Env) -> None:
 
 
 def test_a_stale_key_file_does_not_replace_a_configured_key(env: Env) -> None:
-    (env.settings.data_dir / "secret_key").write_text("stale-key", encoding="utf-8")
-    env.settings.secret_key = "configured-key"
+    (env.settings.data_dir / "secret_key").write_text(
+        "stale-key-0123456789abcdefghijklmn", encoding="utf-8"
+    )
+    env.settings.secret_key = "configured-key-0123456789abcdefghijklmn"
     result = create_backup(env.factory, env.settings, env.clock, origin="manual")
     assert not result.path.with_name(result.path.name + ".secret_key").exists()
 
@@ -540,7 +542,9 @@ def test_backup_refuses_missing_empty_and_schema_less_sources(env: Env, tmp_path
 def test_secret_key_copy_failure_fails_the_backup(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (env.settings.data_dir / "secret_key").write_text("stored-key", encoding="utf-8")
+    (env.settings.data_dir / "secret_key").write_text(
+        "stored-key-0123456789abcdefghijklmn", encoding="utf-8"
+    )
 
     def fail(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full")
