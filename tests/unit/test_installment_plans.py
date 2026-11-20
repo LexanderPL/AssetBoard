@@ -501,6 +501,60 @@ def test_undo_after_archive_reopens_and_reconciles_the_plan(team: WorkspaceDb) -
     assert pending == [date(2026, 3, 5), date(2026, 4, 5), date(2026, 5, 5)]
 
 
+def test_restore_with_overdue_rows_does_not_duplicate_them(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 4, 10, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 2, 5),
+        date(2026, 3, 5),
+        date(2026, 4, 5),
+    ]
+    assert len({row.due_date for row in rows}) == 3
+
+
+def test_undo_after_disable_and_reenable_does_not_revive_the_old_item(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    loan_scheduled.disable_loan_schedule_item(team.factory, ctx, loan_id)
+    loan_scheduled.create_loan_schedule_item(
+        team.factory, ctx, loan_id, _category(team), Settings(_env_file=None)
+    )
+    occurrences.undo_post(team.factory, ctx, first.id)
+    with team.factory() as session:
+        active = ScheduledItemRepository(session, ctx).ordered(active_only=True)
+        rows = [
+            row
+            for item in ScheduledItemRepository(session, ctx).for_loan(loan_id)
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    print("ACTIVE", [(item.id, item.archived_at) for item in active])
+    print("ROWS", [(row.scheduled_item_id, row.status, row.due_date) for row in rows])
+    assert len(active) == 1
+    assert len({row.due_date for row in rows}) == len(rows) == 3
+
+
 def test_auto_post_decrements_the_plan(team: WorkspaceDb) -> None:
     loan_id = _create(team, remaining_count=3)
     ctx = team.ctx("owner", "owner")

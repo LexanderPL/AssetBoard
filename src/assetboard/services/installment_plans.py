@@ -508,6 +508,9 @@ def apply_posted_occurrence(
 def _reactivate_loan_item(session: Session, ctx: Context, loan_id: UUID) -> None:
     """Reuse an archived loan item before regenerating, so its old rows are not duplicated."""
     items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+    if any(item.archived_at is None for item in items):
+        # Another generation is active; never revive an old item beside it.
+        return
     for item in reversed(items):
         if item.archived_at is not None:
             ScheduledItemRepository(session, ctx).update(item.id, archived_at=None, paused_at=None)
@@ -564,6 +567,31 @@ def revert_posted_occurrence(
     from assetboard.services.loan_scheduled import create_loan_schedule_item_in_session
 
     _reactivate_loan_item(session, ctx, loan.id)
+    # If an active generation already has this date, the reverted row is a duplicate from the
+    # archived item (disable generation, re-enable, then undo). Drop the old copy; the active
+    # row already represents the same installment.
+    items = ScheduledItemRepository(session, ctx).for_loan(loan.id)
+    active = next(
+        (item for item in items if item.archived_at is None and item.paused_at is None), None
+    )
+    if active is not None:
+        occurrences = _occurrences_for_loan(session, ctx, loan.id)
+        active_dates = {
+            row.due_date
+            for row in occurrences
+            if row.scheduled_item_id == active.id
+            and row.status == "pending"
+            and row.direction == "expense"
+        }
+        for row in occurrences:
+            if (
+                row.status == "pending"
+                and row.direction == "expense"
+                and row.due_date == posted_on
+                and row.scheduled_item_id != active.id
+                and posted_on in active_dates
+            ):
+                ScheduledOccurrenceRepository(session, ctx).delete(row)
     create_loan_schedule_item_in_session(
         session, ctx, loan.id, plan.category_id, DEFAULT_RECURRENCE_HORIZON_MONTHS
     )
@@ -611,9 +639,10 @@ def restore_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_
             raise NotFound
         if plan.remaining_count <= 0:
             raise loans.LoanError("remaining_count", "installment_plan_closed")
-        today = ctx.clock.today(ctx.workspace.timezone)
-        next_due = next_due_on_or_after(today, loan.payment_day)
-        end_date = _end_date(next_due, plan.remaining_count, loan.payment_day)
+        InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None)
+        next_due, _end = plan_due_dates_in_session(
+            session, ctx, loan, ctx.clock.today(ctx.workspace.timezone)
+        )
         LoanRepository(session, ctx).update(
             loan.id,
             archived_at=None,
@@ -621,7 +650,6 @@ def restore_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_
             term_months=plan.remaining_count,
             principal_original_minor=plan.installment_minor * plan.remaining_count,
         )
-        InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None, end_date=end_date)
         from assetboard.services.loan_scheduled import create_loan_schedule_item_in_session
 
         _reactivate_loan_item(session, ctx, loan.id)
