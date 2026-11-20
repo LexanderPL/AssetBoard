@@ -1037,6 +1037,12 @@ msgstr "Ważne dni"
 msgid "Categories"
 msgstr "Kategorie"
 
+msgid "Plan"
+msgstr "Plan"
+
+msgid "Posted on"
+msgstr "Zaksięgowano"
+
 msgid "Deleted entries cleared"
 msgstr "Usunięte wpisy wyczyszczone"
 
@@ -7562,9 +7568,6 @@ msgstr ""
 "Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
 "Prognoza zakłada stałe stopy i nie modeluje podatków osobno; rzeczywiste "
 "wyniki będą inne."
-
-msgid "Plan"
-msgstr "Plan"
 
 msgid "Horizon age"
 msgstr "Wiek horyzontu"

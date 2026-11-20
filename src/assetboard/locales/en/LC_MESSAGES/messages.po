@@ -1019,6 +1019,12 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
+msgid "Plan"
+msgstr ""
+
+msgid "Posted on"
+msgstr ""
+
 msgid "Deleted entries cleared"
 msgstr ""
 
@@ -6944,9 +6950,6 @@ msgid ""
 "Projections are illustrative and not financial advice. The projection "
 "assumes constant rates and does not model taxes separately; actual "
 "results will differ."
-msgstr ""
-
-msgid "Plan"
 msgstr ""
 
 msgid "Horizon age"
@@ -15293,6 +15296,7 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The month is closed. Reopen it before posting the installment."
+#~ msgstr ""
 
 #~ msgid "Fix the filters to export the year overview."
 #~ msgstr ""
