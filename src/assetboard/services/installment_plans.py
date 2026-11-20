@@ -639,10 +639,18 @@ def restore_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_
             raise NotFound
         if plan.remaining_count <= 0:
             raise loans.LoanError("remaining_count", "installment_plan_closed")
-        InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None)
-        next_due, _end = plan_due_dates_in_session(
-            session, ctx, loan, ctx.clock.today(ctx.workspace.timezone)
-        )
+        # Restore is a fresh schedule for the remaining count: clear every pending row from
+        # the archived item, then generate from today. Keeping overdue rows while shifting the
+        # end date either duplicated dates or left the plan under-scheduled.
+        occurrences = ScheduledOccurrenceRepository(session, ctx)
+        for item in ScheduledItemRepository(session, ctx).for_loan(loan.id):
+            for row in occurrences.for_item(item.id):
+                if row.status == "pending":
+                    occurrences.delete(row)
+        today = ctx.clock.today(ctx.workspace.timezone)
+        next_due = next_due_on_or_after(today, loan.payment_day)
+        end_date = _end_date(next_due, plan.remaining_count, loan.payment_day)
+        InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None, end_date=end_date)
         LoanRepository(session, ctx).update(
             loan.id,
             archived_at=None,

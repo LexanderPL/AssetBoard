@@ -517,11 +517,60 @@ def test_restore_with_overdue_rows_does_not_duplicate_them(team: WorkspaceDb) ->
             if row.status == "pending"
         ]
     assert sorted(row.due_date for row in rows) == [
-        date(2026, 2, 5),
-        date(2026, 3, 5),
-        date(2026, 4, 5),
+        date(2026, 5, 5),
+        date(2026, 6, 5),
+        date(2026, 7, 5),
     ]
     assert len({row.due_date for row in rows}) == 3
+
+
+def test_restore_after_the_original_end_date_still_schedules_the_count(
+    team: WorkspaceDb,
+) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 6, 10, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 7, 5),
+        date(2026, 8, 5),
+        date(2026, 9, 5),
+    ]
+
+
+def test_restore_after_archive_with_no_pending_rows_schedules_the_count(
+    team: WorkspaceDb,
+) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    team.clock._value = datetime(2026, 2, 20, 12, tzinfo=UTC)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 3, 5),
+        date(2026, 4, 5),
+        date(2026, 5, 5),
+    ]
 
 
 def test_undo_after_disable_and_reenable_does_not_revive_the_old_item(
@@ -549,8 +598,6 @@ def test_undo_after_disable_and_reenable_does_not_revive_the_old_item(
             for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
             if row.status == "pending"
         ]
-    print("ACTIVE", [(item.id, item.archived_at) for item in active])
-    print("ROWS", [(row.scheduled_item_id, row.status, row.due_date) for row in rows])
     assert len(active) == 1
     assert len({row.due_date for row in rows}) == len(rows) == 3
 
