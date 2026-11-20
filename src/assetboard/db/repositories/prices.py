@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.engine import CursorResult
 
 from assetboard.db.models.prices import FxRate, PricePoint, PriceSourceConfig, ProviderError
@@ -102,6 +102,69 @@ class PricePointRepository(ScopedRepository[PricePoint]):
         )
         return list(self._session.scalars(statement))
 
+    def for_instruments_in_window(
+        self, instrument_ids: Collection[UUID], *, start: date, end: date
+    ) -> list[PricePoint]:
+        """Prices in ``[start, end]`` plus each instrument's latest observation before ``start``.
+
+        The pre-window row keeps the F6.7 carry-forward rule exact while a short report or Home
+        range does not read years of prices it never plots.
+        """
+        ids = list(instrument_ids)
+        if not ids or start > end:
+            return []
+        latest = (
+            select(PricePoint.instrument_id, func.max(PricePoint.date).label("date"))
+            .where(
+                PricePoint.workspace_id == self._workspace_id,
+                PricePoint.instrument_id.in_(ids),
+                PricePoint.date < start,
+            )
+            .group_by(PricePoint.instrument_id)
+            .subquery()
+        )
+        statement = self._scoped_select().where(
+            PricePoint.instrument_id.in_(ids),
+            or_(
+                and_(PricePoint.date >= start, PricePoint.date <= end),
+                and_(
+                    PricePoint.date < start,
+                    tuple_(PricePoint.instrument_id, PricePoint.date).in_(
+                        select(latest.c.instrument_id, latest.c.date)
+                    ),
+                ),
+            ),
+        )
+        return list(self._session.scalars(statement))
+
+    def latest_for_instruments_on_or_before(
+        self, instrument_ids: Collection[UUID], on: date
+    ) -> list[PricePoint]:
+        """Only the latest observation date per instrument, including same-day sources.
+
+        The current-value path needs one date per instrument, not its whole price history.
+        """
+        ids = list(instrument_ids)
+        if not ids:
+            return []
+        latest = (
+            select(PricePoint.instrument_id, func.max(PricePoint.date).label("date"))
+            .where(
+                PricePoint.workspace_id == self._workspace_id,
+                PricePoint.instrument_id.in_(ids),
+                PricePoint.date <= on,
+            )
+            .group_by(PricePoint.instrument_id)
+            .subquery()
+        )
+        statement = self._scoped_select().where(
+            PricePoint.instrument_id.in_(ids),
+            tuple_(PricePoint.instrument_id, PricePoint.date).in_(
+                select(latest.c.instrument_id, latest.c.date)
+            ),
+        )
+        return list(self._session.scalars(statement))
+
     def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[PricePoint]:
         statement = self._scoped_select().where(PricePoint.import_batch_id == batch_id)
         if lock:
@@ -143,6 +206,54 @@ class FxRateRepository(ScopedRepository[FxRate]):
         statement = self._scoped_select().where(
             FxRate.base_currency == base_currency,
             FxRate.date <= on,
+        )
+        return list(self._session.scalars(statement))
+
+    def for_base_in_window(self, base_currency: str, *, start: date, end: date) -> list[FxRate]:
+        """Rates in ``[start, end]`` plus each currency's latest rate before ``start``."""
+        if start > end:
+            return []
+        latest = (
+            select(FxRate.quote_currency, func.max(FxRate.date).label("date"))
+            .where(
+                FxRate.workspace_id == self._workspace_id,
+                FxRate.base_currency == base_currency,
+                FxRate.date < start,
+            )
+            .group_by(FxRate.quote_currency)
+            .subquery()
+        )
+        statement = self._scoped_select().where(
+            FxRate.base_currency == base_currency,
+            or_(
+                and_(FxRate.date >= start, FxRate.date <= end),
+                and_(
+                    FxRate.date < start,
+                    tuple_(FxRate.quote_currency, FxRate.date).in_(
+                        select(latest.c.quote_currency, latest.c.date)
+                    ),
+                ),
+            ),
+        )
+        return list(self._session.scalars(statement))
+
+    def latest_for_base_on_or_before(self, base_currency: str, on: date) -> list[FxRate]:
+        """Only the latest observation date per currency, including same-day sources."""
+        latest = (
+            select(FxRate.quote_currency, func.max(FxRate.date).label("date"))
+            .where(
+                FxRate.workspace_id == self._workspace_id,
+                FxRate.base_currency == base_currency,
+                FxRate.date <= on,
+            )
+            .group_by(FxRate.quote_currency)
+            .subquery()
+        )
+        statement = self._scoped_select().where(
+            FxRate.base_currency == base_currency,
+            tuple_(FxRate.quote_currency, FxRate.date).in_(
+                select(latest.c.quote_currency, latest.c.date)
+            ),
         )
         return list(self._session.scalars(statement))
 

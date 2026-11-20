@@ -12,6 +12,7 @@ SQL statements therefore does not grow with the selected range.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -28,6 +29,7 @@ from assetboard.domain.networth_history import (
     SnapshotBreakdown,
     breakdown_for,
     history_dates,
+    history_start,
     linked_for_date,
     normalize_history_range,
     summarize_values,
@@ -103,8 +105,16 @@ def networth_history(
     factory: sessionmaker[Session],
     ctx: Context,
     range_code: str = DEFAULT_HISTORY_RANGE,
+    *,
+    dates: Sequence[date] | None = None,
 ) -> NetWorthHistoryData:
-    """The derived trend for one range; every member may read it."""
+    """The derived trend for one range; every member may read it.
+
+    ``dates`` overrides the range's month-ends with exact points (Reports asks for its period
+    ends). In both forms only the valuations needed are read: rows from the window start to
+    today plus each item's latest value before it. The read runs to today (not the last report
+    date) so an ``estimate_between`` point can see its next valuation.
+    """
     require_role(ctx, Role.VIEWER)
     code = normalize_history_range(range_code)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -120,9 +130,25 @@ def networth_history(
             )
             for category in category_rows
         }
-        histories = load_item_histories(session, ctx, categories=category_rows)
-        earliest = _earliest_recorded(histories, today=today, timezone=ctx.workspace.timezone)
-        dates = history_dates(today, code, earliest=earliest)
+        histories: tuple[ItemHistory, ...]
+        if dates is None:
+            start = history_start(today, code)
+            window = None if start is None else (start, today)
+            histories = load_item_histories(session, ctx, categories=category_rows, window=window)
+            earliest = _earliest_recorded(histories, today=today, timezone=ctx.workspace.timezone)
+            dates = history_dates(today, code, earliest=earliest)
+        else:
+            dates = tuple(sorted({day for day in dates if day <= today}))
+            histories = (
+                load_item_histories(
+                    session,
+                    ctx,
+                    categories=category_rows,
+                    window=(dates[0], today),
+                )
+                if dates
+                else ()
+            )
         if not dates:
             return NetWorthHistoryData(
                 base_currency=base_currency,

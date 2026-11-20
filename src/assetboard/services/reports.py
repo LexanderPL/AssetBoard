@@ -16,14 +16,15 @@ The category filter is repeatable and bookmarkable (``?category=<id>&category=<i
 ids and ids from another workspace are ignored; if none of the requested ids belong to an
 eligible expense category, the chart falls back to its default (the largest eight and Other).
 
-Phase B calls the existing derived net-worth and portfolio services in their all-time form and
-keeps the last point of each report period; it never reimplements their valuation math.
+Phase B calls the existing derived net-worth and portfolio services with the report's exact
+period-end dates; it never reimplements their valuation math. Those services read the requested
+window instead of every historical valuation and price.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -331,32 +332,6 @@ def _entries(
         yield LedgerEntry(row.day, row.category_id, Money(row.amount_minor, row.currency))
 
 
-def _last_per_period[T](
-    points: Iterable[T],
-    *,
-    day_of: Callable[[T], date],
-    start_year: int,
-    end_year: int,
-    step: ReportStep,
-    today: date,
-) -> tuple[T, ...]:
-    """The last point of each month/year in the report range, in source order.
-
-    Points after today are ignored, as are points before the range. A period with no point is
-    simply absent; nothing is interpolated.
-    """
-    start = date(start_year, 1, 1)
-    end = min(date(end_year, 12, 31), today)
-    chosen: dict[tuple[int, ...], T] = {}
-    for point in points:
-        point_day = day_of(point)
-        if not start <= point_day <= end:
-            continue
-        key = (point_day.year,) if step is ReportStep.YEAR else (point_day.year, point_day.month)
-        chosen[key] = point
-    return tuple(chosen.values())
-
-
 def net_worth_report(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -368,26 +343,22 @@ def net_worth_report(
 ) -> NetWorthHistoryData | None:
     """F10.4: the derived net-worth series at the report's period ends.
 
-    Reuses F5.9's ``networth_history`` in its all-time form and keeps the last point of each
-    period. Only the workspace base currency is available; the section is absent otherwise.
+    Reuses F5.9's ``networth_history`` with explicit period-end dates, so the service reads the
+    report range and its carry-forward anchors instead of every valuation since the first item.
+    Only the workspace base currency is available; the section is absent otherwise.
     """
     if currency != ctx.workspace.base_currency:
         return None
     today = ctx.clock.today(ctx.workspace.timezone)
     if start_year > today.year:
         return None
-    data = networth_history(factory, ctx, "all")
-    points = _last_per_period(
-        data.points,
-        day_of=lambda point: point.as_of,
-        start_year=start_year,
-        end_year=end_year,
-        step=step,
-        today=data.today,
-    )
-    if not points or not data.has_values:
+    dates = _period_end_dates(start_year, end_year, step, today)
+    if not dates:
         return None
-    return replace(data, points=points)
+    data = networth_history(factory, ctx, "all", dates=dates)
+    if not data.points or not data.has_values:
+        return None
+    return data
 
 
 def _period_end_dates(
@@ -429,8 +400,10 @@ def portfolio_report(
 ) -> PerformancePage | None:
     """F10.5: portfolio value and invested capital at the report's period ends.
 
-    Reuses F6.7's ``performance_page`` in its all-time form; no portfolio math is repeated.
-    Only the workspace base currency is available; the section is absent otherwise.
+    Reuses F6.7's ``performance_page`` with the exact period-end dates; the price and FX read
+    stops at the report range (plus each series' carry-forward anchor), not all history. No
+    portfolio math is repeated. Only the workspace base currency is available; the section is
+    absent otherwise.
     """
     if currency != ctx.workspace.base_currency:
         return None

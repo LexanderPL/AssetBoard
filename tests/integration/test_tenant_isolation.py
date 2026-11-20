@@ -882,6 +882,23 @@ def test_price_queries_stay_in_their_workspace(
     assert [
         row.id for row in prices_b.for_instruments_on_or_before((b_fund.id,), date(2026, 3, 1))
     ] == [b_price.id]
+    assert [
+        row.id
+        for row in prices_a.for_instruments_in_window(
+            (a_fund.id,), start=date(2026, 3, 1), end=date(2026, 3, 31)
+        )
+    ] == [a_price.id]
+    assert (
+        prices_b.for_instruments_in_window(
+            (a_fund.id,), start=date(2026, 3, 1), end=date(2026, 3, 31)
+        )
+        == []
+    )
+    assert [
+        row.id
+        for row in prices_a.latest_for_instruments_on_or_before((a_fund.id,), date(2026, 3, 1))
+    ] == [a_price.id]
+    assert prices_b.latest_for_instruments_on_or_before((a_fund.id,), date(2026, 3, 1)) == []
 
     rates_a = FxRateRepository(db_session, ctx_a)
     rates_b = FxRateRepository(db_session, ctx_b)
@@ -901,6 +918,20 @@ def test_price_queries_stay_in_their_workspace(
     )
     assert [row.id for row in rates_a.for_base_on_or_before("EUR", date(2026, 3, 1))] == [a_rate.id]
     assert [row.id for row in rates_b.for_base_on_or_before("EUR", date(2026, 3, 1))] == [b_rate.id]
+    assert [
+        row.id
+        for row in rates_a.for_base_in_window("EUR", start=date(2026, 3, 1), end=date(2026, 3, 31))
+    ] == [a_rate.id]
+    assert [
+        row.id
+        for row in rates_b.for_base_in_window("EUR", start=date(2026, 3, 1), end=date(2026, 3, 31))
+    ] == [b_rate.id]
+    assert [row.id for row in rates_a.latest_for_base_on_or_before("EUR", date(2026, 3, 1))] == [
+        a_rate.id
+    ]
+    assert [row.id for row in rates_b.latest_for_base_on_or_before("EUR", date(2026, 3, 1))] == [
+        b_rate.id
+    ]
 
 
 def test_bond_terms_queries_stay_in_their_workspace(
@@ -1186,6 +1217,18 @@ def test_networth_queries_stay_in_their_workspace(
     assert [row.id for row in valuations_b.for_item(b_item.id)] == [b_value.id]
     assert [row.id for row in valuations_a.for_items([a_item.id, b_item.id])] == [a_value.id]
     assert [row.id for row in valuations_b.for_items([a_item.id, b_item.id])] == [b_value.id]
+    assert [
+        row.id
+        for row in valuations_a.for_items_in_window(
+            [a_item.id, b_item.id], start=date(2026, 10, 1), end=date(2026, 10, 31)
+        )
+    ] == [a_value.id]
+    assert (
+        valuations_b.for_items_in_window(
+            [a_item.id], start=date(2026, 10, 1), end=date(2026, 10, 31)
+        )
+        == []
+    )
     assert valuations_a.get_for_item(a_item.id, a_value.id) == a_value
     assert valuations_a.get_for_item(b_item.id, b_value.id) is None
     assert valuations_b.get_for_item(a_item.id, a_value.id) is None
