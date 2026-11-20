@@ -18,24 +18,30 @@ JavaScript. Unknown query parameters are ignored.
 
 | Filter | Values | Default |
 | --- | --- | --- |
-| From year | `from=YYYY`, 1900–2199 | the current year and the two calendar years before it (3 years) |
-| To year | `to=YYYY`, inclusive | the current year |
+| From year | `from=YYYY`, 1900–2199 | the earliest of the last three years that have transactions |
+| To year | `to=YYYY`, inclusive | the latest of the last three years that have transactions |
 | Granularity | `step=month` or `step=year` | monthly up to a 3-year range, yearly beyond |
 | Currency | `currency=XXX` | the workspace's base currency |
 | Categories | `category=<id>`, repeatable | empty: all categories in the year overview, the 8 largest (and Other) in the category charts |
 | Include saved / invested | `savings=1` | off |
-| Report year | `year=YYYY` | the report's end year, or the current year when the range ends later |
+| Report year | `year=YYYY` | the latest data year inside the range, or the range end, capped at the current year |
 | Category trends window | `trend=3` or `trend=12` | 3 months |
-| Year-over-year category | `yoy_category=<id>` | empty: all categories |
+
+The **From year** and **To year** dropdowns offer only years that have at least one non-deleted
+transaction on or before today. The default range uses the last three such years, or fewer when
+they would span more than 30 years (and the current year when the workspace has no transactions).
+A range can still span empty years between two selected years; those years show zeros. A URL may
+name any year from 1900 to 2199, so an old bookmark still opens even when that year is not in the
+dropdown.
 
 The **Categories** and **Include saved / invested** filters apply to the expenses-by-category
-section, the year overview and category trends. **Year-over-year** has its own single category
-selector; the other sections always use the whole ledger. An unknown or malformed `year` or
-`yoy_category` is ignored and the default is used, so an old bookmark still opens.
+section, the year overview and category trends. The year-over-year table always uses the whole
+ledger. An unknown or malformed `year` is ignored and the default is used.
 
-The **Report year** selector chooses the year of the year-overview grid and the year-over-year
-comparison. It does not change the range of the first three sections. The **Net worth over time**
-and **Portfolio value over time** sections follow **From year**, **To year** and **Granularity**,
+The **Report year** selector sits inside the **Year overview** panel and chooses the grid's year.
+It does not change the range of the other sections, and its options are the data years inside the
+selected range (plus an explicitly requested year). The **Net worth over time** and
+**Portfolio value over time** sections follow **From year**, **To year** and **Granularity**,
 ignore the category/savings filters, and are shown only in the workspace base currency.
 
 A range is at most 30 years. A malformed year, `from` after `to`, or a longer range is marked on
@@ -71,10 +77,15 @@ series. Use the legend to hide or show a series. Amounts and labels are formatte
 with your locale and the currency's native style.
 
 The table below the chart has the same figures: period, earned, spent, saved and net, plus a
-total row for the range. Each monthly row links to that month's page (`/m/YYYY-MM`). With
-JavaScript the table is visually hidden beside the drawn chart; **Show as table** reveals it.
-Without JavaScript the table stays visible in place of the chart. An empty range shows an empty
-state and a table of zeros.
+total row for the range. Each monthly row links to that month's page (`/m/YYYY-MM`); each yearly
+row links to the Year overview focused on that year. With JavaScript the table is visually hidden
+beside the drawn chart; **Show as table** reveals it. Without JavaScript the table stays visible
+in place of the chart. An empty range shows an empty state and a table of zeros.
+
+The same date links are used throughout the page: month labels open the month page, and year
+labels (including year-overview column headings and year-over-year rows) open the Year overview
+for that year with the current filters preserved. Chart data points and x-axis labels are
+clickable too; the tables are the keyboard-accessible equivalent.
 
 ## Savings rate
 
@@ -136,12 +147,8 @@ chosen categories appear (including a zero row). A category's swatch uses its co
 cells mean more spending in that month; the shading uses the theme's colour tokens, so it follows
 the light and dark themes.
 
-**Download CSV** exports exactly the grid's rows and totals for the same `year`, `category`,
-`savings` and `currency` filters. The file is `reports-year-overview.csv`: UTF-8, comma separated,
-RFC 4180 quoting, CRLF line ends, ISO month columns (`2026-01`), plain decimal amounts with the
-currency's minor digits and no locale grouping. Headers and the total label are stable English
-machine labels, not translated UI; category names are guarded against spreadsheet formula
-execution. It is a normal authenticated GET, available to every member who can open the report.
+The month column headings link to that month's page. The **Report year** selector in this panel
+changes only the grid; changing it reloads the page with the other filters preserved.
 
 ## Category trends
 
@@ -158,18 +165,20 @@ figures; the table is the accessible version and works without JavaScript.
 
 ## Year-over-year
 
-The year-over-year table compares actual spending in the **Report year** with the year before.
-Choose one category in **Year-over-year category**, or leave it empty to compare all categories
-together. It shows the current amount, the previous amount, the absolute change and the percent
-change. A positive change means more spending; it is shown in the danger colour, while a decrease
-is shown as good.
+The year-over-year table has one row per year in the report range, up to the current year.
+Each row shows the year's
+**income** and **expenses**, then the change against the previous year for both: the absolute
+value and the percentage. Income growth is shown as good and an income drop as bad; an expense
+increase is shown as bad and a decrease as good. The signs and percentages carry the meaning, so
+colour is not the only cue.
 
 The percent change is `(current - previous) / previous`, rounded once to one decimal place. When
-the previous year spent nothing the percentage is undefined: the table shows “—” and screen
-readers hear why. When the report year is the current year, both years are compared through the
-current month ("so far") rather than a partial year against a full one. Like the year overview,
-the comparison follows the category treatment rules and the **Include saved / invested** option;
-income, withdrawals and transfers never count.
+the previous year had no income or no expenses, that percentage is undefined: the table shows “—”
+and screen readers hear why. The first year in the range is compared with the year before it even
+when that year is outside the selected range. When the current year is included, both years are
+compared through the current month ("so far") rather than a partial year against a full one. The
+table uses the whole ledger: income, expenses and transfers follow the same treatment rules as
+the rest of the page; the category filter does not narrow it.
 
 ## Planned vs actual accuracy
 
@@ -196,7 +205,10 @@ shown. There is no interpolation between periods.
 
 The section appears only when the workspace has net-worth values and the selected currency is
 the workspace base currency. It is absent otherwise. The chart and table carry the same figures;
-the table is the accessible version and works without JavaScript.
+the data table is collapsed behind **Show as table** with JavaScript and stays visible without
+JavaScript. Period rows link to the month page or the focused Year overview. The report does not
+repeat the per-period “not counted” and “estimated values” notes; the Net worth Summary keeps
+that detail in its breakdown.
 
 ## Portfolio value over time
 
@@ -206,10 +218,11 @@ Performance page and the Home portfolio widget; no portfolio math is repeated.
 
 The section appears only when the workspace has investment transactions and the selected currency
 is the workspace base currency. It is absent otherwise. The chart and table carry the same
-figures; the table is the accessible version and works without JavaScript.
+figures; the data table is collapsed behind **Show as table** with JavaScript and stays visible
+without JavaScript. Period rows link to the month page or the focused Year overview.
 
 ## Limits
 
-Reports read the ledger, the derived net-worth history and the portfolio valuation series. The
-year overview is the only table with a CSV download; CSV export of ledger entries lives on the
+Reports read the ledger, the derived net-worth history and the portfolio valuation series. There
+is no report-table CSV export; CSV export of ledger entries lives on the
 [History](transactions.md) page.

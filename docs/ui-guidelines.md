@@ -51,7 +51,8 @@ belongs to the tab currently shown.
   - dashboards and lists: `max-w-6xl` (the base default);
   - settings and forms: `max-w-3xl`;
   - focused confirmations: `max-w-2xl`;
-  - import/report pages: `max-w-4xl`.
+  - report pages: `max-w-6xl` (the same as dashboards and lists);
+  - import pages: `max-w-4xl`.
 - Detail pages (income edit, tax edit, instrument, work calendar, recurring edit) start with one
   consistent back control. Prefer a `.btn` “Back to …” in the content header, not a one-off
   rounded link on some pages and an underlined text link on others.

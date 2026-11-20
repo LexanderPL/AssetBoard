@@ -5063,9 +5063,6 @@ msgstr ""
 msgid "FIRE projection"
 msgstr ""
 
-msgid "Fix the filters to export the year overview."
-msgstr ""
-
 msgid "The first year must be the same as or before the last year."
 msgstr ""
 
@@ -5147,14 +5144,24 @@ msgstr ""
 msgid "Not available: fewer than %(num)d months of data."
 msgstr ""
 
-msgid "Total (all categories)"
+msgid "Not available: no income in the previous year."
 msgstr ""
 
-msgid "Not available: nothing spent in the previous year."
+msgid "Not available: no expenses in the previous year."
 msgstr ""
 
 #, python-format
 msgid "The current year is compared through %(month)s in both years."
+msgstr ""
+
+msgid "All categories"
+msgstr ""
+
+msgid "1 category selected"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d categories selected"
 msgstr ""
 
 msgid "Net worth over time"
@@ -11514,6 +11521,12 @@ msgstr ""
 msgid "Reminder"
 msgstr ""
 
+msgid "Show as table"
+msgstr ""
+
+msgid "Hide table"
+msgstr ""
+
 msgid "From year"
 msgstr ""
 
@@ -11534,12 +11547,6 @@ msgid ""
 "the category charts."
 msgstr ""
 
-msgid "Report year"
-msgstr ""
-
-msgid "Used by the year overview and year-over-year sections."
-msgstr ""
-
 msgid "Category trends window"
 msgstr ""
 
@@ -11547,9 +11554,6 @@ msgid "3-month average"
 msgstr ""
 
 msgid "12-month average"
-msgstr ""
-
-msgid "Year-over-year category"
 msgstr ""
 
 msgid "Show report"
@@ -11565,12 +11569,6 @@ msgstr ""
 msgid "No earned, spent or saved amounts in this range."
 msgstr ""
 
-msgid "Show as table"
-msgstr ""
-
-msgid "Hide table"
-msgstr ""
-
 msgid ""
 "The share of earnings moved to savings and investments: saved ÷ earned, "
 "the same measure as the Month page."
@@ -11583,6 +11581,9 @@ msgid "Savings rate by period"
 msgstr ""
 
 msgid "Year overview"
+msgstr ""
+
+msgid "Report year"
 msgstr ""
 
 msgid ""
@@ -11624,13 +11625,19 @@ msgstr ""
 msgid "Year-over-year"
 msgstr ""
 
-msgid "Actual spending in the selected year compared with the year before."
+msgid "Income and expenses per year, compared with the previous year."
 msgstr ""
 
-msgid "No spending in either year."
+msgid "No income or expenses in this range."
 msgstr ""
 
 msgid "Year-over-year comparison"
+msgstr ""
+
+msgid "Income change"
+msgstr ""
+
+msgid "Expenses change"
 msgstr ""
 
 msgid "Planned vs actual accuracy"
@@ -11653,9 +11660,6 @@ msgstr ""
 
 #, python-format
 msgid "Over %%"
-msgstr ""
-
-msgid "All categories"
 msgstr ""
 
 msgid ""
@@ -15269,5 +15273,26 @@ msgstr ""
 #~ "Available only in an empty workspace."
 #~ " The untouched suggested categories are "
 #~ "fine."
+#~ msgstr ""
+
+#~ msgid "Fix the filters to export the year overview."
+#~ msgstr ""
+
+#~ msgid "Total (all categories)"
+#~ msgstr ""
+
+#~ msgid "Not available: nothing spent in the previous year."
+#~ msgstr ""
+
+#~ msgid "Used by the year overview and year-over-year sections."
+#~ msgstr ""
+
+#~ msgid "Year-over-year category"
+#~ msgstr ""
+
+#~ msgid "Actual spending in the selected year compared with the year before."
+#~ msgstr ""
+
+#~ msgid "No spending in either year."
 #~ msgstr ""
 

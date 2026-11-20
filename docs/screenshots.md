@@ -64,7 +64,8 @@ Search, filters and the paginated list of all entries.
 
 ## Reports
 
-Income against expenses and the trend, savings-rate and category reports.
+Income against expenses, savings rate, category reports, year overview, year-over-year, net
+worth and portfolio history.
 
 | Desktop light | Desktop dark | Phone light | Phone dark |
 | --- | --- | --- | --- |

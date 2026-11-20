@@ -188,6 +188,7 @@ def _chart(
     base_currency: str,
     locale: str,
     labels: Sequence[str] | None = None,
+    include_notes: bool = True,
 ) -> dict[str, object] | None:
     if not points:
         return None
@@ -206,10 +207,11 @@ def _chart(
                 locale=locale,
             )
         ]
-        lines.extend(_not_counted(point.breakdown, locale))
-        estimated_note = _estimated_note(point.breakdown, locale)
-        if estimated_note is not None:
-            lines.append(estimated_note)
+        if include_notes:
+            lines.extend(_not_counted(point.breakdown, locale))
+            estimated_note = _estimated_note(point.breakdown, locale)
+            if estimated_note is not None:
+                lines.append(estimated_note)
         tooltips.append(lines)
     return {
         "labels": list(labels)
@@ -247,7 +249,11 @@ def _chart(
 
 
 def build_trend_view(
-    data: NetWorthHistoryData, locale: str, *, labels: Sequence[str] | None = None
+    data: NetWorthHistoryData,
+    locale: str,
+    *,
+    labels: Sequence[str] | None = None,
+    include_notes: bool = True,
 ) -> NetWorthTrendView:
     rows = tuple(
         TrendRow(
@@ -287,6 +293,7 @@ def build_trend_view(
                 base_currency=data.base_currency,
                 locale=locale,
                 labels=labels,
+                include_notes=include_notes,
             )
             if data.has_chart
             else None

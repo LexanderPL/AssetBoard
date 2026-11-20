@@ -155,14 +155,16 @@ def test_the_golden_years_are_the_sums_of_the_months(team: WorkspaceDb) -> None:
         assert year.net.amount_minor == sum(p.net.amount_minor for p in months)
 
 
-def test_the_default_range_is_the_current_year_and_the_two_before(team: WorkspaceDb) -> None:
+def test_the_default_range_is_the_current_year_when_there_is_no_data(
+    team: WorkspaceDb,
+) -> None:
     data = reports_data(team.factory, team.ctx("vic", "viewer"))
-    assert (data.filters.start_year, data.filters.end_year) == (2024, 2026)
+    assert (data.filters.start_year, data.filters.end_year) == (2026, 2026)
     assert data.filters.step is ReportStep.MONTH
-    assert data.filters.from_text == "2024" and data.filters.to_text == "2026"
+    assert data.filters.from_text == "2026" and data.filters.to_text == "2026"
     assert data.filters.currency == "EUR"
     assert data.show_currency_selector is False
-    assert [period.period for period in data.series][0] == YearMonth(2024, 1)
+    assert [period.period for period in data.series][0] == YearMonth(2026, 1)
     assert [period.period for period in data.series][-1] == YearMonth(2026, 10)
 
 
@@ -384,9 +386,14 @@ def test_only_column_reads_are_used(team: WorkspaceDb) -> None:
     finally:
         event.remove(team.engine, "before_cursor_execute", capture)
     transaction_statements = [line for line in statements if "FROM transactions" in line]
-    assert len(transaction_statements) == 2  # the currency lookup and the one column stream
+    # The year selector, the currency lookup and the one column stream.
+    assert len(transaction_statements) == 3
     assert any(
         "SELECT DISTINCT transactions.currency" in statement for statement in transaction_statements
+    )
+    assert any(
+        "DISTINCT" in statement and ("STRFTIME('%Y'" in statement or "EXTRACT(year" in statement)
+        for statement in transaction_statements
     )
     assert any("transactions.amount_minor" in statement for statement in transaction_statements)
     assert not any(
