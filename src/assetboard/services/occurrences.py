@@ -19,6 +19,7 @@ from assetboard.db.repositories import (
     AuditEventRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    IncomeSourceRepository,
     LoanRepository,
     MembershipRepository,
     MonthStateRepository,
@@ -437,6 +438,7 @@ def _skip_in_session(session: Session, ctx: Context, occurrence_id: UUID) -> Non
     _ensure_open(session, ctx, occurrence.due_date)
     for child in repository.children(occurrence.id):
         if child.status == OccurrenceStatus.PENDING:
+            _ensure_open(session, ctx, child.due_date)
             repository.delete(child)
     repository.update(occurrence.id, status=OccurrenceStatus.SKIPPED)
     AuditEventRepository(session, ctx).record(
@@ -473,6 +475,12 @@ def unskip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_i
             item = ScheduledItemRepository(session, ctx).get(occurrence.scheduled_item_id)
             if item is None or item.archived_at is not None:
                 raise OccurrenceError("archived_item")
+            if item.paused_at is not None:
+                raise OccurrenceError("paused_item")
+        if occurrence.income_source_id is not None:
+            source = IncomeSourceRepository(session, ctx).get(occurrence.income_source_id)
+            if source is None or source.archived_at is not None:
+                raise OccurrenceError("archived_source")
         repository.update(occurrence.id, status=OccurrenceStatus.PENDING)
         if (
             occurrence.generated_by == "income"
@@ -506,6 +514,7 @@ def reschedule_occurrence(
             raise NotFound
         if occurrence.status != OccurrenceStatus.PENDING:
             raise OccurrenceError("not_pending")
+        _ensure_open(session, ctx, occurrence.due_date)
         _ensure_open(session, ctx, day)
         previous_date = occurrence.due_date
         repository.update(

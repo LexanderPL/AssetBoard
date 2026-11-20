@@ -12,7 +12,11 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.ledger import Transaction
-from assetboard.db.repositories import CategoryRepository, NotFound
+from assetboard.db.repositories import (
+    CategoryRepository,
+    IncomeSourceRepository,
+    NotFound,
+)
 from assetboard.db.repositories.scheduled import ScheduledOccurrenceRepository
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
@@ -218,6 +222,113 @@ def test_posting_a_future_payment_date_is_refused(team):
     assert stored.status == "pending" and stored.transaction_id is None
     with team.factory() as session:
         assert session.scalars(select(Transaction)).all() == []
+
+
+def test_reschedule_checks_the_old_month(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    close_month(team.factory, ctx, YearMonth.from_date(occurrence.due_date))
+    with pytest.raises(occurrences.OccurrenceError, match="month_closed"):
+        occurrences.reschedule_occurrence(team.factory, ctx, occurrence.id, date(2026, 4, 10))
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.due_date == occurrence.due_date
+
+
+def test_skip_checks_every_child_month(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    parent = occurrence_rows(team, item_id)[0]
+    child_due = date(2026, 3, 20)
+    with team.factory.begin() as session:
+        ScheduledOccurrenceRepository(session, ctx).create(
+            scheduled_item_id=None,
+            income_source_id=None,
+            work_month=None,
+            parent_occurrence_id=parent.id,
+            income_source_tax_rule_id=None,
+            direction="expense",
+            category_id=parent.category_id,
+            nominal_date=child_due,
+            due_date=child_due,
+            expected_minor=100,
+            currency="EUR",
+            amount_state="estimated",
+            status="pending",
+            generated_by="tax",
+            label="Tax",
+        )
+    close_month(team.factory, ctx, YearMonth(2026, 3))
+    with pytest.raises(occurrences.OccurrenceError, match="month_closed"):
+        occurrences.skip_occurrence(team.factory, ctx, parent.id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending"
+    with team.factory() as session:
+        children = ScheduledOccurrenceRepository(session, ctx).children(parent.id)
+    assert [row.status for row in children] == ["pending"]
+
+
+def test_unskip_refuses_a_paused_item(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    occurrences.skip_occurrence(team.factory, ctx, occurrence.id)
+    scheduled.change_state(team.factory, ctx, item_id, ItemAction.PAUSE, Settings(_env_file=None))
+    with pytest.raises(occurrences.OccurrenceError, match="paused_item"):
+        occurrences.unskip_occurrence(team.factory, ctx, occurrence.id)
+    assert occurrence_rows(team, item_id)[0].status == "skipped"
+
+
+def test_unskip_refuses_an_archived_income_source(team):
+    ctx = team.ctx("owner", "owner")
+    with team.factory.begin() as session:
+        category = CategoryRepository(session, ctx).create(
+            name="Salary",
+            name_key="salary",
+            kind="income",
+            treatment="regular",
+            color="#16a34a",
+            sort_order=0,
+        )
+        source = IncomeSourceRepository(session, ctx).create(
+            name="Salary",
+            kind="fixed",
+            category_id=category.id,
+            currency="EUR",
+            fixed_minor=100_000,
+            rate_minor=None,
+            unit_label="month",
+            pay_day=5,
+            pay_lag_months=0,
+            expected_mode="fixed",
+            expected_units=None,
+            average_months=3,
+            active_from=date(2026, 1, 1),
+            active_to=None,
+            archived_at=ctx.clock.now(),
+        )
+        occurrence = ScheduledOccurrenceRepository(session, ctx).create(
+            scheduled_item_id=None,
+            income_source_id=source.id,
+            work_month=date(2026, 3, 1),
+            parent_occurrence_id=None,
+            income_source_tax_rule_id=None,
+            direction="income",
+            category_id=category.id,
+            nominal_date=date(2026, 3, 5),
+            due_date=date(2026, 3, 5),
+            expected_minor=100_000,
+            currency="EUR",
+            amount_state="estimated",
+            status="skipped",
+            generated_by="income",
+            label="Salary",
+        )
+    with pytest.raises(occurrences.OccurrenceError, match="archived_source"):
+        occurrences.unskip_occurrence(team.factory, ctx, occurrence.id)
+    with team.factory() as session:
+        stored = ScheduledOccurrenceRepository(session, ctx).get(occurrence.id)
+        assert stored is not None and stored.status == "skipped"
 
 
 def test_occurrence_actions_require_a_current_editor(team):
