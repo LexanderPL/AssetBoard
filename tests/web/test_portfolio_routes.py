@@ -268,6 +268,15 @@ def test_scope_selector_whole_portfolio_class_and_unknown(owner: OwnerApp) -> No
         assert "Holdings by instrument in Stocks" in fallback.text
 
 
+def test_the_polish_risk_table_does_not_render_the_catalog_header(owner: OwnerApp) -> None:
+    with owner.db() as session, session.begin():
+        user = session.scalars(select(User).where(User.email == owner.web.admin_email)).one()
+        user.locale = "pl"
+    page = owner.client.get(PORTFOLIO).text
+    assert "Project-Id-Version" not in page
+    assert "Bezpieczne" in page
+
+
 def test_the_portfolio_tables_have_no_outer_panel_frame(owner: OwnerApp) -> None:
     _fund(owner)
     page = owner.client.get(PORTFOLIO).text

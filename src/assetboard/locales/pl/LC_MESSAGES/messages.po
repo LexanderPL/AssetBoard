@@ -13342,6 +13342,16 @@ msgstr "Domyślnie Twoja wyświetlana nazwa."
 msgid "Not set"
 msgstr "Nie ustawiono"
 
+msgid "Workspace language"
+msgstr "Język obszaru roboczego"
+
+msgid ""
+"Used for the suggested categories and formatting. The interface follows "
+"your profile or browser language; you can change both later."
+msgstr ""
+"Używany do sugerowanych kategorii i formatowania. Interfejs działa w "
+"języku profilu lub przeglądarki; oba ustawienia możesz później zmienić."
+
 msgid "Download workspace archive"
 msgstr "Pobierz archiwum obszaru roboczego"
 

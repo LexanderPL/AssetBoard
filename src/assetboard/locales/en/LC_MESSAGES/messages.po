@@ -12147,6 +12147,14 @@ msgstr ""
 msgid "Not set"
 msgstr ""
 
+msgid "Workspace language"
+msgstr ""
+
+msgid ""
+"Used for the suggested categories and formatting. The interface follows "
+"your profile or browser language; you can change both later."
+msgstr ""
+
 msgid "Download workspace archive"
 msgstr ""
 

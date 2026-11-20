@@ -784,6 +784,8 @@ function focusRequested() {
   element.focus();
   if (element instanceof HTMLInputElement) element.select();
 }
+// A full-page refused form (for example first-run setup) has no HTMX load event.
+document.addEventListener("DOMContentLoaded", focusRequested);
 document.addEventListener("htmx:load", (event) => {
   restoreEntryRows();
   focusRequested();

@@ -248,7 +248,11 @@ def _risk_view(
     rows = tuple(
         RiskTierRowView(
             label=gettext(RISK_TIER_LABELS[row.tier], locale),
-            subtitle=gettext(RISK_TIER_SUBTITLES.get(row.tier, ""), locale),
+            subtitle=(
+                gettext(subtitle, locale)
+                if (subtitle := RISK_TIER_SUBTITLES.get(row.tier, ""))
+                else ""
+            ),
             value=format_money(row.value, locale),
             current_pct=_bp_text(row.current_bp, locale),
             target_pct=_bp_text(row.target_bp, locale),
