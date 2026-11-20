@@ -61,12 +61,15 @@ To export only transactions, for a spreadsheet, use the CSV export on the
 ## Restoring an archive
 
 Restore is for a reinstall or a move to another instance. Owners can restore, and only into a
-workspace that has no data of its own yet. Choose **Restore into this workspace** before
-uploading the archive.
+workspace that has no active data of its own yet. Soft-deleted transactions and open month
+states do not block a restore: the restore permanently clears them before writing the archive,
+and the restore plan shows the archive currency and how many rows will be cleared. Choose
+**Restore into this workspace** before uploading the archive.
 
 A new workspace starts with the **suggested categories**. As long as you have not renamed,
 edited, archived or used any of them, the workspace still counts as empty: the restore removes
-them and puts the archive's categories in their place. Recurring items, income sources, work
+them and puts the archive's categories in their place. A soft-deleted transaction does not
+count as a use for this check. Recurring items, income sources, work
 logs and calendars, and tax rules also make the workspace non-empty, because a restore replaces
 them rather than merging them. The suggested net-worth categories follow the same rule as the
 ledger ones: untouched, unused and seeded automatically, they are removed before the archive's
@@ -78,6 +81,8 @@ than merging it.
 
 Restore writes, all at once:
 
+0. permanently deletes the target's soft-deleted transactions and open month states; this clear
+   is not undone by a rollback;
 1. the workspace settings from the archive (name, base currency, country, time zone, language,
    automatic plan copy, Taxes switch and Upcoming window); whether members must use two-factor
    sign-in is not in the archive and stays as it is;
@@ -351,7 +356,8 @@ shows what will be removed.
   it is archived, like a category that is still referenced.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
-  corrected archive. It also removes the net-worth categories, items, valuations and legacy snapshots
+  corrected archive. The soft-deleted transactions and open month states that the restore
+  cleared before writing are **not** restored. It also removes the net-worth categories, items, valuations and legacy snapshots
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
   rates, provider settings and risk targets it wrote; valuations created by the batch are removed
   only through this explicit batch rollback. It also removes the FIRE plan and its events it

@@ -106,6 +106,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     ),
     "workspace.restored": (
         "batch_id",
+        "purged_transactions",
+        "purged_month_states",
         "categories",
         "transactions",
         "budget_lines",
@@ -438,6 +440,8 @@ KEY_LABELS: dict[str, str] = {
     "email_locked": _("Email address fixed"),
     "expires_in_days": _("Valid for days"),
     "categories": _("Categories"),
+    "purged_transactions": _("Deleted entries cleared"),
+    "purged_month_states": _("Open months cleared"),
     "budget_lines": _("Planned values"),
     "transactions_created": _("Transactions created"),
     "transactions_deleted": _("Transactions deleted"),

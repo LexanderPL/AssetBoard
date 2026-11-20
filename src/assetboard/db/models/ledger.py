@@ -96,6 +96,7 @@ class MonthState(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 
     ``month`` is the month's first day (as for budget lines). A row is created the first time a
     month is closed; reopening clears ``closed_at`` and ``closed_by_user_id`` and keeps the row.
+    A restore into an empty workspace clears open rows explicitly.
     A month without a row is open. ``closed_by_user_id`` becomes NULL if the account is deleted,
     while the month stays closed.
 
@@ -124,7 +125,8 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
     Amounts are positive minor units in the workspace's base currency; ``direction`` says which
     way the money went and always equals the category's kind. ``(workspace_id, category_id)``
     references ``categories(workspace_id, id)``, so a transaction can never point at another
-    workspace's category. Rows are soft-deleted (``deleted_at``) and never removed.
+    workspace's category. Rows are soft-deleted (``deleted_at``) and otherwise never removed;
+    a restore into an empty workspace clears tombstones explicitly.
     ``description_key`` is the description's case-insensitive key for autocomplete
     (``domain.transactions.description_key``). The reserved columns of the spec
     ``scheduled_occurrence_id`` and ``account_id`` are reserved for later features. Import
