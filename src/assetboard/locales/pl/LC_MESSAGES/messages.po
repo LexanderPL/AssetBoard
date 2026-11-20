@@ -683,6 +683,12 @@ msgstr "Zresetowano obszar demonstracyjny"
 msgid "Demo data deleted"
 msgstr "Usunięto dane demonstracyjne"
 
+msgid "Backup created by an administrator"
+msgstr "Kopia zapasowa utworzona przez administratora"
+
+msgid "Backup downloaded by an administrator"
+msgstr "Kopia zapasowa pobrana przez administratora"
+
 msgid "Account created by an administrator"
 msgstr "Konto utworzone przez administratora"
 
@@ -978,6 +984,9 @@ msgid "Confirmed with"
 msgstr "Potwierdzono przez"
 
 msgid "Source"
+msgstr "Źródło"
+
+msgid "Origin"
 msgstr "Źródło"
 
 msgid "Mode"
@@ -1409,6 +1418,21 @@ msgstr "utworzenie konta"
 msgid "changing instance settings"
 msgstr "zmiana ustawień instancji"
 
+msgid "creating a backup"
+msgstr "tworzenie kopii zapasowej"
+
+msgid "downloading a backup"
+msgstr "pobieranie kopii zapasowej"
+
+msgid "resetting the demo workspace"
+msgstr "resetowanie obszaru demonstracyjnego"
+
+msgid "deleting the demo workspace"
+msgstr "usuwanie obszaru demonstracyjnego"
+
+msgid "manual"
+msgstr "ręczne"
+
 msgid "name"
 msgstr "nazwa"
 
@@ -1558,6 +1582,9 @@ msgstr "Usunięte obszary robocze"
 
 msgid "Demo mode"
 msgstr "Tryb demonstracyjny"
+
+msgid "Backups"
+msgstr "Kopie zapasowe"
 
 msgid "Demo"
 msgstr "Demo"
@@ -2854,6 +2881,26 @@ msgstr "Hasło zostało zmienione. Inne urządzenia zostały wylogowane."
 #, python-format
 msgid "Other sessions signed out: %(count)d."
 msgstr "Wylogowane inne sesje: %(count)d."
+
+msgid "Back up now"
+msgstr "Utwórz kopię teraz"
+
+msgid ""
+"Create a copy of the database now. The file can contain every workspace "
+"and account on this instance; keep it somewhere safe."
+msgstr ""
+"Utwórz teraz kopię bazy danych. Plik może zawierać wszystkie obszary "
+"robocze i konta na tej instancji; przechowuj go w bezpiecznym miejscu."
+
+msgid "Download backup"
+msgstr "Pobierz kopię zapasową"
+
+msgid ""
+"Download this database copy. The file can contain every workspace and "
+"account on this instance; keep it somewhere safe."
+msgstr ""
+"Pobierz tę kopię bazy danych. Plik może zawierać wszystkie obszary "
+"robocze i konta na tej instancji; przechowuj go w bezpiecznym miejscu."
 
 msgid "Expense"
 msgstr "Wydatek"
@@ -6473,6 +6520,13 @@ msgstr "Obszar roboczy"
 msgid "Switch"
 msgstr "Przełącz"
 
+#, python-format
+msgid "File: %(name)s"
+msgstr "Plik: %(name)s"
+
+msgid "Back to instance settings"
+msgstr "Wróć do ustawień instancji"
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 "Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie "
@@ -6545,9 +6599,6 @@ msgstr ""
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
 
-msgid "Backups"
-msgstr "Kopie zapasowe"
-
 msgid "Automatic backups are not available for an in-memory database."
 msgstr "Automatyczne kopie zapasowe nie są dostępne dla bazy danych w pamięci."
 
@@ -6578,9 +6629,6 @@ msgstr "Nie zaplanowano"
 
 msgid "Location"
 msgstr "Lokalizacja"
-
-msgid "Back up now"
-msgstr "Utwórz kopię teraz"
 
 msgid "Started"
 msgstr "Rozpoczęto"

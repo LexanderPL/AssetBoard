@@ -34,7 +34,14 @@ def test_settings_page_shows_backup_status_and_retention_defaults(owner: OwnerAp
 
 def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
     _set_clock(owner)
-    response = owner.post("/admin/backups/now")
+    confirm = owner.client.get("/admin/backups/now")
+    assert confirm.status_code == 200
+    assert 'data-backup-confirm="create"' in confirm.text
+    response = owner.post(
+        "/admin/backups/now",
+        {"confirm_password": ADMIN_PASSWORD},
+        token_from="/admin/backups/now",
+    )
     assert response.status_code == 303
     assert response.headers["location"].endswith("?backup=created")
     page = owner.client.get(response.headers["location"])
@@ -47,11 +54,82 @@ def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
         assert run.status == "ok"
         run_id = run.id
     assert f"/admin/backups/{run_id}" in page.text
-    download = owner.client.get(f"/admin/backups/{run_id}")
+    download_page = owner.client.get(f"/admin/backups/{run_id}")
+    assert download_page.status_code == 200
+    assert 'data-backup-confirm="download"' in download_page.text
+    assert files[0].name in download_page.text
+    assert download_page.headers["content-type"].startswith("text/html")
+    assert not download_page.content.startswith(b"SQLite format 3\x00")
+    download = owner.post(
+        f"/admin/backups/{run_id}",
+        {"confirm_password": ADMIN_PASSWORD},
+        token_from=f"/admin/backups/{run_id}",
+    )
     assert download.status_code == 200
     assert download.content.startswith(b"SQLite format 3\x00")
     disposition = download.headers["content-disposition"]
     assert "attachment" in disposition and files[0].name in disposition
+    with owner.db() as session:
+        actions = set(
+            session.scalars(
+                select(AuditEvent.action).where(
+                    AuditEvent.action.in_(("backup.created", "backup.downloaded"))
+                )
+            )
+        )
+        assert actions == {"backup.created", "backup.downloaded"}
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action.in_(("backup.created", "backup.downloaded")))
+        ).all()
+        assert all(event.workspace_id is None for event in events)
+        assert {event.actor_user_id for event in events} == {owner.admin_id}
+        created = next(event for event in events if event.action == "backup.created")
+        assert created.entity_type == "backup"
+        assert created.entity_id == str(run_id)
+        assert created.data == {"origin": "manual"}
+        downloaded = next(event for event in events if event.action == "backup.downloaded")
+        assert downloaded.entity_type == "backup"
+        assert downloaded.entity_id == str(run_id)
+        assert downloaded.data == {}
+
+
+def test_back_up_now_requires_confirmation(owner: OwnerApp) -> None:
+    _set_clock(owner)
+    response = owner.post("/admin/backups/now", token_from="/admin/backups/now")
+    assert response.status_code == 401
+    assert "The password is not correct." in response.text
+    settings = owner.app.state.settings
+    assert not list((settings.data_dir / "backups").glob("assetboard-manual-*.db"))
+    with owner.db() as session:
+        assert (
+            session.scalars(select(AuditEvent).where(AuditEvent.action == "backup.created")).first()
+            is None
+        )
+
+
+def test_backup_download_requires_confirmation(owner: OwnerApp) -> None:
+    _set_clock(owner)
+    created = owner.post(
+        "/admin/backups/now",
+        {"confirm_password": ADMIN_PASSWORD},
+        token_from="/admin/backups/now",
+    )
+    assert created.status_code == 303
+    with owner.db() as session:
+        run_id = session.scalars(select(BackupRun.id).where(BackupRun.origin == "manual")).one()
+    response = owner.post(f"/admin/backups/{run_id}", token_from=f"/admin/backups/{run_id}")
+    assert response.status_code == 401
+    assert "The password is not correct." in response.text
+    settings = owner.app.state.settings
+    files = list((settings.data_dir / "backups").glob("assetboard-manual-*.db"))
+    assert len(files) == 1 and files[0].name in response.text
+    with owner.db() as session:
+        assert (
+            session.scalars(
+                select(AuditEvent).where(AuditEvent.action == "backup.downloaded")
+            ).first()
+            is None
+        )
 
 
 def test_download_unknown_backup_is_404(owner: OwnerApp) -> None:
@@ -145,7 +223,15 @@ def test_backup_routes_need_an_instance_administrator(owner: OwnerApp) -> None:
         )
     try:
         assert owner.client.get("/admin/settings").status_code == 403
-        assert owner.client.post("/admin/backups/now", data={}).status_code == 403
+        assert owner.client.get("/admin/backups/now").status_code == 403
+        assert owner.client.get(f"/admin/backups/{uuid4()}").status_code == 403
+        token = owner.token("/")
+        assert (
+            owner.client.post(
+                "/admin/backups/now", data={"csrf_token": token}, follow_redirects=False
+            ).status_code
+            == 403
+        )
     finally:
         with owner.db() as session, session.begin():
             session.execute(

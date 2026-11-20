@@ -65,9 +65,11 @@ running. The directory is created with mode 0700 and each file with mode 0600.
 Instance administrators open **User menu → Instance settings**:
 
 - **Last backup**, **Last failure**, **Next scheduled backup** and the backup directory.
-- **Back up now** makes a manual copy immediately.
-- **Download** next to a successful copy downloads the database file. The secret key is not
-  included in the download; copy the `.secret_key` file from `<DATA_DIR>/backups/` as well
+- **Back up now** opens a confirmation page; after your password (or a recent external
+  sign-in) it makes a manual copy and records a `backup.created` audit event.
+- **Download** next to a successful copy opens the same confirmation page; after confirmation
+  it serves the database file and records a `backup.downloaded` audit event. The secret key is
+  not included in the download; copy the `.secret_key` file from `<DATA_DIR>/backups/` as well
   when you need a complete standalone copy.
 - **Backup retention** changes the three counts (0–365). Saving asks for your password, like
   the other instance settings.

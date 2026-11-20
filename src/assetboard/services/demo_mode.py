@@ -241,6 +241,9 @@ def _record_reset(
     reason: ResetReason,
     status: Literal["ok", "failed"],
     version: int | None,
+    actor_user_id: UUID | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
 ) -> None:
     if status == "ok":
         row.demo_last_reset_at = clock.now()
@@ -255,6 +258,9 @@ def _record_reset(
         action="demo.reset",
         entity_type="instance",
         entity_id=None,
+        actor_user_id=actor_user_id,
+        host=host,
+        user_agent=user_agent,
         data=data,
     )
     session.flush()
@@ -452,6 +458,9 @@ def reset_demo_instance(
     data_dir: Path,
     *,
     reason: ResetReason,
+    actor_id: UUID | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
 ) -> DemoResetResult:
     """Replace the demo dataset atomically; never raises for a failed reset.
 
@@ -502,6 +511,9 @@ def reset_demo_instance(
             reason=reason,
             status="ok",
             version=result.version,
+            actor_user_id=actor_id,
+            host=host,
+            user_agent=user_agent,
         )
         return DemoResetResult(ok=True, version=result.version, reference_date=today)
 
@@ -526,6 +538,9 @@ def reset_demo_instance(
                 reason=reason,
                 status="failed",
                 version=row.demo_dataset_version,
+                actor_user_id=actor_id,
+                host=host,
+                user_agent=user_agent,
             )
 
         try:
