@@ -44,11 +44,11 @@
     {% endif %}
   </section>
 
-  <section class="p-6 sm:p-7" aria-labelledby="portfolio-holdings-heading" data-portfolio-holdings>
+  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-holdings-heading" data-portfolio-holdings>
     <h2 id="portfolio-holdings-heading" class="text-base font-semibold">{{ _("Holdings") }}</h2>
     {% if view.has_rows %}
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet bg-surface w-full text-sm">
+      <table class="sheet w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Instrument") }}</th>
@@ -99,11 +99,11 @@
   </section>
 
   {% if view.classes %}
-  <section class="p-6 sm:p-7" aria-labelledby="portfolio-classes-heading" data-portfolio-classes>
+  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-classes-heading" data-portfolio-classes>
     <h2 id="portfolio-classes-heading" class="text-base font-semibold">{{ _("By asset class") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value and cost are split by its allocation weights.") }}</p>
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet bg-surface w-full text-sm">
+      <table class="sheet w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Asset class") }}</th>
@@ -129,7 +129,7 @@
   </section>
   {% endif %}
 
-  <section class="p-6 sm:p-7" aria-labelledby="risk-balance-heading" data-risk-balance>
+  <section class="panel p-6 sm:p-7" aria-labelledby="risk-balance-heading" data-risk-balance>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="risk-balance-heading" class="text-base font-semibold">{{ _("Risk balance") }}</h2>
       <p class="text-sm text-muted">{{ view.risk.mode_label }}{% if view.risk.mode != "fixed" and view.risk.targets_available and view.risk.age is not none %} · {{ _("based on your age %(age)s and life expectancy %(life)s", age=view.risk.age, life=view.risk.life_expectancy) }}{% endif %}</p>
@@ -140,7 +140,7 @@
     <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-risk-no-birth-year>{{ _("Set your birth year in Profile to use age-based targets.") }} <a href="{{ url_for('account') }}" class="font-semibold underline">{{ _("Open Profile") }}</a></p>
     {% endif %}
     <div class="mt-4 overflow-x-auto">
-      <table class="sheet bg-surface w-full text-sm">
+      <table class="sheet w-full text-sm">
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-2 pr-3 font-medium">{{ _("Tier") }}</th>
