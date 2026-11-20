@@ -4611,6 +4611,14 @@ msgstr ""
 msgid "This recurring item is archived, so its skipped date cannot come back."
 msgstr ""
 
+msgid ""
+"This recurring item is paused. Resume it before restoring the skipped "
+"date."
+msgstr ""
+
+msgid "This income source is archived, so its skipped date cannot come back."
+msgstr ""
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr ""
 
@@ -5552,14 +5560,6 @@ msgstr ""
 msgid ""
 "A payment cannot be recorded in the future. Choose today or an earlier "
 "date, or edit the recurring rule."
-msgstr ""
-
-msgid ""
-"This recurring item is paused. Resume it before restoring the skipped "
-"date."
-msgstr ""
-
-msgid "This income source is archived, so its skipped date cannot come back."
 msgstr ""
 
 msgid "Choose a valid direction."
