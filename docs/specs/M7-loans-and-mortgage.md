@@ -371,9 +371,12 @@ Tests: resolver values for past/future dates, occurrence amounts follow rate cha
 - Property choices are active asset items in active real-estate categories in the loan
   currency. Linking validates the same rules and audits `loan.property_linked` /
   `loan.property_unlinked`. The view calculates LTV in basis points with half-up rounding and
-  equity = value − remaining principal. Unavailable reasons are no property, missing/archived
-  item, currency mismatch, no value, value zero (LTV only), or balance unavailable. A linked
-  property item may itself be linked; `current_values()` resolves its effective/history value.
+  equity = value − remaining principal. Unavailable reasons are no property, missing item,
+  currency mismatch, no value, value zero (LTV only), or balance unavailable. An item archived
+  on or before the requested date is unavailable; a later archive does not hide its historical
+  value. A historical LTV (`as_of` before today) enables the F5.6 `estimate_between` backfill, so
+  a manual property with estimates interpolates between its valuations. A linked property item
+  may itself be linked; `current_values()` resolves its effective/history value.
 - `services.loan_scheduled` creates one active scheduled item per loan, monthly on the payment
   day, starting at the first projected due date after today and ending at the payoff date. The
   generator updates pending non-overridden rows to the projected installment total and marks

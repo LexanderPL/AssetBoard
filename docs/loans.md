@@ -292,10 +292,12 @@ shows the compact read-only property card):
 - **Property and LTV**: choose an active real-estate asset item in the same currency. The page
   shows the property value on the chosen date, the remaining principal, **LTV** (remaining
   principal divided by the value) and equity (value minus remaining principal). Change the date
-  and press **Show** to recalculate. If no property is linked, the value is missing, the item is
-  archived, the currencies differ, or the balance is unavailable, the page says why instead of
-  showing a misleading number. A zero property value leaves LTV unavailable but still shows
-  equity against the remaining principal.
+  and press **Show** to recalculate. If no property is linked, the value is missing, the item was
+  archived on or before the selected date, the currencies differ, or the balance is unavailable,
+  the page says why instead of showing a misleading number. An item archived after the selected
+  date keeps its historical value. For a past date, a manual property with **Estimate between
+  valuations** interpolates between its valuations. A zero property value leaves LTV unavailable
+  but still shows equity against the remaining principal.
 - **Recurring installments**: choose an expense category and **Generate occurrences** to create
   one monthly scheduled item linked to the loan. The expected amount of each pending occurrence
   comes from the projected installment for its due date, so a rate, cost, term, overpayment or

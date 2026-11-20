@@ -471,6 +471,8 @@ def current_values(
     include_history: bool = False,
     categories: Sequence[NetWorthCategory] | None = None,
     item_ids: Collection[UUID] | None = None,
+    backfill: bool = False,
+    today: date | None = None,
 ) -> list[ItemView]:
     """Every item with its value effective on ``as_of``.
 
@@ -478,14 +480,18 @@ def current_values(
     (default) and any date. A valuation dated after ``as_of`` is ignored even when it exists in
     the history. The archived flag follows the owner's F5.3 rule: an item is archived from its
     workspace-local archive date onwards. ``item_ids`` narrows the read to a specific item for a
-    write response.
+    write response. ``backfill`` enables the F5.6 straight-line estimate for manual
+    ``estimate_between`` items (historical reads); ``today`` is the live date used to bound that
+    estimate and is required when ``backfill`` is true.
     """
     rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     category_by_id = {category.id: category for category in rows.categories}
     histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
     resolved = registry.resolve_many(session, scope, histories, (as_of,))
     linked = linked_for_date(resolved, histories, as_of)
-    values = values_at(histories, as_of, timezone=timezone, linked=linked)
+    values = values_at(
+        histories, as_of, timezone=timezone, linked=linked, backfill=backfill, today=today
+    )
     targets = _link_targets(session, scope, histories)
     return [
         _item_view_at(

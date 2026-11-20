@@ -409,6 +409,7 @@ def loan_property_view(
     factory: sessionmaker[Session], ctx: Context, loan_id: UUID, as_of: date
 ) -> LoanPropertyView:
     require_role(ctx, Role.VIEWER)
+    today = _today(ctx)
     view = loans.get_loan(factory, ctx, loan_id)
     if view.property_item_id is None:
         return LoanPropertyView(
@@ -429,7 +430,18 @@ def loan_property_view(
                 "property_missing",
                 "property_missing",
             )
-        if item.archived_at is not None:
+        values = current_values(
+            session,
+            ctx,
+            as_of=as_of,
+            base_currency=view.currency,
+            timezone=ctx.workspace.timezone,
+            item_ids={item.id},
+            backfill=as_of < today,
+            today=today,
+        )
+        item_view = next((row for row in values if row.id == item.id), None)
+        if item_view is not None and item_view.archived:
             return LoanPropertyView(
                 as_of,
                 item.id,
@@ -455,15 +467,6 @@ def loan_property_view(
                 "property_currency",
                 "property_currency",
             )
-        values = current_values(
-            session,
-            ctx,
-            as_of=as_of,
-            base_currency=view.currency,
-            timezone=ctx.workspace.timezone,
-            item_ids={item.id},
-        )
-        item_view = next((row for row in values if row.id == item.id), None)
         value = item_view.current if item_view is not None else None
         remaining = loan_balance_at(session, ctx, loan_id, as_of)
         if isinstance(remaining, Unavailable):

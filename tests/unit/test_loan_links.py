@@ -94,6 +94,7 @@ def _property_item(
     currency: str = "EUR",
     valued: bool = True,
     side: str = "asset",
+    estimate_between: bool = False,
 ) -> UUID:
     ctx = team.ctx("owner", "owner")
     with team.factory.begin() as session:
@@ -102,7 +103,7 @@ def _property_item(
             category_id=category_id,
             name=name,
             currency=currency,
-            estimate_between=False,
+            estimate_between=estimate_between,
         )
         if valued:
             ItemValuationRepository(session, ctx).create(
@@ -437,8 +438,31 @@ def test_property_validation_and_unavailable_reasons(team: WorkspaceDb) -> None:
 
     with team.factory.begin() as session:
         NetWorthItemRepository(session, ctx).update(zero_id, archived_at=ctx.clock.now())
-    archived = loan_links.loan_property_view(team.factory, ctx, loan_id, date(2026, 1, 1))
+    before_archive = loan_links.loan_property_view(team.factory, ctx, loan_id, date(2026, 1, 1))
+    assert before_archive.ltv_reason == "value_zero"
+    archived = loan_links.loan_property_view(team.factory, ctx, loan_id, date(2026, 3, 1))
     assert archived.ltv_reason == "property_archived"
+
+
+def test_historical_property_value_uses_estimate_between(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    ctx = team.ctx("owner", "owner")
+    category_id = _category(team, "Real estate", "asset")
+    property_id = _property_item(team, category_id=category_id, valued=False, estimate_between=True)
+    with team.factory.begin() as session:
+        valuations = ItemValuationRepository(session, ctx)
+        valuations.create(
+            item_id=property_id, as_of=date(2026, 1, 1), value_minor=40_000_000, currency="EUR"
+        )
+        valuations.create(
+            item_id=property_id, as_of=date(2026, 1, 31), value_minor=60_000_000, currency="EUR"
+        )
+    loan_links.set_loan_property(team.factory, ctx, loan_id, property_id)
+    view = loan_links.loan_property_view(team.factory, ctx, loan_id, date(2026, 1, 16))
+    assert view.value == _money(50_000_000)
+    assert view.remaining == _money(30_000_000)
+    assert view.ltv_bp == 6_000
+    assert view.equity == _money(20_000_000)
 
 
 def test_property_choices_filter_to_real_estate_assets(team: WorkspaceDb) -> None:

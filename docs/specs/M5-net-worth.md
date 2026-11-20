@@ -338,8 +338,8 @@ one drop.
   `networth_item.updated` fields; the value is not audited.
 - A pure domain function (in `domain/networth_history.py`) returns an item's value on `D` and
   whether it was estimated, given the item's ordered valuation points, `D`, today and the switch.
-  `values_at` uses it when called with `backfill=True` for completed month-ends; its other
-  callers keep the F5.3 behaviour.
+  `values_at` uses it when called with `backfill=True` for completed month-ends and for
+  historical property LTV (F7.6); its other callers keep the F5.3 behaviour.
 - The derived history service uses it for completed month-ends. Today's live point and stored
   legacy snapshots never use it. The breakdown carries `estimated`.
 - The monthly-values table and trend tooltip show the estimated count.
