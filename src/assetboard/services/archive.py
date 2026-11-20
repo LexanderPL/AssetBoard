@@ -211,9 +211,10 @@ def suggested_categories_to_remove(
 ) -> list[Category]:
     """The untouched suggested categories a restore may delete before writing its own.
 
-    "Untouched" means the exact suggested set (in a supported locale), unedited and unreferenced,
-    with the automatic seed audit event proving it came from workspace creation. Anything else
-    makes the workspace non-empty.
+    "Untouched" means the exact suggested set (in a supported locale), unedited and unreferenced
+    by active rows, with the automatic seed audit event proving it came from workspace creation.
+    ``ignore_deleted_transactions`` is used by restore, which treats a tombstone as empty state.
+    Anything else makes the workspace non-empty.
     """
     categories = CategoryRepository(session, ctx).ordered()
     if len(categories) != len(SEED):
@@ -414,6 +415,13 @@ def _has_unexpected_categories(session: Session, ctx: Context) -> bool:
     categories = CategoryRepository(session, ctx).list()
     if not categories:
         return False
+    return not suggested_categories_to_remove(session, ctx)
+
+
+def _has_unexpected_active_categories(session: Session, ctx: Context) -> bool:
+    categories = CategoryRepository(session, ctx).list()
+    if not categories:
+        return False
     return not suggested_categories_to_remove(session, ctx, ignore_deleted_transactions=True)
 
 
@@ -465,6 +473,10 @@ def _has_price_source_configs(session: Session, ctx: Context) -> bool:
 
 
 def _has_transactions(session: Session, ctx: Context) -> bool:
+    return TransactionRepository(session, ctx).any_exists()
+
+
+def _has_active_transactions(session: Session, ctx: Context) -> bool:
     return TransactionRepository(session, ctx).any_active_exists()
 
 
@@ -473,6 +485,10 @@ def _has_budget_lines(session: Session, ctx: Context) -> bool:
 
 
 def _has_month_states(session: Session, ctx: Context) -> bool:
+    return MonthStateRepository(session, ctx).any_exists()
+
+
+def _has_closed_month_states(session: Session, ctx: Context) -> bool:
     # A row survives reopening; only a currently closed month is data a restore must not erase.
     return bool(MonthStateRepository(session, ctx).closed_months())
 
@@ -607,9 +623,21 @@ EMPTINESS_CHECKS = (
 )
 
 
-def workspace_is_empty(session: Session, ctx: Context) -> bool:
-    """Whether a restore may target this workspace (untouched suggested categories aside)."""
-    return not any(check(session, ctx) for check in EMPTINESS_CHECKS)
+_RESTORE_VARIANTS = {
+    _has_transactions: _has_active_transactions,
+    _has_month_states: _has_closed_month_states,
+    _has_unexpected_categories: _has_unexpected_active_categories,
+}
+# Restore treats soft-deleted transactions and open month states as empty-state rows: it
+# clears them before writing the archive. Every other caller (demo builder, CLI) keeps the
+# strict checks, because it does not clear those rows.
+RESTORE_EMPTINESS_CHECKS = tuple(_RESTORE_VARIANTS.get(check, check) for check in EMPTINESS_CHECKS)
+
+
+def workspace_is_empty(session: Session, ctx: Context, *, restore: bool = False) -> bool:
+    """Whether the workspace has no data (strict), or no data a restore must preserve."""
+    checks = RESTORE_EMPTINESS_CHECKS if restore else EMPTINESS_CHECKS
+    return not any(check(session, ctx) for check in checks)
 
 
 def restore_available(factory: sessionmaker[Session], ctx: Context) -> bool:
@@ -617,7 +645,7 @@ def restore_available(factory: sessionmaker[Session], ctx: Context) -> bool:
     if ctx.role is not Role.OWNER:
         return False
     with factory() as session:
-        return workspace_is_empty(session, ctx)
+        return workspace_is_empty(session, ctx, restore=True)
 
 
 def _breakdown_for_export(breakdown: object, category_lineage: Mapping[UUID, UUID]) -> str:

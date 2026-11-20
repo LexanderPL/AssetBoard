@@ -992,6 +992,12 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
+msgid "Deleted entries cleared"
+msgstr ""
+
+msgid "Open months cleared"
+msgstr ""
+
 msgid "Planned values"
 msgstr ""
 

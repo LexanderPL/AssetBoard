@@ -356,7 +356,8 @@ use.
     suggested set** counts as empty: the restore deletes those categories before writing the
     archive's and lists them in its report. "Untouched" means the exact suggested set for a
     supported language, created at the automatic `category.seeded` event's time, never edited,
-    archived or referenced by any row. The check is a static list
+    archived or referenced by any active row (soft-deleted transactions are excluded). The
+    check is a static list
     `services.archive.EMPTINESS_CHECKS` that later milestones extend (like
     `BASE_CURRENCY_LOCKS`). Members, invitations, audit events, notification channels and saved
     import mappings do not count.
@@ -417,7 +418,8 @@ use.
   corrected archive can be restored. A restore rollback leaves a truly empty workspace and
   does not re-add the suggested categories; the user can press "Add suggested categories"
   afterwards. (Hard delete is justified: the rows never existed in this workspace before, and
-  soft-deleted leftovers would keep the workspace non-empty and its base currency locked.)
+  the restore already permanently cleared the target's soft-deleted transactions and open month
+  states; a rollback does not bring those rows back.)
 - Version handling per ADR-0016: an archive of a newer **major** format version is refused
   ("made by a newer version of the app"); a newer **minor** version imports with a warning
   listing the ignored files and columns; older majors pass through the reader's upgrade

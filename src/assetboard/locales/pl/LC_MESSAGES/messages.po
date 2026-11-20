@@ -1010,6 +1010,12 @@ msgstr "Ważne dni"
 msgid "Categories"
 msgstr "Kategorie"
 
+msgid "Deleted entries cleared"
+msgstr "Usunięte wpisy wyczyszczone"
+
+msgid "Open months cleared"
+msgstr "Otwarte miesiące wyczyszczone"
+
 msgid "Planned values"
 msgstr "Wartości planowane"
 

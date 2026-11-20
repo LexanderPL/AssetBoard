@@ -82,12 +82,10 @@ USAGE_SOURCES: list[UsageSource] = [
     income_usage,
 ]
 # Restore emptiness treats soft-deleted transactions as absent; the suggested-category check
-# must not be blocked by a tombstone that the restore will purge.
+# must not be blocked by a tombstone that the restore will purge. Derive it from the one list
+# so a new usage source cannot be forgotten here.
 ACTIVE_USAGE_SOURCES: list[UsageSource] = [
-    active_category_usage,
-    budget_line_usage,
-    scheduled_usage,
-    income_usage,
+    active_category_usage if source is transaction_usage else source for source in USAGE_SOURCES
 ]
 
 

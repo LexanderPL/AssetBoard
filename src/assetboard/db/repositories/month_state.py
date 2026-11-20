@@ -14,7 +14,10 @@ from assetboard.domain.months import YearMonth
 
 
 class MonthStateRepository(ScopedRepository[MonthState]):
-    """Rows are never deleted: reopening a month clears its closed fields (generic ``update``).
+    """Rows survive reopening (generic ``update``); only a restore deletes open ones.
+
+    ``delete_open`` is the one explicit purge, used before a restore writes the archive's month
+    states. Closed months are never removed.
 
     Months are passed as ``YearMonth`` and stored as their first day, so no other day can be
     stored.

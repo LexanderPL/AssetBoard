@@ -1769,7 +1769,7 @@ def _restore_report(
     settings: _RestoreSettings | None,
     errors: list[dict[str, object]],
 ) -> dict[str, Any]:
-    empty = workspace_is_empty(session, ctx)
+    empty = workspace_is_empty(session, ctx, restore=True)
     removed = (
         suggested_categories_to_remove(session, ctx, ignore_deleted_transactions=True)
         if empty
@@ -1864,7 +1864,7 @@ def _plan_restore(
 ) -> dict[str, Any]:
     archive = _archive(parsed)
     errors: list[dict[str, object]] = []
-    if not workspace_is_empty(session, ctx):
+    if not workspace_is_empty(session, ctx, restore=True):
         errors.append(_entry("workspace_not_empty", file="archive"))
     settings, settings_errors = _restore_settings(archive)
     errors.extend(settings_errors)
@@ -3154,15 +3154,15 @@ def _apply_restore(
     instance_settings: Settings | None = None,
 ) -> dict[str, int]:
     archive = _archive(parsed)
-    if not workspace_is_empty(session, ctx):
+    if not workspace_is_empty(session, ctx, restore=True):
         raise ImportRestoreUnavailable
     settings, errors = _restore_settings(archive)
     if settings is None or errors:
         raise ImportServiceError("the archive's workspace settings are invalid")
     # The emptiness check ignores tombstones and open month states; clear them before the
     # suggested categories are removed so no orphan rows survive the restore.
-    TransactionRepository(session, ctx).delete_soft_deleted()
-    MonthStateRepository(session, ctx).delete_open()
+    purged_transactions = TransactionRepository(session, ctx).delete_soft_deleted()
+    purged_month_states = MonthStateRepository(session, ctx).delete_open()
     duplicates = _duplicate_active_categories(archive.rows.categories)
     if duplicates:
         raise ImportServiceError("the archive has duplicate active category names")
@@ -3339,6 +3339,8 @@ def _apply_restore(
         ts=restore_now,
         data={
             "batch_id": str(batch.id),
+            "purged_transactions": purged_transactions,
+            "purged_month_states": purged_month_states,
             "categories": len(archive.rows.categories),
             "transactions": len(archive.rows.transactions),
             "budget_lines": created_lines,

@@ -100,7 +100,10 @@ class LedgerColumn:
 
 
 class TransactionRepository(ScopedRepository[Transaction]):
-    """Rows are soft-deleted (``deleted_at``), never removed: generic ``delete`` is unsupported.
+    """Rows are soft-deleted (``deleted_at``); only the restore hard-deletes them.
+
+    Generic ``delete`` is unsupported. ``delete_soft_deleted`` is the one explicit purge, used
+    by a restore into an otherwise empty workspace.
 
     Queries for the month page and autocomplete skip soft-deleted rows; ``get`` returns them
     (the service decides what a deleted row means), and the usage counts include them because
