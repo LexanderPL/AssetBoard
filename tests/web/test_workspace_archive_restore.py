@@ -210,6 +210,7 @@ def test_owner_can_restore_and_roll_back_over_the_suggested_set(owner: OwnerApp)
 def test_restore_parses_fixed_tax_amounts_in_the_archive_currency(
     owner: OwnerApp, currency: str, fixed_tax: str, expected_minor: int
 ) -> None:
+    workspace_id = owner.home_id
     uploaded = _upload(owner, _archive(currency=currency, fixed_tax=fixed_tax))
     assert uploaded.status_code == 303
     batch_id = _batch_url(uploaded)
@@ -220,7 +221,7 @@ def test_restore_parses_fixed_tax_amounts_in_the_archive_currency(
     with owner.db() as session:
         version = session.scalars(select(TaxRuleVersion)).one()
         assert version.fixed_minor == expected_minor
-        workspace = session.get(Workspace, owner.home_id)
+        workspace = session.get(Workspace, workspace_id)
         assert workspace is not None and workspace.base_currency == currency
 
 
