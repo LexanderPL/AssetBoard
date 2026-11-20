@@ -93,6 +93,11 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
 
             # First run: every page leads to setup, which signs the administrator in.
             assert page.url == f"{base}/setup"
+            # A refused form focuses the first invalid field (F11.1).
+            page.get_by_label("Setup token").fill("wrong-token")
+            page.get_by_role("button", name="Create administrator").click()
+            page.wait_for_load_state("networkidle")
+            assert page.evaluate("document.activeElement.id") == "setup_token"
             page.get_by_label("Setup token").fill(app.state.setup_token)
             page.get_by_label("Email").fill("admin@example.com")
             page.get_by_label("Display name").fill("Browser Admin")

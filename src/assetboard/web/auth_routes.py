@@ -193,12 +193,26 @@ def _setup_page(
         "timezone": "UTC",
         "workspace_locale": request.state.locale,
     }
+    translated_errors = {field: _t(request, message) for field, message in (errors or {}).items()}
+    focus_order = (
+        "setup_token",
+        "email",
+        "display_name",
+        "password",
+        "workspace_name",
+        "base_currency",
+        "country_code",
+        "timezone",
+        "workspace_locale",
+    )
+    focus = next((field for field in focus_order if field in translated_errors), None)
     return render_template(
         request,
         "auth/setup.html",
         context={
             "values": defaults | (values or {}),
-            "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
+            "errors": translated_errors,
+            "focus": focus,
             "options": workspace_form_options(request.state.locale),
         },
         status_code=status_code,
