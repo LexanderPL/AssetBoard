@@ -682,6 +682,12 @@ msgstr ""
 msgid "Demo data deleted"
 msgstr ""
 
+msgid "Backup created by an administrator"
+msgstr ""
+
+msgid "Backup downloaded by an administrator"
+msgstr ""
+
 msgid "Account created by an administrator"
 msgstr ""
 
@@ -980,6 +986,9 @@ msgstr ""
 msgid "Source"
 msgstr ""
 
+msgid "Origin"
+msgstr ""
+
 msgid "Mode"
 msgstr ""
 
@@ -1008,6 +1017,12 @@ msgid "Valid for days"
 msgstr ""
 
 msgid "Categories"
+msgstr ""
+
+msgid "Deleted entries cleared"
+msgstr ""
+
+msgid "Open months cleared"
 msgstr ""
 
 msgid "Planned values"
@@ -1403,6 +1418,21 @@ msgstr ""
 msgid "changing instance settings"
 msgstr ""
 
+msgid "creating a backup"
+msgstr ""
+
+msgid "downloading a backup"
+msgstr ""
+
+msgid "resetting the demo workspace"
+msgstr ""
+
+msgid "deleting the demo workspace"
+msgstr ""
+
+msgid "manual"
+msgstr ""
+
 msgid "name"
 msgstr ""
 
@@ -1551,6 +1581,9 @@ msgid "Deleted workspaces"
 msgstr ""
 
 msgid "Demo mode"
+msgstr ""
+
+msgid "Backups"
 msgstr ""
 
 msgid "Demo"
@@ -2704,6 +2737,22 @@ msgstr ""
 
 #, python-format
 msgid "Other sessions signed out: %(count)d."
+msgstr ""
+
+msgid "Back up now"
+msgstr ""
+
+msgid ""
+"Create a copy of the database now. The file can contain every workspace "
+"and account on this instance; keep it somewhere safe."
+msgstr ""
+
+msgid "Download backup"
+msgstr ""
+
+msgid ""
+"Download this database copy. The file can contain every workspace and "
+"account on this instance; keep it somewhere safe."
 msgstr ""
 
 msgid "Expense"
@@ -4326,6 +4375,14 @@ msgid "A checkpoint cannot start before the loan."
 msgstr ""
 
 msgid "A checkpoint already exists on that date."
+msgstr ""
+
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+
+msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
 msgstr ""
 
 msgid ""
@@ -5965,6 +6022,13 @@ msgstr ""
 msgid "Switch"
 msgstr ""
 
+#, python-format
+msgid "File: %(name)s"
+msgstr ""
+
+msgid "Back to instance settings"
+msgstr ""
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 
@@ -6023,9 +6087,6 @@ msgstr ""
 msgid "Save settings"
 msgstr ""
 
-msgid "Backups"
-msgstr ""
-
 msgid "Automatic backups are not available for an in-memory database."
 msgstr ""
 
@@ -6053,9 +6114,6 @@ msgid "Not scheduled"
 msgstr ""
 
 msgid "Location"
-msgstr ""
-
-msgid "Back up now"
 msgstr ""
 
 msgid "Started"
@@ -9412,6 +9470,9 @@ msgstr ""
 msgid "Starting balance %(amount)s"
 msgstr ""
 
+msgid "Starting balance"
+msgstr ""
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr ""
@@ -9792,10 +9853,10 @@ msgid ""
 msgstr ""
 
 #, python-format
-msgid "Current balance (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
 msgstr ""
 
-msgid "Balance date"
+msgid "Starting balance date"
 msgstr ""
 
 msgid "Remaining months"
@@ -9922,6 +9983,13 @@ msgstr ""
 
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr ""
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr ""
+
+msgid "Balance date"
 msgstr ""
 
 msgid ""
@@ -10141,9 +10209,6 @@ msgid "Balance"
 msgstr ""
 
 msgid "Projected balance"
-msgstr ""
-
-msgid "Starting balance"
 msgstr ""
 
 msgid "Projected balance unavailable"
@@ -12233,12 +12298,12 @@ msgstr ""
 msgid ""
 "Replaces settings, categories, transactions, planned values, month "
 "states, net worth, investments, loans, FIRE, recurring items, income, tax"
-" rules, and work logs. Only for an empty workspace."
+" rules, and work logs. Deleted entries and open months are cleared first."
 msgstr ""
 
 msgid ""
-"Available only in an empty workspace. The untouched suggested categories "
-"are fine."
+"Available only when the workspace has no active data. Deleted entries and"
+" open months are fine; closed months and other data block it."
 msgstr ""
 
 msgid "CSV delimiter"
@@ -12324,6 +12389,15 @@ msgid ""
 "This archive contains an encrypted secrets member. Enter its passphrase "
 "in the Apply import form to restore notification channels and provider "
 "keys."
+msgstr ""
+
+msgid "Archive currency"
+msgstr ""
+
+msgid "Deleted entries removed"
+msgstr ""
+
+msgid "Open months removed"
 msgstr ""
 
 msgid "Deleted transactions restored"
@@ -15199,5 +15273,19 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Use Add item above, or paste a list of items below."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Replaces settings, categories, transactions, "
+#~ "planned values, month states, net worth,"
+#~ " investments, loans, FIRE, recurring items,"
+#~ " income, tax rules, and work logs."
+#~ " Only for an empty workspace."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available only in an empty workspace."
+#~ " The untouched suggested categories are "
+#~ "fine."
 #~ msgstr ""
 

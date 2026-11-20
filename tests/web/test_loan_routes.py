@@ -656,7 +656,8 @@ def test_current_balance_terms_edit_updates_the_checkpoint(owner):
         loan = session.scalars(select(Loan).where(Loan.workspace_id == owner.home_id)).one()
         loan_id = loan.id
     edit = owner.client.get(f"/loans/{loan_id}/edit")
-    assert edit.status_code == 200 and "Current balance" in edit.text
+    assert edit.status_code == 200 and "Starting balance" in edit.text
+    assert 'name="balance_date" type="date" value="2026-02-01"' in edit.text
     updated = owner.post(
         f"/loans/{loan_id}/edit",
         {

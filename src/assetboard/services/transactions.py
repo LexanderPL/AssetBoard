@@ -920,6 +920,26 @@ def category_usage(session: Session, ctx: Context) -> dict[UUID, CategoryUsage]:
     }
 
 
+def active_category_usage(session: Session, ctx: Context) -> dict[UUID, CategoryUsage]:
+    """Like ``category_usage`` but ignores soft-deleted rows.
+
+    Restore emptiness treats tombstones as empty; the suggested-category check must use the same
+    view, or a deleted test entry would keep the untouched seed non-removable.
+    """
+    repository = TransactionRepository(session, ctx)
+    months = repository.active_months_by_category()
+    usage: dict[UUID, CategoryUsage] = {}
+    for category_id, counts in repository.counts_by_category().items():
+        if not counts.active:
+            continue
+        usage[category_id] = CategoryUsage(
+            references=counts.active,
+            active_transactions=counts.active,
+            active_months=months.get(category_id, frozenset()),
+        )
+    return usage
+
+
 def workspace_has_transactions(session: Session, ctx: Context) -> bool:
     """Part of ``services.workspaces.BASE_CURRENCY_LOCKS``: deleted rows count too."""
     return TransactionRepository(session, ctx).any_exists()

@@ -65,9 +65,14 @@ from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.income import category_usage as income_usage
 from assetboard.services.scheduled import category_usage as scheduled_usage
-from assetboard.services.transactions import category_usage as transaction_usage
+from assetboard.services.transactions import (
+    active_category_usage,
+)
+from assetboard.services.transactions import (
+    category_usage as transaction_usage,
+)
 
-__all__ = ["USAGE_SOURCES", "CategoryUsage", "UsageSource"]
+__all__ = ["ACTIVE_USAGE_SOURCES", "USAGE_SOURCES", "CategoryUsage", "UsageSource"]
 
 # Every feature whose rows reference categories (see the module docstring).
 USAGE_SOURCES: list[UsageSource] = [
@@ -75,6 +80,12 @@ USAGE_SOURCES: list[UsageSource] = [
     budget_line_usage,
     scheduled_usage,
     income_usage,
+]
+# Restore emptiness treats soft-deleted transactions as absent; the suggested-category check
+# must not be blocked by a tombstone that the restore will purge. Derive it from the one list
+# so a new usage source cannot be forgotten here.
+ACTIVE_USAGE_SOURCES: list[UsageSource] = [
+    active_category_usage if source is transaction_usage else source for source in USAGE_SOURCES
 ]
 
 

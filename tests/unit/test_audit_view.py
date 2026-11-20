@@ -21,6 +21,8 @@ from assetboard.services.audit_view import (
     GROUP_LABELS,
     GROUPS,
     KEY_LABELS,
+    ORIGIN_LABELS,
+    PURPOSE_LABELS,
     VALUE_TABLES,
     AuditQuery,
     BadAuditRequest,
@@ -314,3 +316,14 @@ def test_every_fire_action_has_a_label_keys_and_a_group() -> None:
     texts.append(GROUP_LABELS["fire"])
     for text in texts:
         assert gettext(text, "pl").strip()
+
+
+def test_backup_and_demo_audit_codes_have_labels() -> None:
+    assert {"backup_create", "backup_download", "demo_reset", "demo_delete"} <= set(PURPOSE_LABELS)
+    assert ORIGIN_LABELS["manual"]
+    for locale in ("en", "pl"):
+        for message in (
+            *(PURPOSE_LABELS[key] for key in PURPOSE_LABELS),
+            ORIGIN_LABELS["manual"],
+        ):
+            assert gettext(message, locale)

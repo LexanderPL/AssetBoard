@@ -79,6 +79,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "installment_plan.restored": ("plan_id",),
     "demo.reset": ("reason", "status", "version"),
     "demo.deleted": (),
+    "backup.created": ("origin",),
+    "backup.downloaded": (),
     **AUDIT_DATA_KEYS,
     "scheduled.created": (),
     "scheduled.updated": (),
@@ -112,6 +114,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     ),
     "workspace.restored": (
         "batch_id",
+        "purged_transactions",
+        "purged_month_states",
         "categories",
         "transactions",
         "budget_lines",
@@ -334,6 +338,8 @@ ACTION_LABELS: dict[str, str] = {
     "installment_plan.restored": _("Installment plan restored"),
     "demo.reset": _("Demo workspace reset"),
     "demo.deleted": _("Demo data deleted"),
+    "backup.created": _("Backup created by an administrator"),
+    "backup.downloaded": _("Backup downloaded by an administrator"),
     "admin.user_created": _("Account created by an administrator"),
     "admin.user_activated": _("Account activated"),
     "admin.user_deactivated": _("Account deactivated"),
@@ -440,6 +446,7 @@ KEY_LABELS: dict[str, str] = {
     "purpose": _("For"),
     "confirmed": _("Confirmed with"),
     "source": _("Source"),
+    "origin": _("Origin"),
     "mode": _("Mode"),
     "temporary_password": _("Temporary password"),
     "fields": _("Fields"),
@@ -450,6 +457,8 @@ KEY_LABELS: dict[str, str] = {
     "email_locked": _("Email address fixed"),
     "expires_in_days": _("Valid for days"),
     "categories": _("Categories"),
+    "purged_transactions": _("Deleted entries cleared"),
+    "purged_month_states": _("Open months cleared"),
     "budget_lines": _("Planned values"),
     "transactions_created": _("Transactions created"),
     "transactions_deleted": _("Transactions deleted"),
@@ -606,6 +615,13 @@ PURPOSE_LABELS: dict[str, str] = {
     "admin_demote": _("removing the administrator role"),
     "admin_create_user": _("creating an account"),
     "admin_settings": _("changing instance settings"),
+    "backup_create": _("creating a backup"),
+    "backup_download": _("downloading a backup"),
+    "demo_reset": _("resetting the demo workspace"),
+    "demo_delete": _("deleting the demo workspace"),
+}
+ORIGIN_LABELS: dict[str, str] = {
+    "manual": _("manual"),
 }
 FIELD_LABELS: dict[str, str] = {
     "name": _("name"),
@@ -683,6 +699,7 @@ VALUE_TABLES: dict[str, dict[str, str]] = {
     "via": METHOD_LABELS,
     "confirmed": METHOD_LABELS,
     "source": METHOD_LABELS,
+    "origin": ORIGIN_LABELS,
     "scope": METHOD_LABELS,
     "purpose": PURPOSE_LABELS,
     "fields": FIELD_LABELS,
@@ -821,6 +838,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
         "instance_settings": ("instance.settings_updated", "demo.reset", "demo.deleted"),
         "workspaces": ("workspace.delete",),
         "demo": ("demo.reset", "demo.deleted"),
+        "backups": ("backup.created", "backup.downloaded"),
     },
 }
 GROUP_LABELS: dict[str, str] = {
@@ -843,6 +861,7 @@ GROUP_LABELS: dict[str, str] = {
     "instance_settings": _("Instance settings"),
     "workspaces": _("Deleted workspaces"),
     "demo": _("Demo mode"),
+    "backups": _("Backups"),
 }
 
 

@@ -701,6 +701,12 @@ msgstr "Zresetowano obszar demonstracyjny"
 msgid "Demo data deleted"
 msgstr "Usunięto dane demonstracyjne"
 
+msgid "Backup created by an administrator"
+msgstr "Kopia zapasowa utworzona przez administratora"
+
+msgid "Backup downloaded by an administrator"
+msgstr "Kopia zapasowa pobrana przez administratora"
+
 msgid "Account created by an administrator"
 msgstr "Konto utworzone przez administratora"
 
@@ -998,6 +1004,9 @@ msgstr "Potwierdzono przez"
 msgid "Source"
 msgstr "Źródło"
 
+msgid "Origin"
+msgstr "Źródło"
+
 msgid "Mode"
 msgstr "Tryb"
 
@@ -1027,6 +1036,12 @@ msgstr "Ważne dni"
 
 msgid "Categories"
 msgstr "Kategorie"
+
+msgid "Deleted entries cleared"
+msgstr "Usunięte wpisy wyczyszczone"
+
+msgid "Open months cleared"
+msgstr "Otwarte miesiące wyczyszczone"
 
 msgid "Planned values"
 msgstr "Wartości planowane"
@@ -1421,6 +1436,21 @@ msgstr "utworzenie konta"
 msgid "changing instance settings"
 msgstr "zmiana ustawień instancji"
 
+msgid "creating a backup"
+msgstr "tworzenie kopii zapasowej"
+
+msgid "downloading a backup"
+msgstr "pobieranie kopii zapasowej"
+
+msgid "resetting the demo workspace"
+msgstr "resetowanie obszaru demonstracyjnego"
+
+msgid "deleting the demo workspace"
+msgstr "usuwanie obszaru demonstracyjnego"
+
+msgid "manual"
+msgstr "ręczne"
+
 msgid "name"
 msgstr "nazwa"
 
@@ -1570,6 +1600,9 @@ msgstr "Usunięte obszary robocze"
 
 msgid "Demo mode"
 msgstr "Tryb demonstracyjny"
+
+msgid "Backups"
+msgstr "Kopie zapasowe"
 
 msgid "Demo"
 msgstr "Demo"
@@ -2866,6 +2899,26 @@ msgstr "Hasło zostało zmienione. Inne urządzenia zostały wylogowane."
 #, python-format
 msgid "Other sessions signed out: %(count)d."
 msgstr "Wylogowane inne sesje: %(count)d."
+
+msgid "Back up now"
+msgstr "Utwórz kopię teraz"
+
+msgid ""
+"Create a copy of the database now. The file can contain every workspace "
+"and account on this instance; keep it somewhere safe."
+msgstr ""
+"Utwórz teraz kopię bazy danych. Plik może zawierać wszystkie obszary "
+"robocze i konta na tej instancji; przechowuj go w bezpiecznym miejscu."
+
+msgid "Download backup"
+msgstr "Pobierz kopię zapasową"
+
+msgid ""
+"Download this database copy. The file can contain every workspace and "
+"account on this instance; keep it somewhere safe."
+msgstr ""
+"Pobierz tę kopię bazy danych. Plik może zawierać wszystkie obszary "
+"robocze i konta na tej instancji; przechowuj go w bezpiecznym miejscu."
 
 msgid "Expense"
 msgstr "Wydatek"
@@ -4671,6 +4724,18 @@ msgstr "Punkt kontrolny nie może przypadać przed rozpoczęciem kredytu."
 msgid "A checkpoint already exists on that date."
 msgstr "Punkt kontrolny dla tej daty już istnieje."
 
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+"Data salda początkowego musi być wcześniejsza niż następny punkt "
+"kontrolny."
+
+msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
+msgstr ""
+"Zmiana oprocentowania zaczyna się przed nową datą salda początkowego. "
+"Najpierw ją zmień lub usuń."
+
 msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
@@ -6473,6 +6538,13 @@ msgstr "Obszar roboczy"
 msgid "Switch"
 msgstr "Przełącz"
 
+#, python-format
+msgid "File: %(name)s"
+msgstr "Plik: %(name)s"
+
+msgid "Back to instance settings"
+msgstr "Wróć do ustawień instancji"
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 "Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie "
@@ -6545,9 +6617,6 @@ msgstr ""
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
 
-msgid "Backups"
-msgstr "Kopie zapasowe"
-
 msgid "Automatic backups are not available for an in-memory database."
 msgstr "Automatyczne kopie zapasowe nie są dostępne dla bazy danych w pamięci."
 
@@ -6578,9 +6647,6 @@ msgstr "Nie zaplanowano"
 
 msgid "Location"
 msgstr "Lokalizacja"
-
-msgid "Back up now"
-msgstr "Utwórz kopię teraz"
 
 msgid "Started"
 msgstr "Rozpoczęto"
@@ -10339,6 +10405,9 @@ msgstr "Pierwotny kapitał %(amount)s"
 msgid "Starting balance %(amount)s"
 msgstr "Saldo początkowe %(amount)s"
 
+msgid "Starting balance"
+msgstr "Saldo początkowe"
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr "Wypłacono %(drawn)s z %(approved)s · %(undrawn)s niewypłacone"
@@ -10753,11 +10822,11 @@ msgstr ""
 "Rzeczywiste/365: rzeczywista liczba dni w każdym okresie."
 
 #, python-format
-msgid "Current balance (%(currency)s)"
-msgstr "Bieżące saldo (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
+msgstr "Saldo początkowe (%(currency)s)"
 
-msgid "Balance date"
-msgstr "Data salda"
+msgid "Starting balance date"
+msgstr "Data salda początkowego"
 
 msgid "Remaining months"
 msgstr "Pozostałe miesiące"
@@ -10899,6 +10968,13 @@ msgstr "Część kapitałowa jest równa każdego miesiąca, więc rata maleje w
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
 msgstr "Wszystkie kwoty są w %(currency)s, walucie obszaru roboczego."
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr "Bieżące saldo (%(currency)s)"
+
+msgid "Balance date"
+msgstr "Data salda"
 
 msgid ""
 "Leave empty to use the first payment date's day. A shorter month uses its"
@@ -11147,9 +11223,6 @@ msgstr "Saldo"
 
 msgid "Projected balance"
 msgstr "Saldo prognozowane"
-
-msgid "Starting balance"
-msgstr "Saldo początkowe"
 
 msgid "Projected balance unavailable"
 msgstr "Saldo prognozowane niedostępne"
@@ -13442,19 +13515,20 @@ msgstr "Przywróć do tego obszaru roboczego"
 msgid ""
 "Replaces settings, categories, transactions, planned values, month "
 "states, net worth, investments, loans, FIRE, recurring items, income, tax"
-" rules, and work logs. Only for an empty workspace."
+" rules, and work logs. Deleted entries and open months are cleared first."
 msgstr ""
-"Zastępuje ustawienia, kategorie, transakcje, planowane wartości, stany "
+"Zastępuje ustawienia, kategorie, transakcje, wartości planowane, stany "
 "miesięcy, majątek netto, inwestycje, kredyty, FIRE, pozycje cykliczne, "
-"przychody, reguły podatkowe i dzienniki pracy. Tylko dla pustego obszaru "
-"roboczego."
+"przychody, zasady podatkowe i dzienniki pracy. Usunięte wpisy i otwarte "
+"miesiące są najpierw czyszczone."
 
 msgid ""
-"Available only in an empty workspace. The untouched suggested categories "
-"are fine."
+"Available only when the workspace has no active data. Deleted entries and"
+" open months are fine; closed months and other data block it."
 msgstr ""
-"Dostępne tylko w pustym obszarze roboczym. Nietknięte proponowane "
-"kategorie nie przeszkadzają."
+"Dostępne tylko wtedy, gdy obszar roboczy nie ma aktywnych danych. "
+"Usunięte wpisy i otwarte miesiące nie przeszkadzają; zamknięte miesiące i"
+" inne dane blokują przywracanie."
 
 msgid "CSV delimiter"
 msgstr "Separator CSV"
@@ -13543,6 +13617,15 @@ msgstr ""
 "To archiwum zawiera zaszyfrowany element z sekretami. Podaj jego hasło w "
 "formularzu zastosowania importu, aby przywrócić kanały powiadomień i "
 "klucze dostawców."
+
+msgid "Archive currency"
+msgstr "Waluta archiwum"
+
+msgid "Deleted entries removed"
+msgstr "Wyczyszczone usunięte wpisy"
+
+msgid "Open months removed"
+msgstr "Wyczyszczone otwarte miesiące"
 
 msgid "Deleted transactions restored"
 msgstr "Przywrócone usunięte transakcje"
@@ -16141,4 +16224,13 @@ msgstr "Usuń obszar roboczy…"
 #~ "Pozostaw puste, aby pokazać 8 "
 #~ "największych kategorii, a resztę jako "
 #~ "„Inne (połączone)”."
+
+#~ msgid ""
+#~ "Available only in an empty workspace."
+#~ " The untouched suggested categories are "
+#~ "fine."
+#~ msgstr ""
+#~ "Dostępne tylko w pustym obszarze "
+#~ "roboczym. Nietknięte proponowane kategorie nie"
+#~ " przeszkadzają."
 

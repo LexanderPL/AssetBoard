@@ -47,7 +47,7 @@
       {% if is_owner %}
       <label class="flex items-start gap-2 text-sm {% if not can_restore %}opacity-60{% endif %}">
         <input type="radio" name="mode" value="restore" class="mt-1"{% if not can_restore %} disabled{% endif %}>
-        <span>{{ _("Restore into this workspace") }}<span class="block text-xs text-muted">{% if can_restore %}{{ _("Replaces settings, categories, transactions, planned values, month states, net worth, investments, loans, FIRE, recurring items, income, tax rules, and work logs. Only for an empty workspace.") }}{% else %}{{ _("Available only in an empty workspace. The untouched suggested categories are fine.") }}{% endif %}</span></span>
+        <span>{{ _("Restore into this workspace") }}<span class="block text-xs text-muted">{% if can_restore %}{{ _("Replaces settings, categories, transactions, planned values, month states, net worth, investments, loans, FIRE, recurring items, income, tax rules, and work logs. Deleted entries and open months are cleared first.") }}{% else %}{{ _("Available only when the workspace has no active data. Deleted entries and open months are fine; closed months and other data block it.") }}{% endif %}</span></span>
       </label>
       {% else %}
       <input type="hidden" name="mode" value="merge">
@@ -142,6 +142,9 @@
     <p class="mt-2 text-sm text-muted">{{ _("This archive contains an encrypted secrets member. Enter its passphrase in the Apply import form to restore notification channels and provider keys.") }}</p>
     {% endif %}
     <dl class="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+      <div><dt class="text-muted">{{ _("Archive currency") }}</dt><dd data-restore-currency>{{ selected_batch.report.archive_currency|default("", true) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Deleted entries removed") }}</dt><dd data-restore-purged-transactions>{{ selected_batch.report.counts.purged_transactions|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Open months removed") }}</dt><dd data-restore-purged-months>{{ selected_batch.report.counts.purged_month_states|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Categories") }}</dt><dd>{{ selected_batch.report.counts.categories_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Transactions") }}</dt><dd>{{ selected_batch.report.counts.transactions_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Deleted transactions restored") }}</dt><dd>{{ selected_batch.report.counts.deleted_transactions|default(0) }}</dd></div>

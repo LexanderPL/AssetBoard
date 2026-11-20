@@ -100,6 +100,25 @@ async def confirm_view(request: Request, current: WebSession) -> ConfirmView:
     return await run_in_threadpool(read)
 
 
+async def confirm_only(
+    request: Request, current: WebSession, *, purpose: str, password: str
+) -> ConfirmOutcome[bool]:
+    """Confirm a sensitive action that must then run outside the confirmation transaction.
+
+    Backup copies and file downloads open their own database connections or stream a file, so
+    they cannot run inside ``run_confirmed``'s write transaction. The caller checks
+    ``outcome.status`` and performs the action afterwards. The action returns ``True`` because
+    the confirmation service treats a ``None`` result as a failed password.
+    """
+    return await run_confirmed(
+        request,
+        current,
+        purpose=purpose,
+        password=password,
+        action=lambda session, user, method: True,
+    )
+
+
 async def run_confirmed[T](
     request: Request,
     current: WebSession,
