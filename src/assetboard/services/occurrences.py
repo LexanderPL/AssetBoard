@@ -8,15 +8,19 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.identity import Membership, User
+from assetboard.db.models.loans import Loan
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories import (
     AuditEventRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    LoanRepository,
     MonthStateRepository,
     NotFound,
     ScheduledItemRepository,
@@ -35,7 +39,14 @@ from assetboard.domain.transactions import (
     clean_description,
     description_key,
 )
-from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.context import (
+    Context,
+    Role,
+    UserRef,
+    WorkspaceRef,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.income import resync_work_month
 from assetboard.services.months import ensure_date_open
 
@@ -193,6 +204,62 @@ def _valid_day(day: date) -> None:
         raise OccurrenceError("invalid_date")
 
 
+def _system_context(session: Session, scope: WorkspaceScope, clock: Clock) -> Context | None:
+    """A trusted context for a background write; ``None`` when the workspace has no editor."""
+    workspace = CurrentWorkspaceRepository(session, scope).get()
+    row = session.execute(
+        select(Membership, User)
+        .join(User, Membership.user_id == User.id)
+        .where(
+            Membership.workspace_id == workspace.id,
+            Membership.role.in_(("owner", "editor")),
+        )
+        .order_by(Membership.role)
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    membership, owner = row
+    return Context(
+        user=UserRef(
+            id=owner.id,
+            email=owner.email,
+            display_name=owner.display_name,
+            locale=owner.locale,
+            is_instance_admin=owner.is_instance_admin,
+            is_demo=owner.is_demo,
+        ),
+        workspace=WorkspaceRef(
+            id=workspace.id,
+            name=workspace.name,
+            base_currency=workspace.base_currency,
+            locale=workspace.locale,
+            timezone=workspace.timezone,
+            country_code=workspace.country_code,
+            require_two_factor=workspace.require_two_factor,
+            taxes_enabled=workspace.taxes_enabled,
+            upcoming_days=workspace.upcoming_days,
+            is_demo=workspace.is_demo,
+        ),
+        role=Role(membership.role),
+        clock=clock,
+    )
+
+
+def _plan_loan_for_occurrence(
+    session: Session, scope: WorkspaceScope, occurrence: ScheduledOccurrence
+) -> Loan | None:
+    if occurrence.scheduled_item_id is None:
+        return None
+    item = ScheduledItemRepository(session, scope).get(occurrence.scheduled_item_id)
+    if item is None or item.loan_id is None:
+        return None
+    loan = LoanRepository(session, scope).get(item.loan_id)
+    if loan is None or loan.kind != "installment_plan":
+        return None
+    return loan
+
+
 def _post_in_session(
     session: Session,
     scope: WorkspaceScope,
@@ -288,7 +355,14 @@ def _post_in_session(
         if loan is not None and loan.kind == "installment_plan":
             from assetboard.services.installment_plans import apply_posted_occurrence
 
-            apply_posted_occurrence(session, context, loan, occurrence.due_date)
+            apply_posted_occurrence(
+                session,
+                context,
+                loan,
+                occurrence.due_date,
+                actor_user_id=actor_user_id,
+                now=clock.now(),
+            )
         elif loan is not None and loan.archived_at is None and loan.auto_record_payments:
             with contextlib.suppress(LoanError, LoanValidationError):
                 loan_payments.record_loan_payment_in_session(
@@ -518,6 +592,18 @@ def undo_post(factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID)
             transaction_id=None,
             previous_transaction_id=transaction.id,
         )
+        loan = _plan_loan_for_occurrence(session, ctx, occurrence)
+        if loan is not None:
+            from assetboard.services.installment_plans import revert_posted_occurrence
+
+            revert_posted_occurrence(
+                session,
+                ctx,
+                loan,
+                occurrence.due_date,
+                actor_user_id=ctx.user.id,
+                now=ctx.clock.now(),
+            )
         audit = AuditEventRepository(session, ctx)
         audit.record(
             actor_user_id=ctx.user.id,
@@ -564,6 +650,18 @@ def unlink_deleted_transaction(session: Session, ctx: Context, transaction_id: U
             transaction_id=None,
             previous_transaction_id=transaction_id,
         )
+        loan = _plan_loan_for_occurrence(session, ctx, occurrence)
+        if loan is not None:
+            from assetboard.services.installment_plans import revert_posted_occurrence
+
+            revert_posted_occurrence(
+                session,
+                ctx,
+                loan,
+                occurrence.due_date,
+                actor_user_id=ctx.user.id,
+                now=ctx.clock.now(),
+            )
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="scheduled_occurrence.unposted",
@@ -592,6 +690,18 @@ def relink_restored_transaction(session: Session, ctx: Context, transaction_id: 
         repository.update(
             occurrence.id, status=OccurrenceStatus.POSTED, transaction_id=transaction_id
         )
+        loan = _plan_loan_for_occurrence(session, ctx, occurrence)
+        if loan is not None:
+            from assetboard.services.installment_plans import apply_posted_occurrence
+
+            apply_posted_occurrence(
+                session,
+                ctx,
+                loan,
+                occurrence.due_date,
+                actor_user_id=ctx.user.id,
+                now=ctx.clock.now(),
+            )
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="scheduled_occurrence.relinked",
@@ -610,6 +720,9 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
         CurrentWorkspaceRepository(session, scope).lock(exclusive=False)
         workspace = CurrentWorkspaceRepository(session, scope).get()
         today = clock.today(workspace.timezone)
+        context = _system_context(session, scope, clock)
+        if context is None:
+            return 0
         occurrences = ScheduledOccurrenceRepository(session, scope)
         candidates = occurrences.upcoming(today)
         posted = 0
@@ -642,6 +755,7 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
                         today=today,
                         source=Source.RECURRING_AUTO,
                         actor_user_id=None,
+                        context=context,
                     )
                     posted += 1
             except Exception as exc:

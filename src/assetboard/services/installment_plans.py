@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -294,6 +294,15 @@ def plan_due_dates_in_session(
     plan = InstallmentPlanRepository(session, ctx).for_loan(loan.id)
     if plan is None or plan.closed_at is not None or plan.remaining_count <= 0:
         raise loans.LoanError("loan", "loan_paid_off")
+    # An overdue pending occurrence is the next due date even when today's nominal date is
+    # already past the plan's end; posting it must not roll the whole transaction back.
+    pending = [
+        row.due_date
+        for row in _occurrences_for_loan(session, ctx, loan.id)
+        if row.status == "pending" and row.direction == "expense"
+    ]
+    if pending:
+        return min(pending), plan.end_date
     next_due = next_due_on_or_after(today, loan.payment_day)
     if plan.end_date < next_due:
         raise loans.LoanError("loan", "loan_paid_off")
@@ -440,8 +449,16 @@ def update_installment_plan(
     _write(factory, write)
 
 
-def apply_posted_occurrence(session: Session, ctx: Context, loan: Loan, posted_on: date) -> None:
-    """Decrement a plan after one occurrence is posted; idempotent by the posted row."""
+def apply_posted_occurrence(
+    session: Session,
+    ctx: Context,
+    loan: Loan,
+    posted_on: date,
+    *,
+    actor_user_id: UUID | None,
+    now: datetime,
+) -> None:
+    """Decrement a plan after one occurrence is posted."""
     if loan.kind != LoanKind.INSTALLMENT_PLAN.value:
         return
     plan = InstallmentPlanRepository(session, ctx).for_loan(loan.id)
@@ -454,21 +471,22 @@ def apply_posted_occurrence(session: Session, ctx: Context, loan: Loan, posted_o
         plan.id,
         remaining_count=count,
         end_date=end_date,
-        closed_at=ctx.clock.now() if count == 0 else None,
+        closed_at=now if count == 0 else None,
     )
     LoanRepository(session, ctx).update(
         loan.id,
         term_months=count,
         principal_original_minor=plan.installment_minor * count if count else None,
         first_payment_date=next_due,
-        archived_at=ctx.clock.now() if count == 0 else None,
+        archived_at=now if count == 0 else None,
     )
     AuditEventRepository(session, ctx).record(
-        actor_user_id=ctx.user.id,
+        actor_user_id=actor_user_id,
+        actor_type="system" if actor_user_id is None else "user",
         action="installment_plan.payment_posted",
         entity_type="loan",
         entity_id=str(loan.id),
-        ts=ctx.clock.now(),
+        ts=now,
         data={"plan_id": str(plan.id), "posted_on": posted_on.isoformat()},
     )
     from assetboard.services.loan_scheduled import (
@@ -482,6 +500,62 @@ def apply_posted_occurrence(session: Session, ctx: Context, loan: Loan, posted_o
         create_loan_schedule_item_in_session(
             session, ctx, loan.id, plan.category_id, DEFAULT_RECURRENCE_HORIZON_MONTHS
         )
+
+
+def revert_posted_occurrence(
+    session: Session,
+    ctx: Context,
+    loan: Loan,
+    posted_on: date,
+    *,
+    actor_user_id: UUID | None,
+    now: datetime,
+) -> None:
+    """Reopen a plan after a posted occurrence returns to pending.
+
+    A manually archived plan (closed with a positive remaining count) is left alone; undoing
+    one of its old installments must not unarchive it. A paid-off plan (count zero) reopens.
+    """
+    plan = InstallmentPlanRepository(session, ctx).for_loan(loan.id)
+    if plan is None:
+        return
+    if plan.closed_at is not None and plan.remaining_count > 0:
+        return
+    count = plan.remaining_count + 1
+    pending = [
+        row.due_date
+        for row in _occurrences_for_loan(session, ctx, loan.id)
+        if row.status == "pending" and row.direction == "expense"
+    ]
+    next_due = min(pending) if pending else next_due_on_or_after(posted_on, loan.payment_day)
+    end_date = _end_date(next_due, count, loan.payment_day)
+    InstallmentPlanRepository(session, ctx).update(
+        plan.id,
+        remaining_count=count,
+        end_date=end_date,
+        closed_at=None,
+    )
+    LoanRepository(session, ctx).update(
+        loan.id,
+        term_months=count,
+        principal_original_minor=plan.installment_minor * count,
+        first_payment_date=next_due,
+        archived_at=None,
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=actor_user_id,
+        actor_type="system" if actor_user_id is None else "user",
+        action="installment_plan.payment_reverted",
+        entity_type="loan",
+        entity_id=str(loan.id),
+        ts=now,
+        data={"plan_id": str(plan.id), "posted_on": posted_on.isoformat()},
+    )
+    from assetboard.services.loan_scheduled import create_loan_schedule_item_in_session
+
+    create_loan_schedule_item_in_session(
+        session, ctx, loan.id, plan.category_id, DEFAULT_RECURRENCE_HORIZON_MONTHS
+    )
 
 
 def archive_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> None:
@@ -571,6 +645,7 @@ __all__ = [
     "plan_due_dates_in_session",
     "plan_installment_in_session",
     "plan_remaining_minor_at_in_session",
+    "revert_posted_occurrence",
     "plan_remaining_minor_in_session",
     "post_next_installment",
     "restore_installment_plan",

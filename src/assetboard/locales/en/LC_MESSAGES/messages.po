@@ -658,6 +658,24 @@ msgstr ""
 msgid "Administrator role removed"
 msgstr ""
 
+msgid "Installment plan created"
+msgstr ""
+
+msgid "Installment plan updated"
+msgstr ""
+
+msgid "Installment plan payment posted"
+msgstr ""
+
+msgid "Installment plan payment reverted"
+msgstr ""
+
+msgid "Installment plan archived"
+msgstr ""
+
+msgid "Installment plan restored"
+msgstr ""
+
 msgid "Demo workspace reset"
 msgstr ""
 

@@ -422,6 +422,13 @@ decrement-on-post behaviour, linked liability and overview table. Tests for coun
   plan end date, audits without amounts, and either refreshes generated occurrences or closes the
   plan. Closing sets the plan `closed_at`, archives the Loan, removes pending future occurrences
   and keeps posted/past history. No `LoanPayment` is created for a plan.
+- The count is symmetric across the lifecycle: undo, ledger delete and restore call
+  `revert_posted_occurrence()` / `apply_posted_occurrence()` so the count, progress, end date and
+  liability do not drift; auto-post runs the same hooks through a trusted system context. A
+  manually archived plan is not unarchived by undoing one of its old installments.
+- Overdue installments stay postable: generation uses the earliest pending occurrence date, not
+  today's nominal date, so a plan whose end date has passed but still has pending rows can post
+  them one by one and close at zero.
 - Active plans and closed plans are listed separately. The plan detail screen links the
   net-worth liability and Upcoming generation controls; the property/LTV section is intentionally
   omitted. Archive and restore use the same close/disable machinery. Ordinary `loans` list

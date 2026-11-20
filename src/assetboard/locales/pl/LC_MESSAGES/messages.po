@@ -677,6 +677,24 @@ msgstr "Nadano uprawnienia administratora"
 msgid "Administrator role removed"
 msgstr "Odebrano uprawnienia administratora"
 
+msgid "Installment plan created"
+msgstr "Utworzono plan ratalny"
+
+msgid "Installment plan updated"
+msgstr "Zaktualizowano plan ratalny"
+
+msgid "Installment plan payment posted"
+msgstr "Zaksięgowano ratę planu"
+
+msgid "Installment plan payment reverted"
+msgstr "Cofnięto księgowanie raty planu"
+
+msgid "Installment plan archived"
+msgstr "Zarchiwizowano plan ratalny"
+
+msgid "Installment plan restored"
+msgstr "Przywrócono plan ratalny"
+
 msgid "Demo workspace reset"
 msgstr "Zresetowano obszar demonstracyjny"
 

@@ -18,7 +18,14 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.loans import LoanKind, LoanValidationError, Money
 from assetboard.domain.scheduled import AmountMode
-from assetboard.services import installment_plans, loan_links, loan_scheduled, loans, occurrences
+from assetboard.services import (
+    installment_plans,
+    loan_links,
+    loan_scheduled,
+    loans,
+    occurrences,
+    transactions,
+)
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -358,6 +365,71 @@ def test_plan_balance_at_as_of_uses_posted_occurrences(team: WorkspaceDb) -> Non
             )
             == 0
         )
+
+
+def test_post_undo_and_repost_keep_the_plan_count(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 2
+    occurrences.undo_post(team.factory, ctx, first.id)
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 3
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_ledger_delete_and_restore_keep_the_plan_count(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    transaction_id = occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 3
+    transactions.undo_delete(team.factory, ctx, transaction_id)
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_auto_post_decrements_the_plan(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory.begin() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        ScheduledItemRepository(session, ctx).update(item.id, auto_post=True)
+    posted = occurrences.auto_post_workspace(team.factory, ctx, ctx.clock)
+    assert posted == 1
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_overdue_installments_post_one_by_one(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 5, 10, 12, tzinfo=UTC)
+    for remaining in (2, 1, 0):
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+        view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+        assert view.remaining_count == remaining
+    assert view.closed
+    with pytest.raises(loans.LoanError) as closed:
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+    assert closed.value.code == "loan_paid_off"
 
 
 def test_plan_balance_and_installments_liability(team: WorkspaceDb) -> None:
