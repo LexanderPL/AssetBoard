@@ -126,6 +126,12 @@ conventions). Golden test against services.summary.month_summary; property tests
 - The chart is a new `report-bars` kind of the F2.7 chart module: grouped bars, ECharts' legend
   hides a series, server-formatted labels, token colours, and an sr-only table with a
   “Show as table” control. User guide: [Reports](../reports.md).
+- **As built (F11.8, 2026-11-20):** a range with no ledger data shows one actionable empty state
+  instead of zero/dash tables; the filters use the shared phone disclosure with an active-filter
+  count; a compact section nav links every visible section; the net-worth “items had no value”
+  warning appears once at section level (chart tooltips keep the per-point detail); portfolio
+  gains use the success/danger colours; and a non-base-only net-worth or undated-only portfolio
+  series keeps its section with the explanatory note instead of disappearing.
 
 ---
 
