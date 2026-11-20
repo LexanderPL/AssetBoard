@@ -46,6 +46,9 @@ def test_setup_form_has_token_field_and_option_lists(web: WebHarness) -> None:
     assert '<option value="Europe/Warsaw"' in page.text
     assert ">Polska</option>" in page.text
     assert 'autocomplete="new-password"' in page.text
+    english = client.get("/setup", headers={"accept-language": "en"})
+    assert ">Workspace language</label>" in english.text
+    assert "Used for the suggested categories and formatting." in english.text
 
 
 def test_setup_creates_admin_signs_in_and_rotates_the_csrf_cookie(web: WebHarness) -> None:
@@ -80,6 +83,8 @@ def test_wrong_setup_token_is_refused(web: WebHarness, token: str) -> None:
         response = client.post("/setup", data=_form(client, web, None, setup_token=token))
         assert response.status_code == 400
         assert "The setup token is not correct." in response.text
+        assert 'id="setup_token"' in response.text
+        assert "data-autofocus" in response.text
         assert client.get("/setup").status_code == 200  # still open
 
 

@@ -18,11 +18,21 @@ def translations_for(locale: str) -> GNUTranslations | NullTranslations:
 
 
 def gettext(message: str, locale: str) -> str:
+    """Translate ``message``; an empty message stays empty.
+
+    ``GNUTranslations.gettext("")`` returns the catalog header (the PO metadata), not an empty
+    string. Callers use an empty string as "no label" (for example an optional risk-tier
+    subtitle), so the wrapper must not leak the header into the UI.
+    """
+    if not message:
+        return ""
     return translations_for(locale).gettext(message)
 
 
 def ngettext(singular: str, plural: str, n: int, locale: str) -> str:
-    """The plural form for ``n`` in ``locale`` (Polish has three)."""
+    """The plural form for ``n`` in ``locale`` (Polish has three); empty stays empty."""
+    if not singular:
+        return ""
     return translations_for(locale).ngettext(singular, plural, n)
 
 

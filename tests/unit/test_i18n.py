@@ -22,6 +22,14 @@ def test_polish_catalog_has_no_empty_or_fuzzy_translations() -> None:
         assert all(translation.strip() for translation in translations)
 
 
+def test_empty_messages_do_not_leak_the_catalog_header() -> None:
+    from assetboard.i18n import gettext, ngettext
+
+    assert gettext("", "en") == ""
+    assert gettext("", "pl") == ""
+    assert ngettext("", "", 5, "pl") == ""
+
+
 def test_polish_runtime_catalog_is_compiled_rather_than_an_english_fallback() -> None:
     # .mo files are built (`make i18n-compile` / the wheel build hook), not committed; gettext
     # would silently fall back to English without them.
