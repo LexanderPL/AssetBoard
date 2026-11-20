@@ -41,7 +41,7 @@ EMPTY: dict[ChartBlock, str] = {
     "expense": _("No expenses yet this month"),
     "income": _("No income yet this month"),
 }
-OTHER = _("Other")
+OTHER_COMBINED = _("Other (combined)")
 UNALLOCATED = _("Unallocated")
 
 
@@ -90,7 +90,10 @@ def build_donut(data: SummaryData, block: ChartBlock, locale: str) -> DonutView:
     slices = []
     for s in category_breakdown(summary, block):
         if s.category_id is None:
-            name, color = gettext(OTHER, locale), None
+            # The grouped tail, not the real category that may also be called "Other". Reuse
+            # the report chart's label so both charts name the remainder the same way and the
+            # legend/table never show two identical names distinguished only by colour.
+            name, color = gettext(OTHER_COMBINED, locale), None
         else:
             category = data.categories[s.category_id]
             name, color = category.name, category.color

@@ -243,6 +243,7 @@ class MissingDataView:
     missing_work_logs: tuple[MissingWorkLogView, ...]
     planned_imports: tuple[PlannedImportView, ...]
     empty: bool
+    has_data: bool
 
 
 # Builders. Each one returns the fragment's context; the route adds the widget heading/link.
@@ -516,6 +517,7 @@ def build_missing_data(request: Request, ctx: Context) -> dict[str, object]:
             missing_work_logs=logs,
             planned_imports=imports,
             empty=data.empty,
+            has_data=data.has_data,
         ),
         "portfolio_url": scoped_url(request, "investments_portfolio"),
         "income_url": scoped_url(request, "income_sources"),

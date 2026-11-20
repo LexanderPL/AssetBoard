@@ -3005,6 +3005,9 @@ msgstr "W tym miesiącu nie ma jeszcze wydatków"
 msgid "No income yet this month"
 msgstr "W tym miesiącu nie ma jeszcze przychodów"
 
+msgid "Other (combined)"
+msgstr "Inne (połączone)"
+
 msgid "Unallocated"
 msgstr "Bez przydziału"
 
@@ -5578,9 +5581,6 @@ msgstr "Uwzględnij oszczędności / inwestycje"
 msgid "Saved and invested amounts get their own category series."
 msgstr "Oszczędności i inwestycje otrzymują własne serie kategorii."
 
-msgid "Other (combined)"
-msgstr "Inne (połączone)"
-
 msgid "archived"
 msgstr "zarchiwizowana"
 
@@ -7218,6 +7218,13 @@ msgstr "Skonfiguruj kredyty"
 msgid "Nothing needs attention."
 msgstr "Nic nie wymaga uwagi."
 
+msgid ""
+"Add a net-worth value, an income source or an investment to see missing-"
+"data checks."
+msgstr ""
+"Dodaj wartość majątku, źródło dochodu lub inwestycję, aby zobaczyć "
+"kontrole brakujących danych."
+
 msgid "Prices and FX"
 msgstr "Ceny i kursy walut"
 
@@ -8129,6 +8136,16 @@ msgstr "Brak dochodów"
 #, python-format
 msgid "Loan paid off: %(names)s"
 msgstr "Spłacone kredyty: %(names)s"
+
+msgid "Show all years"
+msgstr "Pokaż wszystkie lata"
+
+msgid "Show fewer years"
+msgstr "Pokaż mniej lat"
+
+#, python-format
+msgid "Showing the first %(shown)s of %(total)s years."
+msgstr "Pokazano pierwsze %(shown)s z %(total)s lat."
 
 msgid "Choose your FIRE plan"
 msgstr "Wybierz plan FIRE"

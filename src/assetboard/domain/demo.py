@@ -27,7 +27,7 @@ from typing import Literal
 
 from assetboard.domain.money import Money
 
-DEMO_DATASET_VERSION: int = 3
+DEMO_DATASET_VERSION: int = 4
 
 CURRENCY_FACTORS: MappingProxyType[str, Decimal] = MappingProxyType(
     {
@@ -172,6 +172,9 @@ class DemoNetWorthItem:
     side: Literal["asset", "liability"]
     category: str
     values: tuple[DemoValuation, ...]
+    # Translated name of a demo loan this item is linked to (F7.6), or None for a manual item.
+    # A linked item has no ``values``: its history comes from the loan schedule.
+    link: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1071,6 +1074,7 @@ def _networth_items(
         values: list[int],
         *,
         gap: int | None = None,
+        link: str | None = None,
     ) -> None:
         points: list[DemoValuation] = []
         for index, value_minor in enumerate(values):
@@ -1088,6 +1092,7 @@ def _networth_items(
                 side=side,
                 category=translate(category),
                 values=tuple(points),
+                link=translate(link) if link is not None else None,
             )
         )
 
@@ -1121,7 +1126,15 @@ def _networth_items(
         _("Mortgage"),
         "liability",
         _("Mortgage"),
-        [max(18000000 - index * 28000, 12000000) for index in range(12)],
+        [],
+        link=_("Mortgage"),
+    )
+    add(
+        _("Car loan"),
+        "liability",
+        _("Other"),
+        [],
+        link=_("Car loan"),
     )
     add(
         _("Credit card"),

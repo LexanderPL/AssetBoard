@@ -432,7 +432,10 @@ def test_the_editor_renders_saved_values_results_and_preview_wiring(owner) -> No
 def test_the_editor_uses_the_surface_table_and_the_uncapped_portfolio_input(owner) -> None:
     create_plan(owner)
     text = owner.client.get("/fire/edit").text
-    assert '<table class="sheet bg-surface w-full min-w-[48rem] text-sm" data-fire-table>' in text
+    assert (
+        '<table id="fire-projection-table" class="sheet bg-surface w-full '
+        'min-w-[48rem] text-sm" data-fire-table>' in text
+    )
     assert "bg-success-soft" in text
     assert 'data-fire-row="fire"' in text
     portfolio = field_html(text, "portfolio_manual")

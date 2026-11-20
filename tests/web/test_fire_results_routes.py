@@ -102,7 +102,10 @@ def test_the_view_gives_the_year_by_year_section_space_below_the_plan_inputs(own
 def test_the_year_by_year_table_uses_the_surface_background_and_keeps_row_tints(owner) -> None:
     _create(owner)
     text = owner.client.get("/fire").text
-    assert '<table class="sheet bg-surface w-full min-w-[48rem] text-sm" data-fire-table>' in text
+    assert (
+        '<table id="fire-projection-table" class="sheet bg-surface w-full '
+        'min-w-[48rem] text-sm" data-fire-table>' in text
+    )
     assert '<tr class="border-t border-line bg-success-soft" data-fire-row="fire"' in text
     assert "data-fire-badge" in text
     assert '<tr class="border-t border-line text-muted" data-income-stopped="true"' in text
@@ -144,6 +147,20 @@ def test_the_view_puts_plan_values_adjustments_and_loans_in_one_collapsed_detail
     assert text.count('id="plan-inputs"') == 1
     assert text.index('data-fire-progress="plan"') < start
     assert start < text.index("data-fire-table-section")
+
+
+def test_the_year_by_year_table_collapses_to_the_first_twelve_rows(owner) -> None:
+    _create(owner)
+    text = owner.client.get("/fire").text
+    start = text.index('<table id="fire-projection-table"')
+    body = text[text.index("<tbody>", start) : text.index("</tbody>", start)]
+    rows = re.findall(r"<tr ", body)
+    assert len(rows) > 12
+    assert len(re.findall(r"<tr [^>]*data-fire-year-extra", body)) == len(rows) - 12
+    assert "data-fire-show-all" in text
+    assert 'aria-controls="fire-projection-table"' in text
+    assert "Showing the first 12 of" in text
+    assert "Show all years" in text
 
 
 def test_the_year_by_year_section_has_no_panel_frame(owner) -> None:

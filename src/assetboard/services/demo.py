@@ -123,6 +123,7 @@ from assetboard.services import (
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.import_csv import TransactionsCsvAdapter, default_import_adapters
 from assetboard.services.imports import ImportAdapterRegistry
+from assetboard.services.loan_links import register_loan_resolvers
 from assetboard.services.scheduled import ScheduledInput
 from assetboard.services.taxes import _RuleFields, _validated_rule
 
@@ -548,11 +549,41 @@ def _write_income(
 
 
 def _write_networth(
-    session: Session, ctx: Context, plan: DemoPlan, lookup: _Lookup
+    session: Session,
+    ctx: Context,
+    plan: DemoPlan,
+    lookup: _Lookup,
+    loan_ids: dict[str, UUID],
 ) -> tuple[int, int]:
     items = 0
     valuations = 0
     for row in plan.networth_items:
+        if row.link is not None:
+            loan_id = loan_ids.get(name_key(row.link))
+            if loan_id is None:
+                raise DemoBuildError(f"the plan links to an unknown loan: {row.link}")
+            sctx = _ctx_at(ctx, plan.reference_date)
+            _use(session, sctx)
+            networth._create_item_in_session(
+                session,
+                sctx,
+                side=networth.Side(row.side),
+                category_id=lookup.networth[(row.side, name_key(row.category))],
+                name=row.name,
+                notes="",
+                acquired_on=None,
+                link_type="loan_balance",
+                link_id=loan_id,
+                parsed=None,
+                requested_currency=None,
+                as_of=None,
+                valuation_note="",
+                include_in_net_worth=True,
+                investable=False,
+                estimate_between=False,
+            )
+            items += 1
+            continue
         if not row.values:
             continue
         first = row.values[0]
@@ -1032,6 +1063,7 @@ def build_demo_workspace_in_session(
     require_role_now(session, ctx, Role.OWNER)
     if plan.locale != ctx.workspace.locale or plan.base_currency != ctx.workspace.base_currency:
         raise DemoPlanMismatch("the plan was built for another locale or base currency")
+    register_loan_resolvers()  # the net-worth mortgage/car items link to their loans
     CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
     if not archive.workspace_is_empty(session, ctx):
         raise DemoWorkspaceNotEmpty("the workspace is not empty")
@@ -1048,11 +1080,16 @@ def build_demo_workspace_in_session(
         _write_planned_values(session, tctx, plan, lookup)
         _write_recurring(session, tctx, plan, lookup, horizon_months=horizon_months)
         _write_income(session, tctx, plan, lookup)
-        _write_networth(session, tctx, plan, lookup)
+        # Loans first: the net-worth mortgage and car loan are linked to their loan ids (F7.6).
         loan_ids = _write_loans(session, tctx, plan)
+        _write_networth(session, tctx, plan, lookup, loan_ids)
         _write_fire(session, tctx, plan.fire, loan_ids)
         _write_investments(session, tctx, plan, lookup)
         _import_batches, upload_path = _write_import(session, tctx, plan, data_dir)
+
+        # The demo always seeds a tax rule and its income attachment, so Taxes must be on or
+        # the Tax page 404s and the income page hides the attached rule (F3.3/F3.4, F9.11a).
+        CurrentWorkspaceRepository(session, tctx).update(taxes_enabled=True)
 
         # Closed months refuse ledger writes (linked dividend income included), so M-3 is the
         # very last thing the builder does.

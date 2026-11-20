@@ -1670,3 +1670,46 @@ document.addEventListener("click", (event) => {
     window.requestAnimationFrame(updateTableScrollHints);
   }
 });
+
+
+// F11.10: the FIRE projection is one row per year (51 rows on the demo plan). Show the first
+// dozen and let the visitor expand the rest; without JavaScript every row stays visible and the
+// button stays hidden, so no projection data is lost.
+function setupFireYearTables() {
+  document.querySelectorAll("[data-fire-table-section]").forEach((section) => {
+    if (!(section instanceof HTMLElement)) return;
+    const button = section.querySelector("[data-fire-show-all]");
+    if (!(button instanceof HTMLElement) || button.dataset.fireReady === "1") return;
+    const rows = [...section.querySelectorAll("[data-fire-year-extra]")];
+    if (!rows.length) return;
+    rows.forEach((row) => {
+      if (row instanceof HTMLElement) row.hidden = true;
+    });
+    const more = section.querySelector("[data-fire-table-more]");
+    if (more instanceof HTMLElement) more.hidden = false;
+    button.dataset.fireReady = "1";
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = button.dataset.showLabel || "";
+  });
+}
+
+function toggleFireYearTable(button) {
+  const section = button.closest("[data-fire-table-section]");
+  if (!(section instanceof HTMLElement)) return;
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  section.querySelectorAll("[data-fire-year-extra]").forEach((row) => {
+    if (row instanceof HTMLElement) row.hidden = expanded;
+  });
+  button.setAttribute("aria-expanded", expanded ? "false" : "true");
+  button.textContent = expanded ? button.dataset.showLabel || "" : button.dataset.hideLabel || "";
+}
+
+document.addEventListener("DOMContentLoaded", setupFireYearTables);
+for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap", "htmx:load"]) {
+  document.addEventListener(eventName, setupFireYearTables);
+}
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest("[data-fire-show-all]");
+  if (button instanceof HTMLElement) toggleFireYearTable(button);
+});

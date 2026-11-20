@@ -16,7 +16,13 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.repositories import DashboardPreferenceRepository, ImportBatchRepository
+from assetboard.db.repositories import (
+    DashboardPreferenceRepository,
+    ImportBatchRepository,
+    IncomeSourceRepository,
+    InstrumentRepository,
+    NetWorthItemRepository,
+)
 from assetboard.domain.dashboard import (
     DEFAULT_NET_WORTH_RANGE,
     DEFAULT_PORTFOLIO_RANGE,
@@ -98,6 +104,7 @@ class MissingData:
     stale_prices: tuple[MissingPrice, ...]
     missing_work_logs: tuple[MissingWorkLog, ...]
     planned_imports: tuple[PlannedImport, ...]
+    has_data: bool
 
     @property
     def empty(self) -> bool:
@@ -296,6 +303,13 @@ def missing_data(
                 for batch in ImportBatchRepository(session, ctx).awaiting_apply()
                 if batch.status == "planned"
             ]
+        # The checks only make sense once there is something to check. A brand-new workspace
+        # has none of these, so Home must not say "Nothing needs attention" there.
+        has_data = (
+            NetWorthItemRepository(session, ctx).any_exists()
+            or IncomeSourceRepository(session, ctx).any_exists()
+            or InstrumentRepository(session, ctx).any_exists()
+        )
     logs = missing_work_logs(
         factory,
         ctx,
@@ -323,4 +337,5 @@ def missing_data(
         planned_imports=tuple(
             sorted(imports, key=lambda item: (item.created_at, str(item.id)), reverse=True)
         ),
+        has_data=has_data,
     )

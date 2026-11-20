@@ -1,7 +1,7 @@
 <section class="panel p-4 sm:p-6" data-home-widget="missing-data" aria-labelledby="widget-missing-data-heading">
   <h2 id="widget-missing-data-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
   {% if view.empty %}
-  <p class="mt-3 text-sm text-muted" data-empty>{{ _("Nothing needs attention.") }}</p>
+  <p class="mt-3 text-sm text-muted" data-empty{% if not view.has_data %} data-empty-setup{% endif %}>{% if view.has_data %}{{ _("Nothing needs attention.") }}{% else %}{{ _("Add a net-worth value, an income source or an investment to see missing-data checks.") }}{% endif %}</p>
   {% else %}
   <div class="mt-3 grid gap-4 lg:grid-cols-3">
     {% if view.stale_prices %}

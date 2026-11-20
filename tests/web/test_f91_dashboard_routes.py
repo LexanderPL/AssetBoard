@@ -322,7 +322,7 @@ def test_every_widget_renders_without_data(owner: OwnerApp, key: str) -> None:
         ("portfolio-changes", "No portfolio history yet"),
         ("loans", "No active loans yet"),
         ("fire", "No FIRE plan yet"),
-        ("missing-data", "Nothing needs attention."),
+        ("missing-data", "Add a net-worth value"),
     ],
 )
 def test_widget_empty_states(owner: OwnerApp, key: str, empty_text: str) -> None:
