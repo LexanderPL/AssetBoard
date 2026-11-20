@@ -97,18 +97,24 @@ def test_liabilities_only_has_negative_net_and_no_asset_shares() -> None:
     assert summary.liability_categories[0].share_tenths == 1000
 
 
-def test_zero_total_categories_are_left_out() -> None:
+def test_zero_total_categories_remain_without_a_share() -> None:
     zero = uuid4()
     counted = uuid4()
     summary = summarize_net_worth([_item(zero, 0)], currency="EUR")
     assert summary.assets == _eur(0)
     assert summary.net == _eur(0)
-    assert summary.asset_categories == ()
-    # A zero category next to a real one disappears without changing the real total/share.
+    assert [(row.category_id, row.total, row.share_tenths) for row in summary.asset_categories] == [
+        (zero, _eur(0), None)
+    ]
+    # A zero category next to a real one stays in the table without changing the real total.
     summary = summarize_net_worth([_item(zero, 0), _item(counted, 100)], currency="EUR")
     assert summary.assets == _eur(100)
+    assert [row.category_id for row in summary.asset_categories] == [counted, zero]
+    assert summary.asset_categories[1].total == _eur(0)
+    assert summary.asset_categories[1].share_tenths is None
     assert [(row.category_id, row.total, row.share_tenths) for row in summary.asset_categories] == [
-        (counted, _eur(100), 1000)
+        (counted, _eur(100), 1000),
+        (zero, _eur(0), None),
     ]
 
 

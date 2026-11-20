@@ -336,6 +336,8 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
 - Pure domain function `value_portfolio(holdings, prices, fx, allocations, as_of)`; golden test: an 80/20 stock/bond fund of value 1 000.00 contributes 800.00 to Stocks and 200.00 to Bonds, with rounding remainder assigned to the largest class so totals match exactly.
 - **Non-investable classes (owner decision 2026-11-09):** every class counts in the portfolio totals, the class table and the chart. A class with `investable=false` gets a "not counted in FIRE" badge in the class table; nothing is excluded or hidden.
 - **As built (owner review of the plan, 2026-11):**
+  - FIFO `avg_cost` is recomputed from the remaining cost basis and quantity after every buy,
+    sell and split, so a buy-only or buy-sell-buy history shows the current average.
   - A missing **price** is handled like missing FX. In both cases the instrument's value **and its cost basis** are left out of every total (portfolio, classes, shares, chart), so the totals and gain % stay consistent. The row stays with a warning, and a note counts the excluded holdings. A stale price or FX rate is valued, with a badge.
   - Look-through rounding: every class except the largest weight gets `floor(amount × weight / 10 000)`, and the largest gets the remainder. Equal largest weights are broken by the class's sort order, then its id. Value and cost are split separately.
   - Realized P&L: `domain.holdings.realized_events` lists each sell's realized P&L from the same ordered pass as `compute_holdings`. All time is their sum; YTD sums the events dated from 1 January of the workspace's current year. YTD is not computed by subtracting a dated holdings run, which excludes undated legacy lots.
@@ -360,6 +362,9 @@ Property tests: class totals sum exactly to the portfolio total; allocation weig
 ---
 
 ## F6.7 Performance over time and XIRR
+
+**As built:** cash flows that all fall on one date make XIRR undefined (`NO_SOLUTION`); the
+equation no longer depends on the rate.
 
 **Acceptance**
 - `portfolio_series(transactions, prices, fx, start, end, step[day|week|month]) -> list[Point(date, value, net_invested)]`: quantity at each date from transactions ≤ date; price = latest ≤ date (carry forward); FX likewise. Lead gaps (no observation on or before the point) can be backfilled from the earliest later observation when the caller asks for it; the Performance chart does, so it does not open with a zero dip. Genuinely missing data (no observation at all) stays incomplete. `net_invested` = cumulative buys + fees − sell proceeds − net dividends in base currency. Undated legacy lots are excluded from the series and counted in a page note. A point with a held instrument missing a price or FX rate is marked incomplete and leaves both that instrument's value and net invested out.

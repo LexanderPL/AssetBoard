@@ -466,6 +466,12 @@ def _compute_instrument_rows(
     if quantity == 0:
         remaining_cost_minor = 0
         average_cost = Decimal(0)
+    elif method is CostBasisMethod.FIFO:
+        with localcontext() as context:
+            context.prec = max(context.prec, _DECIMAL_PRECISION)
+            average_cost = (
+                Decimal(remaining_cost_minor).scaleb(-minor_unit_for(base_currency)) / quantity
+            )
     return Holding(
         instrument_id=instrument_id,
         quantity=quantize_quantity(quantity),

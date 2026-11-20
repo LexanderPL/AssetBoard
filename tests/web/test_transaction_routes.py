@@ -939,7 +939,10 @@ def test_the_undo_countdown_is_the_time_the_server_still_allows(
     def slow_delete(*args: object) -> service.DeletedTransaction:
         deleted = real_delete(*args)  # type: ignore[arg-type]
         return service.DeletedTransaction(
-            deleted.id, deleted.month, deleted.undo_until - timedelta(seconds=3, milliseconds=500)
+            deleted.id,
+            deleted.month,
+            deleted.undo_until - timedelta(seconds=3, milliseconds=500),
+            can_undo=True,
         )
 
     monkeypatch.setattr(transaction_routes, "delete_transaction", slow_delete)

@@ -295,7 +295,7 @@ def _bar(key: str, planned: Money, actual: Money, expected: Money, locale: str) 
     pending = max(expected.amount_minor, 0)
     forecast = actual.amount_minor + pending
     scale = max(planned.amount_minor, actual.amount_minor, forecast)
-    over = actual.amount_minor > planned.amount_minor
+    over = planned.amount_minor > 0 and actual.amount_minor > planned.amount_minor
     return BarView(
         key=key,
         planned=format_money(planned, locale),
@@ -476,9 +476,10 @@ def build_summary(
                 forecast=forecast,
             )
         tint = OVER_PLAN_TINT.get(key, "")
-        over = r.actual.amount_minor > r.planned.amount_minor
+        over = r.planned.amount_minor > 0 and r.actual.amount_minor > r.planned.amount_minor
         pending_over = (
-            not over
+            r.planned.amount_minor > 0
+            and not over
             and r.expected.amount_minor > 0
             and r.forecast.amount_minor > r.planned.amount_minor
         )

@@ -193,6 +193,8 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     # No plan: no "over plan if everything pending arrives" hint and no difference.
     assert "data-pending-over" not in row and "Over plan" not in row
     assert re.search(r"data-difference>\s*</td>", row)
+    bar = _block(summary, r'data-summary-bar="out".*?</svg>')
+    assert "fill-danger" not in bar and "fill-success" not in bar
     total = _block(summary, r'<tr id="summary-total-expense".*?</tr>')
     assert ">+ €100.00 pending<" in total
     # KPIs: Actual with "+ X pending"; left (here: short) if everything pending arrives.

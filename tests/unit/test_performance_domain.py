@@ -104,6 +104,16 @@ def test_xirr_handles_multiple_flows_and_a_negative_rate() -> None:
     assert losing.rate < 0
 
 
+def test_xirr_is_undefined_for_same_date_flows() -> None:
+    result = xirr(
+        (
+            CashFlow(date(2020, 1, 1), Money(-100_000, "EUR")),
+            CashFlow(date(2020, 1, 1), Money(100_000, "EUR")),
+        )
+    )
+    assert result.reason is XirrFailure.NO_SOLUTION
+
+
 def test_xirr_undefined_reasons() -> None:
     assert xirr(()).reason is XirrFailure.NO_CASHFLOWS
     same_sign = xirr(

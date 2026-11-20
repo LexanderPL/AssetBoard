@@ -174,6 +174,7 @@ class DeletedTransaction:
     id: UUID
     month: YearMonth
     undo_until: datetime  # UTC; undo is refused after this
+    can_undo: bool  # a future-dated tombstone has no undo
 
 
 @dataclass(frozen=True, slots=True)
@@ -828,10 +829,12 @@ def delete_transaction(
             category = CategoryRepository(session, ctx).get_or_raise(row.category_id)
             _audit(session, ctx, "transaction.deleted", row, category)
         assert row.deleted_at is not None
+        today = ctx.clock.today(ctx.workspace.timezone)
         return DeletedTransaction(
             id=row.id,
             month=YearMonth.from_date(row.date),
             undo_until=row.deleted_at + UNDO_WINDOW,
+            can_undo=row.date <= today,
         )
 
     return run_immediate(factory, write)
@@ -896,10 +899,12 @@ def pending_undo(
         today = ctx.clock.today(CurrentWorkspaceRepository(session, ctx).get().timezone)
         if row.date > today:
             return None
+        today = ctx.clock.today(ctx.workspace.timezone)
         return DeletedTransaction(
             id=row.id,
             month=YearMonth.from_date(row.date),
             undo_until=row.deleted_at + UNDO_WINDOW,
+            can_undo=row.date <= today,
         )
 
 

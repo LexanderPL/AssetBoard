@@ -462,6 +462,10 @@ def xirr(cashflows: Sequence[CashFlow], *, day_count: int = 365) -> XirrResult:
         row.amount.amount_minor > 0 for row in rows
     ):
         return XirrResult(None, XirrFailure.NO_SIGN_CHANGE)
+    if len({row.date for row in rows}) == 1:
+        # With every flow on one date the equation is independent of the rate; there is no
+        # meaningful annualised return, even when the flows sum to zero.
+        return XirrResult(None, XirrFailure.NO_SOLUTION)
     first = rows[0].date
     with localcontext() as context:
         context.prec = max(context.prec, _DECIMAL_PRECISION)

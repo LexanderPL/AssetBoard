@@ -538,7 +538,7 @@ async def transaction_delete(
     undo_path = undo.path + (f"?filter={kept}" if kept else "")
     # The toast counts down the time the server still allows, not a fixed ten seconds.
     left = (deleted.undo_until - ctx.clock.now()).total_seconds()
-    seconds = max(0, math.ceil(left))
+    seconds = max(0, math.ceil(left)) if deleted.can_undo else 0
     state = SectionState(focus="entry:day")
     return await run_in_threadpool(
         lambda: _section(
@@ -548,7 +548,7 @@ async def transaction_delete(
             row.direction,
             state,
             status="deleted",
-            toast_undo=undo_path,
+            toast_undo=undo_path if deleted.can_undo else None,
             toast_seconds=seconds,
         )
     )
