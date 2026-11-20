@@ -11238,6 +11238,9 @@ msgid ""
 "is checked before anything is created."
 msgstr ""
 
+msgid "Active Net worth categories on this side:"
+msgstr ""
+
 msgid "Items to add"
 msgstr ""
 

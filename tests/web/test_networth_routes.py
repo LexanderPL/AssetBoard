@@ -446,6 +446,8 @@ def test_bulk_add_is_a_header_action_that_opens_a_dialog(owner: OwnerApp) -> Non
     assert "data-add-item" in actions.group(0) and "data-bulk-open" in actions.group(0)
     dialog = re.search(r'<dialog id="bulk-dialog".*?</dialog>', page, re.DOTALL)
     assert dialog is not None and "data-bulk" in dialog.group(0)
+    assert "Active Net worth categories on this side:" in dialog.group(0)
+    assert "Vehicles" in dialog.group(0)
     opening = re.search(r'<dialog id="bulk-dialog"[^>]*>', page)
     assert opening is not None and " open" not in opening.group(0)
     opened = owner.client.get("/net-worth?side=asset&form=bulk").text
@@ -481,6 +483,17 @@ def test_bulk_preview_reports_an_unknown_category_and_cannot_create(owner: Owner
     created = _htmx(owner, "/net-worth/bulk", {"side": "asset", "text": "Car; 10; Missing"})
     assert created.status_code == 400
     assert "No active category with this name." in created.text
+
+
+def test_bulk_preview_reports_a_category_on_the_other_side(owner: OwnerApp) -> None:
+    preview = _htmx(
+        owner,
+        "/net-worth/bulk/preview",
+        {"side": "asset", "text": "abc; 15; Mortgage"},
+    )
+    assert preview.status_code == 200
+    assert "Choose a category from this tab." in preview.text
+    assert "data-bulk-create" not in preview.text
 
 
 def test_bulk_preview_shows_a_decimal_error(owner: OwnerApp) -> None:

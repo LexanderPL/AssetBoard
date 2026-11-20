@@ -12367,6 +12367,9 @@ msgstr ""
 "używają formatu liczb interfejsu i waluty bazowej obszaru roboczego. Cała"
 " partia jest sprawdzana przed utworzeniem czegokolwiek."
 
+msgid "Active Net worth categories on this side:"
+msgstr "Aktywne kategorie majątku netto po tej stronie:"
+
 msgid "Items to add"
 msgstr "Pozycje do dodania"
 
