@@ -378,6 +378,9 @@ def test_month_widgets_render_actual_data(owner: OwnerApp) -> None:
     income = _fragment(owner, "month-income")
     income_data = _chart_data(income)
     assert [slice_["name"] for slice_ in income_data["slices"]] == ["Salary"]
+    for fragment in (expenses, income):
+        assert "Open month" not in fragment
+        assert 'class="text-xl font-semibold tabular-nums" data-chart-total' in fragment
 
     plan = _fragment(owner, "month-plan")
     assert "data-forecast-line" in plan and "Forecast spent" in plan

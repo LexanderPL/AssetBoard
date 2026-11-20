@@ -7191,9 +7191,6 @@ msgstr "Brakujące dzienniki pracy"
 msgid "Imports waiting to be applied"
 msgstr "Importy oczekujące na zastosowanie"
 
-msgid "Open month"
-msgstr "Otwórz miesiąc"
-
 msgid "Add an expense category and an entry to see this chart."
 msgstr "Dodaj kategorię wydatków i wpis, aby zobaczyć ten wykres."
 

@@ -1,6 +1,6 @@
 {% from "macros/charts.html" import donut as chart_donut with context %}
 {% if donut %}
-{{ chart_donut(donut, inline_json=true, heading=widget_title, link_url=module_url, link_label=_("Open month"), widget_key="month-expenses") }}
+{{ chart_donut(donut, inline_json=true, heading=widget_title, link_url=module_url, widget_key="month-expenses", total_prominent=true) }}
 {% else %}
 <section class="panel p-4 sm:p-6" data-home-widget="month-expenses" aria-labelledby="widget-month-expenses-heading">
   <h2 id="widget-month-expenses-heading" class="text-base font-semibold"><a href="{{ module_url }}" class="underline-offset-2 hover:underline">{{ widget_title }}</a></h2>
