@@ -4314,6 +4314,11 @@ msgid "The starting balance date must be before the next checkpoint."
 msgstr ""
 
 msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
+msgstr ""
+
+msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
 msgstr ""
@@ -9397,6 +9402,9 @@ msgstr ""
 msgid "Starting balance %(amount)s"
 msgstr ""
 
+msgid "Starting balance"
+msgstr ""
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr ""
@@ -10133,9 +10141,6 @@ msgid "Balance"
 msgstr ""
 
 msgid "Projected balance"
-msgstr ""
-
-msgid "Starting balance"
 msgstr ""
 
 msgid "Projected balance unavailable"

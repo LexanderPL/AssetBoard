@@ -212,33 +212,36 @@ def schedule_from_anchor(
     return build_inputs_schedule(replace(inputs, anchor=anchor, as_of=as_of))
 
 
-def _terms_for_anchor(inputs: LoanScheduleInputs) -> LoanTerms:
-    """The terms for a schedule anchored after the loan start.
+def _adjusted_terms(inputs: LoanScheduleInputs, terms: LoanTerms) -> LoanTerms:
+    """Adjust ``terms`` for an anchor after the loan start.
 
-    A checkpoint shortens the remaining term and the remaining interest-only phase by the
-    payments already projected before it. The IO clock therefore still starts at the loan
-    start, not at the checkpoint. At least one amortizing payment must remain.
+    A checkpoint shortens the remaining term by the payments already projected before it.
+    For a non-tranched current-balance loan the IO clock starts at the anchor, so the elapsed
+    payments also shorten the remaining IO phase. Original and tranched loans keep their
+    absolute IO boundary (origination or first transfer), so only the term changes.
     """
-    terms = inputs.terms
     base = _base_anchor(inputs)
     if inputs.anchor.date <= base.date:
         return terms
-    base_schedule = build_inputs_schedule(replace(inputs, anchor=base, terms=terms))
+    base_schedule = build_schedule(
+        inputs.terms,
+        inputs.rate_timeline,
+        inputs.costs,
+        inputs.overpayments,
+        base,
+        inputs.as_of,
+        inputs.strategy,
+        inputs.day_count,
+        inputs.drawdowns,
+    )
     elapsed = sum(1 for row in base_schedule.rows if row.date <= inputs.anchor.date)
     remaining = max(1, terms.term_months - elapsed)
-    # An original loan keeps its absolute IO clock from the origination date; a checkpoint
-    # after the IO phase therefore amortizes immediately. A current-balance loan (no
-    # origination date) starts the clock at its anchor, so subtract the elapsed payments.
-    if terms.origination_date is not None:
+    if terms.origination_date is not None or terms.drawdown_mode is DrawdownMode.TRANCHES:
         io_remaining = 0 if remaining <= terms.interest_only_months else terms.interest_only_months
     else:
         io_remaining = max(0, terms.interest_only_months - elapsed)
         io_remaining = min(io_remaining, max(0, remaining - 1))
-    return replace(
-        terms,
-        term_months=remaining,
-        interest_only_months=io_remaining,
-    )
+    return replace(terms, term_months=remaining, interest_only_months=io_remaining)
 
 
 def build_inputs_schedule(
@@ -250,8 +253,23 @@ def build_inputs_schedule(
     strategy: OverpaymentStrategy | str | None = None,
 ) -> Schedule:
     """Build a schedule from loaded inputs, replacing only what a scenario changes."""
+    adjusted = _adjusted_terms(inputs, inputs.terms)
+    if terms is None:
+        effective_terms = adjusted
+    else:
+        # Apply the caller's overrides on top of the anchor-adjusted contractual terms, so a
+        # baseline or scenario does not silently fall back to the full term from the checkpoint.
+        term_delta = terms.term_months - inputs.terms.term_months
+        io_delta = terms.interest_only_months - inputs.terms.interest_only_months
+        term_months = max(1, adjusted.term_months + term_delta)
+        io_remaining = max(0, adjusted.interest_only_months + io_delta)
+        effective_terms = replace(
+            terms,
+            term_months=term_months,
+            interest_only_months=min(io_remaining, max(0, term_months - 1)),
+        )
     return build_schedule(
-        terms if terms is not None else _terms_for_anchor(inputs),
+        effective_terms,
         rates if rates is not None else inputs.rate_timeline,
         inputs.costs,
         overpayments if overpayments is not None else inputs.overpayments,

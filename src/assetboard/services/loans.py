@@ -700,9 +700,13 @@ def _view(
         ),
         balance_date=latest_checkpoint.as_of if latest_checkpoint is not None else None,
         start_balance=(
-            Money(earliest_checkpoint.remaining_principal_minor, loan.currency)
-            if earliest_checkpoint is not None
-            else _money(loan.principal_original_minor, loan.currency)
+            _money(loan.principal_original_minor, loan.currency)
+            if loan.origination_date is not None
+            else (
+                Money(earliest_checkpoint.remaining_principal_minor, loan.currency)
+                if earliest_checkpoint is not None
+                else None
+            )
         ),
         start_date=loan.origination_date
         or (earliest_checkpoint.as_of if earliest_checkpoint is not None else None),
@@ -1453,6 +1457,11 @@ def update_loan_terms(
             day_count if day_count is not None else loan.day_count
         )
         entry = _entry_path(loan)
+        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+        if entry == "current" and balance_date is not None:
+            ordered = sorted(checkpoints, key=lambda row: (row.as_of, row.id))
+            if len(ordered) > 1 and balance_date >= ordered[1].as_of:
+                raise LoanError("balance_date", "checkpoint_order")
         (
             clean_name,
             wanted_kind,
@@ -1477,7 +1486,6 @@ def update_loan_terms(
             installment_override=installment_override,
             currency=currency,
         )
-        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
         start = wanted_origination if wanted_origination is not None else balance_date
         assert start is not None
         if loan.rate_mode == RateMode.VARIABLE.value:
@@ -1507,13 +1515,25 @@ def update_loan_terms(
         if entry == "current" and (current_balance is None or balance_date is None):
             raise LoanError("current_balance", "invalid_balance")
         today = ctx.clock.today(ctx.workspace.timezone)
+        current_view = _load_loan_view(session, ctx, loan, today)
+        if (
+            entry == "current"
+            and balance_date is not None
+            and current_view.start_date is not None
+            and balance_date > current_view.start_date
+            and any(
+                change.effective_from < balance_date
+                for change in LoanRateChangeRepository(session, ctx).for_loan(loan.id)
+            )
+        ):
+            raise LoanError("balance_date", "starting_date_rate_change")
         reference_values = (
             ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
             if rate_id is not None
             else []
         )
         proposed = replace(
-            _load_loan_view(session, ctx, loan, today),
+            current_view,
             origination_date=wanted_origination,
             balance_date=balance_date if entry == "current" else None,
             first_payment_date=first_date,
@@ -1545,8 +1565,6 @@ def update_loan_terms(
             ordered = sorted(checkpoints, key=lambda row: (row.as_of, row.id))
             if not ordered:
                 raise LoanError("current_balance", "invalid_balance")
-            if len(ordered) > 1 and balance_date >= ordered[1].as_of:
-                raise LoanError("balance_date", "checkpoint_order")
             LoanBalanceCheckpointRepository(session, ctx).update(
                 ordered[0].id,
                 as_of=balance_date,

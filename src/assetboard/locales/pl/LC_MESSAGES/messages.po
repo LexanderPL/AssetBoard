@@ -4659,6 +4659,13 @@ msgstr ""
 "kontrolny."
 
 msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
+msgstr ""
+"Zmiana oprocentowania zaczyna się przed nową datą salda początkowego. "
+"Najpierw ją zmień lub usuń."
+
+msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
 msgstr ""
@@ -10326,6 +10333,9 @@ msgstr "Pierwotny kapitał %(amount)s"
 msgid "Starting balance %(amount)s"
 msgstr "Saldo początkowe %(amount)s"
 
+msgid "Starting balance"
+msgstr "Saldo początkowe"
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr "Wypłacono %(drawn)s z %(approved)s · %(undrawn)s niewypłacone"
@@ -11141,9 +11151,6 @@ msgstr "Saldo"
 
 msgid "Projected balance"
 msgstr "Saldo prognozowane"
-
-msgid "Starting balance"
-msgstr "Saldo początkowe"
 
 msgid "Projected balance unavailable"
 msgstr "Saldo prognozowane niedostępne"

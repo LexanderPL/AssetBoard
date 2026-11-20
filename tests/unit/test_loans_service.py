@@ -214,9 +214,53 @@ def test_a_later_checkpoint_keeps_a_current_balance_loan_usable(team: WorkspaceD
     data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
     assert data.schedule is not None and data.summary is not None
     assert data.summary.remaining_principal.amount_minor > 0
+    assert len(data.schedule.rows) == 57
+    assert data.schedule.rows[-1].date == date(2031, 2, 1)
     checkpoints = loan_payments.list_loan_checkpoints(team.factory, ctx, loan_id)
     assert len(checkpoints) == 2
     assert all(row.error_code is None for row in checkpoints)
+
+
+def test_later_checkpoint_keeps_the_baseline_term(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _current_loan(
+        team,
+        overpayment_mode="fixed_extra",
+        overpayment_amount=_money(10_000),
+    )
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None and data.baseline is not None
+    assert len(data.baseline.rows) == 57
+    assert data.baseline.rows[-1].date == date(2031, 2, 1)
+    assert len(data.schedule.rows) < len(data.baseline.rows)
+
+
+def test_tranched_current_balance_loan_keeps_the_io_clock(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _current_loan(team, interest_only_months=6)
+    loans.convert_loan_to_tranched(team.factory, ctx, loan_id)
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None
+    first_amortizing = next(
+        row.date for row in data.schedule.rows if row.principal.amount_minor > 0
+    )
+    assert first_amortizing == date(2026, 9, 1)
 
 
 def test_terms_edit_keeps_a_later_checkpoint(team: WorkspaceDb) -> None:

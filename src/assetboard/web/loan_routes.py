@@ -150,6 +150,9 @@ ERRORS = {
     "checkpoint_before_start": _("A checkpoint cannot start before the loan."),
     "checkpoint_exists": _("A checkpoint already exists on that date."),
     "checkpoint_order": _("The starting balance date must be before the next checkpoint."),
+    "starting_date_rate_change": _(
+        "A rate change starts before the new starting balance date. Change or remove it first."
+    ),
     "starting_checkpoint_required": _(
         "The starting balance checkpoint is required for a loan entered from its current balance."
     ),
