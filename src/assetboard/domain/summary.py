@@ -401,6 +401,13 @@ def summarize_month(
         p = sum(r.planned.amount_minor for r in block_rows)
         a = sum(r.actual.amount_minor for r in block_rows)
         e = sum(r.expected.amount_minor for r in block_rows)
+        # A category without a plan has nothing to compare with; the block's difference counts
+        # only planned categories, matching the group totals in the Month page.
+        d = sum(
+            difference(key, r.planned.amount_minor, r.actual.amount_minor)
+            for r in block_rows
+            if r.planned.amount_minor > 0
+        )
         blocks.append(
             SummaryBlock(
                 key=key,
@@ -409,7 +416,7 @@ def summarize_month(
                 actual=Money(a, currency),
                 expected=Money(e, currency),
                 forecast=Money(a + e, currency),
-                difference=Money(difference(key, p, a), currency),
+                difference=Money(d, currency),
             )
         )
     totals = {b.key: b.actual.amount_minor for b in blocks}

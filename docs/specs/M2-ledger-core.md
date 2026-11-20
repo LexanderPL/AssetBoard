@@ -380,6 +380,10 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   without a reload.
 
 **As built (F2.4 part A: summary, totals, KPIs, bars, sort; filtering by category is part B)**
+
+- A block's difference counts only planned categories; a category without a plan contributes
+  no difference, tint or "over plan" hint, and its bar stays neutral. A future-dated tombstone's
+  HTMX delete toast offers no Undo; the one-time plan item is edited or deleted instead.
 - `domain.summary.summarize_month(transactions, budget_lines, categories, *, currency, sort)`
   is pure and takes domain dataclasses (`Entry`, `PlanLine`, `SummaryCategory`; categories in
   the user's order), not ORM rows; `services.summary.month_summary` reads the month's

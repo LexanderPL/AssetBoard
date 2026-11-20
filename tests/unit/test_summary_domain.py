@@ -142,6 +142,17 @@ def test_positive_difference_is_always_favourable(
     assert difference(key, planned, actual) == expected  # type: ignore[arg-type]
 
 
+def test_block_difference_ignores_unplanned_categories() -> None:
+    planned, unplanned = _category(), _category()
+    summary = summarize_month(
+        [Entry(unplanned.id, _eur(500))],
+        [PlanLine(planned.id, _eur(100))],
+        [planned, unplanned],
+        currency="EUR",
+    )
+    assert summary.block("expense").difference == _eur(100)
+
+
 def test_rows_cover_planned_actual_and_active_categories_only() -> None:
     planned_only, actual_only, idle = _category(), _category(), _category()
     old_with_actual, old_idle = _category(archived=True), _category(archived=True)
@@ -278,7 +289,9 @@ def test_totals_equal_the_sum_of_rows_and_transfers_never_appear(
         assert block.actual.amount_minor == sum(r.actual.amount_minor for r in block.rows)
         assert block.expected.amount_minor == sum(r.expected.amount_minor for r in block.rows)
         assert block.forecast.amount_minor == sum(r.forecast.amount_minor for r in block.rows)
-        assert block.difference.amount_minor == sum(r.difference.amount_minor for r in block.rows)
+        assert block.difference.amount_minor == sum(
+            r.difference.amount_minor for r in block.rows if r.planned.amount_minor > 0
+        )
         for row in block.rows:
             assert kinds[row.category_id][1] != "transfer"
             assert block_of(*kinds[row.category_id]) == block.key

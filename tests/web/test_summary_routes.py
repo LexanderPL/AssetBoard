@@ -180,6 +180,9 @@ def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
     assert bars == ["500", "0"]  # out with no plan: actual is the scale (500 wide); nothing in
     assert "data-bar-planned" not in block  # nothing planned: no plan line
     assert "Out €10.00 (no plan)" in block and "In €0.00 (no plan)" in block
+    out_bar = re.search(r'data-summary-bar="out".*?</svg>', block, re.S)
+    assert out_bar is not None
+    assert "fill-danger" not in out_bar.group(0) and "fill-success" not in out_bar.group(0)
     assert "(over plan)" not in block and "of €0.00 planned" not in block
     # Nothing came in: the strip is all shortfall, the bar all spent; "Short by" in the header.
     assert _strip(block) == {"short": (0, 1000)}

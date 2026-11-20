@@ -645,6 +645,8 @@ def test_undo_is_refused_for_a_future_dated_tombstone(team: WorkspaceDb) -> None
     _convert(team, view, day="2026-12-24")
     editor = team.ctx("ed", "editor")
     assert pending_undo(team.factory, team.ctx("vic", "viewer"), view.id) is None
+    deleted = delete_transaction(team.factory, editor, view.id)
+    assert deleted.can_undo is False
     with pytest.raises(UndoFutureDated):
         undo_delete(team.factory, editor, view.id)
     with team.factory() as session:

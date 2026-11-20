@@ -331,6 +331,41 @@ def test_average_cost_is_unchanged_by_a_partial_sale_and_removes_exact_cost() ->
     assert holding.realized_pnl == Money(8_332, BASE)
 
 
+def test_fifo_average_cost_is_set_on_buys() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _buy(instrument, "10", "200", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows, "fifo")
+    assert holding.avg_cost == Decimal("150")
+
+
+def test_fifo_average_cost_updates_after_a_split_and_buy() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _split(instrument, "2", "1", day=date(2026, 2, 1)),
+        _buy(instrument, "10", "200", day=date(2026, 3, 1)),
+    ]
+    holding = _holding(rows, "fifo")
+    assert holding.quantity == Decimal("30")
+    assert holding.cost_basis_base == Money(300_000, BASE)
+    assert holding.avg_cost.quantize(Decimal("0.01")) == Decimal("100.00")
+
+
+def test_fifo_average_cost_updates_after_a_sale_and_rebuy() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _sell(instrument, "5", "150", day=date(2026, 2, 1)),
+        _buy(instrument, "10", "200", day=date(2026, 3, 1)),
+    ]
+    holding = _holding(rows, "fifo")
+    assert holding.cost_basis_base == Money(250_000, BASE)
+    assert holding.avg_cost.quantize(Decimal("0.01")) == Decimal("166.67")
+
+
 def test_fifo_consumes_the_first_lot_and_rounds_only_the_partial_lot() -> None:
     instrument = uuid4()
     rows = [
@@ -357,6 +392,7 @@ def test_selling_everything_returns_zero_cost_for_both_methods() -> None:
         holding = _holding(rows, method)
         assert holding.quantity == 0
         assert holding.cost_basis_base == Money(0, BASE)
+        assert holding.avg_cost == Decimal(0)
 
 
 def test_fractional_quantity_is_kept_exactly() -> None:
@@ -653,6 +689,7 @@ def test_a_mixed_history_sold_to_zero_has_zero_cost(
         holding = compute_holdings(rows, method, base_currency=BASE)[0]
         assert holding.quantity == 0
         assert holding.cost_basis_base == Money(0, BASE)
+        assert holding.avg_cost == Decimal(0)
 
 
 @given(_mixed_history())

@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from datetime import date
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from babel.messages.pofile import read_po
@@ -177,6 +177,36 @@ def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
     (row,) = _rows(ledger)
     assert (str(row.date), row.amount_minor, row.currency) == ("2026-08-31", 1250, "EUR")
     assert "Entry added." in _page(ledger, "/transactions/2026-08?notice=transaction_added")
+
+
+def test_a_future_dated_tombstone_has_no_undo_toast(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    row_id = uuid4()
+    with ledger.db() as session, session.begin():
+        session.add(
+            Transaction(
+                id=row_id,
+                workspace_id=ledger.home_id,
+                direction="expense",
+                date=date(2026, 12, 24),
+                amount_minor=1250,
+                currency="EUR",
+                category_id=food,
+                description="Future",
+                description_key="future",
+                source="manual",
+            )
+        )
+    token = ledger.token(PAGE)
+    response = ledger.client.post(
+        f"/m/2026-10/transactions/{row_id}/delete",
+        data={"csrf_token": token},
+        headers={"HX-Request": "true"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 200
+    assert "data-toast-strict" not in response.text
+    assert "data-toast-undo" not in response.text
 
 
 def test_a_future_dated_entry_is_planned_as_a_one_time_item(ledger: OwnerApp) -> None:
@@ -939,7 +969,10 @@ def test_the_undo_countdown_is_the_time_the_server_still_allows(
     def slow_delete(*args: object) -> service.DeletedTransaction:
         deleted = real_delete(*args)  # type: ignore[arg-type]
         return service.DeletedTransaction(
-            deleted.id, deleted.month, deleted.undo_until - timedelta(seconds=3, milliseconds=500)
+            deleted.id,
+            deleted.month,
+            deleted.undo_until - timedelta(seconds=3, milliseconds=500),
+            can_undo=True,
         )
 
     monkeypatch.setattr(transaction_routes, "delete_transaction", slow_delete)

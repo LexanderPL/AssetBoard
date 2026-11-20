@@ -46,7 +46,7 @@ class CategoryTotal:
     category_id: UUID
     side: Side
     total: Money
-    share_tenths: int | None  # None when the side total is zero
+    share_tenths: int | None  # None when the side or the category total is zero
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +103,7 @@ def summarize_net_worth(items: Iterable[SummaryItem], *, currency: str) -> NetWo
         rows = [
             (category_id, amount, order)
             for (row_side, category_id), amount in category_totals.items()
-            if row_side is side and amount != 0
+            if row_side is side
             for order in (category_order[(row_side, category_id)],)
         ]
         rows.sort(key=lambda row: (-row[1], row[2]))
@@ -112,7 +112,9 @@ def summarize_net_worth(items: Iterable[SummaryItem], *, currency: str) -> NetWo
                 category_id=category_id,
                 side=side,
                 total=Money(amount, currency),
-                share_tenths=(share_tenths(amount, side_total) if side_total > 0 else None),
+                share_tenths=(
+                    share_tenths(amount, side_total) if side_total > 0 and amount != 0 else None
+                ),
             )
             for category_id, amount, _order in rows
         )
