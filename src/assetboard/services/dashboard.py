@@ -28,10 +28,23 @@ from assetboard.domain.dashboard import (
     clean_upcoming_limit,
     clean_widgets,
 )
+from assetboard.domain.networth_history import normalize_history_range
 from assetboard.services.context import Context, Role, has_role, require_role, require_role_now
+from assetboard.services.home_cache import cache_generation, cache_get, cache_put
 from assetboard.services.income import missing_work_logs
 from assetboard.services.months import current_month
-from assetboard.services.portfolio import current_portfolio_data_in_session
+from assetboard.services.networth_history import NetWorthHistoryData, networth_history
+from assetboard.services.performance import (
+    VALUE_RANGES,
+    PerformancePage,
+    normalize_value_range,
+    performance_page,
+)
+from assetboard.services.portfolio import (
+    PortfolioPage,
+    current_portfolio_data_in_session,
+    portfolio_page,
+)
 
 __all__ = [
     "DashboardPreferences",
@@ -39,6 +52,9 @@ __all__ = [
     "MissingPrice",
     "MissingWorkLog",
     "PlannedImport",
+    "home_net_worth_history",
+    "home_portfolio_history",
+    "home_portfolio_page",
     "missing_data",
     "read_dashboard_preferences",
     "reset_dashboard_preferences",
@@ -161,6 +177,73 @@ def reset_dashboard_preferences(factory: sessionmaker[Session], ctx: Context) ->
         DashboardPreferenceRepository(session, ctx).delete_for_user(ctx.user.id)
 
     run_immediate(factory, write)
+
+
+def home_net_worth_history(
+    factory: sessionmaker[Session], ctx: Context, range_code: str
+) -> NetWorthHistoryData:
+    """The Home net-worth trend for one range, cached per workspace/date/range.
+
+    The range is applied before the read: a one-year widget loads one year of valuations plus
+    each item's carry-forward value, never the all-time series. Any committed net-worth write
+    invalidates the cache before the next request (``services.home_cache``).
+    """
+    require_role(ctx, Role.VIEWER)
+    code = normalize_history_range(range_code)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    key = ("net-worth", ctx.workspace.id, today, code)
+    cached = cache_get(key, now=ctx.clock.now())
+    if isinstance(cached, NetWorthHistoryData):
+        return cached
+    generation = cache_generation()
+    data = networth_history(factory, ctx, code)
+    cache_put(key, data, generation=generation, now=ctx.clock.now())
+    return data
+
+
+def home_portfolio_history(
+    factory: sessionmaker[Session], ctx: Context, range_code: str
+) -> PerformancePage:
+    """The Home portfolio history for one range, cached per workspace/date/range.
+
+    The chart-only read (no period table) loads prices and FX from the range start plus each
+    series' latest observation before it. Any committed investment write invalidates the cache.
+    """
+    require_role(ctx, Role.VIEWER)
+    code = normalize_value_range(range_code)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    key = ("portfolio-history", ctx.workspace.id, today, code)
+    cached = cache_get(key, now=ctx.clock.now())
+    if isinstance(cached, PerformancePage):
+        return cached
+    generation = cache_generation()
+    page = performance_page(
+        factory,
+        ctx,
+        range_code=code,
+        ranges=VALUE_RANGES,
+        with_periods=False,
+    )
+    cache_put(key, page, generation=generation, now=ctx.clock.now())
+    return page
+
+
+def home_portfolio_page(factory: sessionmaker[Session], ctx: Context) -> PortfolioPage:
+    """The Home portfolio valuation for one workspace/date, cached until an investment write.
+
+    The risk block is viewer-specific (age and policy), so the key includes the user even though
+    the Home widget only renders value and gain.
+    """
+    require_role(ctx, Role.VIEWER)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    key = ("portfolio", ctx.workspace.id, ctx.user.id, today)
+    cached = cache_get(key, now=ctx.clock.now())
+    if isinstance(cached, PortfolioPage):
+        return cached
+    generation = cache_generation()
+    page = portfolio_page(factory, ctx)
+    cache_put(key, page, generation=generation, now=ctx.clock.now())
+    return page
 
 
 def missing_data(

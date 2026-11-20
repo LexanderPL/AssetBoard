@@ -28,6 +28,7 @@ from assetboard.domain.dashboard import (
     complete_order,
     move_widget,
 )
+from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
@@ -39,20 +40,22 @@ from assetboard.i18n.numbers import (
 )
 from assetboard.services import occurrences
 from assetboard.services.context import Context, Role, has_role
-from assetboard.services.dashboard import MissingData, missing_data, read_dashboard_preferences
+from assetboard.services.dashboard import (
+    MissingData,
+    home_net_worth_history,
+    home_portfolio_history,
+    home_portfolio_page,
+    missing_data,
+    read_dashboard_preferences,
+)
 from assetboard.services.fire_projection import results_for_detail
 from assetboard.services.fire_scenarios import get_fire_plan_if_any
 from assetboard.services.loans import LoanPage, list_loans
 from assetboard.services.months import current_month, get_month
-from assetboard.services.networth_history import networth_history
-from assetboard.services.networth_summary import networth_summary
-from assetboard.services.performance import VALUE_RANGES, normalize_value_range, performance_page
-from assetboard.services.portfolio import portfolio_page
 from assetboard.services.portfolio_changes import ValueChange, portfolio_changes
 from assetboard.web.charts import build_class_donut, build_donut, build_performance_chart
 from assetboard.web.networth_history import RANGE_LABELS as NET_WORTH_RANGE_LABELS
 from assetboard.web.networth_history import build_trend_view
-from assetboard.web.networth_summary import build_summary_view
 from assetboard.web.plan import SummaryView, build_summary
 from assetboard.web.rendering import scoped_url
 
@@ -145,6 +148,14 @@ class CustomiseView:
     portfolio_range_options: tuple[tuple[str, str], ...]
     net_worth_range: str
     net_worth_range_options: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class HomeNetWorthView:
+    """The Home header figure; the full summary page carries the category detail."""
+
+    net: str
+    net_tone: Literal["favourable", "unfavourable", "neutral"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,15 +303,23 @@ def build_net_worth(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
     preferences = read_dashboard_preferences(factory, ctx)
-    data = networth_summary(factory, ctx)
-    trend = build_trend_view(networth_history(factory, ctx, preferences.net_worth_range), locale)
-    return {"view": build_summary_view(data, locale), "trend": trend}
+    data = home_net_worth_history(factory, ctx, preferences.net_worth_range)
+    trend = build_trend_view(data, locale)
+    net = data.points[-1].net if data.points else Money(0, data.base_currency)
+    tone: Literal["favourable", "unfavourable", "neutral"] = (
+        "favourable"
+        if net.amount_minor > 0
+        else "unfavourable"
+        if net.amount_minor < 0
+        else "neutral"
+    )
+    return {"view": HomeNetWorthView(net=format_money(net, locale), net_tone=tone), "trend": trend}
 
 
 def build_portfolio(request: Request, ctx: Context) -> dict[str, object]:
     factory = request.app.state.session_factory
     locale = request.state.locale
-    page = portfolio_page(factory, ctx)
+    page = home_portfolio_page(factory, ctx)
     return {
         "page": page,
         "donut": build_class_donut(page, locale),
@@ -319,13 +338,7 @@ def build_portfolio_history(request: Request, ctx: Context) -> dict[str, object]
     factory = request.app.state.session_factory
     locale = request.state.locale
     preferences = read_dashboard_preferences(factory, ctx)
-    history_page = performance_page(
-        factory,
-        ctx,
-        range_code=normalize_value_range(preferences.portfolio_range),
-        ranges=VALUE_RANGES,
-        with_periods=False,
-    )
+    history_page = home_portfolio_history(factory, ctx, preferences.portfolio_range)
     chart = build_performance_chart(history_page, locale)
     history = PortfolioHistoryView(
         chart=chart,
@@ -765,6 +778,7 @@ __all__ = [
     "ChangeView",
     "CustomiseView",
     "CustomiseWidgetView",
+    "HomeNetWorthView",
     "HomeView",
     "HomeWidgetView",
     "LoanRowView",
