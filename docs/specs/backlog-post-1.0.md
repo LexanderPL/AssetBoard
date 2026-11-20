@@ -73,7 +73,7 @@ mapping profiles, dedupe and category suggestions. Synthetic sample CSVs for tes
 ## Public read-only demo (future hardening)
 
 > **Status (DOC-06, 2026-11-20): not shipped, not scheduled.** The 1.0 demo mode is writable and
-> operator-only (`ASSETBOARD_DEMO_ENABLED`; see [Demo workspace](../demo-mode.md)). This item
+> operator-enabled (`ASSETBOARD_DEMO_ENABLED`; see [Demo workspace](../demo-mode.md)). This item
 > describes a stricter public showcase proposed before that mode existed: read-only, an
 > instance-admin toggle and a separate demo principal. It is kept as a possible future
 > hardening of the public demo, not as a description of 1.0 behaviour. Building it would

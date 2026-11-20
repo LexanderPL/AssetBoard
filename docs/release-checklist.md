@@ -7,12 +7,12 @@ and tag named in that step; record the command and result in the
 [execution record](#execution-record).
 
 **Release hold (2026-11-20).** The owner's v1.0 hold remains in place: `main` keeps the
-pre-alpha README status, the draft release PR #397 is based on an older `main`, and no tag or
-image has been published. Do not merge #397, change the README status, tag or publish while the
+pre-alpha README status, the draft release PR #397 is based on an older `main`, and no v1.0
+tag or image has been published. Do not merge #397, change the README status, tag or publish while the
 hold is in place. When the owner lifts it, merge current `main` into #397 (keeping the 1.0
 README/changelog), resolve the version files, then run this checklist.
 
-Target: `v1.0.0`, from the previous release tag `v0.8.3`, with the image
+Target: `v1.0.0`, from the previous release tag `v0.8.5`, with the image
 `ghcr.io/lexanderpl/assetboard` for `linux/amd64` and `linux/arm64`.
 
 F9.7 (documentation, screenshots and the i18n completeness report) is a required pre-tag step
@@ -61,7 +61,7 @@ data directory into the test.
 ```bash
 export VERSION=1.0.0
 export IMAGE=ghcr.io/lexanderpl/assetboard
-export PREVIOUS_TAG=v0.8.3
+export PREVIOUS_TAG=v0.8.5
 git checkout <release-pr-merge-commit>
 docker build --build-arg VERSION=v${VERSION} -t assetboard:release-candidate .
 ```
@@ -279,7 +279,7 @@ reason.
 | 0 | Unit, browser and security checks | `make check`, browser pytest, Security workflow |  |  |
 | 1 | Release PR is 1.0.0 | PR link, version files diff |  |  |
 | 2 | Candidate fresh install | `release_checks.sh fresh-install assetboard:release-candidate` |  |  |
-| 2 | Candidate upgrade from v0.8.3 | `release_checks.sh upgrade …` |  |  |
+| 2 | Candidate upgrade from v0.8.5 | `release_checks.sh upgrade …` |  |  |
 | 2 | Candidate backup/restore | `release_checks.sh backup-restore …` |  |  |
 | 2 | Candidate forward-only migration | `release_checks.sh upgrade … --require-migration` |  |  |
 | 3 | Tag and publish | Release Please run, Docker workflow run |  |  |

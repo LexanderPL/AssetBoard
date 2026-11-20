@@ -114,8 +114,9 @@ A CLI password reset does not remove your second factor.
   account, so it follows you across workspaces; Home always stays first and shown. Hiding a
   page only removes its link: the page
   remains reachable by its address, and it is not a permission change. A page whose feature the
-  workspace has not enabled, such as Taxes, stays hidden there whatever your choice, and its
-  routes answer 404 while the feature is off. Without JavaScript, moving a page saves the new
+  workspace has not enabled, such as Taxes, stays hidden there whatever your choice; its pages
+  and forms answer 404 while the feature is off, and the legacy calculator URL redirects to the
+  Taxes page, which then answers 404. Without JavaScript, moving a page saves the new
   order immediately.
 
 ## Sign-in methods

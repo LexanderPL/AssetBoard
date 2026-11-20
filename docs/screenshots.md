@@ -65,9 +65,9 @@ Search, filters and the paginated list of all entries.
 
 ## Reports
 
-The first viewport: filters and the income vs expenses chart. The savings rate, category,
-year-over-year, plan-accuracy, net-worth and portfolio-history sections continue below these
-images, so they are not visible here.
+The first viewport: filters, and on desktop the start of the income vs expenses chart. The
+savings rate, category, year-over-year, plan-accuracy, net-worth and portfolio-history sections
+continue below these images, so they are not visible here.
 
 > [!NOTE]
 > DOC-02 follow-up: the capture script takes a viewport screenshot, so the net-worth and
