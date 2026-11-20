@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from assetboard import app as app_module
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import (
+    AuditEvent,
     InstanceSettings,
     User,
     UserSession,
@@ -218,6 +219,14 @@ def test_admin_panel_resets_now_and_hides_the_demo_account(
         assert "The demo workspace was rebuilt." in response.text
         with app.state.session_factory() as session:
             assert session.scalars(select(User).where(User.is_demo.is_(True))).one()
+            admin_id = session.scalars(select(User.id).where(User.email == web.admin_email)).one()
+            event = session.scalars(
+                select(AuditEvent).where(
+                    AuditEvent.action == "demo.reset",
+                    AuditEvent.actor_user_id == admin_id,
+                )
+            ).first()
+            assert event is not None
 
 
 def test_turning_demo_off_revokes_sessions_and_offers_delete(

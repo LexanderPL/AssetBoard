@@ -58,6 +58,8 @@ def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
     assert download_page.status_code == 200
     assert 'data-backup-confirm="download"' in download_page.text
     assert files[0].name in download_page.text
+    assert download_page.headers["content-type"].startswith("text/html")
+    assert not download_page.content.startswith(b"SQLite format 3\x00")
     download = owner.post(
         f"/admin/backups/{run_id}",
         {"confirm_password": ADMIN_PASSWORD},
@@ -81,6 +83,14 @@ def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
         ).all()
         assert all(event.workspace_id is None for event in events)
         assert {event.actor_user_id for event in events} == {owner.admin_id}
+        created = next(event for event in events if event.action == "backup.created")
+        assert created.entity_type == "backup"
+        assert created.entity_id == str(run_id)
+        assert created.data == {"origin": "manual"}
+        downloaded = next(event for event in events if event.action == "backup.downloaded")
+        assert downloaded.entity_type == "backup"
+        assert downloaded.entity_id == str(run_id)
+        assert downloaded.data == {}
 
 
 def test_back_up_now_requires_confirmation(owner: OwnerApp) -> None:
@@ -110,6 +120,9 @@ def test_backup_download_requires_confirmation(owner: OwnerApp) -> None:
     response = owner.post(f"/admin/backups/{run_id}", token_from=f"/admin/backups/{run_id}")
     assert response.status_code == 401
     assert "The password is not correct." in response.text
+    settings = owner.app.state.settings
+    files = list((settings.data_dir / "backups").glob("assetboard-manual-*.db"))
+    assert len(files) == 1 and files[0].name in response.text
     with owner.db() as session:
         assert (
             session.scalars(
@@ -211,7 +224,14 @@ def test_backup_routes_need_an_instance_administrator(owner: OwnerApp) -> None:
     try:
         assert owner.client.get("/admin/settings").status_code == 403
         assert owner.client.get("/admin/backups/now").status_code == 403
-        assert owner.client.post("/admin/backups/now", data={}).status_code == 403
+        assert owner.client.get(f"/admin/backups/{uuid4()}").status_code == 403
+        token = owner.token("/")
+        assert (
+            owner.client.post(
+                "/admin/backups/now", data={"csrf_token": token}, follow_redirects=False
+            ).status_code
+            == 403
+        )
     finally:
         with owner.db() as session, session.begin():
             session.execute(

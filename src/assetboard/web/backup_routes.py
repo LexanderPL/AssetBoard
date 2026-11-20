@@ -1,7 +1,7 @@
 """Instance administrator backup actions (F9.4).
 
-* ``GET /admin/backups/now`` and ``POST``: confirm, then make a manual copy.
-* ``GET /admin/backups/{run_id}`` and ``POST``: confirm, then download one successful copy.
+* ``GET /admin/backups/now``: the confirmation page; ``POST``: confirm, then make a copy.
+* ``GET /admin/backups/{run_id}``: the confirmation page; ``POST``: confirm, then download.
 * ``POST`` actions require the administrator's password (or a fresh external sign-in) through
   the shared confirmation path, and record instance-level ``backup.created`` /
   ``backup.downloaded`` audit events.
@@ -220,6 +220,8 @@ async def backup_download_file(
     outcome = await confirm_only(
         request, current, purpose="backup_download", password=confirm_password
     )
+    state = request.app.state
+    found = await run_in_threadpool(download_path, state.session_factory, state.settings, run_id)
     if outcome.status != "confirmed":
         refused = refusal(request, outcome)
         page = await _confirm_page(
@@ -229,15 +231,15 @@ async def backup_download_file(
             title=_t(request, BACKUP_DOWNLOAD_TITLE),
             explanation=_t(request, BACKUP_DOWNLOAD_EXPLANATION),
             action_url=scoped_url(request, "backup_download_file", run_id=str(run_id)),
+            filename=found[1] if found is not None else None,
             error=refused.message,
             status_code=refused.status_code,
         )
         return _refused(page, refused)
-    state = request.app.state
-    found = await run_in_threadpool(download_path, state.session_factory, state.settings, run_id)
     if found is None:
         raise HTTPException(status_code=404)
     path, filename = found
+    # "Downloaded" means authorised and served; an aborted client read still leaves the event.
     await run_in_threadpool(_record, request, current, "backup.downloaded", run_id)
     return FileResponse(
         path,

@@ -670,6 +670,9 @@ async def demo_reset_now(request: Request, confirm_password: FormStr = "") -> Re
         state.clock,
         state.settings.data_dir,
         reason="manual",
+        actor_id=current.user_id,
+        host=client_host(request),
+        user_agent=request.headers.get("user-agent"),
     )
     if result.ok:
         return await _settings_page(request, current, notice=_t(request, DEMO_RESET_DONE))

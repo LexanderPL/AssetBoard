@@ -1394,6 +1394,21 @@ msgstr ""
 msgid "changing instance settings"
 msgstr ""
 
+msgid "creating a backup"
+msgstr ""
+
+msgid "downloading a backup"
+msgstr ""
+
+msgid "resetting the demo workspace"
+msgstr ""
+
+msgid "deleting the demo workspace"
+msgstr ""
+
+msgid "manual"
+msgstr ""
+
 msgid "name"
 msgstr ""
 

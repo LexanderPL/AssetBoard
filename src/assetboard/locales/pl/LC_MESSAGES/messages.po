@@ -1412,6 +1412,21 @@ msgstr "utworzenie konta"
 msgid "changing instance settings"
 msgstr "zmiana ustawień instancji"
 
+msgid "creating a backup"
+msgstr "tworzenie kopii zapasowej"
+
+msgid "downloading a backup"
+msgstr "pobieranie kopii zapasowej"
+
+msgid "resetting the demo workspace"
+msgstr "resetowanie obszaru demonstracyjnego"
+
+msgid "deleting the demo workspace"
+msgstr "usuwanie obszaru demonstracyjnego"
+
+msgid "manual"
+msgstr "ręczne"
+
 msgid "name"
 msgstr "nazwa"
 

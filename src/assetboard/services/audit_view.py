@@ -599,6 +599,13 @@ PURPOSE_LABELS: dict[str, str] = {
     "admin_demote": _("removing the administrator role"),
     "admin_create_user": _("creating an account"),
     "admin_settings": _("changing instance settings"),
+    "backup_create": _("creating a backup"),
+    "backup_download": _("downloading a backup"),
+    "demo_reset": _("resetting the demo workspace"),
+    "demo_delete": _("deleting the demo workspace"),
+}
+ORIGIN_LABELS: dict[str, str] = {
+    "manual": _("manual"),
 }
 FIELD_LABELS: dict[str, str] = {
     "name": _("name"),
@@ -676,6 +683,7 @@ VALUE_TABLES: dict[str, dict[str, str]] = {
     "via": METHOD_LABELS,
     "confirmed": METHOD_LABELS,
     "source": METHOD_LABELS,
+    "origin": ORIGIN_LABELS,
     "scope": METHOD_LABELS,
     "purpose": PURPOSE_LABELS,
     "fields": FIELD_LABELS,
