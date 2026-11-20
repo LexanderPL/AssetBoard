@@ -17,6 +17,7 @@ from assetboard.domain.reports import (
     CategorySeries,
     CategorySpend,
     LedgerEntry,
+    PeriodTotals,
     PlannedMonth,
     ReportCategory,
     ReportStep,
@@ -25,7 +26,7 @@ from assetboard.domain.reports import (
     plan_accuracy,
     rolling_category_averages,
     year_grid,
-    year_over_year,
+    year_over_year_table,
 )
 
 FOOD = ReportCategory(uuid4(), "expense", "regular", "Food", "#16a34a")
@@ -262,66 +263,99 @@ def test_property_each_rolling_average_is_the_window_sum_over_its_length(
 # Year over year
 
 
-def yearly_series(
-    current: int, previous: int, *, category: ReportCategory = FOOD
-) -> CategorySeries:
-    row = CategorySpend(
-        category_id=category.id,
-        name=category.name,
-        color=category.color,
-        amounts=(Money(previous, "EUR"), Money(current, "EUR")),
-        total=Money(previous + current, "EUR"),
-        archived=category.archived,
-    )
-    return CategorySeries(
-        (2025, 2026), (row,), (Money(previous, "EUR"), Money(current, "EUR")), row.total
+def totals(year: int, month: int, earned: int, spent: int) -> PeriodTotals:
+    return PeriodTotals(
+        YearMonth(year, month),
+        Money(earned, "EUR"),
+        Money(spent, "EUR"),
+        Money(0, "EUR"),
+        Money(earned - spent, "EUR"),
     )
 
 
-def test_year_over_year_compares_a_category() -> None:
-    yoy = year_over_year(yearly_series(1_200, 1_000), year=2026, category_id=FOOD.id)
-    assert (yoy.current, yoy.previous, yoy.change) == (
-        Money(1_200, "EUR"),
-        Money(1_000, "EUR"),
-        Money(200, "EUR"),
+def test_year_over_year_table_has_one_row_per_year_and_separate_changes() -> None:
+    periods = [totals(2025, month, 1_000, 500) for month in range(1, 13)]
+    periods += [totals(2026, 1, 1_500, 700), totals(2026, 2, 1_500, 700)]
+    table = year_over_year_table(
+        periods,
+        start_year=2025,
+        end_year=2026,
+        today=date(2026, 2, 14),
+        currency="EUR",
     )
-    assert yoy.change_tenths == 200  # +20.0 %
-    assert yoy.name == "Food" and yoy.color == "#16a34a" and not yoy.archived
-    assert yoy.year == 2026 and yoy.previous_year == 2025
+    assert [row.year for row in table.rows] == [2025, 2026]
+    first, current = table.rows
+    assert first.earned == Money(12_000, "EUR")
+    assert first.spent == Money(6_000, "EUR")
+    assert first.earned_change == Money(12_000, "EUR")
+    assert first.spent_change == Money(6_000, "EUR")
+    assert first.earned_change_tenths is None and first.spent_change_tenths is None
+    assert not first.partial
+
+    # 2026 is compared with January-February 2025, not with that year's full total.
+    assert current.earned == Money(3_000, "EUR")
+    assert current.spent == Money(1_400, "EUR")
+    assert current.earned_change == Money(1_000, "EUR")
+    assert current.spent_change == Money(400, "EUR")
+    assert current.earned_change_tenths == 500  # +50.0 %
+    assert current.spent_change_tenths == 400  # +40.0 %
+    assert current.partial
+    assert table.earned == Money(15_000, "EUR")
+    assert table.spent == Money(7_400, "EUR")
 
 
-def test_year_over_year_total_uses_the_column_totals() -> None:
-    yoy = year_over_year(yearly_series(1_200, 1_000), year=2026)
-    assert yoy.category_id is None
-    assert yoy.current == Money(1_200, "EUR") and yoy.previous == Money(1_000, "EUR")
-    assert yoy.change_tenths == 200
+def test_year_over_year_table_handles_a_zero_previous_year_and_rounding() -> None:
+    periods = [totals(2026, 1, 1_000, 300)]
+    table = year_over_year_table(
+        periods,
+        start_year=2026,
+        end_year=2026,
+        today=date(2026, 10, 14),
+        currency="EUR",
+    )
+    row = table.rows[0]
+    assert row.earned_change == Money(1_000, "EUR")
+    assert row.spent_change == Money(300, "EUR")
+    assert row.earned_change_tenths is None and row.spent_change_tenths is None
+
+    previous = [totals(2025, 1, 300, 1_000)]
+    down = year_over_year_table(
+        previous + periods,
+        start_year=2026,
+        end_year=2026,
+        today=date(2026, 10, 14),
+        currency="EUR",
+    ).rows[0]
+    assert down.earned_change_tenths == 2_333  # +233.3 %
+    assert down.spent_change_tenths == -700  # -70.0 %
 
 
-def test_year_over_year_percent_is_none_when_the_previous_year_was_zero() -> None:
-    yoy = year_over_year(yearly_series(500, 0), year=2026)
-    assert yoy.previous == Money(0, "EUR") and yoy.change == Money(500, "EUR")
-    assert yoy.change_tenths is None and not yoy.available
+def test_year_over_year_table_omits_future_years_and_keeps_empty_years() -> None:
+    periods = [totals(2024, 1, 500, 100), totals(2026, 1, 800, 200)]
+    table = year_over_year_table(
+        periods,
+        start_year=2024,
+        end_year=2027,
+        today=date(2026, 10, 14),
+        currency="EUR",
+    )
+    assert [row.year for row in table.rows] == [2024, 2025, 2026]
+    empty = table.rows[1]
+    assert empty.earned == Money(0, "EUR") and empty.spent == Money(0, "EUR")
 
 
-def test_year_over_year_handles_a_negative_change_and_rounding() -> None:
-    yoy = year_over_year(yearly_series(1_000, 300), year=2026)
-    assert yoy.change == Money(700, "EUR")
-    assert yoy.change_tenths == 2_333  # +233.3 %
-    down = year_over_year(yearly_series(800, 1_000), year=2026)
-    assert down.change == Money(-200, "EUR")
-    assert down.change_tenths == -200
-
-
-def test_year_over_year_without_a_previous_year_counts_zero() -> None:
-    series = CategorySeries((2026,), (), (Money(500, "EUR"),), Money(500, "EUR"))
-    yoy = year_over_year(series, year=2026)
-    assert yoy.previous == Money(0, "EUR") and yoy.change_tenths is None
-
-
-def test_year_over_year_missing_category_counts_zero() -> None:
-    yoy = year_over_year(yearly_series(1_000, 500), year=2026, category_id=RENT.id)
-    assert yoy.current == Money(0, "EUR") and yoy.previous == Money(0, "EUR")
-    assert yoy.change_tenths is None
+def test_year_over_year_table_requires_monthly_periods() -> None:
+    yearly = PeriodTotals(
+        2026, Money(1_000, "EUR"), Money(500, "EUR"), Money(0, "EUR"), Money(500, "EUR")
+    )
+    with pytest.raises(ValueError, match="monthly"):
+        year_over_year_table(
+            [yearly],
+            start_year=2026,
+            end_year=2026,
+            today=date(2026, 10, 14),
+            currency="EUR",
+        )
 
 
 # Planned vs actual accuracy

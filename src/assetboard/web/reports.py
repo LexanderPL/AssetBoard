@@ -10,6 +10,7 @@ for visitors without JavaScript.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -37,7 +38,7 @@ from assetboard.i18n.dates import format_month, short_month_names
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.networth_history import NetWorthHistoryData
 from assetboard.services.performance import PerformancePage
-from assetboard.services.reports import CategoryOption, FilterError, ReportsData
+from assetboard.services.reports import CategoryOption, FilterError, ReportFilters, ReportsData
 from assetboard.web.chart_axis import money_axis, rate_axis
 from assetboard.web.charts import build_performance_chart
 from assetboard.web.networth_history import build_trend_view
@@ -81,9 +82,12 @@ INCLUDE_SAVINGS_HELP = _("Saved and invested amounts get their own category seri
 OTHER = _("Other (combined)")
 ARCHIVED = _("archived")
 CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data.")
-YEAR_OVER_YEAR_TOTAL = _("Total (all categories)")
-YEAR_OVER_YEAR_NO_PREVIOUS = _("Not available: nothing spent in the previous year.")
+YEAR_OVER_YEAR_NO_INCOME = _("Not available: no income in the previous year.")
+YEAR_OVER_YEAR_NO_EXPENSES = _("Not available: no expenses in the previous year.")
 YEAR_OVER_YEAR_PARTIAL = _("The current year is compared through %(month)s in both years.")
+CATEGORY_SUMMARY_ALL = _("All categories")
+CATEGORY_SUMMARY_ONE = _("1 category selected")
+CATEGORY_SUMMARY_MANY = _("%(num)d categories selected")
 NET_WORTH_TITLE = _("Net worth over time")
 NET_WORTH_DESCRIPTION = _(
     "Assets, liabilities and net worth at the end of each period, from your saved values."
@@ -193,13 +197,18 @@ class YearGridRow:
 
 
 @dataclass(frozen=True, slots=True)
+class YearOverviewColumn:
+    label: str
+    href: str
+
+
+@dataclass(frozen=True, slots=True)
 class YearOverview:
     year: int
-    columns: tuple[str, ...]
+    columns: tuple[YearOverviewColumn, ...]
     rows: tuple[YearGridRow, ...]
     totals: tuple[str, ...]
     total: str
-    csv_url: str
     empty: bool
     so_far_month: int | None = None
 
@@ -230,20 +239,29 @@ class CategoryTrendsView:
 
 
 @dataclass(frozen=True, slots=True)
-class YearOverYearView:
-    label: str
-    color: str | None
-    year_label: str
-    previous_year_label: str
-    current: str
-    previous: str
-    change: str
-    change_minor: int
-    percent: str | None
-    percent_note: str | None
+class YearOverYearRowView:
+    year: int
+    href: str
+    earned: str
+    spent: str
+    earned_change: str
+    earned_change_minor: int
+    earned_percent: str | None
+    earned_percent_note: str | None
+    spent_change: str
+    spent_change_minor: int
+    spent_percent: str | None
+    spent_percent_note: str | None
     partial: bool = False
-    partial_note: str | None = None
-    empty: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class YearOverYearView:
+    rows: tuple[YearOverYearRowView, ...]
+    earned: str
+    spent: str
+    partial_note: str | None
+    empty: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +285,7 @@ class PlanAccuracyView:
 @dataclass(frozen=True, slots=True)
 class ReportSeriesRow:
     label: str
+    href: str | None
     cells: tuple[str, ...]
     notes: tuple[str, ...] = ()
     so_far: bool = False
@@ -303,9 +322,10 @@ class ReportsView:
     year_overview: YearOverview
     category_trends: CategoryTrendsView
     trend_chart: dict[str, Any] | None
-    year_over_year: YearOverYearView | None
+    year_over_year: YearOverYearView
     plan_accuracy: PlanAccuracyView
-    yoy_category_options: tuple[CategoryOptionView, ...]
+    category_summary: str
+    category_many_label: str
     notes: tuple[str, ...]
     range_years: str
     net_worth: ReportSeriesView | None
@@ -351,6 +371,33 @@ def _is_so_far(period: PeriodKey, step: ReportStep, today: date) -> bool:
     return period == today.year
 
 
+def _report_year_url(request: Request, filters: ReportFilters, year: int) -> str:
+    """A Reports URL focused on one year overview, preserving every other filter."""
+    params: list[tuple[str, str]] = [
+        ("from", str(filters.start_year)),
+        ("to", str(filters.end_year)),
+        ("step", filters.step.value),
+        ("currency", filters.currency),
+        ("trend", str(filters.trend_months)),
+        ("year", str(year)),
+    ]
+    if filters.savings:
+        params.append(("savings", "1"))
+    params.extend(("category", str(category_id)) for category_id in filters.category_ids)
+    return f"{scoped_url(request, 'reports')}?{urlencode(params)}#year-overview"
+
+
+def _period_href(
+    request: Request, filters: ReportFilters, period: YearMonth | int, step: ReportStep
+) -> str:
+    """The month page for a monthly period, or the focused Year overview for a year."""
+    if step is ReportStep.MONTH:
+        month = period if isinstance(period, YearMonth) else YearMonth(period, 1)
+        return scoped_url(request, "month", month=str(month))
+    year = period.year if isinstance(period, YearMonth) else period
+    return _report_year_url(request, filters, year)
+
+
 def _format_totals(totals: ReportTotals, locale: str) -> tuple[str, str, str, str, int]:
     return (
         format_money(totals.earned, locale),
@@ -362,15 +409,17 @@ def _format_totals(totals: ReportTotals, locale: str) -> tuple[str, str, str, st
 
 
 def _period_row(
-    period: PeriodTotals, step: ReportStep, today: date, locale: str, request: Request
+    period: PeriodTotals,
+    step: ReportStep,
+    today: date,
+    locale: str,
+    request: Request,
+    filters: ReportFilters,
 ) -> ReportRow:
     earned, spent, saved, net, net_minor = _format_totals(
         ReportTotals(period.earned, period.spent, period.saved, period.net), locale
     )
-    href = None
-    if step is ReportStep.MONTH:
-        assert isinstance(period.period, YearMonth)
-        href = scoped_url(request, "month", month=str(period.period))
+    href = _period_href(request, filters, period.period, step)
     return ReportRow(
         label=_period_label(period.period, step, locale),
         href=href,
@@ -416,10 +465,7 @@ def _rate_rows(
                     NOT_ENOUGH_HISTORY if index < REPORT_ROLLING_MONTHS - 1 else NOT_AVAILABLE,
                     locale,
                 )
-        href = None
-        if data.filters.step is ReportStep.MONTH:
-            assert isinstance(period.period, YearMonth)
-            href = scoped_url(request, "month", month=str(period.period))
+        href = _period_href(request, data.filters, period.period, data.filters.step)
         rows.append(
             RateRow(
                 label=_period_label(period.period, data.filters.step, locale),
@@ -445,6 +491,7 @@ def _rate_chart(
     *,
     show_rolling: bool,
     locale: str,
+    request: Request,
 ) -> dict[str, Any] | None:
     if not data.has_data or not data.series:
         return None
@@ -493,6 +540,10 @@ def _rate_chart(
         )
     return {
         "labels": labels,
+        "links": [
+            _period_href(request, data.filters, period.period, data.filters.step)
+            for period in data.series
+        ],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -502,7 +553,7 @@ def _rate_chart(
     }
 
 
-def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
+def _chart(data: ReportsData, locale: str, request: Request) -> dict[str, Any] | None:
     if not data.has_data or not data.series:
         return None
     currency = data.filters.currency
@@ -528,6 +579,10 @@ def _chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
         tooltips.append(lines)
     return {
         "labels": labels,
+        "links": [
+            _period_href(request, data.filters, period.period, data.filters.step)
+            for period in data.series
+        ],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -576,10 +631,7 @@ def _category_columns(
 ) -> tuple[CategoryColumn, ...]:
     columns: list[CategoryColumn] = []
     for period in series.periods:
-        href = None
-        if data.filters.step is ReportStep.MONTH:
-            assert isinstance(period, YearMonth)
-            href = scoped_url(request, "month", month=str(period))
+        href = _period_href(request, data.filters, period, data.filters.step)
         columns.append(
             CategoryColumn(
                 label=_period_label(period, data.filters.step, locale),
@@ -609,7 +661,7 @@ def _category_table(data: ReportsData, locale: str, request: Request) -> Categor
     )
 
 
-def _category_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
+def _category_chart(data: ReportsData, locale: str, request: Request) -> dict[str, Any] | None:
     series = data.category_series
     if not series.rows or series.total.amount_minor <= 0:
         return None
@@ -631,6 +683,10 @@ def _category_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
         tooltips.append(lines)
     return {
         "labels": labels,
+        "links": [
+            _period_href(request, data.filters, period, data.filters.step)
+            for period in series.periods
+        ],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -680,30 +736,18 @@ def _heat_class(amount_minor: int, maximum_minor: int) -> str:
     return f"heat-{step}"
 
 
-def _year_csv_url(data: ReportsData, request: Request) -> str:
-    """The CSV link with the same year, category and currency filters as the page."""
-    filters = data.filters
-    params: list[tuple[str, str]] = [
-        ("from", str(filters.start_year)),
-        ("to", str(filters.end_year)),
-        ("step", filters.step.value),
-        ("currency", filters.currency),
-        ("year", str(filters.year)),
-        ("trend", str(filters.trend_months)),
-    ]
-    if filters.savings:
-        params.append(("savings", "1"))
-    params.extend(("category", str(category_id)) for category_id in filters.category_ids)
-    if filters.yoy_category_id is not None:
-        params.append(("yoy_category", str(filters.yoy_category_id)))
-    return f"{scoped_url(request, 'reports_year_overview_csv')}?{urlencode(params)}"
-
-
 def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOverview:
     series = data.year_grid
     month_names = short_month_names(locale)
     columns = tuple(
-        month_names[period.month - 1] if isinstance(period, YearMonth) else str(period)
+        YearOverviewColumn(
+            label=month_names[period.month - 1] if isinstance(period, YearMonth) else str(period),
+            href=(
+                scoped_url(request, "month", month=str(period))
+                if isinstance(period, YearMonth)
+                else _report_year_url(request, data.filters, int(period))
+            ),
+        )
         for period in series.periods
     )
     maximum = max(
@@ -731,7 +775,6 @@ def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOver
         rows=rows,
         totals=tuple(format_money(total, locale) for total in series.totals),
         total=format_money(series.total, locale),
-        csv_url=_year_csv_url(data, request),
         empty=not rows,
         so_far_month=data.today.month if data.filters.year == data.today.year else None,
     )
@@ -790,7 +833,7 @@ def _category_trends_view(data: ReportsData, locale: str, request: Request) -> C
     )
 
 
-def _trend_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
+def _trend_chart(data: ReportsData, locale: str, request: Request) -> dict[str, Any] | None:
     trends = data.category_trends
     if data.filters.step is not ReportStep.MONTH or not trends.has_values:
         return None
@@ -814,6 +857,10 @@ def _trend_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
 
     return {
         "labels": labels,
+        "links": [
+            _period_href(request, data.filters, period, data.filters.step)
+            for period in trends.periods
+        ],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -838,39 +885,66 @@ def _trend_chart(data: ReportsData, locale: str) -> dict[str, Any] | None:
     }
 
 
-def _year_over_year_view(data: ReportsData, locale: str) -> YearOverYearView | None:
-    yoy = data.yoy
-    if yoy is None:
-        return None
-    if yoy.category_id is None:
-        label = gettext(YEAR_OVER_YEAR_TOTAL, locale)
-        color = None
-    else:
-        label = _display_category_name(yoy.name, yoy.archived, locale)
-        color = yoy.color or None
-    percent = (
-        format_rate_tenths(yoy.change_tenths, locale) if yoy.change_tenths is not None else None
+def _year_over_year_view(data: ReportsData, locale: str, request: Request) -> YearOverYearView:
+    rows: list[YearOverYearRowView] = []
+    for row in data.yoy.rows:
+        earned_percent = (
+            format_rate_tenths(row.earned_change_tenths, locale)
+            if row.earned_change_tenths is not None
+            else None
+        )
+        spent_percent = (
+            format_rate_tenths(row.spent_change_tenths, locale)
+            if row.spent_change_tenths is not None
+            else None
+        )
+        rows.append(
+            YearOverYearRowView(
+                year=row.year,
+                href=_report_year_url(request, data.filters, row.year),
+                earned=format_money(row.earned, locale),
+                spent=format_money(row.spent, locale),
+                earned_change=format_money(row.earned_change, locale),
+                earned_change_minor=row.earned_change.amount_minor,
+                earned_percent=earned_percent,
+                earned_percent_note=(
+                    None
+                    if earned_percent is not None
+                    else gettext(YEAR_OVER_YEAR_NO_INCOME, locale)
+                ),
+                spent_change=format_money(row.spent_change, locale),
+                spent_change_minor=row.spent_change.amount_minor,
+                spent_percent=spent_percent,
+                spent_percent_note=(
+                    None
+                    if spent_percent is not None
+                    else gettext(YEAR_OVER_YEAR_NO_EXPENSES, locale)
+                ),
+                partial=row.partial,
+            )
+        )
+    partial_note = (
+        gettext(YEAR_OVER_YEAR_PARTIAL, locale)
+        % {"month": format_month(YearMonth(data.today.year, data.today.month), locale)}
+        if any(row.partial for row in data.yoy.rows)
+        else None
     )
     return YearOverYearView(
-        label=label,
-        color=color,
-        year_label=str(yoy.year),
-        previous_year_label=str(yoy.previous_year),
-        current=format_money(yoy.current, locale),
-        previous=format_money(yoy.previous, locale),
-        change=format_money(yoy.change, locale),
-        change_minor=yoy.change.amount_minor,
-        percent=percent,
-        percent_note=None if percent is not None else gettext(YEAR_OVER_YEAR_NO_PREVIOUS, locale),
-        partial=yoy.partial,
-        partial_note=(
-            gettext(YEAR_OVER_YEAR_PARTIAL, locale)
-            % {"month": format_month(YearMonth(data.today.year, data.today.month), locale)}
-            if yoy.partial
-            else None
-        ),
-        empty=yoy.empty,
+        rows=tuple(rows),
+        earned=format_money(data.yoy.earned, locale),
+        spent=format_money(data.yoy.spent, locale),
+        partial_note=partial_note,
+        empty=data.yoy.empty,
     )
+
+
+def _category_summary(data: ReportsData, locale: str) -> str:
+    count = len(data.filters.category_ids)
+    if count == 0:
+        return gettext(CATEGORY_SUMMARY_ALL, locale)
+    if count == 1:
+        return gettext(CATEGORY_SUMMARY_ONE, locale)
+    return gettext(CATEGORY_SUMMARY_MANY, locale) % {"num": count}
 
 
 def _plan_accuracy_view(data: ReportsData, locale: str) -> PlanAccuracyView:
@@ -897,19 +971,6 @@ def _plan_accuracy_view(data: ReportsData, locale: str) -> PlanAccuracyView:
             else "—"
         ),
         empty=accuracy.empty,
-    )
-
-
-def _yoy_category_options(data: ReportsData) -> tuple[CategoryOptionView, ...]:
-    selected = data.filters.yoy_category_id
-    return tuple(
-        CategoryOptionView(
-            id=option.id,
-            name=option.name,
-            selected=option.id == selected,
-            archived=option.archived,
-        )
-        for option in data.yoy_category_options
     )
 
 
@@ -953,7 +1014,11 @@ def _series_is_partial(day: date, step: ReportStep, today: date) -> bool:
 
 
 def _net_worth_series(
-    data: NetWorthHistoryData | None, step: ReportStep, locale: str, today: date
+    data: NetWorthHistoryData | None,
+    step: ReportStep,
+    locale: str,
+    today: date,
+    href_for: Callable[[date], str] | None = None,
 ) -> ReportSeriesView | None:
     if data is None:
         return None
@@ -961,16 +1026,21 @@ def _net_worth_series(
     trend = build_trend_view(data, locale, labels=labels)
     if trend.chart is None:
         return None
+    links = [href_for(point.as_of) if href_for is not None else "" for point in data.points]
+    chart = dict(trend.chart)
+    if any(links):
+        chart["links"] = links
     rows = tuple(
         ReportSeriesRow(
             label=label,
+            href=href or None,
             cells=(row.net, row.assets, row.liabilities),
             notes=(
                 (*row.not_counted, row.estimated_note) if row.estimated_note else row.not_counted
             ),
             so_far=_series_is_partial(point.as_of, step, today),
         )
-        for point, row, label in zip(data.points, trend.rows, labels, strict=True)
+        for point, row, label, href in zip(data.points, trend.rows, labels, links, strict=True)
     )
     return ReportSeriesView(
         title=gettext(NET_WORTH_TITLE, locale),
@@ -984,12 +1054,16 @@ def _net_worth_series(
             gettext("Liabilities", locale),
         ),
         rows=rows,
-        chart=trend.chart,
+        chart=chart,
     )
 
 
 def _portfolio_series(
-    page: PerformancePage | None, step: ReportStep, locale: str, today: date
+    page: PerformancePage | None,
+    step: ReportStep,
+    locale: str,
+    today: date,
+    href_for: Callable[[date], str] | None = None,
 ) -> ReportSeriesView | None:
     if page is None:
         return None
@@ -997,10 +1071,14 @@ def _portfolio_series(
     chart = build_performance_chart(page, locale, labels=labels)
     if chart is None:
         return None
+    links = [href_for(point.date) if href_for is not None else "" for point in page.chart]
+    if any(links):
+        chart["links"] = links
     incomplete_note = gettext("Incomplete: an instrument has no price or FX rate.", locale)
     rows = tuple(
         ReportSeriesRow(
             label=label,
+            href=href or None,
             cells=(
                 (
                     "—",
@@ -1017,7 +1095,7 @@ def _portfolio_series(
             notes=(incomplete_note,) if point.incomplete else (),
             so_far=_series_is_partial(point.date, step, today),
         )
-        for point, label in zip(page.chart, labels, strict=True)
+        for point, label, href in zip(page.chart, labels, links, strict=True)
     )
     notes: list[str] = []
     if page.undated_count:
@@ -1061,7 +1139,10 @@ def _portfolio_series(
 def build_reports_view(request: Request, data: ReportsData, locale: str) -> ReportsView:
     """The formatted page from the service's data."""
     step = data.filters.step
-    rows = tuple(_period_row(period, step, data.today, locale, request) for period in data.series)
+    rows = tuple(
+        _period_row(period, step, data.today, locale, request, data.filters)
+        for period in data.series
+    )
     earned, spent, saved, net, net_minor = _format_totals(data.totals, locale)
     total = ReportTotal(TOTAL, earned, spent, saved, net, net_minor)
     errors = {
@@ -1072,6 +1153,11 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         if data.filters.start_year != data.filters.end_year
         else str(data.filters.start_year)
     )
+
+    def series_href(day: date) -> str:
+        period = YearMonth.from_date(day) if step is ReportStep.MONTH else day.year
+        return _period_href(request, data.filters, period, step)
+
     rolling = _rolling_rates(data)
     show_rolling = step is ReportStep.MONTH and len(data.series) >= REPORT_ROLLING_MONTHS
     if data.filters.category_ids:
@@ -1085,26 +1171,29 @@ def build_reports_view(request: Request, data: ReportsData, locale: str) -> Repo
         errors=errors,
         rows=rows,
         total=total,
-        chart=_chart(data, locale),
+        chart=_chart(data, locale, request),
         rate_rows=_rate_rows(
             data, rolling, show_rolling=show_rolling, locale=locale, request=request
         ),
         rate_total=_rate_total(data, locale),
-        rate_chart=_rate_chart(data, rolling, show_rolling=show_rolling, locale=locale),
+        rate_chart=_rate_chart(
+            data, rolling, show_rolling=show_rolling, locale=locale, request=request
+        ),
         show_rolling=show_rolling,
-        category_chart=_category_chart(data, locale),
+        category_chart=_category_chart(data, locale, request),
         category_table=_category_table(data, locale, request),
         category_options=_category_options(data),
         category_notes=_category_notes(data, locale),
         category_empty=gettext(category_empty, locale),
         year_overview=_year_overview(data, locale, request),
         category_trends=_category_trends_view(data, locale, request),
-        trend_chart=_trend_chart(data, locale),
-        year_over_year=_year_over_year_view(data, locale),
+        trend_chart=_trend_chart(data, locale, request),
+        year_over_year=_year_over_year_view(data, locale, request),
         plan_accuracy=_plan_accuracy_view(data, locale),
-        yoy_category_options=_yoy_category_options(data),
+        category_summary=_category_summary(data, locale),
+        category_many_label=gettext(CATEGORY_SUMMARY_MANY, locale),
         notes=_notes(data, locale),
         range_years=range_years,
-        net_worth=_net_worth_series(data.net_worth, step, locale, data.today),
-        portfolio=_portfolio_series(data.portfolio, step, locale, data.today),
+        net_worth=_net_worth_series(data.net_worth, step, locale, data.today, href_for=series_href),
+        portfolio=_portfolio_series(data.portfolio, step, locale, data.today, href_for=series_href),
     )

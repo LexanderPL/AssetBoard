@@ -25,9 +25,10 @@ the M4 archive.
   viewers included, can open it (it shows what they can already read); the services check the
   role like every other read.
 - **Filters** (a plain GET form, so a view is a bookmarkable URL; works without JavaScript):
-  - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the current year and the two before
-    it; at most 30 years; `from > to`, malformed or out-of-range values are marked on the form
-    and show no charts.
+  - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the last three years that have
+    transactions (the current year when there are none); at most 30 years; `from > to`,
+    malformed or out-of-range values are marked on the form and show no charts. The dropdowns
+    offer only years with transactions.
   - **Granularity** `step=month|year` (default `month` for a range up to 3 years, `year`
     beyond).
   - **Currency** `currency=XXX`: defaults to the workspace base currency; the selector lists
@@ -105,10 +106,11 @@ conventions). Golden test against services.summary.month_summary; property tests
 **As built (F10.1):**
 - `/reports` is in the sidebar after History; every member, viewers included, may open it. The
   filters are one plain GET form; unknown parameters are ignored.
-- Defaults follow the open questions: the current year and the two before, monthly for a range
-  up to 3 years and yearly beyond. The currency selector is hidden when only one currency occurs
+- Defaults follow the data: the last three years that have transactions (the current year when
+  there are none), monthly for a range up to 3 years and yearly beyond. The year selectors offer
+  only years with transactions. The currency selector is hidden when only one currency occurs
   (always the base in v1). Withdrawals are not a series. There is no per-table CSV in this
-  feature; F9.2 owns report CSV.
+  feature.
 - The range ends with the current month in the workspace's time zone; a `to` year later than the
   current one is kept in the form and the chart stops at the current month with a note. Entries
   dated after today are excluded and counted in a note. Amounts in another currency than the
@@ -281,22 +283,23 @@ category averages, year-over-year, planned-vs-actual accuracy) are added as furt
 this `/reports` page when M9 is built, using the same filters and aggregation rules.
 
 **As built (F9.2):** the page now also has the year overview (a category × month grid for a
-selected `year`, with heat shading and a `GET /reports/year-overview.csv` export), category
-trends (3- or 12-month rolling averages over the displayed F10.3 series, `trend=3|12`),
-year-over-year (`year` plus `yoy_category`, absolute and percent change, no percent when the
-previous year was zero) and planned-vs-actual accuracy (planned regular expense categories,
-months planned/over/strictly greater, from the raw budget lines in one scoped read). Section
-details and assumptions are in M9 F9.2; the user guide is [Reports](../reports.md).
+selected `year`, with heat shading and month links), category trends (3- or 12-month rolling
+averages over the displayed F10.3 series, `trend=3|12`), year-over-year (one row per year in the
+range, income and expenses, separate value and percent changes against the previous year) and
+planned-vs-actual accuracy (planned regular expense categories, months planned/over/strictly
+greater, from the raw budget lines in one scoped read). The year selectors offer only years with
+transactions; the report-table CSV was removed. Section details and assumptions are in M9 F9.2;
+the user guide is [Reports](../reports.md).
 
 ## Open questions (for the owner)
 
-1. **Default range and step.** Proposed: the current year and the two before, monthly up to
-   3 years and yearly beyond. Prefer "all years with data"?
+1. **Default range and step.** Resolved: the last three years with transactions, or the current
+   year when there are none; monthly up to 3 years and yearly beyond.
 2. **Currency filter.** In v1 it can only show the base currency. Keep the selector visible (one
    value) for later multi-currency, or hide it until a second currency exists? Proposed: hide
    it when only one currency occurs.
-3. **CSV of the report tables.** Not in Phase A (F2.6 and F9.2 cover CSV). Add a "Download CSV"
-   per table?
+3. **CSV of the report tables.** Decided against: the year-overview CSV was removed and report
+   tables have no CSV download. Ledger CSV stays on [History](../transactions.md).
 4. **Withdrawals from savings.** Proposed: not shown in Phase A (they are not earnings). Should
    F10.1 show them as their own series?
 5. **Sidebar placement.** Proposed: after History. Or among the later modules (Net worth,

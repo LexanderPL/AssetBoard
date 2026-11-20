@@ -17,8 +17,11 @@ from sqlalchemy import select
 from assetboard.app import create_app
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
+from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
+from assetboard.services.networth import add_valuation, create_item
+from assetboard.services.networth import create_category as create_networth_category
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
@@ -139,6 +142,55 @@ def _seed(app) -> None:
             )
 
 
+def _seed_net_worth(app) -> None:
+    with app.state.session_factory() as session:
+        user = session.scalars(select(User)).one()
+        workspace = session.scalars(select(Workspace)).one()
+        ctx = Context(
+            user=UserRef(
+                id=user.id,
+                email=user.email,
+                display_name=user.display_name,
+                locale=user.locale,
+                is_instance_admin=user.is_instance_admin,
+            ),
+            workspace=WorkspaceRef(
+                id=workspace.id,
+                name=workspace.name,
+                base_currency=workspace.base_currency,
+                locale=workspace.locale,
+                timezone=workspace.timezone,
+                country_code=workspace.country_code,
+                taxes_enabled=workspace.taxes_enabled,
+            ),
+            role=Role.OWNER,
+            clock=app.state.clock,
+        )
+    category = create_networth_category(
+        app.state.session_factory, ctx, side="asset", name="Browser Assets", color="#16a34a"
+    )
+    item = create_item(
+        app.state.session_factory,
+        ctx,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Browser Fund",
+        value="1000",
+        currency="EUR",
+        include_in_net_worth=True,
+        as_of=date(2025, 12, 31),
+    )
+    add_valuation(
+        app.state.session_factory,
+        ctx,
+        item.id,
+        locale="en",
+        value="1500",
+        as_of=date(2026, 6, 30),
+    )
+
+
 def _sign_in(page: Page, base: str, app) -> None:
     page.goto(f"{base}/", wait_until="networkidle")
     page.get_by_label("Setup token").fill(app.state.setup_token)
@@ -247,7 +299,24 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(toggle).to_have_text("Show as table")
             assert "sr-only" in (table.get_attribute("class") or "").split()
 
-            # F9.2: the year grid has twelve heat-shaded month columns and a CSV link.
+            # One multi-select category dropdown. The summary updates without a reload.
+            picker = page.locator("[data-multi-select]")
+            expect(picker).to_be_visible()
+            expect(picker.locator("[data-multi-select-summary]")).to_have_text("All categories")
+            picker.locator("summary").click()
+            options = picker.locator("input[name=category]")
+            expect(options.first).to_be_visible()
+            options.first.check()
+            expect(picker.locator("[data-multi-select-summary]")).to_have_text(
+                "1 category selected"
+            )
+            options.first.uncheck()
+            expect(picker.locator("[data-multi-select-summary]")).to_have_text("All categories")
+            page.keyboard.press("Escape")
+            expect(picker).not_to_have_attribute("open", "")
+            expect(picker.locator("summary")).to_be_focused()
+
+            # F9.2: the year grid has twelve heat-shaded month columns and its own year selector.
             grid = page.locator("[data-report-year-overview]")
             expect(grid).to_be_visible()
             expect(grid.locator("[data-report-grid-row]")).to_have_count(1)
@@ -260,9 +329,10 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
                 "(cells) => cells.map((cell) => cell.className)"
             )
             assert any("heat-" in value for value in heat_classes)
-            csv_link = grid.locator("[data-report-year-csv]")
-            expect(csv_link).to_be_visible()
-            assert "/reports/year-overview.csv" in (csv_link.get_attribute("href") or "")
+            year_select = grid.locator("#report-year")
+            expect(year_select).to_be_visible()
+            expect(year_select).to_have_value("2026")
+            expect(year_select).to_have_attribute("form", "report-filters")
 
             # The rolling-average chart reuses the report line module and reveals its table.
             trend = page.locator('[data-chart="report-trend"]')
@@ -278,14 +348,47 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             )
             assert trend_option["series"] == ["Browser Food"]
 
-            # Year-over-year and plan accuracy read the section year and the plans.
+            # Year-over-year has one row per year and compares the current partial year
+            # with the same months of the previous one.
             expect(page.locator("[data-report-yoy-partial]")).to_be_visible()
-            expect(page.locator("[data-report-yoy-row]")).to_be_visible()
-            expect(page.locator("[data-report-yoy-percent]")).to_contain_text("140.0%")
+            expect(page.locator("[data-report-yoy-row]")).to_have_count(1)
+            expect(page.locator("[data-report-yoy-expense-percent]").last).to_contain_text("140.0%")
+            expect(page.locator("[data-report-yoy-so-far]")).to_be_visible()
             accuracy = page.locator("[data-report-accuracy-row]")
             expect(accuracy).to_have_count(1)
             expect(accuracy.locator("[data-report-accuracy-planned]")).to_have_text("2")
             expect(accuracy.locator("[data-report-accuracy-over]")).to_have_text("2")
+
+            # Net worth/portfolio data tables are collapsed by default once the chart is drawn.
+            _seed_net_worth(app)
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            series = page.locator('[data-report-series="net-worth"]')
+            expect(series).to_be_visible()
+            chart_root = series.locator('[data-chart="line"]')
+            expect(chart_root).to_have_attribute("data-chart-ready", "true")
+            table = chart_root.locator("[data-chart-table]")
+            assert "sr-only" in (table.get_attribute("class") or "").split()
+            toggle = chart_root.locator("[data-chart-table-toggle]")
+            expect(toggle).to_be_visible()
+            expect(toggle).to_have_text("Show as table")
+            toggle.click()
+            expect(toggle).to_have_text("Hide table")
+            assert "sr-only" not in (table.get_attribute("class") or "").split()
+            chart_json = page.evaluate(
+                """() => JSON.parse(
+                  document.getElementById("reports-net-worth-data").textContent
+                )"""
+            )
+            assert chart_json["links"] and "/m/2026-06" in chart_json["links"]
+            chart_state = page.evaluate(
+                """() => {
+                  const root = document.querySelector('[data-report-series="net-worth"]');
+                  const el = root.querySelector("[data-chart-canvas]");
+                  const option = window.echarts.getInstanceByDom(el).getOption();
+                  return {trigger: option.xAxis[0].triggerEvent};
+                }"""
+            )
+            assert chart_state["trigger"] is True
 
             # Phone width: one column, no sideways page scroll.
             page.set_viewport_size({"width": 390, "height": 844})
@@ -296,6 +399,33 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
                 "data-chart-ready", "true"
             )
             expect(page.locator('[data-chart="report-bars"] [data-chart-canvas]')).to_be_visible()
+
+            # The Report year selector inside the Year overview submits the filter form on
+            # change, preserving the range and the other filters.
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.goto(f"{base}/reports?from=2025&to=2026&step=month", wait_until="networkidle")
+            year_select = page.locator("#report-year")
+            expect(year_select).to_have_value("2026")
+            year_select.select_option("2025")
+            page.wait_for_url("**year=2025**")
+            expect(page.locator("#report-year")).to_have_value("2025")
+
+            # A chart data point uses the same link as the table row.
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            page.wait_for_function(
+                """() => {
+                  const chart = document.querySelector('[data-chart="report-bars"]');
+                  return chart && chart.getAttribute("data-chart-ready") === "true";
+                }"""
+            )
+            page.evaluate(
+                """() => {
+                  const chart = document.querySelector('[data-chart="report-bars"]');
+                  const el = chart.querySelector("[data-chart-canvas]");
+                  window.echarts.getInstanceByDom(el).trigger("click", {dataIndex: 0});
+                }"""
+            )
+            page.wait_for_url(f"{base}/m/2026-01")
 
             assert page.evaluate("window.__cspViolations") == []
             assert console_errors == []

@@ -454,6 +454,7 @@
       element.querySelector("[data-chart-table]")?.classList.add("sr-only");
     } else if (kind === "line" && Array.isArray(data.series)) {
       option = lineOptions(data);
+      revealReportTable(element);
     } else if (kind === "report-bars" && Array.isArray(data.series)) {
       option = reportBarsOptions(data);
       revealReportTable(element);
@@ -474,11 +475,13 @@
       revealReportTable(element);
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
+      revealReportTable(element);
     } else if (kind === "loan-payments" && Array.isArray(data.series)) {
       option = loanPaymentsOptions(data);
     } else {
       return;
     }
+    addLinks(option, data);
     canvas.hidden = false;
     let chart = charts.get(element);
     if (!chart) {
@@ -486,7 +489,34 @@
       charts.set(element, chart);
     }
     chart.setOption(option, true);
+    bindLinks(chart, element);
     element.setAttribute("data-chart-ready", "true");
+  }
+
+  function addLinks(option, data) {
+    if (!Array.isArray(data.links) || data.links.length === 0) return;
+    const axes = Array.isArray(option.xAxis) ? option.xAxis : option.xAxis ? [option.xAxis] : [];
+    for (const axis of axes) {
+      axis.triggerEvent = true;
+      if (axis.axisLabel) axis.axisLabel.cursor = "pointer";
+    }
+    for (const series of option.series || []) series.cursor = "pointer";
+  }
+
+  function bindLinks(chart, element) {
+    if (chart.__linksBound) return;
+    chart.__linksBound = true;
+    chart.on("click", (params) => {
+      const data = readData(element);
+      if (!data || !Array.isArray(data.links)) return;
+      let index = params.dataIndex;
+      if (index == null && params.componentType === "xAxis" && Array.isArray(data.labels)) {
+        index = data.labels.indexOf(params.value);
+      }
+      if (index == null || index < 0) return;
+      const href = data.links[index];
+      if (typeof href === "string" && href) window.location.assign(href);
+    });
   }
 
   function disposeDetached() {

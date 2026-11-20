@@ -120,9 +120,9 @@ expenses by category over time to F10.3. The reports left here are added as sect
 `/reports` page, with its filters and aggregation rules.
 
 **Acceptance**
-- **Year overview:** grid of categories × months (actual), totals per row/column, year selector; heat-shading; CSV export.
+- **Year overview:** grid of categories × months (actual), totals per row/column, year selector; heat-shading.
 - **Category trends:** rolling 3/12-month averages on top of F10.3's category series.
-- **Year-over-year** comparison for a category or total.
+- **Year-over-year:** one row per year in the range, with income, expenses and separate value/percent changes against the previous year.
 - **Planned vs actual accuracy:** how often each category exceeded its plan.
 - All reports are pure query + domain functions, paginated/streamed where large, respect closed/open months equally, and exclude `transfer` categories.
 - Date-range and category filters are URL-addressable (shareable between workspace members).
@@ -130,31 +130,31 @@ expenses by category over time to F10.3. The reports left here are added as sect
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F9.2 from docs/specs/M9-dashboard-reports-hardening.md: the four remaining reports as sections of M10's /reports page, with domain aggregation functions, URL-addressable filters, CSV export.
+Implement F9.2 from docs/specs/M9-dashboard-reports-hardening.md: the four remaining reports as sections of M10's /reports page, with domain aggregation functions, URL-addressable filters and linked periods.
 Property tests: grid totals equal transaction sums; treatment rules respected. Include an EXPLAIN-based index review in the PR.
 ```
 
 **As built (F9.2):**
 - The four sections are additional panels on M10's `/reports` page, using the same shared
-  filters and treatment rules. A `year` query parameter (default: the report's end year, capped
-  at the current year) drives the year grid and the year-over-year section; `trend=3|12`
-  (default 3) chooses the rolling window; `yoy_category` chooses one category or the total.
-  Unknown years (not 1900–2199) and unknown/other-workspace category ids are ignored; a year outside the report range is still shown.
+  filters and treatment rules. A `year` query parameter (default: the latest data year inside the
+  range, capped at the current year) drives the year grid; `trend=3|12` (default 3) chooses the
+  rolling window. Unknown years (not 1900–2199) and unknown/other-workspace category ids are
+  ignored; a year outside the report range is still shown when explicitly requested.
 - **Year overview:** `domain.reports.year_grid` is F10.3's `category_series` for one calendar
   year, so the grid is one row per eligible category with spending in that year (plus explicitly selected zero rows) and twelve month columns, with row/column/
   grand totals. It follows the category filter and the savings option; transfers, income and
   withdrawals never count. Heat shading is four CSS classes over the primary-soft token, not
-  inline styles. `GET /reports/year-overview.csv` (fixed `reports-year-overview.csv`) exports the
-  same rows and totals with ISO month headers and plain decimal amounts; it requires the same
-  sign-in and accepts the same filters.
+  inline styles. The report-year selector sits inside the Year overview panel and offers only
+  years with transactions inside the selected range.
 - **Category trends:** `domain.reports.rolling_category_averages` averages the displayed F10.3
   series over a trailing 3- or 12-month window, from exact integer sums, and leaves the first
   `window - 1` points empty (a gap, not zero). The chart reuses the report line module; the
   table is the accessible version. Yearly granularity shows a prompt to choose monthly.
-- **Year-over-year:** `domain.reports.year_over_year` compares the selected year's total or one
-  category with the year before. Absolute and percent change are exact integers; the percent is
-  `None` when the previous year spent zero. It uses the same yearly category series and savings
-  option as the grid.
+- **Year-over-year:** `domain.reports.year_over_year_table` builds one row per year in the range
+  from a monthly totals series, with separate income and expense changes. The first year is
+  compared with the year before the range (read but not shown); the current year is compared with
+  the same months of the previous year. Percent changes are `None` when the previous figure was
+  zero. The table always uses the whole ledger.
 - **Planned vs actual accuracy:** `domain.reports.plan_accuracy` counts planned months and
   months whose actual was **strictly greater** than the plan per planned regular expense
   category, with a footer over category-months. The service reads the raw `BudgetLine` rows for

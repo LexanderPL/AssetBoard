@@ -28,10 +28,11 @@ their history keeps counting and the caller supplies their current name and colo
 **F9.2 sections.** ``year_grid`` is the same category series for one calendar year, month by
 month. ``rolling_category_averages`` averages each category's monthly amount over a trailing
 window (3 or 12 months) and leaves the first ``months - 1`` points empty, like F10.2's rolling
-rate. ``year_over_year`` compares the selected year's category-series total (or one category)
-with the year before; the percent change is ``None`` when the previous year spent nothing.
-``plan_accuracy`` counts, per planned regular expense category, the months with a plan and the
-months whose actual was **greater** than the plan; a month with equal amounts is not over.
+rate. ``year_over_year_table`` compares every year in the range with the year before, with
+separate income and expense changes; the percent change is ``None`` when the previous year's
+figure was zero. ``plan_accuracy`` counts, per planned regular expense category, the months with
+a plan and the months whose actual was **greater** than the plan; a month with equal amounts is
+not over.
 """
 
 from __future__ import annotations
@@ -223,34 +224,35 @@ class CategoryTrends:
 
 
 @dataclass(frozen=True, slots=True)
-class YearOverYear:
-    """One category's (or the whole category series') selected year against the year before.
+class YearOverYearRow:
+    """One calendar year's income and expenses, with the change against the year before.
 
-    ``change = current - previous`` (positive means more was spent); ``change_tenths`` is the
-    percent change in tenths of a percent, rounded once, or ``None`` when the previous year was
-    zero (the percentage is undefined).
+    ``earned_change = earned - previous_earned`` and ``spent_change = spent - previous_spent``;
+    a positive expense change means more was spent. The percent changes are in tenths of a
+    percent, rounded once, and are ``None`` when the previous year's figure was zero.
     """
 
     year: int
-    previous_year: int
-    category_id: UUID | None
-    name: str
-    color: str
-    archived: bool
-    current: Money
-    previous: Money
-    change: Money
-    change_tenths: int | None
+    earned: Money
+    spent: Money
+    earned_change: Money
+    earned_change_tenths: int | None
+    spent_change: Money
+    spent_change_tenths: int | None
     partial: bool = False
 
-    @property
-    def available(self) -> bool:
-        return self.change_tenths is not None
+
+@dataclass(frozen=True, slots=True)
+class YearOverYearTable:
+    """One row per year in the report range, plus the exact income/expense totals."""
+
+    rows: tuple[YearOverYearRow, ...]
+    earned: Money
+    spent: Money
 
     @property
     def empty(self) -> bool:
-        """Whether both years have nothing to compare."""
-        return self.current.amount_minor == 0 and self.previous.amount_minor == 0
+        return not self.rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -752,65 +754,66 @@ def rolling_category_averages(
     return CategoryTrends(periods, months, tuple(rows))
 
 
-def year_over_year(
-    series: CategorySeries,
+def year_over_year_table(
+    periods: Iterable[PeriodTotals],
     *,
-    year: int,
-    category_id: UUID | None = None,
-    partial: bool = False,
-) -> YearOverYear:
-    """The selected year's spending against the previous year (F9.2).
+    start_year: int,
+    end_year: int,
+    today: date,
+    currency: str,
+) -> YearOverYearTable:
+    """One row per calendar year in the range, compared with the year before.
 
-    ``series`` is a yearly ``CategorySeries`` covering ``year`` and, when it exists, the year
-    before. With ``category_id`` the row's figures are compared; otherwise the series' column
-    totals (the whole category report) are. A missing category row or previous year counts as
-    zero. ``change_tenths`` is ``None`` when the previous amount was zero. ``partial`` says the
-    current year is compared only through today (same months of both years).
+    ``periods`` is a monthly ``PeriodTotals`` series. The service includes the year before
+    ``start_year`` so the first row can still show its change; missing months count as zero.
+    The current year is compared with the same months of the previous year, never with that
+    year's full total. Future years are omitted, like the rest of the reports.
     """
-    currency = series.total.currency
-    positions = {period: index for index, period in enumerate(series.periods)}
-    current_index = positions.get(year)
-    previous_index = positions.get(year - 1)
-    if category_id is None:
-        current_minor = (
-            series.totals[current_index].amount_minor if current_index is not None else 0
+    by_year: dict[int, list[PeriodTotals]] = {}
+    for period in periods:
+        if not isinstance(period.period, YearMonth):
+            raise ValueError("year-over-year needs a monthly period series")
+        by_year.setdefault(period.period.year, []).append(period)
+
+    def totals(year: int, *, through_month: int | None = None) -> tuple[int, int]:
+        earned = spent = 0
+        for period in by_year.get(year, ()):
+            assert isinstance(period.period, YearMonth)
+            if through_month is not None and period.period.month > through_month:
+                continue
+            earned += period.earned.amount_minor
+            spent += period.spent.amount_minor
+        return earned, spent
+
+    rows: list[YearOverYearRow] = []
+    total_earned = total_spent = 0
+    last_year = min(end_year, today.year)
+    for year in range(start_year, last_year + 1):
+        partial = year == today.year
+        current_earned, current_spent = totals(year, through_month=today.month if partial else None)
+        previous_earned, previous_spent = totals(
+            year - 1, through_month=today.month if partial else None
         )
-        previous_minor = (
-            series.totals[previous_index].amount_minor if previous_index is not None else 0
+        earned_change = current_earned - previous_earned
+        spent_change = current_spent - previous_spent
+        rows.append(
+            YearOverYearRow(
+                year=year,
+                earned=Money(current_earned, currency),
+                spent=Money(current_spent, currency),
+                earned_change=Money(earned_change, currency),
+                earned_change_tenths=ratio_tenths(earned_change, previous_earned),
+                spent_change=Money(spent_change, currency),
+                spent_change_tenths=ratio_tenths(spent_change, previous_spent),
+                partial=partial,
+            )
         )
-        name = color = ""
-        archived = False
-    else:
-        row = next(
-            (spend for spend in series.rows if spend.category_id == category_id),
-            None,
-        )
-        current_minor = (
-            row.amounts[current_index].amount_minor
-            if row is not None and current_index is not None
-            else 0
-        )
-        previous_minor = (
-            row.amounts[previous_index].amount_minor
-            if row is not None and previous_index is not None
-            else 0
-        )
-        name = row.name if row is not None else ""
-        color = row.color if row is not None else ""
-        archived = row.archived if row is not None else False
-    change_minor = current_minor - previous_minor
-    return YearOverYear(
-        year=year,
-        previous_year=year - 1,
-        category_id=category_id,
-        name=name,
-        color=color,
-        archived=archived,
-        current=Money(current_minor, currency),
-        previous=Money(previous_minor, currency),
-        change=Money(change_minor, currency),
-        change_tenths=ratio_tenths(change_minor, previous_minor),
-        partial=partial,
+        total_earned += current_earned
+        total_spent += current_spent
+    return YearOverYearTable(
+        rows=tuple(rows),
+        earned=Money(total_earned, currency),
+        spent=Money(total_spent, currency),
     )
 
 
@@ -961,7 +964,8 @@ __all__ = [
     "ReportStep",
     "ReportTotals",
     "SavingsRate",
-    "YearOverYear",
+    "YearOverYearRow",
+    "YearOverYearTable",
     "category_series",
     "ledger_and_category_series",
     "ledger_series",
@@ -974,5 +978,5 @@ __all__ = [
     "top_categories",
     "totals_of",
     "year_grid",
-    "year_over_year",
+    "year_over_year_table",
 ]
