@@ -89,6 +89,14 @@ def test_notification_channels_in_a_browser(tmp_path: Path) -> None:
             form.get_by_label("Name").fill("Phone")
             form.get_by_label("Apprise URL").fill(URL)
             form.get_by_label("Daily at").fill("07:15")
+            # A hidden required field must not block submission. Clear the values, hide both,
+            # and let the server use its defaults / keep the posted value.
+            form.get_by_label("Daily at").fill("")
+            form.get_by_label("Delivery").select_option("per_item")
+            expect(form.get_by_label("Daily at")).to_be_hidden()
+            form.get_by_label("Remind days before the due date").fill("90")
+            form.get_by_label("Items due soon").uncheck()
+            expect(form.get_by_label("Remind days before the due date")).to_be_hidden()
             form.get_by_role("button", name="Add channel").click()
             expect(page.locator("[data-notice]")).to_be_visible()
             expect(page.locator("[data-masked-url]")).to_have_text("ntfys://••••••")

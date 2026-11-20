@@ -52,6 +52,8 @@ def test_the_new_channel_form_is_a_header_dialog(owner):
     header = _header_actions(page)
     assert "data-new-channel-open" in header and 'data-dialog-open="channel-dialog"' in header
     assert 'id="channel-dialog"' in page and "data-new-channel" in page
+    assert "data-notification-channel" in page and "data-notification-mode" in page
+    assert "data-digest-time" in page and "data-lead-days" in page
     assert " open" not in _dialog_opening(page)
     opened = owner.client.get("/notifications?form=channel").text
     assert " open" in _dialog_opening(opened)

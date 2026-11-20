@@ -12,7 +12,7 @@
 {% endif %}
 {% endblock %}
 {% macro channel_fields(prefix, channel=None) -%}
-<div class="grid gap-4 sm:grid-cols-2">
+<div class="grid gap-4 sm:grid-cols-2" data-notification-channel>
   <div class="space-y-1.5">
     <label for="{{ prefix }}-name" class="block text-sm font-medium">{{ _("Name") }}</label>
     <input id="{{ prefix }}-name" name="name" maxlength="100" required value="{{ channel.name if channel else '' }}" class="{{ input_class }}">
@@ -24,24 +24,24 @@
   </div>
   <div class="space-y-1.5">
     <label for="{{ prefix }}-mode" class="block text-sm font-medium">{{ _("Delivery") }}</label>
-    <select id="{{ prefix }}-mode" name="mode" class="form-select w-full py-2">
+    <select id="{{ prefix }}-mode" name="mode" data-notification-mode class="form-select w-full py-2">
       <option value="digest"{% if not channel or channel.mode == "digest" %} selected{% endif %}>{{ _("One digest a day") }}</option>
       <option value="per_item"{% if channel and channel.mode == "per_item" %} selected{% endif %}>{{ _("One message per reminder") }}</option>
     </select>
   </div>
-  <div class="space-y-1.5">
+  <div class="space-y-1.5" data-digest-time>
     <label for="{{ prefix }}-time" class="block text-sm font-medium">{{ _("Daily at") }}</label>
     <input id="{{ prefix }}-time" name="digest_time" type="time" required value="{{ channel.digest_time.strftime('%H:%M') if channel else '08:00' }}" aria-describedby="{{ prefix }}-time-help" class="{{ input_class }}">
     <p id="{{ prefix }}-time-help" class="text-xs text-muted">{{ _("In the workspace time zone (%(zone)s).", zone=workspace_nav.current.timezone) }}</p>
   </div>
-  <div class="space-y-1.5">
+  <div class="space-y-1.5" data-lead-days>
     <label for="{{ prefix }}-lead" class="block text-sm font-medium">{{ _("Remind days before the due date") }}</label>
     <input id="{{ prefix }}-lead" name="default_lead_days" type="number" min="0" max="{{ max_lead_days }}" required value="{{ channel.default_lead_days if channel else 3 }}" aria-describedby="{{ prefix }}-lead-help" class="{{ input_class }}">
     <p id="{{ prefix }}-lead-help" class="text-xs text-muted">{{ _("Recurring items can set their own number of days.") }}</p>
   </div>
   <fieldset class="space-y-2">
     <legend class="text-sm font-medium">{{ _("Remind me about") }}</legend>
-    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_due_soon" value="1"{% if not channel or channel.notify_due_soon %} checked{% endif %} class="{{ check_class }}"> {{ _("Items due soon") }}</label>
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_due_soon" value="1"{% if not channel or channel.notify_due_soon %} checked{% endif %} data-notify-due-soon class="{{ check_class }}"> {{ _("Items due soon") }}</label>
     <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_overdue" value="1"{% if not channel or channel.notify_overdue %} checked{% endif %} class="{{ check_class }}"> {{ _("Overdue items (once a day, up to 7 times)") }}</label>
     <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="notify_work_logs" value="1"{% if not channel or channel.notify_work_logs %} checked{% endif %} class="{{ check_class }}"> {{ _("Entering days worked") }}</label>
   </fieldset>

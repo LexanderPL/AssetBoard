@@ -11269,6 +11269,12 @@ msgstr ""
 msgid "Add an item"
 msgstr ""
 
+msgid "Include in net worth"
+msgstr ""
+
+msgid "More options"
+msgstr ""
+
 msgid "Link to…"
 msgstr ""
 
@@ -11277,16 +11283,13 @@ msgstr ""
 
 msgid ""
 "A linked item takes its value and currency from the target. The value "
-"fields below are ignored."
+"fields are ignored."
 msgstr ""
 
 msgid "Value note (optional)"
 msgstr ""
 
 msgid "Acquired on (optional)"
-msgstr ""
-
-msgid "Include in net worth"
 msgstr ""
 
 msgid "Estimate values between entries"
@@ -15317,5 +15320,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "No spending in either year."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A linked item takes its value and"
+#~ " currency from the target. The value"
+#~ " fields below are ignored."
 #~ msgstr ""
 

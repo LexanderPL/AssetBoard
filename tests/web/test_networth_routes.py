@@ -175,6 +175,8 @@ def test_the_add_item_form_is_a_tab_action_dialog(owner: OwnerApp) -> None:
     assert dialog is not None
     assert "grid gap-3 sm:grid-cols-2 lg:grid-cols-4" in dialog.group(0)
     assert "data-create-item" in page
+    assert "More options" in dialog.group(0)
+    assert "data-item-value-field" in dialog.group(0)
     opening = re.search(r'<dialog id="item-dialog"[^>]*>', page)
     assert opening is not None and " open" not in opening.group(0)
     opened = owner.client.get("/net-worth?side=asset&form=item").text

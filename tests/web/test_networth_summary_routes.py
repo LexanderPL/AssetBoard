@@ -132,6 +132,8 @@ def test_summary_shows_totals_one_bar_and_tables(owner: OwnerApp) -> None:
         "Liabilities are 35.7% of assets; the green part is net worth."
     )
     assert "data-summary-bar-text" in page and "€14,000.00" in page
+    assert "data-summary-bar-side" not in page and "data-bar-amount" not in page
+    assert "data-assets-total" in page and "data-liabilities-total" in page
     assert "data-donut=" not in page
     assert 'data-chart-source="networth-trend-data"' in page
     assert "echarts.min.js" in page
