@@ -25,7 +25,8 @@ uv run python scripts/capture_screenshots.py --base-url http://127.0.0.1:8000 --
 ```
 
 Each page is captured in four variants: desktop light (1440 × 900), desktop dark, phone light
-(390 × 844) and phone dark. The committed files are JPEG at quality 85 under
+(390 × 844) and phone dark. Each image is the first viewport, not a full-page capture. The
+committed files are JPEG at quality 85 under
 `docs/assets/screenshots/<viewport>/<theme>/<page>.jpg`. Regenerate and commit them when a page's
 layout changes; keep the reference date in the script unless the demo data itself changes.
 
@@ -64,8 +65,15 @@ Search, filters and the paginated list of all entries.
 
 ## Reports
 
-Income against expenses, savings rate, category reports, year overview, year-over-year, net
-worth and portfolio history.
+The first viewport: filters and the income vs expenses chart. The savings rate, category,
+year-over-year, plan-accuracy, net-worth and portfolio-history sections continue below these
+images, so they are not visible here.
+
+> [!NOTE]
+> DOC-02 follow-up: the capture script takes a viewport screenshot, so the net-worth and
+> portfolio history sections added in F10.4/F10.5 are below the fold. Capture those sections
+> separately, or add a documented full-page/section mode to the script, once their layout is
+> final. Do not crop or mock up an image.
 
 | Desktop light | Desktop dark | Phone light | Phone dark |
 | --- | --- | --- | --- |

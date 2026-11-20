@@ -146,7 +146,8 @@ def sidebar_links(request: Request, nav: WorkspaceNav | None) -> tuple[SidebarLi
 
     Home is always present. Without a workspace context only Home is shown (the account, admin
     and audit pages of a user with no membership). Taxes appears only when the workspace enables
-    the feature; a hidden destination remains reachable by its address.
+    the feature. Hiding a destination in the sidebar never removes access, but a disabled feature
+    is different: while the Taxes switch is off, its routes answer 404.
     """
     path = request.url.path
     items = nav.sidebar if nav is not None else DEFAULT_SIDEBAR

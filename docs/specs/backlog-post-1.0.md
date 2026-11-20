@@ -70,25 +70,39 @@ mapping profiles, dedupe and category suggestions. Synthetic sample CSVs for tes
 
 ---
 
-## Public read-only demo
+## Public read-only demo (future hardening)
+
+> **Status (DOC-06, 2026-11-20): not shipped, not scheduled.** The 1.0 demo mode is writable and
+> operator-only (`ASSETBOARD_DEMO_ENABLED`; see [Demo workspace](../demo-mode.md)). This item
+> describes a stricter public showcase proposed before that mode existed: read-only, an
+> instance-admin toggle and a separate demo principal. It is kept as a possible future
+> hardening of the public demo, not as a description of 1.0 behaviour. Building it would
+> replace or tighten the shipped mode, not run beside it. The owner still needs to decide
+> whether the shipped writable mode is the intended showcase.
 
 Owner decision, 2026-10-25. An instance administrator can switch on a demo: a read-only
 workspace with synthetic sample data that anyone can open from the login page without an
 account, reset on a schedule. Meant for a public showcase instance, never for a household's own
 instance.
 
-**Why post-1.0:** it opens an unauthenticated way into the app, so it builds on 1.0 work that
-does not exist yet: F9.7's synthetic demo builder (`assetboard demo-seed`), F9.6's role × route
-authorization matrix and rate-limit review, and F9.1's dashboard (what a visitor should see).
-Doing it earlier would mean building a second sample-data generator and hardening one route
-family ahead of the security review.
+**Why post-1.0:** it opens an unauthenticated way into the app. 1.0 now ships the pieces this
+proposal was waiting for — F9.7's synthetic demo builder (`assetboard demo-seed`), F9.6's
+role × route authorization matrix and rate-limit review, F9.1's dashboard, and F9.11b's
+writable demo mode — so this item is the hardening step on top of them: a separate read-only
+principal, an instance-admin toggle and a public-showcase reset policy. Implementing it in 1.0
+would have meant hardening one route family ahead of the security review.
 
-**Acceptance**
+**Acceptance (original 2026-10-25 proposal)**
+
+If the owner chooses to build this, reconcile it with the shipped F9.11b mode instead of adding
+a second unrelated switch. The current mode is writable and environment-driven; this proposal is
+read-only and admin-page-driven.
+
 - **Off by default, instance-admin toggle.** A "Public demo" setting on the instance settings
   page (`/admin/settings`), confirmed through `run_confirmed` and audited (`admin.demo_enabled`,
   `admin.demo_disabled`). A fresh install, an upgrade and a restore never turn it on; there is
   no environment variable that enables it without the admin page (an operator setting may only
-  forbid it).
+  forbid it). This is deliberately different from the shipped `ASSETBOARD_DEMO_ENABLED` switch.
 - **Demo workspace.** Turning it on creates one dedicated workspace marked as the demo
   (a flag or an instance setting holding its id; decide in the plan), filled by the F9.7
   builder with dates relative to the Clock, so the current month always has data. It has no
@@ -155,6 +169,7 @@ family ahead of the security review.
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Do not start until the owner has decided that the read-only showcase supersedes or hardens the shipped writable demo mode.
 Implement "Public read-only demo" from docs/specs/backlog-post-1.0.md: the instance-admin toggle (off by default, confirmed,
 audited), the demo workspace built by the F9.7 builder, GET /demo issuing a separate short-lived demo session that never
 replaces a signed-in one, read-only enforcement in the service layer, refusal of account/admin/workspace-management/API

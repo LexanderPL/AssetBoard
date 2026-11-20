@@ -6,6 +6,12 @@ marked **operator** below. Do not tick a box until the command has been run agai
 and tag named in that step; record the command and result in the
 [execution record](#execution-record).
 
+**Release hold (2026-11-20).** The owner's v1.0 hold remains in place: `main` keeps the
+pre-alpha README status, the draft release PR #397 is based on an older `main`, and no tag or
+image has been published. Do not merge #397, change the README status, tag or publish while the
+hold is in place. When the owner lifts it, merge current `main` into #397 (keeping the 1.0
+README/changelog), resolve the version files, then run this checklist.
+
 Target: `v1.0.0`, from the previous release tag `v0.8.3`, with the image
 `ghcr.io/lexanderpl/assetboard` for `linux/amd64` and `linux/arm64`.
 

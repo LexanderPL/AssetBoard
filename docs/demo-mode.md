@@ -1,8 +1,8 @@
 # Demo workspace
 
-AssetBoard ships a deterministic demo dataset for screenshots, manual testing and the public
-"Try the demo" mode. This page documents the builder, its command and the demo mode an operator
-turns on for visitors.
+AssetBoard ships a deterministic demo dataset for screenshots, manual testing and the writable
+public "Try the demo" mode. This page documents the builder, its command and the demo mode an
+operator turns on for visitors.
 
 > [!WARNING]
 > Demo mode is for public, sample-only instances. Anyone who can reach the instance can sign in
@@ -55,6 +55,18 @@ empty, stale (older than 24 hours) or built by an older `DEMO_DATASET_VERSION`.
   notifications and provider pages stay visible read-only with a short note. The scheduler skips
   every workspace job for the demo workspace except its reset. These guards are implemented by
   the F9.11b restriction work and use the same `Context` flags as the login and banner.
+
+## Shipped mode vs. the read-only demo backlog
+
+This shipped mode is writable by design: the demo user gets a normal owner session for the
+sample workspace and may use the import, export, merge and restore paths within the normal
+per-file limits. It is turned on by the operator with `ASSETBOARD_DEMO_ENABLED`; there is no
+instance-admin switch.
+
+The [post-1.0 backlog](specs/backlog-post-1.0.md#public-read-only-demo-future-hardening) keeps a
+different "Public read-only demo" proposal: read-only, an instance-admin toggle and a separate
+demo principal. It does not describe the mode on this page. If the owner chooses to build it, it
+would replace or tighten this mode rather than run beside it.
 
 ## Reset
 
