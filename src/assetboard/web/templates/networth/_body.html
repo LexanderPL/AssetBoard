@@ -132,8 +132,8 @@
       <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-4">
         <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if create_item_values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
       </div>
-      <details class="sm:col-span-2 lg:col-span-4" data-more-options>
-        <summary class="cursor-pointer py-2 text-sm font-medium text-muted">{{ _("More options") }}</summary>
+      <details class="sm:col-span-2 lg:col-span-4" data-more-options{% if create_item_errors.get("link") or create_item_errors.get("valuation_note") or create_item_errors.get("acquired_on") or create_item_errors.get("notes") or create_item_errors.get("investable") or create_item_errors.get("estimate_between") %} open{% endif %}>
+        <summary class="cursor-pointer py-3 text-sm font-medium text-muted">{{ _("More options") }}</summary>
         <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {% if link_options %}
           <div class="space-y-1">

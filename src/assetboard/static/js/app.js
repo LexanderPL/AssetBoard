@@ -1518,8 +1518,10 @@ else window.addEventListener("load", registerServiceWorker, { once: true });
 function syncLinkedItemFields() {
   const select = document.querySelector("[data-item-link]");
   if (!(select instanceof HTMLSelectElement)) return;
+  const form = select.closest("form");
+  if (form === null) return;
   const linked = select.value !== "";
-  document.querySelectorAll("[data-item-value-field]").forEach((field) => {
+  form.querySelectorAll("[data-item-value-field]").forEach((field) => {
     if (!(field instanceof HTMLElement)) return;
     field.classList.toggle("hidden", linked);
     field.querySelectorAll("input, select").forEach((control) => {
@@ -1536,12 +1538,22 @@ function syncNotificationFields() {
     const mode = form.querySelector("[data-notification-mode]");
     const time = form.querySelector("[data-digest-time]");
     if (mode instanceof HTMLSelectElement && time instanceof HTMLElement) {
-      time.classList.toggle("hidden", mode.value !== "digest");
+      const hidden = mode.value !== "digest";
+      time.classList.toggle("hidden", hidden);
+      // Keep the value posted (the server uses the saved time), but a hidden required input
+      // would block submission with no visible field to focus.
+      time.querySelectorAll("input").forEach((control) => {
+        if (control instanceof HTMLInputElement) control.required = !hidden;
+      });
     }
     const due = form.querySelector("[data-notify-due-soon]");
     const lead = form.querySelector("[data-lead-days]");
     if (due instanceof HTMLInputElement && lead instanceof HTMLElement) {
-      lead.classList.toggle("hidden", !due.checked);
+      const hidden = !due.checked;
+      lead.classList.toggle("hidden", hidden);
+      lead.querySelectorAll("input").forEach((control) => {
+        if (control instanceof HTMLInputElement) control.required = !hidden;
+      });
     }
   });
 }
