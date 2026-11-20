@@ -47,6 +47,9 @@ def _new_tax(owner, **fields: str):
 def test_tax_pages_are_hidden_until_taxes_are_switched_on(owner):
     assert owner.client.get("/taxes").status_code == 404
     assert owner.client.get("/taxes/new").status_code == 404
+    old = owner.client.get("/taxes/calculator", follow_redirects=False)
+    assert old.status_code == 303
+    assert owner.client.get(old.headers["location"]).status_code == 404
     assert "data-taxes-link" not in owner.client.get("/").text
     settings = owner.client.get("/workspace/settings").text
     assert "data-taxes-switch" in settings and 'aria-pressed="false"' in settings
