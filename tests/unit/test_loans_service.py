@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 import pytest
@@ -14,7 +14,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.loans import DayCount, LoanKind, LoanValidationError
 from assetboard.domain.money import Money
-from assetboard.services import loan_schedule, loans
+from assetboard.services import loan_payments, loan_schedule, loans
 from assetboard.services.context import PermissionDenied
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -190,6 +190,85 @@ def test_current_balance_path_creates_one_checkpoint(team: WorkspaceDb) -> None:
         assert checkpoints[0].remaining_principal_minor == 15_000_000
         changes = LoanRateChangeRepository(session, team.ctx("owner", "owner")).for_loan(loan_id)
         assert [row.effective_from for row in changes] == [date(2026, 2, 1)]
+
+
+def test_a_later_checkpoint_keeps_a_current_balance_loan_usable(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _current_loan(team)
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+
+    view = loans.get_loan(team.factory, team.ctx("viewer", "viewer"), loan_id)
+    assert view.start_date == date(2026, 2, 1)
+    assert view.start_balance == _money(15_000_000)
+    assert view.balance_date == date(2026, 5, 1)
+    assert view.current_balance == _money(14_000_000)
+    assert view.current_rate_bp == 500
+
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None and data.summary is not None
+    assert data.summary.remaining_principal.amount_minor > 0
+    checkpoints = loan_payments.list_loan_checkpoints(team.factory, ctx, loan_id)
+    assert len(checkpoints) == 2
+    assert all(row.error_code is None for row in checkpoints)
+
+
+def test_terms_edit_keeps_a_later_checkpoint(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _current_loan(team)
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+    loans.update_loan_terms(
+        team.factory,
+        ctx,
+        loan_id,
+        name="Car loan",
+        kind="equal_principal",
+        principal_original=_money(20_000_000),
+        current_balance=_money(15_500_000),
+        balance_date=date(2026, 2, 1),
+        origination_date=None,
+        first_payment_date=date(2026, 3, 1),
+        term_months=60,
+        payment_day=1,
+        installment_override=None,
+    )
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.start_balance == _money(15_500_000)
+    assert view.start_date == date(2026, 2, 1)
+    assert view.current_balance == _money(14_000_000)
+    assert view.balance_date == date(2026, 5, 1)
+
+
+def test_a_later_checkpoint_keeps_the_interest_only_clock(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _current_loan(team, interest_only_months=6)
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None
+    first_amortizing = next(
+        row.date for row in data.schedule.rows if row.principal.amount_minor > 0
+    )
+    assert first_amortizing == date(2026, 9, 1)
 
 
 def test_variable_loan_uses_reference_rate_and_margin(team: WorkspaceDb) -> None:

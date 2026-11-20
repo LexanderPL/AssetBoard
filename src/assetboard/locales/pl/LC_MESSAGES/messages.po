@@ -4653,6 +4653,11 @@ msgstr "Punkt kontrolny nie może przypadać przed rozpoczęciem kredytu."
 msgid "A checkpoint already exists on that date."
 msgstr "Punkt kontrolny dla tej daty już istnieje."
 
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+"Data salda początkowego musi być wcześniejsza niż następny punkt "
+"kontrolny."
+
 msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
@@ -10735,11 +10740,11 @@ msgstr ""
 "Rzeczywiste/365: rzeczywista liczba dni w każdym okresie."
 
 #, python-format
-msgid "Current balance (%(currency)s)"
-msgstr "Bieżące saldo (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
+msgstr "Saldo początkowe (%(currency)s)"
 
-msgid "Balance date"
-msgstr "Data salda"
+msgid "Starting balance date"
+msgstr "Data salda początkowego"
 
 msgid "Remaining months"
 msgstr "Pozostałe miesiące"
@@ -10881,6 +10886,13 @@ msgstr "Część kapitałowa jest równa każdego miesiąca, więc rata maleje w
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
 msgstr "Wszystkie kwoty są w %(currency)s, walucie obszaru roboczego."
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr "Bieżące saldo (%(currency)s)"
+
+msgid "Balance date"
+msgstr "Data salda"
 
 msgid ""
 "Leave empty to use the first payment date's day. A shorter month uses its"

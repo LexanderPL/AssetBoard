@@ -4310,6 +4310,9 @@ msgstr ""
 msgid "A checkpoint already exists on that date."
 msgstr ""
 
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+
 msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
@@ -9774,10 +9777,10 @@ msgid ""
 msgstr ""
 
 #, python-format
-msgid "Current balance (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
 msgstr ""
 
-msgid "Balance date"
+msgid "Starting balance date"
 msgstr ""
 
 msgid "Remaining months"
@@ -9904,6 +9907,13 @@ msgstr ""
 
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr ""
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr ""
+
+msgid "Balance date"
 msgstr ""
 
 msgid ""

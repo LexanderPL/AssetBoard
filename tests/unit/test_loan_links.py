@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -171,6 +171,45 @@ def test_loan_balance_from_origination_checkpoint_and_actuals(team: WorkspaceDb)
     assert not isinstance(after, Unavailable)
     assert after.amount_minor == before.amount_minor - 50_000
     assert checkpoint
+
+
+def test_current_balance_loan_with_a_later_checkpoint_still_links(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_id = loans.create_loan(
+        team.factory,
+        ctx,
+        entry_path="current",
+        name="Car loan",
+        kind="equal_principal",
+        principal_original=_money(20_000_000),
+        current_balance=_money(15_000_000),
+        balance_date=date(2026, 2, 1),
+        origination_date=None,
+        first_payment_date=date(2026, 3, 1),
+        term_months=60,
+        payment_day=1,
+        rate_mode="fixed",
+        fixed_rate_bp=500,
+        reference_rate_id=None,
+        margin_bp=None,
+        high_rate_confirmed=False,
+        installment_override=None,
+        overpayment_mode="none",
+        overpayment_amount=None,
+        overpayment_strategy="reduce_term",
+    )
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(14_000_000),
+    )
+    with team.factory() as session:
+        balance = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 7, 1))
+    assert not isinstance(balance, Unavailable)
+    assert 0 < balance.amount_minor < 14_000_000
 
 
 def test_loan_balance_counts_only_transfers_through_the_requested_date(

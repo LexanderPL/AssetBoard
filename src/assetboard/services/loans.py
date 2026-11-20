@@ -159,6 +159,8 @@ class LoanView:
     principal_original: Money | None
     current_balance: Money | None
     balance_date: date | None
+    start_balance: Money | None
+    start_date: date | None
     origination_date: date | None
     first_payment_date: date
     term_months: int
@@ -436,7 +438,7 @@ def _segments_from_changes(
 def _view_segments(view: LoanView) -> list[RateSegment]:
     if view.kind is LoanKind.INSTALLMENT_PLAN:
         return []
-    start = view.origination_date or view.balance_date
+    start = view.start_date
     if start is None:
         raise LoanError("origination_date", "invalid_date")
     return _segments_from_changes(
@@ -453,7 +455,7 @@ def rate_timeline(view: LoanView) -> list[RatePeriod]:
     """The flat rate timeline of a loan view: initial rate plus every rate segment start."""
     if view.kind is LoanKind.INSTALLMENT_PLAN:
         return []
-    start = view.origination_date or view.balance_date
+    start = view.start_date
     if start is None:
         raise LoanError("origination_date", "invalid_date")
     return build_rate_timeline_domain(_view_segments(view), start)
@@ -669,8 +671,10 @@ def _view(
     """
     entry = _entry_path(loan)
     latest_checkpoint = None
+    earliest_checkpoint = None
     if checkpoints:
         latest_checkpoint = max(checkpoints, key=lambda row: (row.as_of, row.id))
+        earliest_checkpoint = min(checkpoints, key=lambda row: (row.as_of, row.id))
     initial_reference = (
         reference_data.rates.get(loan.reference_rate_id)
         if loan.reference_rate_id is not None
@@ -695,6 +699,13 @@ def _view(
             else None
         ),
         balance_date=latest_checkpoint.as_of if latest_checkpoint is not None else None,
+        start_balance=(
+            Money(earliest_checkpoint.remaining_principal_minor, loan.currency)
+            if earliest_checkpoint is not None
+            else _money(loan.principal_original_minor, loan.currency)
+        ),
+        start_date=loan.origination_date
+        or (earliest_checkpoint.as_of if earliest_checkpoint is not None else None),
         origination_date=loan.origination_date,
         first_payment_date=loan.first_payment_date,
         term_months=loan.term_months,
@@ -784,9 +795,7 @@ def _view(
         if not tolerant_rates:
             raise
         timeline = []
-    initial_on = loan.origination_date or (
-        min(row.as_of for row in checkpoints) if checkpoints else None
-    )
+    initial_on = view.start_date
     try:
         current_mode, current_name, current_margin = _current_rate_source(view, today)
     except LoanError:
@@ -1497,8 +1506,6 @@ def update_loan_terms(
             raise LoanError("principal_original", "drawdown_exceeds_principal")
         if entry == "current" and (current_balance is None or balance_date is None):
             raise LoanError("current_balance", "invalid_balance")
-        if entry == "current" and len(checkpoints) != 1:
-            raise LoanError("current_balance", "invalid_balance")
         today = ctx.clock.today(ctx.workspace.timezone)
         reference_values = (
             ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
@@ -1535,8 +1542,13 @@ def update_loan_terms(
         if entry == "current":
             assert balance_date is not None
             assert current_balance is not None
+            ordered = sorted(checkpoints, key=lambda row: (row.as_of, row.id))
+            if not ordered:
+                raise LoanError("current_balance", "invalid_balance")
+            if len(ordered) > 1 and balance_date >= ordered[1].as_of:
+                raise LoanError("balance_date", "checkpoint_order")
             LoanBalanceCheckpointRepository(session, ctx).update(
-                checkpoints[0].id,
+                ordered[0].id,
                 as_of=balance_date,
                 remaining_principal_minor=current_balance.amount_minor,
             )

@@ -208,33 +208,35 @@ def _base_anchor(inputs: LoanScheduleInputs) -> ScheduleAnchor:
 def schedule_from_anchor(
     inputs: LoanScheduleInputs, anchor: ScheduleAnchor, as_of: date
 ) -> Schedule:
-    """Build from ``anchor`` with the remaining term adjusted for rows already projected.
+    """Build from ``anchor``; ``build_inputs_schedule`` adjusts the remaining term and IO."""
+    return build_inputs_schedule(replace(inputs, anchor=anchor, as_of=as_of))
 
-    The F7.2 engine takes the number of payments from its anchor. A checkpoint after the loan's
-    base anchor needs the original term minus the rows the base schedule already put before it.
+
+def _terms_for_anchor(inputs: LoanScheduleInputs) -> LoanTerms:
+    """The terms for a schedule anchored after the loan start.
+
+    A checkpoint shortens the remaining term and the remaining interest-only phase by the
+    payments already projected before it. The IO clock therefore still starts at the loan
+    start, not at the checkpoint. At least one amortizing payment must remain.
     """
+    terms = inputs.terms
     base = _base_anchor(inputs)
-    remaining = inputs.terms.term_months
-    if anchor.date > base.date:
-        base_schedule = build_inputs_schedule(replace(inputs, anchor=base, as_of=as_of))
-        elapsed = sum(1 for row in base_schedule.rows if row.date <= anchor.date)
-        remaining = max(1, inputs.terms.term_months - elapsed)
-    terms = (
-        inputs.terms
-        if remaining == inputs.terms.term_months
-        else replace(
-            inputs.terms,
-            term_months=remaining,
-            # A checkpoint this late is already past the original IO boundary, so the
-            # remaining schedule amorts from the start and the term stays valid.
-            interest_only_months=(
-                0
-                if remaining <= inputs.terms.interest_only_months
-                else inputs.terms.interest_only_months
-            ),
-        )
+    if inputs.anchor.date <= base.date:
+        return terms
+    base_schedule = build_inputs_schedule(replace(inputs, anchor=base, terms=terms))
+    elapsed = sum(1 for row in base_schedule.rows if row.date <= inputs.anchor.date)
+    remaining = max(1, terms.term_months - elapsed)
+    # An original loan keeps its absolute IO clock from the origination date; only a
+    # current-balance loan (no origination date) starts the clock at its anchor.
+    io_remaining = terms.interest_only_months
+    if terms.origination_date is None:
+        io_remaining = max(0, io_remaining - elapsed)
+    io_remaining = min(io_remaining, max(0, remaining - 1))
+    return replace(
+        terms,
+        term_months=remaining,
+        interest_only_months=io_remaining,
     )
-    return build_inputs_schedule(replace(inputs, anchor=anchor, terms=terms, as_of=as_of))
 
 
 def build_inputs_schedule(
@@ -247,7 +249,7 @@ def build_inputs_schedule(
 ) -> Schedule:
     """Build a schedule from loaded inputs, replacing only what a scenario changes."""
     return build_schedule(
-        terms if terms is not None else inputs.terms,
+        terms if terms is not None else _terms_for_anchor(inputs),
         rates if rates is not None else inputs.rate_timeline,
         inputs.costs,
         overpayments if overpayments is not None else inputs.overpayments,

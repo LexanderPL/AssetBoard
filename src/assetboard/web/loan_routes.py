@@ -149,6 +149,7 @@ ERRORS = {
     "checkpoint_future": _("A checkpoint date cannot be in the future."),
     "checkpoint_before_start": _("A checkpoint cannot start before the loan."),
     "checkpoint_exists": _("A checkpoint already exists on that date."),
+    "checkpoint_order": _("The starting balance date must be before the next checkpoint."),
     "starting_checkpoint_required": _(
         "The starting balance checkpoint is required for a loan entered from its current balance."
     ),
@@ -648,8 +649,8 @@ def _loan_values_from_view(view: loans.LoanView, locale: str) -> dict[str, str]:
         "kind": view.kind.value,
         "principal_original": amount(view.principal_original),
         "origination_date": view.origination_date.isoformat() if view.origination_date else "",
-        "current_balance": amount(view.current_balance),
-        "balance_date": view.balance_date.isoformat() if view.balance_date else "",
+        "current_balance": amount(view.start_balance),
+        "balance_date": view.start_date.isoformat() if view.start_date else "",
         "first_payment_date": view.first_payment_date.isoformat(),
         "term_months": str(view.term_months),
         "interest_only_months": str(view.interest_only_months),

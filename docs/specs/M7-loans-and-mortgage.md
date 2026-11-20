@@ -309,6 +309,11 @@ optional ledger transaction link. Tests: re-anchoring changes the future schedul
   earlier checkpoint, otherwise origination, with the F7.2 engine; the projected balance is the
   last closing at/before the date (or the anchor balance). Variance is checkpoint balance minus
   projection. A projection error marks that row instead of failing the list.
+- A later checkpoint re-anchors the **balance**, not the loan's start: the rate timeline always
+  starts at origination or the earliest checkpoint, and a current-balance loan's remaining
+  interest-only phase is reduced by the payments already before the new anchor. Editing terms
+  with several checkpoints updates the starting checkpoint and keeps the later balance updates;
+  the new starting date must stay before the next checkpoint.
 - `services.loan_schedule` now also loads actual payments. Installment payments are aggregated
   by date and replace the components/total in the schedule table with an **Actual** badge;
   overpayment-only payments stay in the payment list. The closing column remains projected.
