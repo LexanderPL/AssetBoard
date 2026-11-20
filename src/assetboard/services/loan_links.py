@@ -92,9 +92,9 @@ def loan_balance_at(
     except NotFound:
         return UNAVAILABLE
     if view.kind is loans.LoanKind.INSTALLMENT_PLAN:
-        from assetboard.services.installment_plans import plan_remaining_minor_in_session
+        from assetboard.services.installment_plans import plan_remaining_minor_at_in_session
 
-        amount = plan_remaining_minor_in_session(session, ctx, loan_id)
+        amount = plan_remaining_minor_at_in_session(session, ctx, loan_id, as_of)
         return UNAVAILABLE if amount is None else Money(amount, view.currency)
     try:
         inputs = loan_schedule.load_loan_schedule_inputs_in_session(session, ctx, loan_id, as_of)

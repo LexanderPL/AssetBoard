@@ -432,14 +432,28 @@ decrement-on-post behaviour, linked liability and overview table. Tests for coun
   plan end date, audits without amounts, and either refreshes generated occurrences or closes the
   plan. Closing sets the plan `closed_at`, archives the Loan, removes pending future occurrences
   and keeps posted/past history. No `LoanPayment` is created for a plan.
+- The count is symmetric across the lifecycle: undo, ledger delete and restore call
+  `revert_posted_occurrence()` / `apply_posted_occurrence()` so the count, progress, end date and
+  liability do not drift; auto-post runs the same hooks through a trusted system context. Undoing
+  an installment of an archived plan reopens the plan and reuses its archived scheduled item, so
+  the regenerated rows do not duplicate. Restoring a plan does the same.
+- Auto-post keeps the item's `auto_post` flag and reminder lead, uses a system context that
+  bypasses the interactive two-factor gate, and does not create ordinary-loan payments; the M7
+  F7.6 rule that only manual Upcoming posting auto-records a payment is unchanged.
+- Overdue installments stay postable: generation uses the earliest pending occurrence date, not
+  today's nominal date, so a plan whose end date has passed but still has pending rows can post
+  them one by one and close at zero.
 - Active plans and closed plans are listed separately. The plan detail screen links the
   net-worth liability and Upcoming generation controls; the property/LTV section is intentionally
   omitted. Archive and restore use the same close/disable machinery. Ordinary `loans` list
   queries exclude plan rows, and `/loans/{id}` redirects a plan to its installment detail page.
-- `loan_links.loan_balance_at()` special-cases plans as `installment × remaining_count`, zero
-  when closed/archived. The linked liability helper creates a translated **Installments**
-  category for plans instead of **Mortgage**; the resolver choices/describe and idempotent link
-  behavior are shared with ordinary loans.
+- `loan_links.loan_balance_at()` special-cases plans with an `as_of`-aware helper: the original
+  count is reconstructed from `remaining_count + posted_count`, posted occurrences whose linked
+  transaction date (or due date when unlinked) is on or before `as_of` are subtracted, and the
+  result is zero before the plan existed and on/after closure or archiving. The current UI and
+  scheduling use `installment × remaining_count` directly. The linked liability
+  helper creates a translated **Installments** category for plans instead of **Mortgage**; the
+  resolver choices/describe and idempotent link behavior are shared with ordinary loans.
 - Plan scheduled items use the plan dates and a fixed `from_loan` amount; ordinary loan
   generation and auto-record behavior are unchanged.
 

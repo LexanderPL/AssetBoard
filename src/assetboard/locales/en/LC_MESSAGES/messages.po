@@ -658,6 +658,24 @@ msgstr ""
 msgid "Administrator role removed"
 msgstr ""
 
+msgid "Installment plan created"
+msgstr ""
+
+msgid "Installment plan updated"
+msgstr ""
+
+msgid "Installment plan payment posted"
+msgstr ""
+
+msgid "Installment plan payment reverted"
+msgstr ""
+
+msgid "Installment plan archived"
+msgstr ""
+
+msgid "Installment plan restored"
+msgstr ""
+
 msgid "Demo workspace reset"
 msgstr ""
 
@@ -999,6 +1017,12 @@ msgid "Valid for days"
 msgstr ""
 
 msgid "Categories"
+msgstr ""
+
+msgid "Plan"
+msgstr ""
+
+msgid "Posted on"
 msgstr ""
 
 msgid "Deleted entries cleared"
@@ -4418,7 +4442,7 @@ msgstr ""
 msgid "No installment is due yet."
 msgstr ""
 
-msgid "The month is closed. Reopen it before posting the installment."
+msgid "The month is closed. Reopen it before changing this plan or posting."
 msgstr ""
 
 msgid "That installment is no longer pending."
@@ -6926,9 +6950,6 @@ msgid ""
 "Projections are illustrative and not financial advice. The projection "
 "assumes constant rates and does not model taxes separately; actual "
 "results will differ."
-msgstr ""
-
-msgid "Plan"
 msgstr ""
 
 msgid "Horizon age"
@@ -15272,6 +15293,9 @@ msgstr ""
 #~ "Available only in an empty workspace."
 #~ " The untouched suggested categories are "
 #~ "fine."
+#~ msgstr ""
+
+#~ msgid "The month is closed. Reopen it before posting the installment."
 #~ msgstr ""
 
 #~ msgid "Fix the filters to export the year overview."

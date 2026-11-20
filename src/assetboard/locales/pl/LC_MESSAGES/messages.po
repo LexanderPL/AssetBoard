@@ -677,6 +677,24 @@ msgstr "Nadano uprawnienia administratora"
 msgid "Administrator role removed"
 msgstr "Odebrano uprawnienia administratora"
 
+msgid "Installment plan created"
+msgstr "Utworzono plan ratalny"
+
+msgid "Installment plan updated"
+msgstr "Zaktualizowano plan ratalny"
+
+msgid "Installment plan payment posted"
+msgstr "Zaksięgowano ratę planu"
+
+msgid "Installment plan payment reverted"
+msgstr "Cofnięto księgowanie raty planu"
+
+msgid "Installment plan archived"
+msgstr "Zarchiwizowano plan ratalny"
+
+msgid "Installment plan restored"
+msgstr "Przywrócono plan ratalny"
+
 msgid "Demo workspace reset"
 msgstr "Zresetowano obszar demonstracyjny"
 
@@ -1018,6 +1036,12 @@ msgstr "Ważne dni"
 
 msgid "Categories"
 msgstr "Kategorie"
+
+msgid "Plan"
+msgstr "Plan"
+
+msgid "Posted on"
+msgstr "Zaksięgowano"
 
 msgid "Deleted entries cleared"
 msgstr "Usunięte wpisy wyczyszczone"
@@ -4770,8 +4794,10 @@ msgstr "Nie można przywrócić zamkniętego planu ratalnego."
 msgid "No installment is due yet."
 msgstr "Żadna rata nie jest jeszcze wymagalna."
 
-msgid "The month is closed. Reopen it before posting the installment."
-msgstr "Miesiąc jest zamknięty. Otwórz go ponownie przed zaksięgowaniem raty."
+msgid "The month is closed. Reopen it before changing this plan or posting."
+msgstr ""
+"Miesiąc jest zamknięty. Otwórz go ponownie przed zmianą tego planu lub "
+"księgowaniem."
 
 msgid "That installment is no longer pending."
 msgstr "Ta rata nie oczekuje już na księgowanie."
@@ -7542,9 +7568,6 @@ msgstr ""
 "Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
 "Prognoza zakłada stałe stopy i nie modeluje podatków osobno; rzeczywiste "
 "wyniki będą inne."
-
-msgid "Plan"
-msgstr "Plan"
 
 msgid "Horizon age"
 msgstr "Wiek horyzontu"
@@ -16219,6 +16242,9 @@ msgstr "Usuń obszar roboczy…"
 #~ "Dostępne tylko w pustym obszarze "
 #~ "roboczym. Nietknięte proponowane kategorie nie"
 #~ " przeszkadzają."
+
+#~ msgid "The month is closed. Reopen it before posting the installment."
+#~ msgstr "Miesiąc jest zamknięty. Otwórz go ponownie przed zaksięgowaniem raty."
 
 #~ msgid "Fix the filters to export the year overview."
 #~ msgstr "Popraw filtry, aby wyeksportować przegląd roczny."

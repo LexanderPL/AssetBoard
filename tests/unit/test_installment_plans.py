@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
 
-from assetboard.db.models.identity import AuditEvent
+from assetboard.config import Settings
+from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.repositories import (
     CategoryRepository,
     InstallmentPlanRepository,
@@ -17,8 +18,17 @@ from assetboard.db.repositories import (
     ScheduledOccurrenceRepository,
 )
 from assetboard.domain.loans import LoanKind, LoanValidationError, Money
+from assetboard.domain.months import YearMonth
 from assetboard.domain.scheduled import AmountMode
-from assetboard.services import installment_plans, loan_links, loan_scheduled, loans, occurrences
+from assetboard.services import (
+    installment_plans,
+    loan_links,
+    loan_scheduled,
+    loans,
+    months,
+    occurrences,
+    transactions,
+)
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -288,6 +298,412 @@ def test_list_active_and_closed(team: WorkspaceDb) -> None:
     page = installment_plans.list_installment_plans(team.factory, team.ctx("viewer", "viewer"))
     assert [row.loan.id for row in page.active] == [first]
     assert [row.loan.id for row in page.closed] == [second]
+
+
+def test_plan_balance_at_as_of_uses_posted_occurrences(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    with team.factory() as session:
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 2, 1)) == _money(0)
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 2, 1)
+            )
+            == 0
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 300_000
+        )
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        rows = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+        first, second, third = rows
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 300_000
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 5)
+            )
+            == 200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 5)) == _money(
+            200_000
+        )
+    team.clock._value = datetime(2026, 4, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, second.id, amount_minor=100_000, day=date(2026, 4, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 4, 5)
+            )
+            == 100_000
+        )
+    team.clock._value = datetime(2026, 5, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, third.id, amount_minor=100_000, day=date(2026, 5, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 4, 5)
+            )
+            == 100_000
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 5, 5)
+            )
+            == 0
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 4, 5)) == _money(
+            100_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 5, 5)) == _money(0)
+
+
+def test_post_undo_and_repost_keep_the_plan_count(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 2
+    occurrences.undo_post(team.factory, ctx, first.id)
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 3
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_ledger_delete_and_restore_keep_the_plan_count(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    transaction_id = occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 3
+    transactions.undo_delete(team.factory, ctx, transaction_id)
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_auto_post_keeps_the_item_flag_and_posts_more_than_once(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory.begin() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        ScheduledItemRepository(session, ctx).update(item.id, auto_post=True)
+    assert occurrences.auto_post_workspace(team.factory, ctx, ctx.clock) == 1
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        assert item.auto_post is True
+    team.clock._value = datetime(2026, 4, 5, 12, tzinfo=UTC)
+    assert occurrences.auto_post_workspace(team.factory, ctx, ctx.clock) == 1
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 1
+
+
+def test_auto_post_works_when_the_workspace_requires_two_factor(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    with team.factory.begin() as session:
+        workspace = session.get(Workspace, team.workspace_id)
+        assert workspace is not None
+        workspace.require_two_factor = True
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory.begin() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        ScheduledItemRepository(session, ctx).update(item.id, auto_post=True)
+    assert occurrences.auto_post_workspace(team.factory, ctx, ctx.clock) == 1
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 2
+
+
+def test_auto_post_does_not_create_ordinary_loan_payments(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 1, 15, 12, tzinfo=UTC)
+    loan_id = loans.create_loan(
+        team.factory,
+        ctx,
+        entry_path="original",
+        name="Mortgage",
+        kind="annuity",
+        principal_original=_money(30_000_000),
+        current_balance=None,
+        balance_date=None,
+        origination_date=date(2026, 1, 1),
+        first_payment_date=date(2026, 2, 1),
+        term_months=12,
+        payment_day=1,
+        rate_mode="fixed",
+        fixed_rate_bp=500,
+        reference_rate_id=None,
+        margin_bp=None,
+        high_rate_confirmed=False,
+        installment_override=None,
+        overpayment_mode="none",
+        overpayment_amount=None,
+        overpayment_strategy="reduce_term",
+    )
+    loan_links.set_auto_record_payments(team.factory, ctx, loan_id, True)
+    item_id = loan_scheduled.create_loan_schedule_item(
+        team.factory, ctx, loan_id, _category(team), Settings(_env_file=None)
+    )
+    with team.factory.begin() as session:
+        ScheduledItemRepository(session, ctx).update(item_id, auto_post=True)
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    assert occurrences.auto_post_workspace(team.factory, ctx, ctx.clock) == 1
+    with team.factory() as session:
+        assert LoanPaymentRepository(session, ctx).for_loan(loan_id) == []
+
+
+def test_undo_after_archive_reopens_and_reconciles_the_plan(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    occurrences.undo_post(team.factory, ctx, first.id)
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert view.remaining_count == 3
+    assert view.closed is False
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        rows = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+    pending = [row.due_date for row in rows if row.status == "pending"]
+    assert pending == [date(2026, 3, 5), date(2026, 4, 5), date(2026, 5, 5)]
+
+
+def test_restore_with_overdue_rows_does_not_duplicate_them(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 4, 10, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 5, 5),
+        date(2026, 6, 5),
+        date(2026, 7, 5),
+    ]
+    assert len({row.due_date for row in rows}) == 3
+
+
+def test_restore_refuses_a_closed_pending_month(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    months.close_month(team.factory, ctx, YearMonth(2026, 2))
+    team.clock._value = datetime(2026, 2, 2, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    before = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    with pytest.raises(loans.LoanError) as raised:
+        installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    assert raised.value.code == "month_closed"
+    after = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert after.closed is True
+    assert (after.remaining_count, after.end_date) == (before.remaining_count, before.end_date)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        pending = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert len(pending) == 1 and pending[0].due_date == date(2026, 2, 5)
+
+
+def test_restore_refuses_a_closed_target_month(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    team.clock._value = datetime(2026, 3, 1, 12, tzinfo=UTC)
+    months.close_month(team.factory, ctx, YearMonth(2026, 3))
+    team.clock._value = datetime(2026, 3, 2, 12, tzinfo=UTC)
+    before = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    with pytest.raises(loans.LoanError) as raised:
+        installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    assert raised.value.code == "month_closed"
+    after = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert after.closed is True
+    assert (after.remaining_count, after.end_date) == (before.remaining_count, before.end_date)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        assert all(
+            row.status != "pending"
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+        )
+
+
+def test_restore_after_the_original_end_date_still_schedules_the_count(
+    team: WorkspaceDb,
+) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 6, 10, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 7, 5),
+        date(2026, 8, 5),
+        date(2026, 9, 5),
+    ]
+
+
+def test_restore_after_archive_with_no_pending_rows_schedules_the_count(
+    team: WorkspaceDb,
+) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    team.clock._value = datetime(2026, 2, 20, 12, tzinfo=UTC)
+    installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    with team.factory() as session:
+        items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+        rows = [
+            row
+            for item in items
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert sorted(row.due_date for row in rows) == [
+        date(2026, 3, 5),
+        date(2026, 4, 5),
+        date(2026, 5, 5),
+    ]
+
+
+def test_undo_after_disable_and_reenable_does_not_revive_the_old_item(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    loan_scheduled.disable_loan_schedule_item(team.factory, ctx, loan_id)
+    loan_scheduled.create_loan_schedule_item(
+        team.factory, ctx, loan_id, _category(team), Settings(_env_file=None)
+    )
+    occurrences.undo_post(team.factory, ctx, first.id)
+    with team.factory() as session:
+        active = ScheduledItemRepository(session, ctx).ordered(active_only=True)
+        rows = [
+            row
+            for item in ScheduledItemRepository(session, ctx).for_loan(loan_id)
+            for row in ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+            if row.status == "pending"
+        ]
+    assert len(active) == 1
+    assert len({row.due_date for row in rows}) == len(rows) == 3
+
+
+def test_auto_post_decrements_the_plan(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    with team.factory.begin() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        ScheduledItemRepository(session, ctx).update(item.id, auto_post=True)
+    posted = occurrences.auto_post_workspace(team.factory, ctx, ctx.clock)
+    assert posted == 1
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.remaining_count, view.paid_count) == (2, 1)
+
+
+def test_overdue_installments_post_one_by_one(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 5, 10, 12, tzinfo=UTC)
+    for remaining in (2, 1, 0):
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+        view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+        assert view.remaining_count == remaining
+    assert view.closed
+    with pytest.raises(loans.LoanError) as closed:
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+    assert closed.value.code == "loan_paid_off"
+
+
+def test_plan_balance_counts_an_early_post_on_the_posting_date(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 3, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 1)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 1)) == _money(
+            200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 4)) == _money(
+            200_000
+        )
 
 
 def test_plan_balance_and_installments_liability(team: WorkspaceDb) -> None:
