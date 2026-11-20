@@ -26,14 +26,17 @@
 {%- endmacro %}
 {% block content %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{# F11.9/UX-05: a posted or skipped item keeps the visitor's place. The action form carries the
+   week anchor and the server appends it to the redirect; the status is pinned to the bottom of
+   the viewport, so it stays visible wherever the anchor lands. #}
 {% if undo and can_edit %}
-<div role="status" class="mb-4 flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-post-undo>
+<div role="status" class="fixed bottom-5 right-5 z-50 flex w-[min(28rem,calc(100vw-2.5rem))] flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong shadow-card" data-post-undo data-upcoming-pinned>
   <span>{{ _("Occurrence marked paid or received.") }}</span>
   <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
 </div>
 {% endif %}
 {% if notice %}
-<div role="status" class="mb-4 flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>
+<div role="status" class="{% if skipped_id and can_edit %}fixed bottom-5 right-5 z-50 w-[min(28rem,calc(100vw-2.5rem))] shadow-card {% else %}mb-4{% endif %} flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong"{% if skipped_id and can_edit %} data-upcoming-pinned{% endif %} data-upcoming-notice>
   <span>{{ notice }}</span>
   {% if skipped_id and can_edit %}
   <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=skipped_id) }}" data-skip-undo>{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
@@ -128,6 +131,7 @@
 </details>
 <p class="mb-6 mt-3 text-sm text-muted">{{ _("Showing overdue items and the next %(days)d days.", days=days) }}</p>
 {% for week in weeks %}
+{% set week_anchor = "week-" ~ week.monday.isoformat() %}
 <section class="mb-8" aria-labelledby="week-{{ week.monday.isoformat() }}">
   <h2 id="week-{{ week.monday.isoformat() }}" class="mb-3 text-base font-semibold">{{ _("Week of %(date)s", date=format_day(week.monday, locale)) }}</h2>
   <div class="panel divide-y divide-line">
@@ -135,7 +139,7 @@
   {# A future payment is recorded when it happens, not on its future due date: the dialog starts
      at today unless the occurrence is already due. #}
   {% set post_day = today if occurrence.due_date > today else occurrence.due_date %}
-  <article class="p-4 sm:p-5 {% if occurrence.due_date < today %}bg-danger-soft{% endif %}" data-occurrence="{{ occurrence.id }}">
+  <article id="occurrence-{{ occurrence.id }}" class="p-4 sm:p-5 {% if occurrence.due_date < today %}bg-danger-soft{% endif %}" data-occurrence="{{ occurrence.id }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <h3 class="break-words font-semibold">{{ occurrence.label }}</h3>
@@ -159,6 +163,7 @@
            rule; the posting date/transaction amount dialog stays available from sm up. #}
         <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="sm:hidden" data-phone-post>
           {{ csrf_input() }}
+          <input type="hidden" name="anchor" value="{{ week_anchor }}">
           <input type="hidden" name="day" value="{{ post_day.isoformat() }}">
           <input type="hidden" name="amount" value="{{ amount_input(occurrence.expected) }}">
           <button type="submit" class="btn-primary btn-sm">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></button>
@@ -171,13 +176,14 @@
           {% else %}
           <a class="row-menu-item" href="{{ page_url('reschedule-' ~ occurrence.id) }}" data-dialog-open="reschedule-{{ occurrence.id }}-dialog">{{ _("Reschedule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
           <a class="row-menu-item" href="{{ page_url('amount-' ~ occurrence.id) }}" data-dialog-open="amount-{{ occurrence.id }}-dialog">{{ _("Edit amount") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="row-menu-item">{{ _("Skip") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<input type="hidden" name="anchor" value="{{ week_anchor }}"><button type="submit" class="row-menu-item">{{ _("Skip") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
           {% if occurrence.scheduled_item_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}">{{ _("Edit rule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% elif occurrence.income_source_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}">{{ _("Edit income") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% endif %}
           {% endif %}
         {% endcall %}
         {% if not occurrence.one_time %}
         <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}" class="sm:hidden" data-phone-skip>
           {{ csrf_input() }}
+          <input type="hidden" name="anchor" value="{{ week_anchor }}">
           <button type="submit" class="btn-sm">{{ _("Skip") }}<span class="sr-only"> {{ occurrence.label }}</span></button>
         </form>
         {% endif %}
@@ -188,6 +194,7 @@
     {% call dialog_shell('paid-' ~ occurrence.id, _('Mark paid or received'), occurrence.label) %}
     <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-4 grid gap-4 sm:grid-cols-2">
       {{ csrf_input() }}
+      <input type="hidden" name="anchor" value="{{ week_anchor }}">
       <div>
         <label for="post-day-{{ occurrence.id }}" class="mb-1 block text-sm font-medium">{{ _("Date") }}</label>
         <input id="post-day-{{ occurrence.id }}" name="day" type="date" value="{{ post_day.isoformat() }}" required class="{{ input_class }}">

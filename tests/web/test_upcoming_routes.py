@@ -104,6 +104,24 @@ def test_a_future_payment_date_is_refused(owner):
         assert session.scalars(select(Transaction)).all() == []
 
 
+def test_skip_keeps_the_week_in_view(owner):
+    fixed_clock(owner)
+    assert create_recurring(owner, include_past="1").status_code == 303
+    with owner.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).first()
+        assert occurrence is not None
+        occurrence_id = occurrence.id
+    page = owner.client.get("/upcoming").text
+    assert 'name="anchor" value="week-2026-02-23"' in page
+    skipped = owner.post(
+        f"/upcoming/{occurrence_id}/skip",
+        {"anchor": "week-2026-02-23"},
+        token_from="/upcoming",
+    )
+    assert skipped.status_code == 303
+    assert skipped.headers["location"].endswith("#week-2026-02-23")
+
+
 def test_mark_paid_dialog_is_a_modal_and_starts_at_today(owner):
     fixed_clock(owner)  # 2026-03-01
     assert create_recurring(owner, start_date="2026-03-21", month_day="21").status_code == 303

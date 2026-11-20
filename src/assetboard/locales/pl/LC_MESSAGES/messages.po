@@ -6222,6 +6222,9 @@ msgstr ""
 " albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
 "podany poniżej i potwierdź ponownie."
 
+msgid "Skip to content"
+msgstr "Przejdź do treści"
+
 msgid "Menu"
 msgstr "Menu"
 
@@ -6292,6 +6295,9 @@ msgstr "Kontynuuj"
 msgid "Cancel"
 msgstr "Anuluj"
 
+msgid "Customise"
+msgstr "Dostosuj"
+
 #, python-format
 msgid "Loading %(widget)s…"
 msgstr "Ładowanie: %(widget)s…"
@@ -6308,14 +6314,6 @@ msgstr "Twoja strona główna jest pusta"
 
 msgid "Choose the widgets you want to see."
 msgstr "Wybierz widżety, które chcesz widzieć."
-
-msgid "Choose which widgets appear on Home and in what order."
-msgstr ""
-"Wybierz, które widżety pojawiają się na stronie głównej i w jakiej "
-"kolejności."
-
-msgid "Customise"
-msgstr "Dostosuj"
 
 msgid "You are offline"
 msgstr "Jesteś offline"
@@ -13448,6 +13446,9 @@ msgstr "Najbliższy termin"
 msgid "Create an expense category first."
 msgstr "Najpierw dodaj kategorię wydatków."
 
+msgid "Add entry"
+msgstr "Dodaj wpis"
+
 msgid "Reopen it on the month page."
 msgstr "Można go ponownie otworzyć na stronie miesiąca."
 
@@ -16278,4 +16279,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "No spending in either year."
 #~ msgstr "Brak wydatków w obu latach."
+
+#~ msgid "Choose which widgets appear on Home and in what order."
+#~ msgstr ""
+#~ "Wybierz, które widżety pojawiają się na"
+#~ " stronie głównej i w jakiej "
+#~ "kolejności."
 

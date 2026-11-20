@@ -12,6 +12,7 @@ from tests.conftest import OwnerApp
 
 PAGES = [
     ("/", "Home", "Home"),
+    ("/m/2026-01", "Month", "Month: January 2026"),
     ("/investments/portfolio", "Investments", "Portfolio"),
     ("/investments/performance", "Investments", "Performance"),
     ("/investments/providers", "Investments", "Price providers"),

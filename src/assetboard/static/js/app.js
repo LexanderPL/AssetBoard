@@ -83,6 +83,18 @@ document.addEventListener("click", (event) => {
   const sidebarToggle = target.closest("[data-sidebar-toggle]");
   if (sidebarToggle) setSidebarOpen(sidebarToggle.getAttribute("aria-expanded") !== "true");
 
+  // F11.9/UX-01: the header's "Add entry" / "Add income" link jumps to the chronological entry
+  // row without JavaScript. With it, centre the row and put the keyboard focus in its Day field.
+  const addEntry = target.closest("[data-add-entry]");
+  if (addEntry instanceof HTMLElement) {
+    event.preventDefault();
+    const direction = addEntry.dataset.addEntry;
+    const row = document.getElementById(`entry-${direction}-row`);
+    const field = document.getElementById(`entry-${direction}-day`);
+    if (field instanceof HTMLElement) field.focus({ preventScroll: true });
+    if (row instanceof HTMLElement) row.scrollIntoView({ block: "center" });
+  }
+
   const themeReset = target.closest("[data-theme-reset]");
   if (themeReset) {
     // Drop this device's override: the saved profile theme (or the system setting) applies.
@@ -1591,5 +1603,56 @@ document.addEventListener("change", (event) => {
     event.target.matches("[data-notify-due-soon]")
   ) {
     syncConditionalFields();
+  }
+});
+
+// F11.9/UX-04: the visible "scroll sideways" hint belongs only to a table that really is wider
+// than its frame. Without JavaScript the hint stays visible below the tablet breakpoint, where
+// the wide data tables always scroll; with it, any table that fits gets a quiet frame instead.
+function updateTableScrollHints() {
+  document.querySelectorAll("[data-table-frame]").forEach((frame) => {
+    const region = frame.querySelector("[data-table-scroll]");
+    const hint = frame.querySelector("[data-table-scroll-hint]");
+    if (!(region instanceof HTMLElement) || !(hint instanceof HTMLElement)) return;
+    hint.hidden = region.scrollWidth <= region.clientWidth + 1;
+  });
+}
+document.addEventListener("DOMContentLoaded", updateTableScrollHints);
+for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap", "htmx:load"]) {
+  document.addEventListener(eventName, updateTableScrollHints);
+}
+window.addEventListener("resize", updateTableScrollHints);
+
+// F11.9/UX-05: a redirect may lose its fragment in a service-worker navigation response, so the
+// Upcoming page also names the week in ?at=. Scroll there once the document is ready.
+function scrollToRequestedAnchor() {
+  const anchor = new URLSearchParams(window.location.search).get("at") || "";
+  if (!/^(?:week-[0-9]{4}-[0-9]{2}-[0-9]{2}|occurrence-[0-9a-f-]{36})$/.test(anchor)) return;
+  const target = document.getElementById(anchor);
+  if (target instanceof HTMLElement) target.scrollIntoView({ block: "start" });
+}
+document.addEventListener("DOMContentLoaded", scrollToRequestedAnchor);
+
+// A table scroll region is focusable (the FIRE pattern); Chromium does not move a horizontal
+// scroller with the arrow keys on its own, so the focused region handles them itself. Events
+// from a field inside the table keep their normal behaviour.
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const region = target.closest("[data-table-scroll]");
+  if (!(region instanceof HTMLElement) || target !== region) return;
+  const step = Math.max(40, Math.round(region.clientWidth * 0.25));
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    region.scrollLeft -= step;
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    region.scrollLeft += step;
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    region.scrollLeft = 0;
+  } else if (event.key === "End") {
+    event.preventDefault();
+    region.scrollLeft = region.scrollWidth;
   }
 });

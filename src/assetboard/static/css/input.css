@@ -129,6 +129,16 @@
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-ink transition hover:bg-subtle hover:text-ink;
   }
 
+  /* The first focusable element on a signed-in page: visually hidden until focused, then a
+     normal primary-toned button at the top-left, above the fixed sidebar. */
+  .skip-link {
+    @apply sr-only;
+  }
+
+  .skip-link:focus {
+    @apply not-sr-only fixed left-4 top-4 z-50 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-card;
+  }
+
   .nav-link[aria-current="page"] {
     @apply bg-primary-soft text-primary-ink;
   }

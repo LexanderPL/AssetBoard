@@ -3,7 +3,7 @@
    attribute (a form cannot wrap a table row). Keyboard handling, focus after a swap and the
    autocomplete list are in static/js/app.js (data-* hooks); no inline script or style.
    Classes are set once here, so the colour tokens can replace them in one place. #}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, table_scroll with context %}
 {% from "categories/_macros.html" import swatch, category_options %}
 {# Entry and edit rows: the inputs are the cells (input.css .cell-input); popover forms keep
    ordinary boxed fields. #}
@@ -168,8 +168,9 @@
   {% endif %}
   {% if s.state.error %}<p class="mt-2 text-sm {{ error_class }}" role="alert" data-ledger-error>{{ s.state.error }}</p>{% endif %}
   {# Narrow screens scroll the table sideways; wider ones let the suggestion list overflow.
-     "relative" keeps the sr-only labels inside the scroller (no page-wide overflow at 320px). #}
-  <div class="relative mt-3 overflow-x-auto md:overflow-visible">
+     "relative" keeps the sr-only labels inside the scroller (no page-wide overflow at 320px).
+     F11.9/UX-04: the scroller is a labelled, focusable region with a visible phone hint. #}
+  {% call table_scroll(s.heading, class_name="mt-3", scroll_class="md:overflow-visible") %}
     <table class="sheet bg-surface w-full min-w-[40rem] text-sm">
       <thead>
         <tr class="text-left text-xs {{ muted_class }}">
@@ -251,7 +252,7 @@
         {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>
-  </div>
+  {% endcall %}
 </section>
 {%- endmacro %}
 

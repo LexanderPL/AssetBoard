@@ -81,7 +81,8 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-month-link]").click()
             page.wait_for_url(f"{base}/m/{today}")
             heading = page.locator("h1")
-            expect(heading).to_contain_text(str(today.first_day.year))
+            expect(heading).to_have_text("Month")
+            expect(page.locator("[data-month-subtitle]")).to_contain_text(str(today.first_day.year))
 
             # Previous, next and "Today".
             previous = today.prev()
@@ -103,7 +104,8 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
                 page.wait_for_load_state("networkidle")
             page.locator('[data-month-option="2025-03"]').click()
             page.wait_for_url(f"{base}/m/2025-03")
-            expect(heading).to_contain_text("March 2025")
+            expect(heading).to_have_text("Month")
+            expect(page.locator("[data-month-subtitle]")).to_have_text("March 2025")
 
             # Closing asks for confirmation through the CSP-safe dialog; cancel keeps it open.
             page.locator("[data-month-close]").click()

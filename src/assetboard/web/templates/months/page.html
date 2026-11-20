@@ -4,8 +4,9 @@
    block holds the summary (#month-summary: the flow bar, F2.3's planned values, F2.4's totals)
    and the expense and income donuts. Entries are made on the Transactions page.
    No inline script or style. #}
-{% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
-{% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block title %}{{ _("Month") }}: {{ month_heading }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Month") }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block subtitle %}<p class="mt-1 text-sm text-muted" data-month-subtitle>{{ month_heading }}</p>{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
 <div class="space-y-6" data-month="{{ view.month }}">

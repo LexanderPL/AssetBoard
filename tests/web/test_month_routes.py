@@ -58,7 +58,8 @@ def test_the_current_month_is_judged_in_the_workspace_time_zone(months: OwnerApp
 
 def test_a_month_page_links_its_neighbours_and_today(months: OwnerApp) -> None:
     page = _page(months, "/m/2026-09")
-    assert "<h1" in page and "September 2026" in page
+    assert "<h1" in page and ">Month</h1>" in page and "September 2026" in page
+    assert "data-month-subtitle>September 2026</p>" in page
     assert _href(page, "data-month-prev") == "/m/2026-08"
     assert _href(page, "data-month-next") == "/m/2026-10"
     assert _href(page, "data-month-today") == "/m/2026-10"
@@ -124,10 +125,11 @@ def test_empty_and_future_months_render(months: OwnerApp) -> None:
 def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
     months.client.headers["Accept-Language"] = "pl"
     page = _page(months, "/m/2026-10")
-    # Capitalised only as a heading and title; CLDR's lowercase form in running text.
+    # The h1 names the destination; the period is the subtitle and the title's detail.
     heading = re.search(r"<h1[^>]*>\s*([^<]+?)\s*<", page)
-    assert heading is not None and heading.group(1) == "Październik 2026"
-    assert "<title>Październik 2026 · " in page and "Dzisiaj" in page
+    assert heading is not None and heading.group(1) == "Miesiąc"
+    assert "data-month-subtitle>Październik 2026</p>" in page
+    assert "<title>Miesiąc: Październik 2026 · " in page and "Dzisiaj" in page
     assert 'aria-label="Następny miesiąc: listopad 2026"' in page
     assert 'aria-label="Poprzedni miesiąc: wrzesień 2026"' in page
     assert 'data-confirm="Zamknąć miesiąc październik 2026? ' in page

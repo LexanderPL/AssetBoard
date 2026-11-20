@@ -198,7 +198,7 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
             assert stretched["panel"] > probe["before"] + 200, (probe, stretched)
             assert abs(stretched["panel"] - stretched["section"]) <= 1, stretched
 
-            # Phone: Home does not scroll sideways and Customise stays below the widgets.
+            # Phone: Home does not scroll sideways and Customise stays in the header.
             page.set_viewport_size({"width": 390, "height": 844})
             page.reload(wait_until="networkidle")
             expect(page.locator("[data-widget='month-in-out'] [data-summary-kpis]")).to_have_count(
@@ -209,12 +209,13 @@ def test_dashboard_in_a_browser(tmp_path: Path) -> None:
                 "el => getComputedStyle(el).gridTemplateColumns.split(' ').length"
             )
             assert phone_columns == 1
-            widgets_box = page.locator("[data-home-widgets]").bounding_box()
+            title_box = page.locator("h1").bounding_box()
             customise_box = page.locator("[data-customise-link]").bounding_box()
-            assert widgets_box is not None and customise_box is not None
-            assert customise_box["y"] >= widgets_box["y"] + widgets_box["height"] - 1
+            assert title_box is not None and customise_box is not None
+            assert customise_box["y"] < 844
+            assert customise_box["y"] >= title_box["y"] + title_box["height"] - 1
 
-            # Customise: the Customise link is below the widgets, the arrows reorder rows
+            # Customise: the header link opens the customiser; the arrows reorder rows
             # locally, and Save/Reset share one horizontal action row. No drag and drop.
             page.locator("[data-customise-link]").click()
             page.wait_for_url(f"{base}/dashboard/customise")

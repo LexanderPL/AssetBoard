@@ -29,6 +29,7 @@
   {% block scripts %}{% endblock %}
 </head>
 <body class="min-h-full">
+  <a href="#main-content" class="skip-link" data-skip-link>{{ _("Skip to content") }}</a>
   {% from "macros/components.html" import confirm_dialog, flashes %}
   <div class="min-h-screen">
     {# Desktop: the sidebar is fixed to the viewport (top to bottom, so its height never depends on
@@ -69,7 +70,7 @@
       </div>
       </div>
     </aside>
-    <main id="main-content" class="min-w-0 px-4 py-6 sm:px-7 lg:ml-64 lg:px-10 lg:py-9">
+    <main id="main-content" tabindex="-1" class="min-w-0 px-4 py-6 focus:outline-none sm:px-7 lg:ml-64 lg:px-10 lg:py-9">
       <div class="mx-auto max-w-6xl">
         {% set menu_item = "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-subtle focus-visible:bg-subtle" %}
         {% if demo_banner %}
@@ -82,6 +83,7 @@
             <div class="min-w-0">
               {% if workspace_nav %}<p class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-primary-ink" data-current-workspace>{{ workspace_nav.current.name }}</p>{% endif %}
               <h1 class="{% if workspace_nav %}mt-2 {% endif %}text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
+              {% block subtitle %}{% endblock %}
             </div>
             {% if workspace_nav %}
             <div class="flex flex-wrap items-center gap-2" data-header-actions>{% block header_actions %}{% endblock %}</div>

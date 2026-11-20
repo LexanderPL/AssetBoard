@@ -7,6 +7,18 @@
    values. No inline script or style. #}
 {% block title %}{{ _("Transactions") }}: {{ month_heading }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Transactions") }}: {{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block header_actions %}
+{# F11.9/UX-01: the entry rows stay chronological at the end of their tables, but a populated
+   month must not hide the primary action below the fold. A plain fragment link reveals the row
+   without JavaScript; app.js focuses its Day field and centres the row. #}
+{% if ledger.can_write %}
+{% for s in ledger.sections %}
+{% if s.categories %}
+<a href="#entry-{{ s.direction }}-row" data-add-entry="{{ s.direction }}" class="{{ 'btn-primary' if s.direction == 'expense' else 'btn' }}">{{ _("Add entry") if s.direction == "expense" else _("Add income") }}</a>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}
 {% block content %}
 <div class="space-y-6" data-month="{{ view.month }}" data-transactions-page>
   {% if notice %}

@@ -115,10 +115,10 @@
 {%- endmacro %}
 
 {% macro confirm_dialog(id, title, message, confirm_label, cancel_label) -%}
-<dialog id="{{ id }}" class="popup w-[min(92vw,28rem)]" data-backdrop-static>
+<dialog id="{{ id }}" aria-labelledby="{{ id }}-title" class="popup w-[min(92vw,28rem)]" data-backdrop-static>
   <div class="space-y-5 p-6">
     <div>
-      <h2 class="text-lg font-semibold">{{ title }}</h2>
+      <h2 id="{{ id }}-title" class="text-lg font-semibold">{{ title }}</h2>
       <p data-confirm-message class="mt-2 text-sm text-muted">{{ message }}</p>
     </div>
     <div class="flex justify-end gap-3">
@@ -127,6 +127,20 @@
     </div>
   </div>
 </dialog>
+{%- endmacro %}
+
+{# A data table that can be wider than the viewport: a labelled, keyboard-focusable scroll
+   region (the FIRE projection pattern) with a visible hint below the tablet breakpoint. The
+   hint is hidden by app.js when the table actually fits, so it never claims a sideways scroll
+   that is not there. ``chart_table`` puts the chart-table hook on the frame, so "Show as table"
+   hides the hint with the table. #}
+{% macro table_scroll(label, chart_table=false, id="", class_name="mt-3", scroll_class="") -%}
+<div{% if id %} id="{{ id }}"{% endif %} class="relative{% if class_name %} {{ class_name }}{% endif %}"{% if chart_table %} data-chart-table{% endif %} data-table-frame>
+  <p class="mb-1 text-xs text-muted md:hidden" data-table-scroll-hint><span aria-hidden="true">↔</span> {{ _("Scroll sideways to see every column.") }}</p>
+  <div class="relative overflow-x-auto{% if scroll_class %} {{ scroll_class }}{% endif %}" role="region" aria-label="{{ label }}" tabindex="0" data-table-scroll>
+    {{ caller() }}
+  </div>
+</div>
 {%- endmacro %}
 
 {# An undo toast is strict: it does not pause on hover or focus, since the server's undo window
