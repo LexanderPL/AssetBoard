@@ -188,6 +188,8 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "budget_lines_created": 0,
         "months_created": 0,
         "deleted_transactions": 0,
+        "purged_transactions": 0,
+        "purged_month_states": 0,
         "suggested_categories_removed": 0,
         "suggested_networth_categories_removed": 0,
         "networth_categories_created": 0,
@@ -248,6 +250,7 @@ def _empty_report(**values: object) -> dict[str, Any]:
         "errors": [],
         "refused": False,
         "secrets_present": False,
+        "archive_currency": "",
     }
     report.update(values)
     return report
@@ -1639,6 +1642,7 @@ def _merge(
         warnings.append(_entry("secrets_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
+        archive_currency=str(archive.rows.workspace.get("base_currency", "")),
         months=months_report,
         categories=category_report,
         mapping=category_resolution.mapping,
@@ -1765,17 +1769,14 @@ def _restore_report(
     settings: _RestoreSettings | None,
     errors: list[dict[str, object]],
 ) -> dict[str, Any]:
+    empty = workspace_is_empty(session, ctx, restore=True)
     removed = (
-        suggested_categories_to_remove(session, ctx) if workspace_is_empty(session, ctx) else []
-    )
-    removed_networth = (
-        suggested_networth_categories_to_remove(session, ctx)
-        if workspace_is_empty(session, ctx)
+        suggested_categories_to_remove(session, ctx, ignore_deleted_transactions=True)
+        if empty
         else []
     )
-    removed_assets = (
-        suggested_asset_classes_to_remove(session, ctx) if workspace_is_empty(session, ctx) else []
-    )
+    removed_networth = suggested_networth_categories_to_remove(session, ctx) if empty else []
+    removed_assets = suggested_asset_classes_to_remove(session, ctx) if empty else []
     counts = _restore_counts_for(
         archive.rows,
         removed=len(removed),
@@ -1789,6 +1790,10 @@ def _restore_report(
     )
     counts["invalid"] = len(errors)
     counts["secrets_included"] = 1 if archive.secrets is not None else 0
+    counts["purged_transactions"] = (
+        TransactionRepository(session, ctx).count_soft_deleted() if empty else 0
+    )
+    counts["purged_month_states"] = MonthStateRepository(session, ctx).count_open() if empty else 0
     asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
         _entry(
@@ -1821,6 +1826,7 @@ def _restore_report(
     )
     report = _empty_report(
         counts=counts,
+        archive_currency=str(archive.rows.workspace.get("base_currency", "")),
         errors=errors,
         warnings=warnings,
         restore_months=[row.month for row in archive.rows.months],
@@ -1858,7 +1864,7 @@ def _plan_restore(
 ) -> dict[str, Any]:
     archive = _archive(parsed)
     errors: list[dict[str, object]] = []
-    if not workspace_is_empty(session, ctx):
+    if not workspace_is_empty(session, ctx, restore=True):
         errors.append(_entry("workspace_not_empty", file="archive"))
     settings, settings_errors = _restore_settings(archive)
     errors.extend(settings_errors)
@@ -2443,6 +2449,7 @@ def _restore_m3_configuration(
     *,
     restore_now: datetime,
     category_ids: Mapping[UUID, UUID],
+    currency: str,
 ) -> tuple[
     dict[str, list[str]],
     dict[UUID, UUID],
@@ -2451,9 +2458,12 @@ def _restore_m3_configuration(
 ]:
     """Recreate tax rules, income sources, tax links and work logs/days.
 
+    ``currency`` is the archive's base currency. The workspace row has already been updated to
+    it, so ``ctx.workspace.base_currency`` would still hold the target's old currency and would
+    parse fixed tax amounts with the wrong minor unit.
+
     Returns the restored-id report plus the source-id maps used by the scheduled rows.
     """
-    currency = ctx.workspace.base_currency
     restored: dict[str, list[str]] = {}
     tax_ids: dict[UUID, UUID] = {}
     tax_repository = TaxRuleRepository(session, ctx)
@@ -3144,11 +3154,15 @@ def _apply_restore(
     instance_settings: Settings | None = None,
 ) -> dict[str, int]:
     archive = _archive(parsed)
-    if not workspace_is_empty(session, ctx):
+    if not workspace_is_empty(session, ctx, restore=True):
         raise ImportRestoreUnavailable
     settings, errors = _restore_settings(archive)
     if settings is None or errors:
         raise ImportServiceError("the archive's workspace settings are invalid")
+    # The emptiness check ignores tombstones and open month states; clear them before the
+    # suggested categories are removed so no orphan rows survive the restore.
+    purged_transactions = TransactionRepository(session, ctx).delete_soft_deleted()
+    purged_month_states = MonthStateRepository(session, ctx).delete_open()
     duplicates = _duplicate_active_categories(archive.rows.categories)
     if duplicates:
         raise ImportServiceError("the archive has duplicate active category names")
@@ -3159,7 +3173,7 @@ def _apply_restore(
         field: getattr(workspace, field) for field in RESTORE_SETTINGS_FIELDS
     }
     CurrentWorkspaceRepository(session, ctx).update(**settings.values())
-    removed = suggested_categories_to_remove(session, ctx)
+    removed = suggested_categories_to_remove(session, ctx, ignore_deleted_transactions=True)
     removed_networth = suggested_networth_categories_to_remove(session, ctx)
     removed_assets = suggested_asset_classes_to_remove(session, ctx)
     categories = CategoryRepository(session, ctx)
@@ -3201,6 +3215,7 @@ def _apply_restore(
         archive,
         restore_now=restore_now,
         category_ids=category_ids,
+        currency=currency,
     )
     transactions = TransactionRepository(session, ctx)
     total = len(archive.rows.transactions)
@@ -3324,6 +3339,8 @@ def _apply_restore(
         ts=restore_now,
         data={
             "batch_id": str(batch.id),
+            "purged_transactions": purged_transactions,
+            "purged_month_states": purged_month_states,
             "categories": len(archive.rows.categories),
             "transactions": len(archive.rows.transactions),
             "budget_lines": created_lines,

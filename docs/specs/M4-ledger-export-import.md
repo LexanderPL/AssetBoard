@@ -348,13 +348,16 @@ use.
 **Acceptance**
 - An archive upload offers two modes:
   - **Restore** (owners only), only when the target workspace is **empty**: no categories of
-    its own, no transactions (deleted included), no budget lines, no month states, and no M3
-    data (recurring items and occurrences, income sources, work logs/days, tax rules and their
-    versions and links). A workspace whose only categories are the untouched **automatic
+    its own, no active transactions, no budget lines, no closed month states, and no M3 data
+    (recurring items and occurrences, income sources, work logs/days, tax rules and their
+    versions and links). Soft-deleted transactions and open month states do not block a
+    restore; they are hard-deleted before the archive is written and the restore report shows
+    how many were cleared. A workspace whose only categories are the untouched **automatic
     suggested set** counts as empty: the restore deletes those categories before writing the
     archive's and lists them in its report. "Untouched" means the exact suggested set for a
     supported language, created at the automatic `category.seeded` event's time, never edited,
-    archived or referenced by any row. The check is a static list
+    archived or referenced by any active row (soft-deleted transactions are excluded). The
+    check is a static list
     `services.archive.EMPTINESS_CHECKS` that later milestones extend (like
     `BASE_CURRENCY_LOCKS`). Members, invitations, audit events, notification channels and saved
     import mappings do not count.
@@ -373,7 +376,10 @@ use.
     applied; differing settings and the archive's closed months are listed as information. A
     `base_currency` different from the workspace's refuses the whole archive even when invalid
     rows could otherwise be skipped.
-- **Restore order, in one transaction:** (1) settings from `workspace.json` (name, base
+- **Restore order, in one transaction:** (0) hard-delete the workspace's soft-deleted
+  transactions and open month states (closed months and every other emptiness check still
+  block the restore); this clear is permanent and a later rollback does not bring those rows
+  back; (1) settings from `workspace.json` (name, base
   currency, country, time zone, locale, automatic plan copy, and from 1.1 the Taxes switch and
   the Upcoming window, which keep their defaults when a 1.0 archive lacks them; the replaced
   values are kept in `ImportBatch.previous_settings`); settings are validated with the normal
@@ -412,7 +418,8 @@ use.
   corrected archive can be restored. A restore rollback leaves a truly empty workspace and
   does not re-add the suggested categories; the user can press "Add suggested categories"
   afterwards. (Hard delete is justified: the rows never existed in this workspace before, and
-  soft-deleted leftovers would keep the workspace non-empty and its base currency locked.)
+  the restore already permanently cleared the target's soft-deleted transactions and open month
+  states; a rollback does not bring those rows back.)
 - Version handling per ADR-0016: an archive of a newer **major** format version is refused
   ("made by a newer version of the app"); a newer **minor** version imports with a warning
   listing the ignored files and columns; older majors pass through the reader's upgrade

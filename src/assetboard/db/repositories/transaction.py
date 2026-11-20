@@ -100,7 +100,10 @@ class LedgerColumn:
 
 
 class TransactionRepository(ScopedRepository[Transaction]):
-    """Rows are soft-deleted (``deleted_at``), never removed: generic ``delete`` is unsupported.
+    """Rows are soft-deleted (``deleted_at``); only the restore hard-deletes them.
+
+    Generic ``delete`` is unsupported. ``delete_soft_deleted`` is the one explicit purge, used
+    by a restore into an otherwise empty workspace.
 
     Queries for the month page and autocomplete skip soft-deleted rows; ``get`` returns them
     (the service decides what a deleted row means), and the usage counts include them because
@@ -503,6 +506,38 @@ class TransactionRepository(ScopedRepository[Transaction]):
         """Whether the workspace has any transaction, soft-deleted ones included."""
         statement = select(exists().where(Transaction.workspace_id == self._workspace_id))
         return bool(self._session.execute(statement).scalar_one())
+
+    def any_active_exists(self) -> bool:
+        """Whether the workspace has at least one non-deleted transaction."""
+        statement = select(
+            exists().where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+            )
+        )
+        return bool(self._session.execute(statement).scalar_one())
+
+    def count_soft_deleted(self) -> int:
+        """The number of tombstones a restore would clear."""
+        statement = (
+            select(func.count())
+            .select_from(Transaction)
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_not(None),
+            )
+        )
+        return int(self._session.execute(statement).scalar_one())
+
+    def delete_soft_deleted(self) -> int:
+        """Hard-delete this workspace's tombstones (restore only; ordinary rows stay)."""
+        result = self._session.execute(
+            delete(Transaction).where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_not(None),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def _described(self, direction: str) -> tuple[ColumnElement[bool], ...]:
         return (

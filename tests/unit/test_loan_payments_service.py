@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -608,6 +608,39 @@ def test_current_path_starting_checkpoint_is_required(team: WorkspaceDb) -> None
     with pytest.raises(loans.LoanError) as raised:
         loan_payments.delete_loan_checkpoint(team.factory, ctx, loan_id, rows[0].id)
     assert raised.value.code == "starting_checkpoint_required"
+
+
+def test_starting_checkpoint_cannot_move_past_the_next(team: WorkspaceDb) -> None:
+    loan_id = _create(
+        team,
+        entry_path="current",
+        principal_original=None,
+        origination_date=None,
+        current_balance=_money(20_000_000),
+        balance_date=date(2026, 2, 1),
+        first_payment_date=date(2026, 3, 1),
+        term_months=120,
+    )
+    ctx = team.ctx("owner", "owner")
+    team.clock._value = datetime(2026, 8, 1, 12, tzinfo=UTC)
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 5, 1),
+        remaining_principal=_money(18_000_000),
+    )
+    starting = loan_payments.list_loan_checkpoints(team.factory, ctx, loan_id)[0]
+    with pytest.raises(loans.LoanError) as raised:
+        loan_payments.update_loan_checkpoint(
+            team.factory,
+            ctx,
+            loan_id,
+            starting.id,
+            as_of=date(2026, 7, 1),
+            remaining_principal=_money(17_000_000),
+        )
+    assert raised.value.code == "checkpoint_order"
 
 
 def test_checkpoint_validation_and_duplicate_dates(team: WorkspaceDb) -> None:

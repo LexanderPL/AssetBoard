@@ -976,7 +976,7 @@ def upload_import(
         nonlocal path
         require_role_now(session, ctx, required_role)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        if mode == "restore" and not workspace_is_empty(session, ctx):
+        if mode == "restore" and not workspace_is_empty(session, ctx, restore=True):
             raise ImportRestoreUnavailable
         repository = ImportBatchRepository(session, ctx)
         batch = repository.create(

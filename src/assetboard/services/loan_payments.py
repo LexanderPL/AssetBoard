@@ -727,11 +727,12 @@ def _validate_checkpoint(
     if view.origination_date is not None and day < view.origination_date:
         raise loans.LoanError("as_of", "checkpoint_before_start")
     if view.entry_path == "current":
-        earlier = [
-            checkpoint.as_of for checkpoint in view.checkpoints if checkpoint.id != exclude_id
-        ]
+        ordered = sorted(view.checkpoints, key=lambda row: (row.as_of, row.id))
+        earlier = [checkpoint.as_of for checkpoint in ordered if checkpoint.id != exclude_id]
         if earlier and day < min(earlier):
             raise loans.LoanError("as_of", "checkpoint_before_start")
+        if len(ordered) > 1 and ordered[0].id == exclude_id and day >= ordered[1].as_of:
+            raise loans.LoanError("as_of", "checkpoint_order")
     amount = _require_money(balance, view.currency, "remaining_principal")
     if amount < 0 or amount > MAX_AMOUNT_MINOR:
         raise loans.LoanError("remaining_principal", "invalid_balance")

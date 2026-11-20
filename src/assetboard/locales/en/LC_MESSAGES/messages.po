@@ -992,6 +992,12 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
+msgid "Deleted entries cleared"
+msgstr ""
+
+msgid "Open months cleared"
+msgstr ""
+
 msgid "Planned values"
 msgstr ""
 
@@ -4308,6 +4314,14 @@ msgid "A checkpoint cannot start before the loan."
 msgstr ""
 
 msgid "A checkpoint already exists on that date."
+msgstr ""
+
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+
+msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
 msgstr ""
 
 msgid ""
@@ -9401,6 +9415,9 @@ msgstr ""
 msgid "Starting balance %(amount)s"
 msgstr ""
 
+msgid "Starting balance"
+msgstr ""
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr ""
@@ -9781,10 +9798,10 @@ msgid ""
 msgstr ""
 
 #, python-format
-msgid "Current balance (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
 msgstr ""
 
-msgid "Balance date"
+msgid "Starting balance date"
 msgstr ""
 
 msgid "Remaining months"
@@ -9911,6 +9928,13 @@ msgstr ""
 
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr ""
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr ""
+
+msgid "Balance date"
 msgstr ""
 
 msgid ""
@@ -10130,9 +10154,6 @@ msgid "Balance"
 msgstr ""
 
 msgid "Projected balance"
-msgstr ""
-
-msgid "Starting balance"
 msgstr ""
 
 msgid "Projected balance unavailable"
@@ -12151,6 +12172,14 @@ msgstr ""
 msgid "Not set"
 msgstr ""
 
+msgid "Workspace language"
+msgstr ""
+
+msgid ""
+"Used for the suggested categories and formatting. The interface follows "
+"your profile or browser language; you can change both later."
+msgstr ""
+
 msgid "Download workspace archive"
 msgstr ""
 
@@ -12211,12 +12240,12 @@ msgstr ""
 msgid ""
 "Replaces settings, categories, transactions, planned values, month "
 "states, net worth, investments, loans, FIRE, recurring items, income, tax"
-" rules, and work logs. Only for an empty workspace."
+" rules, and work logs. Deleted entries and open months are cleared first."
 msgstr ""
 
 msgid ""
-"Available only in an empty workspace. The untouched suggested categories "
-"are fine."
+"Available only when the workspace has no active data. Deleted entries and"
+" open months are fine; closed months and other data block it."
 msgstr ""
 
 msgid "CSV delimiter"
@@ -12302,6 +12331,15 @@ msgid ""
 "This archive contains an encrypted secrets member. Enter its passphrase "
 "in the Apply import form to restore notification channels and provider "
 "keys."
+msgstr ""
+
+msgid "Archive currency"
+msgstr ""
+
+msgid "Deleted entries removed"
+msgstr ""
+
+msgid "Open months removed"
 msgstr ""
 
 msgid "Deleted transactions restored"
@@ -15177,6 +15215,20 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Use Add item above, or paste a list of items below."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Replaces settings, categories, transactions, "
+#~ "planned values, month states, net worth,"
+#~ " investments, loans, FIRE, recurring items,"
+#~ " income, tax rules, and work logs."
+#~ " Only for an empty workspace."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available only in an empty workspace."
+#~ " The untouched suggested categories are "
+#~ "fine."
 #~ msgstr ""
 
 #~ msgid "Fix the filters to export the year overview."

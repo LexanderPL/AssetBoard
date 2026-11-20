@@ -1317,6 +1317,14 @@ def test_month_state_queries_stay_in_their_workspace(
     assert in_a.for_month(october) is a_october
     assert in_a.delete_for_months([november]) == 0
     assert in_b.delete_for_months([november]) == 1
+    in_a.create(november)
+    in_b.create(YearMonth(2026, 12))
+    assert (in_a.count_open(), in_b.count_open()) == (1, 1)
+    assert in_a.delete_open() == 1
+    assert in_b.delete_open() == 1
+    assert in_a.for_month(november) is None
+    assert in_b.for_month(YearMonth(2026, 12)) is None
+    assert in_a.closed_months() == {october}
 
 
 def test_transaction_queries_stay_in_their_workspace(
@@ -1454,6 +1462,20 @@ def test_transaction_queries_stay_in_their_workspace(
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+
+    tombstone = make(in_a, food_a.id, "Tombstone")
+    in_a.update(tombstone.id, deleted_at=datetime(2026, 10, 9, 12, tzinfo=UTC))
+    assert (in_a.any_active_exists(), in_b.any_active_exists()) == (True, True)
+    assert (in_a.count_soft_deleted(), in_b.count_soft_deleted()) == (1, 0)
+    assert in_b.delete_soft_deleted() == 0
+    assert in_a.count_soft_deleted() == 1
+    in_b.update(b_row.id, deleted_at=datetime(2026, 10, 9, 12, tzinfo=UTC))
+    assert in_b.any_active_exists() is False
+    assert in_b.count_soft_deleted() == 1
+    assert (in_a.delete_soft_deleted(), in_b.delete_soft_deleted()) == (1, 1)
+    assert (in_a.count_soft_deleted(), in_b.count_soft_deleted()) == (0, 0)
+    assert in_a.any_active_exists() is True
+    assert in_b.any_active_exists() is False
 
 
 def test_import_batch_queries_stay_in_their_workspace(
