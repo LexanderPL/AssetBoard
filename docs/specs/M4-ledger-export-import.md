@@ -348,9 +348,11 @@ use.
 **Acceptance**
 - An archive upload offers two modes:
   - **Restore** (owners only), only when the target workspace is **empty**: no categories of
-    its own, no transactions (deleted included), no budget lines, no month states, and no M3
-    data (recurring items and occurrences, income sources, work logs/days, tax rules and their
-    versions and links). A workspace whose only categories are the untouched **automatic
+    its own, no active transactions, no budget lines, no closed month states, and no M3 data
+    (recurring items and occurrences, income sources, work logs/days, tax rules and their
+    versions and links). Soft-deleted transactions and open month states do not block a
+    restore; they are hard-deleted before the archive is written and the restore report shows
+    how many were cleared. A workspace whose only categories are the untouched **automatic
     suggested set** counts as empty: the restore deletes those categories before writing the
     archive's and lists them in its report. "Untouched" means the exact suggested set for a
     supported language, created at the automatic `category.seeded` event's time, never edited,
@@ -373,7 +375,10 @@ use.
     applied; differing settings and the archive's closed months are listed as information. A
     `base_currency` different from the workspace's refuses the whole archive even when invalid
     rows could otherwise be skipped.
-- **Restore order, in one transaction:** (1) settings from `workspace.json` (name, base
+- **Restore order, in one transaction:** (0) hard-delete the workspace's soft-deleted
+  transactions and open month states (closed months and every other emptiness check still
+  block the restore); this clear is permanent and a later rollback does not bring those rows
+  back; (1) settings from `workspace.json` (name, base
   currency, country, time zone, locale, automatic plan copy, and from 1.1 the Taxes switch and
   the Upcoming window, which keep their defaults when a 1.0 archive lacks them; the replaced
   values are kept in `ImportBatch.previous_settings`); settings are validated with the normal

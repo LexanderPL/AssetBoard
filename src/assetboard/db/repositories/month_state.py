@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 
 from assetboard.db.models.ledger import MonthState
 from assetboard.db.repositories.base import ScopedRepository
@@ -52,6 +52,28 @@ class MonthStateRepository(ScopedRepository[MonthState]):
                 updated_at=updated_at,
             )
         )
+
+    def count_open(self) -> int:
+        """The number of open month states a restore would clear."""
+        statement = (
+            select(func.count())
+            .select_from(MonthState)
+            .where(
+                MonthState.workspace_id == self._workspace_id,
+                MonthState.closed_at.is_(None),
+            )
+        )
+        return int(self._session.execute(statement).scalar_one())
+
+    def delete_open(self) -> int:
+        """Hard-delete open month states (restore only; closed months stay)."""
+        result = self._session.execute(
+            delete(MonthState).where(
+                MonthState.workspace_id == self._workspace_id,
+                MonthState.closed_at.is_(None),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def delete_for_months(self, months: Iterable[YearMonth]) -> int:
         """Hard-delete month states (restore rollback only; ordinary months are never removed)."""

@@ -12207,12 +12207,12 @@ msgstr ""
 msgid ""
 "Replaces settings, categories, transactions, planned values, month "
 "states, net worth, investments, loans, FIRE, recurring items, income, tax"
-" rules, and work logs. Only for an empty workspace."
+" rules, and work logs. Deleted entries and open months are cleared first."
 msgstr ""
 
 msgid ""
-"Available only in an empty workspace. The untouched suggested categories "
-"are fine."
+"Available only when the workspace has no active data. Deleted entries and"
+" open months are fine; closed months and other data block it."
 msgstr ""
 
 msgid "CSV delimiter"
@@ -12298,6 +12298,15 @@ msgid ""
 "This archive contains an encrypted secrets member. Enter its passphrase "
 "in the Apply import form to restore notification channels and provider "
 "keys."
+msgstr ""
+
+msgid "Archive currency"
+msgstr ""
+
+msgid "Deleted entries removed"
+msgstr ""
+
+msgid "Open months removed"
 msgstr ""
 
 msgid "Deleted transactions restored"
@@ -15173,5 +15182,19 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Use Add item above, or paste a list of items below."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Replaces settings, categories, transactions, "
+#~ "planned values, month states, net worth,"
+#~ " investments, loans, FIRE, recurring items,"
+#~ " income, tax rules, and work logs."
+#~ " Only for an empty workspace."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Available only in an empty workspace."
+#~ " The untouched suggested categories are "
+#~ "fine."
 #~ msgstr ""
 

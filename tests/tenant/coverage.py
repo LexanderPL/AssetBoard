@@ -291,7 +291,14 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
-        for method in ("for_month", "create", "create_restored", "delete_for_months")
+        for method in (
+            "for_month",
+            "create",
+            "create_restored",
+            "delete_for_months",
+            "delete_open",
+            "count_open",
+        )
     },
     **{
         ("MonthStateRepository", "closed_months"): (
@@ -307,6 +314,9 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "counts_by_category",
             "active_months_by_category",
             "any_exists",
+            "any_active_exists",
+            "count_soft_deleted",
+            "delete_soft_deleted",
             "description_keys",
             "description_details",
             "recent_expenses",

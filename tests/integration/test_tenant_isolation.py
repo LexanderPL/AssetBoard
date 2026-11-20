@@ -1317,6 +1317,14 @@ def test_month_state_queries_stay_in_their_workspace(
     assert in_a.for_month(october) is a_october
     assert in_a.delete_for_months([november]) == 0
     assert in_b.delete_for_months([november]) == 1
+    in_a.create(november)
+    in_b.create(YearMonth(2026, 12))
+    assert (in_a.count_open(), in_b.count_open()) == (1, 1)
+    assert in_a.delete_open() == 1
+    assert in_b.delete_open() == 1
+    assert in_a.for_month(november) is None
+    assert in_b.for_month(YearMonth(2026, 12)) is None
+    assert in_a.closed_months() == {october}
 
 
 def test_transaction_queries_stay_in_their_workspace(

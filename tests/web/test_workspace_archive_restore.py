@@ -10,15 +10,24 @@ from sqlalchemy import select
 
 from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.ledger import Category, Transaction
-from assetboard.db.repositories import CategoryRepository, TransactionRepository
+from assetboard.db.models.tax import TaxRuleVersion
+from assetboard.db.repositories import (
+    CategoryRepository,
+    MonthStateRepository,
+    TransactionRepository,
+)
 from assetboard.domain.archive import (
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
     MonthRow,
+    TaxRuleRow,
+    TaxRuleVersionRow,
     TransactionRow,
     write_archive,
 )
+from assetboard.domain.ledger_csv import plain_amount
+from assetboard.domain.months import YearMonth
 from assetboard.web.workspace_routes import _mapping_options_from_form
 from tests.conftest import OwnerApp
 from tests.tenant.harness import context_for
@@ -29,7 +38,10 @@ CAR = UUID("22222222-2222-4222-8222-222222222222")
 SALARY = UUID("33333333-3333-4333-8333-333333333333")
 
 
-def _archive(*, currency: str = "EUR", name: str = "Archive Home") -> bytes:
+def _archive(
+    *, currency: str = "EUR", name: str = "Archive Home", fixed_tax: str | None = None
+) -> bytes:
+    tax_rule_id = UUID("44444444-4444-4444-8444-444444444444")
     rows = ArchiveRows(
         workspace={
             "name": name,
@@ -55,14 +67,18 @@ def _archive(*, currency: str = "EUR", name: str = "Archive Home") -> bytes:
             CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
         ),
         budget_lines=(
-            BudgetLineRow("2026-02", "expense", "Food", "50.00", currency, str(FOOD)),
-            BudgetLineRow("2026-02", "expense", "Car", "20.00", currency, str(CAR)),
+            BudgetLineRow(
+                "2026-02", "expense", "Food", plain_amount(5_000, currency), currency, str(FOOD)
+            ),
+            BudgetLineRow(
+                "2026-02", "expense", "Car", plain_amount(2_000, currency), currency, str(CAR)
+            ),
         ),
         transactions=(
             TransactionRow(
                 "2026-02-01",
                 "income",
-                "100.00",
+                plain_amount(10_000, currency),
                 currency,
                 "Salary",
                 "February",
@@ -73,7 +89,7 @@ def _archive(*, currency: str = "EUR", name: str = "Archive Home") -> bytes:
             TransactionRow(
                 "2026-02-02",
                 "expense",
-                "12.50",
+                plain_amount(1_250, currency),
                 currency,
                 "Food",
                 "Bakery",
@@ -83,6 +99,39 @@ def _archive(*, currency: str = "EUR", name: str = "Archive Home") -> bytes:
             ),
         ),
         months=(MonthRow("2026-02", "2026-02-28T20:00:00Z", "2026-02-01T08:00:00Z"),),
+        tax_rules=(
+            (
+                TaxRuleRow(
+                    str(tax_rule_id),
+                    "Flat tax",
+                    "self_paid",
+                    "net",
+                    10,
+                    "same_month",
+                    None,
+                    "",
+                    "",
+                    None,
+                ),
+            )
+            if fixed_tax is not None
+            else ()
+        ),
+        tax_rule_versions=(
+            (
+                TaxRuleVersionRow(
+                    str(uuid4()),
+                    str(tax_rule_id),
+                    "Flat tax",
+                    "2026-01-01",
+                    "fixed",
+                    None,
+                    fixed_tax,
+                ),
+            )
+            if fixed_tax is not None
+            else ()
+        ),
     )
     return write_archive(
         rows,
@@ -151,6 +200,47 @@ def test_owner_can_restore_and_roll_back_over_the_suggested_set(owner: OwnerApp)
         assert session.scalars(select(Category)).all() == []
         workspace = session.get(Workspace, owner.home_id)
         assert workspace is not None and workspace.name == "Home"
+
+
+def test_restore_parses_fixed_tax_amounts_in_the_archive_currency(owner: OwnerApp) -> None:
+    uploaded = _upload(owner, _archive(currency="JPY", fixed_tax="1000"))
+    assert uploaded.status_code == 303
+    batch_id = _batch_url(uploaded)
+    applied = owner.post(f"/workspace/data/import/{batch_id}/apply", token_from="/workspace/data")
+    assert applied.status_code == 303, applied.text
+    with owner.db() as session:
+        version = session.scalars(select(TaxRuleVersion)).one()
+        assert version.fixed_minor == 1000
+
+
+def test_restore_is_available_with_only_tombstones_and_open_month_states(
+    owner: OwnerApp,
+) -> None:
+    ctx = context_for(owner.home_id, owner.app.state.clock)
+    with owner.db() as session, session.begin():
+        category = CategoryRepository(session, ctx).ordered()[0]
+        row = TransactionRepository(session, ctx).create(
+            direction="expense",
+            day=date(2026, 1, 2),
+            amount_minor=100,
+            currency="EUR",
+            category_id=category.id,
+            description="Deleted test entry",
+            description_key="deleted test entry",
+            source="manual",
+            created_by_user_id=owner.admin_id,
+        )
+        TransactionRepository(session, ctx).update(row.id, deleted_at=owner.app.state.clock.now())
+        MonthStateRepository(session, ctx).create(YearMonth(2026, 1))
+    page = owner.client.get("/workspace/data").text
+    assert 'name="mode" value="restore"' in page
+    assert 'name="mode" value="restore" class="mt-1" disabled' not in page
+    uploaded = _upload(owner, _archive())
+    assert uploaded.status_code == 303
+    report = owner.client.get(f"/workspace/data?batch={_batch_url(uploaded)}")
+    assert "Archive currency" in report.text
+    assert "Deleted entries removed" in report.text
+    assert "Open months removed" in report.text
 
 
 def test_restore_apply_explains_a_workspace_that_became_non_empty(owner: OwnerApp) -> None:

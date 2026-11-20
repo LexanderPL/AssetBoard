@@ -485,6 +485,38 @@ class TransactionRepository(ScopedRepository[Transaction]):
         statement = select(exists().where(Transaction.workspace_id == self._workspace_id))
         return bool(self._session.execute(statement).scalar_one())
 
+    def any_active_exists(self) -> bool:
+        """Whether the workspace has at least one non-deleted transaction."""
+        statement = select(
+            exists().where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+            )
+        )
+        return bool(self._session.execute(statement).scalar_one())
+
+    def count_soft_deleted(self) -> int:
+        """The number of tombstones a restore would clear."""
+        statement = (
+            select(func.count())
+            .select_from(Transaction)
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_not(None),
+            )
+        )
+        return int(self._session.execute(statement).scalar_one())
+
+    def delete_soft_deleted(self) -> int:
+        """Hard-delete this workspace's tombstones (restore only; ordinary rows stay)."""
+        result = self._session.execute(
+            delete(Transaction).where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_not(None),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
     def _described(self, direction: str) -> tuple[ColumnElement[bool], ...]:
         return (
             Transaction.workspace_id == self._workspace_id,

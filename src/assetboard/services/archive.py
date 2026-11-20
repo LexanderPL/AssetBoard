@@ -122,7 +122,7 @@ from assetboard.services.archive_secrets import (
     encrypt_archive_secrets,
     validate_passphrase,
 )
-from assetboard.services.categories import usage_by_category
+from assetboard.services.categories import ACTIVE_USAGE_SOURCES, usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.fire_linked import linked_inputs_in_session
 
@@ -206,7 +206,9 @@ def _expected_suggested_categories(locale: str) -> set[tuple[str, str, str, str,
     return expected
 
 
-def suggested_categories_to_remove(session: Session, ctx: Context) -> list[Category]:
+def suggested_categories_to_remove(
+    session: Session, ctx: Context, *, ignore_deleted_transactions: bool = False
+) -> list[Category]:
     """The untouched suggested categories a restore may delete before writing its own.
 
     "Untouched" means the exact suggested set (in a supported locale), unedited and unreferenced,
@@ -240,7 +242,11 @@ def suggested_categories_to_remove(session: Session, ctx: Context) -> list[Categ
         for category in categories
     ):
         return []
-    usage = usage_by_category(session, ctx)
+    usage = usage_by_category(
+        session,
+        ctx,
+        sources=ACTIVE_USAGE_SOURCES if ignore_deleted_transactions else None,
+    )
     if any(usage.get(category.id) is not None for category in categories):
         return []
     actual = {
@@ -408,7 +414,7 @@ def _has_unexpected_categories(session: Session, ctx: Context) -> bool:
     categories = CategoryRepository(session, ctx).list()
     if not categories:
         return False
-    return not suggested_categories_to_remove(session, ctx)
+    return not suggested_categories_to_remove(session, ctx, ignore_deleted_transactions=True)
 
 
 def _has_unexpected_networth_categories(session: Session, ctx: Context) -> bool:
@@ -459,7 +465,7 @@ def _has_price_source_configs(session: Session, ctx: Context) -> bool:
 
 
 def _has_transactions(session: Session, ctx: Context) -> bool:
-    return TransactionRepository(session, ctx).any_exists()
+    return TransactionRepository(session, ctx).any_active_exists()
 
 
 def _has_budget_lines(session: Session, ctx: Context) -> bool:
@@ -467,7 +473,8 @@ def _has_budget_lines(session: Session, ctx: Context) -> bool:
 
 
 def _has_month_states(session: Session, ctx: Context) -> bool:
-    return MonthStateRepository(session, ctx).any_exists()
+    # A row survives reopening; only a currently closed month is data a restore must not erase.
+    return bool(MonthStateRepository(session, ctx).closed_months())
 
 
 def _has_scheduled_items(session: Session, ctx: Context) -> bool:
