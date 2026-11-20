@@ -226,12 +226,14 @@ def _terms_for_anchor(inputs: LoanScheduleInputs) -> LoanTerms:
     base_schedule = build_inputs_schedule(replace(inputs, anchor=base, terms=terms))
     elapsed = sum(1 for row in base_schedule.rows if row.date <= inputs.anchor.date)
     remaining = max(1, terms.term_months - elapsed)
-    # An original loan keeps its absolute IO clock from the origination date; only a
-    # current-balance loan (no origination date) starts the clock at its anchor.
-    io_remaining = terms.interest_only_months
-    if terms.origination_date is None:
-        io_remaining = max(0, io_remaining - elapsed)
-    io_remaining = min(io_remaining, max(0, remaining - 1))
+    # An original loan keeps its absolute IO clock from the origination date; a checkpoint
+    # after the IO phase therefore amortizes immediately. A current-balance loan (no
+    # origination date) starts the clock at its anchor, so subtract the elapsed payments.
+    if terms.origination_date is not None:
+        io_remaining = 0 if remaining <= terms.interest_only_months else terms.interest_only_months
+    else:
+        io_remaining = max(0, terms.interest_only_months - elapsed)
+        io_remaining = min(io_remaining, max(0, remaining - 1))
     return replace(
         terms,
         term_months=remaining,
