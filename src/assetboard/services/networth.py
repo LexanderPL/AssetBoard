@@ -471,6 +471,8 @@ def current_values(
     include_history: bool = False,
     categories: Sequence[NetWorthCategory] | None = None,
     item_ids: Collection[UUID] | None = None,
+    backfill: bool = False,
+    today: date | None = None,
 ) -> list[ItemView]:
     """Every item with its value effective on ``as_of``.
 
@@ -485,7 +487,9 @@ def current_values(
     histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
     resolved = registry.resolve_many(session, scope, histories, (as_of,))
     linked = linked_for_date(resolved, histories, as_of)
-    values = values_at(histories, as_of, timezone=timezone, linked=linked)
+    values = values_at(
+        histories, as_of, timezone=timezone, linked=linked, backfill=backfill, today=today
+    )
     targets = _link_targets(session, scope, histories)
     return [
         _item_view_at(
