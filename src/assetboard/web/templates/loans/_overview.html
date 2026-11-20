@@ -31,7 +31,7 @@
       {% endif %}
     </svg>
     <div class="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted">
-      <span>{% if loan.entry_path == "original" %}{{ _("Original principal %(amount)s", amount=format_money(summary.original_principal, locale)) }}{% else %}{{ _("Starting balance %(amount)s", amount=format_money(summary.original_principal, locale)) }}{% endif %}</span>
+      <span>{% if loan.entry_path == "original" %}{{ _("Original principal %(amount)s", amount=format_money(summary.original_principal, locale)) }}{% elif loan.start_balance %}{{ _("Starting balance %(amount)s", amount=format_money(loan.start_balance, locale)) }}{% else %}{{ _("Starting balance") }}{% endif %}</span>
       {% if summary.undrawn_principal.amount_minor > 0 %}<span data-overview-undrawn>{{ _("Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn", drawn=format_money(summary.drawn_principal, locale), approved=format_money(summary.original_principal, locale), undrawn=format_money(summary.undrawn_principal, locale)) }}</span>{% endif %}
       {% if summary.payoff_date %}<span>{{ _("Payoff %(date)s", date=format_day(summary.payoff_date, locale)) }}</span>{% endif %}
     </div>

@@ -208,33 +208,40 @@ def _base_anchor(inputs: LoanScheduleInputs) -> ScheduleAnchor:
 def schedule_from_anchor(
     inputs: LoanScheduleInputs, anchor: ScheduleAnchor, as_of: date
 ) -> Schedule:
-    """Build from ``anchor`` with the remaining term adjusted for rows already projected.
+    """Build from ``anchor``; ``build_inputs_schedule`` adjusts the remaining term and IO."""
+    return build_inputs_schedule(replace(inputs, anchor=anchor, as_of=as_of))
 
-    The F7.2 engine takes the number of payments from its anchor. A checkpoint after the loan's
-    base anchor needs the original term minus the rows the base schedule already put before it.
+
+def _adjusted_terms(inputs: LoanScheduleInputs, terms: LoanTerms) -> LoanTerms:
+    """Adjust ``terms`` for an anchor after the loan start.
+
+    A checkpoint shortens the remaining term by the payments already projected before it.
+    For a non-tranched current-balance loan the IO clock starts at the anchor, so the elapsed
+    payments also shorten the remaining IO phase. Original and tranched loans keep their
+    absolute IO boundary (origination or first transfer), so only the term changes.
     """
     base = _base_anchor(inputs)
-    remaining = inputs.terms.term_months
-    if anchor.date > base.date:
-        base_schedule = build_inputs_schedule(replace(inputs, anchor=base, as_of=as_of))
-        elapsed = sum(1 for row in base_schedule.rows if row.date <= anchor.date)
-        remaining = max(1, inputs.terms.term_months - elapsed)
-    terms = (
-        inputs.terms
-        if remaining == inputs.terms.term_months
-        else replace(
-            inputs.terms,
-            term_months=remaining,
-            # A checkpoint this late is already past the original IO boundary, so the
-            # remaining schedule amorts from the start and the term stays valid.
-            interest_only_months=(
-                0
-                if remaining <= inputs.terms.interest_only_months
-                else inputs.terms.interest_only_months
-            ),
-        )
+    if inputs.anchor.date <= base.date:
+        return terms
+    base_schedule = build_schedule(
+        inputs.terms,
+        inputs.rate_timeline,
+        inputs.costs,
+        inputs.overpayments,
+        base,
+        inputs.as_of,
+        inputs.strategy,
+        inputs.day_count,
+        inputs.drawdowns,
     )
-    return build_inputs_schedule(replace(inputs, anchor=anchor, terms=terms, as_of=as_of))
+    elapsed = sum(1 for row in base_schedule.rows if row.date <= inputs.anchor.date)
+    remaining = max(1, terms.term_months - elapsed)
+    if terms.origination_date is not None or terms.drawdown_mode is DrawdownMode.TRANCHES:
+        io_remaining = 0 if remaining <= terms.interest_only_months else terms.interest_only_months
+    else:
+        io_remaining = max(0, terms.interest_only_months - elapsed)
+        io_remaining = min(io_remaining, max(0, remaining - 1))
+    return replace(terms, term_months=remaining, interest_only_months=io_remaining)
 
 
 def build_inputs_schedule(
@@ -246,8 +253,23 @@ def build_inputs_schedule(
     strategy: OverpaymentStrategy | str | None = None,
 ) -> Schedule:
     """Build a schedule from loaded inputs, replacing only what a scenario changes."""
+    adjusted = _adjusted_terms(inputs, inputs.terms)
+    if terms is None:
+        effective_terms = adjusted
+    else:
+        # Apply the caller's overrides on top of the anchor-adjusted contractual terms, so a
+        # baseline or scenario does not silently fall back to the full term from the checkpoint.
+        term_delta = terms.term_months - inputs.terms.term_months
+        io_delta = terms.interest_only_months - inputs.terms.interest_only_months
+        term_months = max(1, adjusted.term_months + term_delta)
+        io_remaining = max(0, adjusted.interest_only_months + io_delta)
+        effective_terms = replace(
+            terms,
+            term_months=term_months,
+            interest_only_months=min(io_remaining, max(0, term_months - 1)),
+        )
     return build_schedule(
-        terms if terms is not None else inputs.terms,
+        effective_terms,
         rates if rates is not None else inputs.rate_timeline,
         inputs.costs,
         overpayments if overpayments is not None else inputs.overpayments,

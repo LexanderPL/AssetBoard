@@ -4316,6 +4316,14 @@ msgstr ""
 msgid "A checkpoint already exists on that date."
 msgstr ""
 
+msgid "The starting balance date must be before the next checkpoint."
+msgstr ""
+
+msgid ""
+"A rate change starts before the new starting balance date. Change or "
+"remove it first."
+msgstr ""
+
 msgid ""
 "The starting balance checkpoint is required for a loan entered from its "
 "current balance."
@@ -9400,6 +9408,9 @@ msgstr ""
 msgid "Starting balance %(amount)s"
 msgstr ""
 
+msgid "Starting balance"
+msgstr ""
+
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
 msgstr ""
@@ -9780,10 +9791,10 @@ msgid ""
 msgstr ""
 
 #, python-format
-msgid "Current balance (%(currency)s)"
+msgid "Starting balance (%(currency)s)"
 msgstr ""
 
-msgid "Balance date"
+msgid "Starting balance date"
 msgstr ""
 
 msgid "Remaining months"
@@ -9910,6 +9921,13 @@ msgstr ""
 
 #, python-format
 msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr ""
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr ""
+
+msgid "Balance date"
 msgstr ""
 
 msgid ""
@@ -10129,9 +10147,6 @@ msgid "Balance"
 msgstr ""
 
 msgid "Projected balance"
-msgstr ""
-
-msgid "Starting balance"
 msgstr ""
 
 msgid "Projected balance unavailable"
