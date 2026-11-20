@@ -12,6 +12,7 @@ import pytest
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import User, Workspace
+from assetboard.db.models.investments import InvestmentTransaction
 from assetboard.db.repositories import PricePointRepository
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.investment_transactions import create_transaction
@@ -108,7 +109,7 @@ def _net_worth(app: OwnerApp) -> None:
     )
 
 
-def _portfolio(app: OwnerApp) -> None:
+def _portfolio(app: OwnerApp) -> Any:
     ctx = _context(app)
     asset_class = create_asset_class(
         app.app.state.session_factory, ctx, name="Phase B Stocks", color="#2563eb", investable=True
@@ -149,6 +150,7 @@ def _portfolio(app: OwnerApp) -> None:
                 price=Decimal(price),
                 source="manual",
             )
+    return instrument.id
 
 
 def _section(html: str, key: str) -> str:
@@ -186,19 +188,23 @@ def test_net_worth_report_section_reuses_the_derived_series(reports: OwnerApp) -
     assert data["series"][0]["values"][-1] == 20_000
     assert data["labels"] == ["2024", "2025", "2026"]
     assert len(data["links"]) == 3 and "year=2024" in data["links"][0]
-    assert all(
-        "not counted" not in line and "estimated value" not in line
+    # UX-08: the warning is in the tooltips and once at section level, not on every row.
+    assert any(
+        "another currency was not counted" in line
         for tooltip in data["tooltips"]
         for line in tooltip
     )
+    notes = re.search(r"<ul[^>]*data-report-series-notes>(.*?)</ul>", section, re.DOTALL)
+    assert notes is not None
+    assert notes.group(1).count("another currency was not counted") == 1
     assert "data-chart-table-toggle" in section
     assert 'id="reports-net-worth-table"' in section
     assert "data-report-series-period" in section
-    assert "another currency was not counted" not in section
     assert "had no value yet" not in section
     assert "estimated value" not in section
     rows = _rows(section)
     assert len(rows) == 3
+    assert all("was not counted" not in row for row in rows)
     assert "2024" in rows[0] and "2026" in rows[-1]
     assert "data-report-series-so-far" in rows[-1]
     assert 'data-report-series="portfolio"' not in html
@@ -226,6 +232,83 @@ def test_portfolio_report_section_reuses_the_performance_series(reports: OwnerAp
     assert len(rows) == 3
     assert "2024" in rows[0] and "2026" in rows[-1]
     assert "data-report-series-so-far" in rows[-1]
+
+
+def test_portfolio_gain_cells_follow_the_gain_loss_convention(reports: OwnerApp) -> None:
+    instrument_id = _portfolio(reports)
+    ctx = _context(reports)
+    with reports.app.state.session_factory.begin() as session:
+        repository = PricePointRepository(session, ctx)
+        point = repository.manual_on(instrument_id, date(2024, 12, 1))
+        assert point is not None
+        repository.update(point.id, price=Decimal("50"))
+    html = reports.client.get("/reports?from=2024&to=2026&step=year").text
+    rows = _rows(_section(html, "portfolio"))
+    assert "text-danger" in rows[0]
+    assert "text-success-strong" in rows[-1]
+
+
+def test_a_non_base_only_net_worth_section_explains_itself(reports: OwnerApp) -> None:
+    ctx = _context(reports)
+    category = create_networth_category(
+        reports.app.state.session_factory, ctx, side="asset", name="Dollars", color="#16a34a"
+    )
+    create_item(
+        reports.app.state.session_factory,
+        ctx,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Dollar only",
+        value="100",
+        currency="USD",
+        include_in_net_worth=True,
+        as_of=date(2024, 12, 31),
+    )
+    html = reports.client.get("/reports?from=2024&to=2026&step=year").text
+    section = _section(html, "net-worth")
+    assert "data-chart-empty" in section
+    assert "No values to chart in this range." in section
+    assert "another currency was not counted" in section
+    assert not _rows(section)
+
+
+def test_an_undated_only_portfolio_section_explains_itself(reports: OwnerApp) -> None:
+    ctx = _context(reports)
+    asset_class = create_asset_class(
+        reports.app.state.session_factory, ctx, name="Legacy", color="#2563eb", investable=True
+    )
+    instrument = create_instrument(
+        reports.app.state.session_factory,
+        ctx,
+        name="Legacy lot",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(asset_class.id, 10_000)],
+        locale="en",
+    )
+    with reports.app.state.session_factory.begin() as session:
+        session.add(
+            InvestmentTransaction(
+                workspace_id=reports.home_id,
+                instrument_id=instrument.id,
+                type="buy",
+                date=None,
+                quantity=Decimal("10"),
+                unit_price=Decimal("100"),
+                fee_minor=0,
+                quote_currency="EUR",
+                fx_to_base=Decimal("1"),
+                note="",
+            )
+        )
+    html = reports.client.get("/reports?from=2024&to=2026&step=year").text
+    section = _section(html, "portfolio")
+    assert "data-chart-empty" in section
+    assert "undated legacy transaction" in section
+    assert not _rows(section)
 
 
 def test_phase_b_sections_follow_the_report_period_step(reports: OwnerApp) -> None:

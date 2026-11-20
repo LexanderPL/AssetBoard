@@ -11567,6 +11567,9 @@ msgstr ""
 msgid "Reminder"
 msgstr ""
 
+msgid "No values to chart in this range."
+msgstr ""
+
 msgid "Show as table"
 msgstr ""
 
@@ -11612,6 +11615,21 @@ msgstr ""
 msgid "Fix the filters to see the report."
 msgstr ""
 
+msgid "Report sections"
+msgstr ""
+
+msgid "Year overview"
+msgstr ""
+
+msgid "Category trends"
+msgstr ""
+
+msgid "Year-over-year"
+msgstr ""
+
+msgid "Planned vs actual accuracy"
+msgstr ""
+
 msgid "No earned, spent or saved amounts in this range."
 msgstr ""
 
@@ -11626,9 +11644,6 @@ msgstr ""
 msgid "Savings rate by period"
 msgstr ""
 
-msgid "Year overview"
-msgstr ""
-
 msgid "Report year"
 msgstr ""
 
@@ -11641,9 +11656,6 @@ msgid "No spending in this year."
 msgstr ""
 
 msgid "Spending by category and month"
-msgstr ""
-
-msgid "Category trends"
 msgstr ""
 
 #, fuzzy, python-format
@@ -11668,9 +11680,6 @@ msgid ""
 "selected month."
 msgstr ""
 
-msgid "Year-over-year"
-msgstr ""
-
 msgid "Income and expenses per year, compared with the previous year."
 msgstr ""
 
@@ -11684,9 +11693,6 @@ msgid "Income change"
 msgstr ""
 
 msgid "Expenses change"
-msgstr ""
-
-msgid "Planned vs actual accuracy"
 msgstr ""
 
 msgid "How often actual spending exceeded the plan, by category."
@@ -11711,6 +11717,15 @@ msgstr ""
 msgid ""
 "A month counts as over when actual spending is greater than the plan. "
 "Only planned regular expense categories are included."
+msgstr ""
+
+msgid "No transactions in this range"
+msgstr ""
+
+msgid "Add an entry or change the years."
+msgstr ""
+
+msgid "Add an entry"
 msgstr ""
 
 msgid "Edit recurring item"

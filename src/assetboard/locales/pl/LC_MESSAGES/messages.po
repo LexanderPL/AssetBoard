@@ -12736,6 +12736,9 @@ msgstr "Kanał"
 msgid "Reminder"
 msgstr "Przypomnienie"
 
+msgid "No values to chart in this range."
+msgstr "Brak wartości do pokazania na wykresie w tym zakresie."
+
 msgid "Show as table"
 msgstr "Pokaż jako tabelę"
 
@@ -12783,6 +12786,21 @@ msgstr "Kwoty w %(currency)s."
 msgid "Fix the filters to see the report."
 msgstr "Popraw filtry, aby zobaczyć raport."
 
+msgid "Report sections"
+msgstr "Sekcje raportu"
+
+msgid "Year overview"
+msgstr "Przegląd roczny"
+
+msgid "Category trends"
+msgstr "Trendy kategorii"
+
+msgid "Year-over-year"
+msgstr "Rok do roku"
+
+msgid "Planned vs actual accuracy"
+msgstr "Dokładność planu i rzeczywistości"
+
 msgid "No earned, spent or saved amounts in this range."
 msgstr "W tym zakresie nie ma kwot zarobionych, wydanych ani zaoszczędzonych."
 
@@ -12799,9 +12817,6 @@ msgstr "Brak stopy oszczędności dla uwzględnionych wpisów."
 msgid "Savings rate by period"
 msgstr "Stopa oszczędności według okresu"
 
-msgid "Year overview"
-msgstr "Przegląd roczny"
-
 msgid "Report year"
 msgstr "Rok raportu"
 
@@ -12817,9 +12832,6 @@ msgstr "Brak wydatków w tym roku."
 
 msgid "Spending by category and month"
 msgstr "Wydatki według kategorii i miesiąca"
-
-msgid "Category trends"
-msgstr "Trendy kategorii"
 
 #, python-format
 msgid "Window: %(num)d months"
@@ -12843,9 +12855,6 @@ msgid ""
 "selected month."
 msgstr "Średnia krocząca obejmuje poprzednie %(num)d mies., w tym wybrany miesiąc."
 
-msgid "Year-over-year"
-msgstr "Rok do roku"
-
 msgid "Income and expenses per year, compared with the previous year."
 msgstr "Dochody i wydatki w każdym roku w porównaniu z rokiem poprzednim."
 
@@ -12860,9 +12869,6 @@ msgstr "Zmiana dochodów"
 
 msgid "Expenses change"
 msgstr "Zmiana wydatków"
-
-msgid "Planned vs actual accuracy"
-msgstr "Dokładność planu i rzeczywistości"
 
 msgid "How often actual spending exceeded the plan, by category."
 msgstr "Jak często rzeczywiste wydatki przekroczyły plan, według kategorii."
@@ -12889,6 +12895,15 @@ msgid ""
 msgstr ""
 "Miesiąc liczy się jako przekroczenie, gdy rzeczywiste wydatki są większe "
 "niż plan. Uwzględniane są tylko zaplanowane regularne kategorie wydatków."
+
+msgid "No transactions in this range"
+msgstr "Brak transakcji w tym zakresie"
+
+msgid "Add an entry or change the years."
+msgstr "Dodaj wpis lub zmień lata."
+
+msgid "Add an entry"
+msgstr "Dodaj wpis"
 
 msgid "Edit recurring item"
 msgstr "Edytuj pozycję cykliczną"

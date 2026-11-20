@@ -137,17 +137,15 @@ def test_the_default_page_is_the_current_year_when_there_is_no_data(
     html = _page(reports)
     assert "<h1" in html and ">Reports</h1>" in html
     assert 'class="mx-auto max-w-6xl space-y-6" data-reports' in html
-    assert "data-report-range>2026<" in html
-    assert len(_row_labels(html)) == 10  # January through October 2026 (today)
+    # UX-06: one empty state instead of 10 zero rows and a dash table.
+    assert "data-empty-state" in html and "No transactions in this range" in html
+    assert "Add an entry or change the years." in html
+    assert "data-report-row" not in html and "data-report-total" not in html
+    assert "data-report-range" not in html and "data-report-nav" not in html
     assert '<select id="report-from" name="from"' in html
     assert '<select id="report-to" name="to"' in html
     assert '<option value="2026" selected>2026</option>' in html
-    for heading in ("Period", "Earned", "Spent", "Saved", "Net"):
-        assert f">{heading}</th>" in html
-    assert "data-report-total" in html
-    assert "No income or expenses in this range." in html
-    assert "data-chart-table-toggle" in html
-    assert 'data-chart-source="reports-data"' not in html  # no JSON without a chart
+    assert "data-filter-disclosure" in html
 
 
 def test_the_year_dropdowns_only_offer_years_with_transactions(reports: OwnerApp) -> None:
@@ -231,6 +229,7 @@ def test_errors_mark_the_field_and_hide_the_chart(reports: OwnerApp) -> None:
 
 
 def test_unknown_parameters_and_values_are_ignored(reports: OwnerApp) -> None:
+    _tx(reports, _category(reports, "Golden Food"), date(2025, 3, 5), 1_000)
     html = _page(reports, "surprise=1&step=week&currency=ZZZ&from=2024&to=2026")
     assert "data-report-range>2024 – 2026<" in html
     assert len(_row_labels(html)) == 34
@@ -261,10 +260,11 @@ def test_future_rows_are_noted_and_do_not_make_a_chart(reports: OwnerApp) -> Non
     _tx(reports, food, date(2026, 10, 20), 10_000)
     _tx(reports, food, date(2026, 11, 2), 20_000)
     html = _page(reports, "from=2026&to=2026&step=month")
+    # The note survives the empty state, but no zero rows are drawn.
     assert "2 entries are dated after today and are not charted." in html
-    assert "data-chart-empty" in html
+    assert "No transactions in this range" in html
+    assert "data-report-row" not in html
     assert 'data-chart-source="reports-data"' not in html
-    assert all(value == "€0.00" for value in re.findall(r"data-report-net>([^<]*)<", html))
 
 
 def test_soft_deleted_and_transfer_rows_do_not_count(reports: OwnerApp) -> None:
@@ -287,15 +287,17 @@ def test_soft_deleted_and_transfer_rows_do_not_count(reports: OwnerApp) -> None:
     assert "€990.00" not in html and "€500.00" not in html
 
 
-def test_an_empty_range_shows_zeros_and_the_total_row(reports: OwnerApp) -> None:
+def test_an_empty_range_shows_one_empty_state_not_zero_rows(reports: OwnerApp) -> None:
     html = _page(reports, "from=2019&to=2020&step=year")
-    assert _row_labels(html) == ["2019", "2020"]
-    assert "data-chart-empty" in html
-    assert "data-report-total" in html
-    assert html.count("€0.00") >= 4
+    assert _row_labels(html) == []
+    assert "data-empty-state" in html and "No transactions in this range" in html
+    assert "data-report-total" not in html
+    assert "data-report-rate-row" not in html
+    assert html.count("€0.00") < 4  # only the filter's currency hint, no zero table
 
 
 def test_viewers_may_open_the_page(reports: OwnerApp) -> None:
+    _tx(reports, _category(reports, "Golden Food"), date(2026, 3, 5), 1_000)
     user_id = reports.add_user("vic")
     reports.join(user_id, reports.home_id, "viewer")
     reports.client.cookies.clear()
@@ -613,12 +615,43 @@ def test_a_selected_archived_category_without_spending_stays_in_the_filter(
 ) -> None:
     archived = _category(reports, "Old Filter", archived=True)
     _tx(reports, archived, date(2025, 1, 10), 10_000)
+    _tx(reports, _category(reports, "Other 2026"), date(2026, 3, 5), 1_000)
     html = _page(
         reports,
         f"from=2026&to=2026&step=month&category={archived}",
     )
     assert f'value="{archived}" checked' in html and "Old Filter (archived)" in html
     assert "No spending for the selected categories." in html
+
+
+def test_the_filters_are_a_phone_disclosure_with_an_active_count(reports: OwnerApp) -> None:
+    food = _category(reports, "Golden Food")
+    _tx(reports, food, date(2026, 3, 5), 1_000)
+    html = _page(reports, f"from=2024&to=2026&step=month&category={food}&savings=1")
+    panel = re.search(r"<details[^>]*data-filter-disclosure.*?</form>", html, re.DOTALL)
+    assert panel is not None
+    summary = re.search(r"<summary.*?</summary>", panel.group(0), re.DOTALL)
+    assert summary is not None
+    assert "Filters" in summary.group(0)
+    assert "3 filters" in summary.group(0)  # range, category, savings
+    assert 'class="btn-primary"' in panel.group(0)
+
+
+def test_the_section_nav_links_each_visible_section(reports: OwnerApp) -> None:
+    _tx(reports, _category(reports, "Golden Food"), date(2026, 3, 5), 1_000)
+    html = _page(reports)
+    nav = re.search(r"<nav[^>]*data-report-nav.*?</nav>", html, re.DOTALL)
+    assert nav is not None
+    for anchor in (
+        "reports-chart-heading",
+        "reports-rate-heading",
+        "reports-category-heading",
+        "reports-year-overview-heading",
+        "reports-trends-heading",
+        "reports-yoy-heading",
+        "reports-accuracy-heading",
+    ):
+        assert f'href="#{anchor}"' in nav.group(0)
 
 
 def test_a_future_only_category_filter_has_no_zero_column_table(reports: OwnerApp) -> None:

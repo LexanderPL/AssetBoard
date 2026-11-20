@@ -288,6 +288,8 @@ class ReportSeriesRow:
     cells: tuple[str, ...]
     notes: tuple[str, ...] = ()
     so_far: bool = False
+    # One tone per cell: "positive" or "negative" for a gain/loss cell, empty otherwise.
+    tones: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,7 +300,7 @@ class ReportSeriesView:
     chart_type: str
     columns: tuple[str, ...]
     rows: tuple[ReportSeriesRow, ...]
-    chart: dict[str, Any]
+    chart: dict[str, Any] | None
     notes: tuple[str, ...] = ()
 
 
@@ -337,6 +339,10 @@ class ReportsView:
     @property
     def has_data(self) -> bool:
         return self.data.has_data
+
+    @property
+    def active_filter_count(self) -> int:
+        return self.data.active_filter_count
 
     @property
     def show_currency_selector(self) -> bool:
@@ -1025,22 +1031,29 @@ def _net_worth_series(
     if data is None:
         return None
     labels = [_series_label(point.as_of, step, locale) for point in data.points]
-    trend = build_trend_view(data, locale, labels=labels, include_notes=False)
-    if trend.chart is None:
-        return None
+    trend = build_trend_view(data, locale, labels=labels, include_notes=True)
+    # The per-point "items had no value" warning repeats on every row; show each distinct
+    # warning once at section level and keep the chart tooltips for the per-point detail.
+    notes = tuple(dict.fromkeys(note for row in trend.rows for note in row.not_counted))
     links = [href_for(point.as_of) if href_for is not None else "" for point in data.points]
-    chart = dict(trend.chart)
-    if any(links):
-        chart["links"] = links
-    rows = tuple(
-        ReportSeriesRow(
-            label=label,
-            href=href or None,
-            cells=(row.net, row.assets, row.liabilities),
-            notes=(),
-            so_far=_series_is_partial(point.as_of, step, today),
+    chart = None
+    if trend.chart is not None:
+        chart = dict(trend.chart)
+        if any(links):
+            chart["links"] = links
+    rows = (
+        tuple(
+            ReportSeriesRow(
+                label=label,
+                href=href or None,
+                cells=(row.net, row.assets, row.liabilities),
+                notes=(),
+                so_far=_series_is_partial(point.as_of, step, today),
+            )
+            for point, row, label, href in zip(data.points, trend.rows, labels, links, strict=True)
         )
-        for point, row, label, href in zip(data.points, trend.rows, labels, links, strict=True)
+        if chart is not None
+        else ()
     )
     return ReportSeriesView(
         title=gettext(NET_WORTH_TITLE, locale),
@@ -1055,6 +1068,7 @@ def _net_worth_series(
         ),
         rows=rows,
         chart=chart,
+        notes=notes,
     )
 
 
@@ -1069,10 +1083,8 @@ def _portfolio_series(
         return None
     labels = [_series_label(point.date, step, locale) for point in page.chart]
     chart = build_performance_chart(page, locale, labels=labels)
-    if chart is None:
-        return None
     links = [href_for(point.date) if href_for is not None else "" for point in page.chart]
-    if any(links):
+    if chart is not None and any(links):
         chart["links"] = links
     incomplete_note = gettext("Incomplete: an instrument has no price or FX rate.", locale)
     rows = tuple(
@@ -1094,6 +1106,19 @@ def _portfolio_series(
             ),
             notes=(incomplete_note,) if point.incomplete else (),
             so_far=_series_is_partial(point.date, step, today),
+            tones=(
+                "",
+                "",
+                (
+                    "positive"
+                    if (point.value - point.net_invested).amount_minor > 0
+                    else "negative"
+                    if (point.value - point.net_invested).amount_minor < 0
+                    else ""
+                ),
+            )
+            if not point.incomplete
+            else (),
         )
         for point, label, href in zip(page.chart, labels, links, strict=True)
     )
