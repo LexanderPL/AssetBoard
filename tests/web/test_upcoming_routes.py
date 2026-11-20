@@ -248,6 +248,21 @@ def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
     )
     assert "month_closed" in still_blocked.headers["location"]
 
+    # COR-02: moving an occurrence out of a closed month is itself refused.
+    moved = owner.post(
+        f"/upcoming/{other_id}/reschedule",
+        {"day": "2026-04-01"},
+        token_from="/upcoming",
+    )
+    assert moved.status_code == 303 and "month_closed" in moved.headers["location"]
+    with owner.db() as session, session.begin():
+        state = session.scalars(
+            select(MonthState).where(
+                MonthState.workspace_id == workspace_id,
+                MonthState.month == date(2026, 3, 1),
+            )
+        ).one()
+        state.closed_at = None
     assert (
         owner.post(
             f"/upcoming/{other_id}/reschedule",
