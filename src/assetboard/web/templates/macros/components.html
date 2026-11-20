@@ -162,17 +162,17 @@
 
 {# Confirmation for a sensitive account action (F1.5): the account's password, or a fresh
    external sign-in for accounts without one. ``confirm`` is web.confirm.ConfirmView. #}
-{% macro confirm_block(confirm, suffix, label) -%}
+{% macro confirm_block(confirm, suffix, label, button_class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-subtle") -%}
 {% if confirm.method == "password" %}
 <div class="space-y-1.5">
   <label for="confirm-password-{{ suffix }}" class="block text-sm font-medium text-ink">{{ _("Your password") }}</label>
   <input id="confirm-password-{{ suffix }}" name="confirm_password" type="password" required autocomplete="current-password" maxlength="1024"
          class="form-control w-full">
 </div>
-<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-subtle">{{ label }}</button>
+<button type="submit" class="{{ button_class }}">{{ label }}</button>
 {% elif confirm.method == "fresh_session" %}
 <p class="text-xs text-muted" data-confirm-fresh>{{ _("Confirmed by your recent sign-in for %(minutes)d more minutes.", minutes=confirm.minutes_left) }}</p>
-<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-subtle">{{ label }}</button>
+<button type="submit" class="{{ button_class }}">{{ label }}</button>
 {% else %}
 <p class="text-xs text-muted" data-confirm-stale>{{ _("To make this change, sign out and sign in again (with your identity provider, or by opening any page through your proxy). You then have 10 minutes.") }}</p>
 {% endif %}

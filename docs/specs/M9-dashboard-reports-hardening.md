@@ -228,6 +228,7 @@ and the golden-archive regression tests for every released format version.
 **Acceptance**
 - Scheduled online backup of the SQLite database using the SQLite backup API (or `VACUUM INTO`), written to `DATA_DIR/backups/` with retention (default: 7 daily, 4 weekly, 6 monthly); `BackupRun` records; failures notify via the notification channels (M3).
 - Settings page: backup status, "Back up now", download a backup, retention settings.
+- Manual backup creation and download require the administrator's password (or a fresh external sign-in) and record instance-level `backup.created` / `backup.downloaded` audit events. Demo reset and delete use the same confirmation.
 - Restore procedure documented and **tested** (CLI `assetboard restore <file>` with integrity check, schema-version check, and automatic pre-restore backup).
 - For PostgreSQL deployments (if configured later) the page explains using `pg_dump`; the feature is disabled gracefully.
 - Docs: `docs/backup.md` includes advice for volume snapshots and off-site copies.

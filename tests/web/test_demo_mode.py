@@ -195,15 +195,23 @@ def test_admin_panel_resets_now_and_hides_the_demo_account(
         page = client.get("/admin/settings")
         assert "data-demo-panel" in page.text
         assert 'data-demo-on="true"' in page.text
-        assert "data-demo-reset" in page.text
+        assert "data-demo-reset-form" in page.text
         assert "data-demo-next-reset" in page.text
         users = client.get("/admin/users")
         assert DEMO_EMAIL not in users.text
         token = web.csrf(page.text)
         assert client.post("/admin/settings/demo/reset", data={}).status_code == 403
+        assert (
+            client.post(
+                "/admin/settings/demo/reset",
+                data={"csrf_token": token},
+                follow_redirects=False,
+            ).status_code
+            == 401
+        )
         response = client.post(
             "/admin/settings/demo/reset",
-            data={"csrf_token": token},
+            data={"csrf_token": token, "confirm_password": web.admin_password},
             follow_redirects=False,
         )
         assert response.status_code == 200
@@ -245,12 +253,20 @@ def test_turning_demo_off_revokes_sessions_and_offers_delete(
         page = client.get("/admin/settings")
         assert "data-demo-panel" in page.text
         assert 'data-demo-on="false"' in page.text
-        assert "data-demo-delete" in page.text
+        assert "data-demo-delete-form" in page.text
         assert "Delete demo data" in page.text
         token = web.csrf(page.text)
+        assert (
+            client.post(
+                "/admin/settings/demo/delete",
+                data={"csrf_token": token},
+                follow_redirects=False,
+            ).status_code
+            == 401
+        )
         response = client.post(
             "/admin/settings/demo/delete",
-            data={"csrf_token": token},
+            data={"csrf_token": token, "confirm_password": web.admin_password},
             follow_redirects=False,
         )
         assert response.status_code == 200

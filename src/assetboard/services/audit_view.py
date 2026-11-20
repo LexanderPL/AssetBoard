@@ -73,6 +73,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "auth.instance_admin_revoked": ("source",),
     "demo.reset": ("reason", "status", "version"),
     "demo.deleted": (),
+    "backup.created": ("origin",),
+    "backup.downloaded": (),
     **AUDIT_DATA_KEYS,
     "scheduled.created": (),
     "scheduled.updated": (),
@@ -322,6 +324,8 @@ ACTION_LABELS: dict[str, str] = {
     "auth.instance_admin_revoked": _("Administrator role removed"),
     "demo.reset": _("Demo workspace reset"),
     "demo.deleted": _("Demo data deleted"),
+    "backup.created": _("Backup created by an administrator"),
+    "backup.downloaded": _("Backup downloaded by an administrator"),
     "admin.user_created": _("Account created by an administrator"),
     "admin.user_activated": _("Account activated"),
     "admin.user_deactivated": _("Account deactivated"),
@@ -428,6 +432,7 @@ KEY_LABELS: dict[str, str] = {
     "purpose": _("For"),
     "confirmed": _("Confirmed with"),
     "source": _("Source"),
+    "origin": _("Origin"),
     "mode": _("Mode"),
     "temporary_password": _("Temporary password"),
     "fields": _("Fields"),
@@ -809,6 +814,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
         "instance_settings": ("instance.settings_updated", "demo.reset", "demo.deleted"),
         "workspaces": ("workspace.delete",),
         "demo": ("demo.reset", "demo.deleted"),
+        "backups": ("backup.created", "backup.downloaded"),
     },
 }
 GROUP_LABELS: dict[str, str] = {
@@ -831,6 +837,7 @@ GROUP_LABELS: dict[str, str] = {
     "instance_settings": _("Instance settings"),
     "workspaces": _("Deleted workspaces"),
     "demo": _("Demo mode"),
+    "backups": _("Backups"),
 }
 
 

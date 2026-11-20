@@ -64,7 +64,7 @@ from assetboard.services.instance_settings import (
     update_settings,
 )
 from assetboard.services.profile import ConfirmMethod
-from assetboard.web.confirm import Refusal, confirm_view, refusal, run_confirmed
+from assetboard.web.confirm import Refusal, confirm_only, confirm_view, refusal, run_confirmed
 from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.rendering import render_template
 from assetboard.web.security import client_host, require_csrf, web_session
@@ -651,11 +651,18 @@ async def settings_submit(
 
 
 @router.post("/admin/settings/demo/reset", name="admin_demo_reset")
-async def demo_reset_now(request: Request) -> Response:
+async def demo_reset_now(request: Request, confirm_password: FormStr = "") -> Response:
     current = _require_admin(request)
     state = _state(request)
     if not state.settings.demo_enabled:
         raise HTTPException(status_code=404)
+    outcome = await confirm_only(request, current, purpose="demo_reset", password=confirm_password)
+    if outcome.status != "confirmed":
+        refused = refusal(request, outcome)
+        page = await _settings_page(
+            request, current, error=refused.message, status_code=refused.status_code
+        )
+        return _with_retry_after(page, refused)
     result = await run_in_threadpool(
         reset_demo_instance,
         state.session_factory,
@@ -672,12 +679,19 @@ async def demo_reset_now(request: Request) -> Response:
 
 
 @router.post("/admin/settings/demo/delete", name="admin_demo_delete")
-async def demo_delete(request: Request) -> Response:
+async def demo_delete(request: Request, confirm_password: FormStr = "") -> Response:
     current = _require_admin(request)
     state = _state(request)
     if state.settings.demo_enabled:
         # Delete is only offered while demo mode is off; reset is the on-mode action.
         raise HTTPException(status_code=404)
+    outcome = await confirm_only(request, current, purpose="demo_delete", password=confirm_password)
+    if outcome.status != "confirmed":
+        refused = refusal(request, outcome)
+        page = await _settings_page(
+            request, current, error=refused.message, status_code=refused.status_code
+        )
+        return _with_retry_after(page, refused)
     deleted = await run_in_threadpool(
         delete_demo_instance,
         state.session_factory,

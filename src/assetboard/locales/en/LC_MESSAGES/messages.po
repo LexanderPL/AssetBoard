@@ -664,6 +664,12 @@ msgstr ""
 msgid "Demo data deleted"
 msgstr ""
 
+msgid "Backup created by an administrator"
+msgstr ""
+
+msgid "Backup downloaded by an administrator"
+msgstr ""
+
 msgid "Account created by an administrator"
 msgstr ""
 
@@ -960,6 +966,9 @@ msgid "Confirmed with"
 msgstr ""
 
 msgid "Source"
+msgstr ""
+
+msgid "Origin"
 msgstr ""
 
 msgid "Mode"
@@ -1533,6 +1542,9 @@ msgid "Deleted workspaces"
 msgstr ""
 
 msgid "Demo mode"
+msgstr ""
+
+msgid "Backups"
 msgstr ""
 
 msgid "Demo"
@@ -2686,6 +2698,22 @@ msgstr ""
 
 #, python-format
 msgid "Other sessions signed out: %(count)d."
+msgstr ""
+
+msgid "Back up now"
+msgstr ""
+
+msgid ""
+"Create a copy of the database now. The file can contain every workspace "
+"and account on this instance; keep it somewhere safe."
+msgstr ""
+
+msgid "Download backup"
+msgstr ""
+
+msgid ""
+"Download this database copy. The file can contain every workspace and "
+"account on this instance; keep it somewhere safe."
 msgstr ""
 
 msgid "Expense"
@@ -5947,6 +5975,13 @@ msgstr ""
 msgid "Switch"
 msgstr ""
 
+#, python-format
+msgid "File: %(name)s"
+msgstr ""
+
+msgid "Back to instance settings"
+msgstr ""
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 
@@ -6005,9 +6040,6 @@ msgstr ""
 msgid "Save settings"
 msgstr ""
 
-msgid "Backups"
-msgstr ""
-
 msgid "Automatic backups are not available for an in-memory database."
 msgstr ""
 
@@ -6035,9 +6067,6 @@ msgid "Not scheduled"
 msgstr ""
 
 msgid "Location"
-msgstr ""
-
-msgid "Back up now"
 msgstr ""
 
 msgid "Started"
