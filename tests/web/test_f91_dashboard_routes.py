@@ -25,6 +25,7 @@ from assetboard.db.repositories import (
     PricePointRepository,
 )
 from assetboard.domain.dashboard import WIDGET_KEYS
+from assetboard.services import dashboard as dashboard_service
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.demo import build_demo_workspace, plan_for_workspace
 from assetboard.services.investments import create_instrument
@@ -594,13 +595,13 @@ def test_the_portfolio_history_widget_uses_the_saved_range_and_chart_only_read(
 ) -> None:
     _fixed(owner)
     calls: list[dict[str, object]] = []
-    original = dashboard_module.performance_page
+    original = dashboard_service.performance_page
 
     def recording(*args: object, **kwargs: object):
         calls.append(kwargs)
         return original(*args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(dashboard_module, "performance_page", recording)
+    monkeypatch.setattr(dashboard_service, "performance_page", recording)
     _undated_portfolio(owner)
     with owner.db() as session, session.begin():
         DashboardPreferenceRepository(session, _ctx(owner)).upsert(
@@ -648,13 +649,13 @@ def test_the_net_worth_widget_uses_the_saved_range(
 ) -> None:
     _fixed(owner)
     calls: list[tuple[object, ...]] = []
-    original = dashboard_module.networth_history
+    original = dashboard_service.networth_history
 
     def recording(*args: object, **kwargs: object):
         calls.append(args)
         return original(*args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(dashboard_module, "networth_history", recording)
+    monkeypatch.setattr(dashboard_service, "networth_history", recording)
     with owner.db() as session, session.begin():
         DashboardPreferenceRepository(session, _ctx(owner)).upsert(
             user_id=owner.admin_id,

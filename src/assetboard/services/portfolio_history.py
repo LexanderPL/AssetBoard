@@ -1,10 +1,11 @@
 """Historical portfolio values for the F6.8 net-worth resolvers.
 
-One load reads the workspace's instruments, allocations, dated transactions, price points, FX
-rates and bond terms, reusing the F6.7 observation builders. Values at past dates use the F6.7
-rules: dated lots only, prices and FX carried forward, and the F6.5 model value for bond
-instruments. Current values deliberately use the separate F6.6 path in ``services.portfolio``
-because that path includes undated legacy lots.
+One load reads the workspace's instruments, allocations, dated transactions, the observation
+window's price points and FX rates (plus their carry-forward anchors) and bond terms, reusing
+the F6.7 observation builders. Values at past dates use the F6.7 rules: dated lots only, prices
+and FX carried forward, and the F6.5 model value for bond instruments. Current values
+deliberately use the separate F6.6 path in ``services.portfolio`` because that path includes
+undated legacy lots.
 """
 
 from __future__ import annotations
@@ -113,10 +114,11 @@ def load_history(
         row.instrument_id: row
         for row in BondTermsRepository(session, ctx).for_instruments(transaction_ids)
     }
-    price_rows = PricePointRepository(session, ctx).for_instruments_on_or_before(
-        transaction_ids, end
+    read_start = min(observation_dates)
+    price_rows = PricePointRepository(session, ctx).for_instruments_in_window(
+        transaction_ids, start=read_start, end=end
     )
-    fx_rows = FxRateRepository(session, ctx).for_base_on_or_before(base, end)
+    fx_rows = FxRateRepository(session, ctx).for_base_in_window(base, start=read_start, end=end)
     prices: dict[UUID, Observations] = {
         instrument_id: _observations(rows)
         for instrument_id, rows in price_observations(price_rows, dated).items()

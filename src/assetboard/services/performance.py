@@ -1,9 +1,10 @@
 """Performance series, ranges and XIRR (F6.7): read-only, viewers and up.
 
-One read builds sorted price and FX observations for the whole history, then the pure
-``portfolio_series``/``portfolio_value_at`` functions answer the chart and period rows. The chart
-defaults to one year; the class filter applies F6.6 look-through weights to both value and net
-invested. Undated legacy lots are excluded from the series and counted in a page note.
+One read builds sorted price and FX observations for the selected window (the range plus its
+carry-forward/backfill anchors), then the pure ``portfolio_series``/``portfolio_value_at``
+functions answer the chart and period rows. The chart defaults to one year; the class filter
+applies F6.6 look-through weights to both value and net invested. Undated legacy lots are
+excluded from the series and counted in a page note.
 """
 
 from __future__ import annotations
@@ -285,18 +286,36 @@ def performance_page(
             row.instrument_id: row
             for row in BondTermsRepository(session, ctx).for_instruments(transaction_ids)
         }
-        price_rows = PricePointRepository(session, ctx).for_instruments_on_or_before(
-            transaction_ids, today
+        dated_rows = [row for row in transaction_rows if row.date is not None]
+        first_date = min((row.date for row in dated_rows if row.date is not None), default=None)
+        range_start = _range_start(chosen_range, today, first_date)
+        step = _step_for(chosen_range, range_start, today)
+        period_starts: set[date] = (
+            {_period_start(code, today, first_date) for code in PERIODS} if with_periods else set()
         )
-        fx_rows = FxRateRepository(session, ctx).for_base_on_or_before(base, today)
-    dated_rows = [row for row in transaction_rows if row.date is not None]
+        chart_dates = set(dates) if dates is not None else set(step_dates(range_start, today, step))
+        observation_dates: set[date] = chart_dates | period_starts
+        if observation_dates:
+            read_start = min(observation_dates)
+            # Read through today even for an old report range: an estimate or a leading-gap
+            # backfill may need the next valuation/price after the last plotted date.
+            read_end = today
+            if first_date is None or read_start <= first_date:
+                price_rows = PricePointRepository(session, ctx).for_instruments_on_or_before(
+                    transaction_ids, read_end
+                )
+                fx_rows = FxRateRepository(session, ctx).for_base_on_or_before(base, read_end)
+            else:
+                price_rows = PricePointRepository(session, ctx).for_instruments_in_window(
+                    transaction_ids, start=read_start, end=read_end
+                )
+                fx_rows = FxRateRepository(session, ctx).for_base_in_window(
+                    base, start=read_start, end=read_end
+                )
+        else:
+            price_rows = []
+            fx_rows = []
     undated_count = len(transaction_rows) - len(dated_rows)
-    first_date = min((row.date for row in dated_rows if row.date is not None), default=None)
-    range_start = _range_start(chosen_range, today, first_date)
-    step = _step_for(chosen_range, range_start, today)
-    period_starts = {_period_start(code, today, first_date) for code in PERIODS}
-    chart_dates = set(dates) if dates is not None else set(step_dates(range_start, today, step))
-    observation_dates = chart_dates | period_starts | {today}
 
     prices = price_observations(price_rows, dated_rows)
     fx = fx_observations(fx_rows, dated_rows, base)

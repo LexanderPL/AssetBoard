@@ -248,7 +248,7 @@ def test_property_totals_and_exclusions(
             item.value.amount_minor for item in counted if item.value is not None
         )
         for row in categories:
-            if total.amount_minor == 0:
+            if row.total.amount_minor == 0:
                 assert row.share_tenths is None
             else:
                 assert row.share_tenths is not None

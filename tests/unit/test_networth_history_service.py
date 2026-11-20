@@ -254,6 +254,46 @@ def test_estimate_switch_off_carries_the_last_value(team: WorkspaceDb) -> None:
     assert february.breakdown.estimated == 0
 
 
+def test_explicit_dates_before_the_first_manual_value_are_dropped(team: WorkspaceDb) -> None:
+    _at(team, "2026-12-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    _item(team, ctx, category, value="100", as_of=date(2025, 6, 30))
+    data = networth_history(
+        team.factory,
+        ctx,
+        dates=(date(2024, 12, 31), date(2025, 6, 30), date(2025, 12, 31)),
+    )
+    assert [point.as_of for point in data.points] == [
+        date(2025, 6, 30),
+        date(2025, 12, 31),
+    ]
+
+
+def test_explicit_dates_before_a_linked_item_creation_are_dropped(
+    team: WorkspaceDb, fake_links: FakeLinks
+) -> None:
+    _at(team, "2025-01-01T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    target = FakeTarget(
+        workspace_id=team.workspace_id,
+        link_id=uuid4(),
+        label="Holding",
+        currency="EUR",
+        values={date(2025, 1, 31): 100, date(2026, 1, 31): 200},
+    )
+    fake_links.register(targets=[target])
+    _item(team, ctx, category, name="Holding", link_type=LINK_TYPE, link_id=target.link_id)
+    _at(team, "2026-03-15T12:00:00+00:00")
+    data = networth_history(
+        team.factory,
+        team.ctx("ed", "editor"),
+        dates=(date(2024, 12, 31), date(2025, 1, 31), date(2026, 1, 31)),
+    )
+    assert [point.as_of for point in data.points] == [date(2025, 1, 31), date(2026, 1, 31)]
+
+
 def test_linked_values_use_resolver_history_and_live_today(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:

@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from datetime import date
+from collections.abc import Collection, Iterator
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
+from time import perf_counter
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import event, insert
 
 from assetboard.clock import FixedClock
-from assetboard.db.repositories import AssetClassRepository, PricePointRepository
+from assetboard.db.models.networth import ItemValuation
+from assetboard.db.models.prices import PricePoint
+from assetboard.db.repositories import (
+    AssetClassRepository,
+    ItemValuationRepository,
+    PricePointRepository,
+)
 from assetboard.domain.money import Money
 from assetboard.domain.performance import SeriesPoint
 from assetboard.domain.reports import ReportStep
@@ -19,6 +27,7 @@ from assetboard.services.context import Context
 from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.networth import add_valuation, create_category, create_item
+from assetboard.services.networth_history import networth_history
 from assetboard.services.performance import PerformancePage, performance_page
 from assetboard.services.reports import net_worth_report, portfolio_report, reports_data
 from assetboard.web.reports import _portfolio_series
@@ -280,3 +289,197 @@ def test_a_future_net_worth_range_does_not_read_the_history(
     monkeypatch.setattr("assetboard.services.reports.networth_history", fail)
     data = _data(team, from_year="2030", to_year="2030")
     assert data.net_worth is None
+
+
+def _month(day: date, offset: int) -> date:
+    year = day.year + (day.month - 1 + offset) // 12
+    month = (day.month - 1 + offset) % 12 + 1
+    return date(year, month, 28)
+
+
+def _ten_years(team: WorkspaceDb) -> None:
+    """A ten-year net-worth and price history; the report below asks only for 2026."""
+    owner = _owner(team)
+    category = create_category(
+        team.factory, owner, side="asset", name="Long history", color="#16a34a"
+    )
+    item = create_item(
+        team.factory,
+        owner,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Long fund",
+        value="100",
+        currency="EUR",
+        include_in_net_worth=True,
+        as_of=date(2016, 1, 15),
+    )
+    instrument_id = _instrument(team, owner)
+    create_transaction(
+        team.factory,
+        owner,
+        instrument_id=instrument_id,
+        type_value="buy",
+        date_value="2016-01-04",
+        quantity_value="10",
+        unit_price_value="100",
+        fee_value="0",
+        fx_value="",
+        note_value="",
+        locale="en",
+    )
+    with team.factory.begin() as session:
+        valuations = [
+            {
+                "id": uuid4(),
+                "workspace_id": team.workspace_id,
+                "item_id": item.id,
+                "as_of": _month(date(2016, 1, 1), offset),
+                "value_minor": 10_000_000 + offset * 10_000,
+                "currency": "EUR",
+                "note": "",
+                "created_at": datetime(2016, 1, 1, tzinfo=UTC),
+                "updated_at": datetime(2016, 1, 1, tzinfo=UTC),
+            }
+            for offset in range(1, 132)
+            if _month(date(2016, 1, 1), offset) < date(2026, 12, 15)
+        ]
+        session.execute(insert(ItemValuation), valuations)
+        prices = [
+            {
+                "id": uuid4(),
+                "workspace_id": team.workspace_id,
+                "instrument_id": instrument_id,
+                "date": _month(date(2016, 1, 1), offset),
+                "price": Decimal(100 + offset),
+                "source": "manual",
+                "provider_key": None,
+                "import_key": None,
+                "import_batch_id": None,
+                "created_at": datetime(2016, 1, 1, tzinfo=UTC),
+                "updated_at": datetime(2016, 1, 1, tzinfo=UTC),
+            }
+            for offset in range(0, 132)
+            if _month(date(2016, 1, 1), offset) < date(2026, 12, 15)
+        ]
+        session.execute(insert(PricePoint), prices)
+
+
+def test_a_short_report_reads_only_its_range(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ten_years(team)
+    valuation_rows: list[int] = []
+    price_rows: list[int] = []
+    original_valuations = ItemValuationRepository.for_items_in_window
+    original_prices = PricePointRepository.for_instruments_in_window
+
+    def record_valuations(
+        self: ItemValuationRepository, item_ids: Collection[UUID], *, start: date, end: date
+    ):
+        rows = original_valuations(self, item_ids, start=start, end=end)
+        valuation_rows.append(len(rows))
+        return rows
+
+    def record_prices(
+        self: PricePointRepository,
+        instrument_ids: Collection[UUID],
+        *,
+        start: date,
+        end: date,
+    ):
+        rows = original_prices(self, instrument_ids, start=start, end=end)
+        price_rows.append(len(rows))
+        return rows
+
+    monkeypatch.setattr(ItemValuationRepository, "for_items_in_window", record_valuations)
+    monkeypatch.setattr(PricePointRepository, "for_instruments_in_window", record_prices)
+    statements: list[str] = []
+
+    def capture(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: object,
+    ) -> None:
+        statements.append(statement)
+
+    event.listen(team.engine, "before_cursor_execute", capture)
+    started = perf_counter()
+    try:
+        data = _data(team, from_year="2026", to_year="2026", step="month")
+    finally:
+        event.remove(team.engine, "before_cursor_execute", capture)
+    elapsed = perf_counter() - started
+
+    assert data.net_worth is not None and data.portfolio is not None
+    # 12 valuations and 12 prices per series in 2026, not the ten-year history.
+    assert valuation_rows and sum(valuation_rows) <= 13
+    assert price_rows and sum(price_rows) <= 13
+    # Phase A's scoped reads plus the two Phase B sections; no per-month query.
+    assert len(statements) <= 25
+    assert elapsed < 1.5, f"reports read took {elapsed:.3f}s"
+
+
+def test_a_short_net_worth_report_matches_the_full_history(team: WorkspaceDb) -> None:
+    _ten_years(team)
+    ctx = team.ctx("vic", "viewer")
+    data = _data(team, from_year="2026", to_year="2026", step="month")
+    assert data.net_worth is not None
+    full = networth_history(team.factory, ctx, "all")
+    expected = {point.as_of: point.net for point in full.points if point.as_of.year == 2026}
+    assert {point.as_of: point.net for point in data.net_worth.points} == expected
+
+
+def test_a_historical_report_keeps_the_estimate_lookahead(team: WorkspaceDb) -> None:
+    owner = _owner(team)
+    category = create_category(team.factory, owner, side="asset", name="Estimated", color="#16a34a")
+    item = create_item(
+        team.factory,
+        owner,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Flat",
+        value="100",
+        currency="EUR",
+        include_in_net_worth=True,
+        estimate_between=True,
+        as_of=date(2024, 1, 1),
+    )
+    add_valuation(team.factory, owner, item.id, locale="en", value="300", as_of=date(2025, 1, 1))
+    ctx = team.ctx("vic", "viewer")
+    full = networth_history(team.factory, ctx, "all")
+    expected = next(point for point in full.points if point.as_of == date(2024, 12, 31))
+    data = _data(team, from_year="2024", to_year="2024", step="year")
+    assert data.net_worth is not None
+    assert data.net_worth.points[-1].as_of == date(2024, 12, 31)
+    assert data.net_worth.points[-1].assets == expected.assets
+    assert data.net_worth.points[-1].breakdown.estimated == 1
+
+
+def test_a_historical_portfolio_report_keeps_the_backfill_lookahead(team: WorkspaceDb) -> None:
+    owner = _owner(team)
+    instrument_id = _instrument(team, owner)
+    create_transaction(
+        team.factory,
+        owner,
+        instrument_id=instrument_id,
+        type_value="buy",
+        date_value="2024-01-01",
+        quantity_value="10",
+        unit_price_value="100",
+        fee_value="0",
+        fx_value="",
+        note_value="",
+        locale="en",
+    )
+    _price(team, owner, instrument_id, "2025-01-15", "150")
+    data = _data(team, from_year="2024", to_year="2024", step="year")
+    assert data.portfolio is not None
+    assert data.portfolio.chart
+    assert data.portfolio.chart[-1].date == date(2024, 12, 31)
+    assert not data.portfolio.chart[-1].incomplete

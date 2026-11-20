@@ -357,6 +357,7 @@ def _load_rows(
     *,
     categories: Sequence[NetWorthCategory] | None = None,
     item_ids: Collection[UUID] | None = None,
+    window: tuple[date, date] | None = None,
 ) -> _LoadedRows:
     category_rows = (
         list(categories)
@@ -366,7 +367,14 @@ def _load_rows(
     repository = NetWorthItemRepository(session, scope)
     items = repository.by_ids(item_ids) if item_ids is not None else repository.ordered()
     valuations: dict[UUID, list[ItemValuation]] = {}
-    for valuation in ItemValuationRepository(session, scope).for_items([item.id for item in items]):
+    valuation_repository = ItemValuationRepository(session, scope)
+    item_ids_list = [item.id for item in items]
+    rows = (
+        valuation_repository.for_items_in_window(item_ids_list, start=window[0], end=window[1])
+        if window is not None
+        else valuation_repository.for_items(item_ids_list)
+    )
+    for valuation in rows:
         valuations.setdefault(valuation.item_id, []).append(valuation)
     return _LoadedRows(category_rows, items, valuations)
 
@@ -394,9 +402,14 @@ def load_item_histories(
     *,
     categories: Sequence[NetWorthCategory] | None = None,
     item_ids: Collection[UUID] | None = None,
+    window: tuple[date, date] | None = None,
 ) -> tuple[ItemHistory, ...]:
-    """Every item (or only ``item_ids``) with its valuation history, loaded once."""
-    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
+    """Every item (or only ``item_ids``) with its valuation history, loaded once.
+
+    ``window`` narrows the valuations to ``[start, end]`` plus each item's latest value before
+    the window, which is enough for carry-forward reads such as the Home trend and Reports.
+    """
+    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids, window=window)
     return tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
 
 

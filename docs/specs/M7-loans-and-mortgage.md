@@ -98,7 +98,7 @@ F7.6 uses a net-worth property item rather than the earlier `property_instrument
   1. No overpayments: schedule equals `numpy_financial.pmt/ipmt/ppmt` row by row (dev-only oracle) for a sample loan.
   2. With overpayments: an independent naive loop in the test module, transcribed from the spreadsheet behaviour listed above, matches the engine exactly (rows and payoff date).
   3. Property tests: closing balance never negative; sum of principal + overpayments = starting balance; total paid = principal + interest + costs; more overpayment never increases total interest.
-- Performance: a 360-month schedule builds in < 10 ms.
+- Performance: a 360-month schedule builds in < 10 ms on a development machine; the benchmark gate is < 20 ms (CPU time, minimum of five runs) as an explicit 2× shared-CI margin.
 
 **Agent prompt**
 ```

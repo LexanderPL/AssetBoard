@@ -60,7 +60,10 @@ the M4 archive.
   the server's locale helpers. Each chart has an empty state when the range has no data.
 - **Performance:** 10 years × 5 000 transactions a year renders the Phase A page in < 500 ms
   on the CI runner (benchmark test with a generous margin), with one streamed read of the
-  transactions per request, not one per month.
+  transactions per request, not one per month. Phase B passes the report's exact period-end
+  dates to the net-worth and portfolio services; a short range reads from its start through
+  today plus the carry-forward (and estimate/backfill) anchors, not every historical valuation
+  and price.
 
 **Phases**
 
@@ -244,8 +247,10 @@ Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports 
 service (last point per period, gaps not interpolated), hidden when there are no values. Do not read stored snapshots.
 ```
 
-**As built (2026-11-19).** `services.reports.net_worth_report` calls F5.9's `networth_history`
-in its all-time form and keeps the last point of each report month/year. The `/reports` section
+**As built (2026-11-19, bounded 2026-11-20).** `services.reports.net_worth_report` calls F5.9's
+`networth_history(dates=...)` with the report period ends. The service reads only the report
+window plus a carry-forward anchor, drops dates before the first recorded value, and keeps the
+last point of each report month/year. The `/reports` section
 reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
 the chart and accessible table, with the per-period not-counted/estimated notes suppressed. The
 section is absent without values or outside the base currency. Tests cover year/month selection,

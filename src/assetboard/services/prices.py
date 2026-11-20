@@ -292,7 +292,7 @@ def _latest_prices_in_session(
     instruments = {
         row.id: row for row in InstrumentRepository(session, ctx).ordered() if row.id in ids
     }
-    stored = PricePointRepository(session, ctx).for_instruments_on_or_before(ids, on)
+    stored = PricePointRepository(session, ctx).latest_for_instruments_on_or_before(ids, on)
     transactions = InvestmentTransactionRepository(session, ctx).live_dated(on, ids)
     splits: dict[UUID, list[HoldingTransaction]] = {}
     for row in transactions:
@@ -421,7 +421,7 @@ def _latest_fx_in_session(
     wanted = {currency for currency in currencies if currency != base_currency}
     if not wanted:
         return {}
-    stored = FxRateRepository(session, ctx).for_base_on_or_before(base_currency, on)
+    stored = FxRateRepository(session, ctx).latest_for_base_on_or_before(base_currency, on)
     transactions = InvestmentTransactionRepository(session, ctx).live_dated(on)
     transaction_rates = _latest_transaction_fx(transactions, base_currency)
     candidates: dict[str, list[_Candidate]] = {currency: [] for currency in wanted}
@@ -482,7 +482,7 @@ def stored_fx_rates_in_session(
     if not wanted:
         return {}
     candidates: dict[str, list[_Candidate]] = {}
-    for row in FxRateRepository(session, ctx).for_base_on_or_before(base, on):
+    for row in FxRateRepository(session, ctx).latest_for_base_on_or_before(base, on):
         if row.quote_currency in wanted and row.source != "transaction":
             candidates.setdefault(row.quote_currency, []).append(
                 _Candidate(row.date, row.source, row.created_at, row.id, row.rate)

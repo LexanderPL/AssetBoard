@@ -597,9 +597,9 @@ def test_a_360_month_schedule_builds_in_under_ten_ms() -> None:
         started = process_time()
         _build(terms, rates=[RatePeriod(date(2026, 1, 1), 550)], anchor=anchor)
         timings.append(process_time() - started)
-    # Local runs are ~5 ms. The budget guards pathological regressions while leaving room for
-    # the slower shared CI runners (observed ~13 ms).
-    assert min(timings) < 0.030
+    # F7.2's target is 10 ms on a development machine. The gate is 20 ms (a 2× explicit CI
+    # margin) and uses CPU time, minimum of five runs, so xdist/coverage does not flake it.
+    assert min(timings) < 0.020
 
 
 def test_a_360_month_schedule_with_many_rate_changes_stays_linear() -> None:
@@ -616,8 +616,8 @@ def test_a_360_month_schedule_with_many_rate_changes_stays_linear() -> None:
         _build(terms, rates=rates, anchor=anchor)
         timings.append(process_time() - started)
     # Before the per-rate growth cursor this took ~12 ms locally: one full-term Decimal table
-    # per distinct rate. Local runs are ~5 ms; the budget leaves room for slower CI runners.
-    assert min(timings) < 0.030
+    # per distinct rate. Local runs are ~5 ms; the 20 ms gate is the documented 2× CI margin.
+    assert min(timings) < 0.020
 
 
 # 14. Input validation

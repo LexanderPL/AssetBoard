@@ -6,7 +6,7 @@ from collections.abc import Collection
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -276,6 +276,58 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
             statement = (
                 self._scoped_select()
                 .where(ItemValuation.item_id.in_(chunk))
+                .order_by(
+                    ItemValuation.item_id,
+                    ItemValuation.as_of,
+                    ItemValuation.created_at,
+                    ItemValuation.id,
+                )
+            )
+            rows.extend(self._session.scalars(statement))
+        return rows
+
+    def for_items_in_window(
+        self, item_ids: Collection[UUID], *, start: date, end: date
+    ) -> list[ItemValuation]:
+        """Valuations in ``[start, end]`` plus each item's latest row before ``start``.
+
+        The one row (or same-date group) before the window keeps carry-forward correct without
+        reading a ten-year history for a one-year range. Rows keep the same order as
+        :meth:`for_items`.
+        """
+        ids = list(item_ids)
+        if not ids or start > end:
+            return []
+        rows: list[ItemValuation] = []
+        for offset in range(0, len(ids), 400):
+            chunk = ids[offset : offset + 400]
+            latest = (
+                select(ItemValuation.item_id, func.max(ItemValuation.as_of).label("as_of"))
+                .where(
+                    ItemValuation.workspace_id == self._workspace_id,
+                    ItemValuation.item_id.in_(chunk),
+                    ItemValuation.as_of < start,
+                )
+                .group_by(ItemValuation.item_id)
+                .subquery()
+            )
+            statement = (
+                self._scoped_select()
+                .where(
+                    ItemValuation.item_id.in_(chunk),
+                    or_(
+                        and_(
+                            ItemValuation.as_of >= start,
+                            ItemValuation.as_of <= end,
+                        ),
+                        and_(
+                            ItemValuation.as_of < start,
+                            tuple_(ItemValuation.item_id, ItemValuation.as_of).in_(
+                                select(latest.c.item_id, latest.c.as_of)
+                            ),
+                        ),
+                    ),
+                )
                 .order_by(
                     ItemValuation.item_id,
                     ItemValuation.as_of,
