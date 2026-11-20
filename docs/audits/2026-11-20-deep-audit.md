@@ -747,6 +747,8 @@ The Home page issues 12 `GET /dashboard/widgets/*` requests. The net-worth widge
 
 **Test.** Benchmark Home with a large history; assert a budget for the net-worth widget and the total widget requests.
 
+**Status (F11.12):** fixed. The Home net-worth and portfolio-history widgets use range-limited reads and a per-workspace/date cache that any committed net-worth/investment write invalidates; the net-worth widget no longer loads the summary and the trend separately. A populated-history budget test covers query count and time.
+
 **Effort:** M. **Related:** F5.9, F6.7, F9.1.
 
 #### OPS-02 — P2 — Reports Phase B reads all history: 42 SQL vs 6, 73 ms vs 9 ms
@@ -759,6 +761,8 @@ With Phase B: **42 SQL / 72.8 ms**; without: **6 SQL / 9.2 ms**. `networth_histo
 
 **Test.** A 1-year report on a 10-year history reads only the needed rows; query count stays bounded.
 
+**Status (F11.12):** fixed. `networth_history` accepts exact report dates and bounds the valuation read to the report start through today (plus each item's carry-forward value); `performance_page` does the same for prices and FX. Reports pass its period ends; a test asserts the bounded row and query counts on a ten-year history.
+
 **Effort:** M. **Related:** F10.4/F10.5, F5.9/F6.7.
 
 #### OPS-03 — P3 — Benchmark budgets allow 3–4× the specified performance
@@ -770,6 +774,8 @@ F6.7 specifies “5 years × 30 instruments × weekly points computed in **< 500
 **Fix.** Tighten to the spec (with a separate CI-margin marker or a benchmark job if shared runners are noisy).
 
 **Test.** The existing benchmark tests with tighter thresholds.
+
+**Status (F11.12):** fixed. The performance benchmark now asserts the 500 ms spec budget (CPU time, best of three); the loan schedule gate is 20 ms against the 10 ms target, documented as an explicit 2× CI margin in M7.
 
 **Effort:** S. **Related:** F6.7, F7.2.
 

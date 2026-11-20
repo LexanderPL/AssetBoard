@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from time import perf_counter
+from time import process_time
 from uuid import UUID, uuid4
 
 from hypothesis import given
@@ -17,6 +17,7 @@ from assetboard.domain.performance import (
     CashFlow,
     PriceObservation,
     RateObservation,
+    SeriesPoint,
     Step,
     XirrFailure,
     add_months,
@@ -640,17 +641,23 @@ def test_five_year_weekly_series_is_fast() -> None:
         prices[instrument_id] = _price(
             (DAY, "100"), (DAY + timedelta(days=5 * 365), f"{100 + index}")
         )
-    started = perf_counter()
-    points = portfolio_series(
-        transactions,
-        prices,
-        {},
-        DAY,
-        DAY + timedelta(days=5 * 365),
-        Step.WEEK,
-        base_currency="EUR",
-    )
-    elapsed = perf_counter() - started
+    timings = []
+    points: tuple[SeriesPoint, ...] = ()
+    for _ in range(3):
+        started = process_time()
+        points = portfolio_series(
+            transactions,
+            prices,
+            {},
+            DAY,
+            DAY + timedelta(days=5 * 365),
+            Step.WEEK,
+            base_currency="EUR",
+        )
+        timings.append(process_time() - started)
+    elapsed = min(timings)
     print(f"five-year weekly series: {elapsed * 1000:.1f} ms, {len(points)} points")
-    assert elapsed < 2
+    # F6.7's budget is 500 ms. CPU time and the best of three runs keep the gate stable under
+    # xdist/CI contention while still catching a regression past the specified target.
+    assert elapsed < 0.5
     assert len(points) >= 260
