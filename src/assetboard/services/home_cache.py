@@ -137,8 +137,3 @@ def _mark_changed(session: Session, _flush_context: object) -> None:
 def _committed(session: Session) -> None:
     if session.info.pop(_DIRTY, False):
         _invalidate()
-
-
-@event.listens_for(Session, "after_rollback")
-def _rolled_back(session: Session) -> None:
-    session.info.pop(_DIRTY, None)
