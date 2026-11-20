@@ -143,6 +143,7 @@ BULK_ERRORS = {
     "amount_too_large": _("The value is too large."),
     "category_unknown": _("No active category with this name."),
     "category_archived": _("This category is archived; choose an active one."),
+    "wrong_side": _("Choose a category from this tab."),
 }
 BULK_WARNINGS = {
     "duplicate_name": _("This name appears more than once in the batch."),

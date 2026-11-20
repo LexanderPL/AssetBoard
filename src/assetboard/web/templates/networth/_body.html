@@ -180,6 +180,7 @@
       <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
     </div>
     <p class="mt-2 text-sm text-muted">{{ _("Paste one item per line as name; value; category. Amounts use the interface number format and the workspace base currency. The whole batch is checked before anything is created.") }}</p>
+    <p class="mt-1 text-xs text-muted" data-bulk-categories>{{ _("Active Net worth categories on this side:") }} {% for category in view.categories %}{{ category.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
     {% if bulk_error %}<p class="mt-3 border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>{% endif %}
     <form {{ htmx_form(scoped_url(request, 'networth_bulk_preview')) }} class="mt-3 space-y-2">
       {{ csrf_input() }}
