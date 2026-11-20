@@ -18,12 +18,14 @@ from assetboard.db.repositories import (
     ScheduledOccurrenceRepository,
 )
 from assetboard.domain.loans import LoanKind, LoanValidationError, Money
+from assetboard.domain.months import YearMonth
 from assetboard.domain.scheduled import AmountMode
 from assetboard.services import (
     installment_plans,
     loan_links,
     loan_scheduled,
     loans,
+    months,
     occurrences,
     transactions,
 )
@@ -522,6 +524,20 @@ def test_restore_with_overdue_rows_does_not_duplicate_them(team: WorkspaceDb) ->
         date(2026, 7, 5),
     ]
     assert len({row.due_date for row in rows}) == 3
+
+
+def test_restore_refuses_a_closed_month(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 2, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    months.close_month(team.factory, ctx, YearMonth(2026, 2))
+    team.clock._value = datetime(2026, 2, 2, 12, tzinfo=UTC)
+    installment_plans.archive_installment_plan(team.factory, ctx, loan_id)
+    with pytest.raises(loans.LoanError) as raised:
+        installment_plans.restore_installment_plan(team.factory, ctx, loan_id)
+    assert raised.value.code == "month_closed"
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert view.closed is True
 
 
 def test_restore_after_the_original_end_date_still_schedules_the_count(

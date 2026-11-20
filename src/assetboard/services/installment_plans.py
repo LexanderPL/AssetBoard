@@ -37,6 +37,7 @@ from assetboard.domain.loans import (
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 from assetboard.services import loans
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.months import MonthClosed, ensure_date_open
 
 
 @dataclass(frozen=True, slots=True)
@@ -639,17 +640,28 @@ def restore_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_
             raise NotFound
         if plan.remaining_count <= 0:
             raise loans.LoanError("remaining_count", "installment_plan_closed")
-        # Restore is a fresh schedule for the remaining count: clear every pending row from
-        # the archived item, then generate from today. Keeping overdue rows while shifting the
-        # end date either duplicated dates or left the plan under-scheduled.
-        occurrences = ScheduledOccurrenceRepository(session, ctx)
-        for item in ScheduledItemRepository(session, ctx).for_loan(loan.id):
-            for row in occurrences.for_item(item.id):
-                if row.status == "pending":
-                    occurrences.delete(row)
         today = ctx.clock.today(ctx.workspace.timezone)
         next_due = next_due_on_or_after(today, loan.payment_day)
         end_date = _end_date(next_due, plan.remaining_count, loan.payment_day)
+        occurrences = ScheduledOccurrenceRepository(session, ctx)
+        pending = [
+            row
+            for item in ScheduledItemRepository(session, ctx).for_loan(loan.id)
+            for row in occurrences.for_item(item.id)
+            if row.status == "pending"
+        ]
+        try:
+            # Restore is a fresh schedule for the remaining count: clear every pending row from
+            # the archived item, then generate from today. Refuse rather than mutate a closed
+            # month or leave the plan under-scheduled because a target month is closed.
+            for row in pending:
+                ensure_date_open(session, ctx, row.due_date)
+            for index in range(plan.remaining_count):
+                ensure_date_open(session, ctx, _add_months(next_due, index, loan.payment_day))
+        except MonthClosed:
+            raise loans.LoanError("loan", "month_closed") from None
+        for row in pending:
+            occurrences.delete(row)
         InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None, end_date=end_date)
         LoanRepository(session, ctx).update(
             loan.id,
