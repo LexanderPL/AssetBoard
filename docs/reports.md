@@ -24,7 +24,7 @@ JavaScript. Unknown query parameters are ignored.
 | Currency | `currency=XXX` | the workspace's base currency |
 | Categories | `category=<id>`, repeatable | empty: all categories in the year overview, the 8 largest (and Other) in the category charts |
 | Include saved / invested | `savings=1` | off |
-| Report year | `year=YYYY` | the latest data year inside the range, or the range end |
+| Report year | `year=YYYY` | the latest data year inside the range, or the range end, capped at the current year |
 | Category trends window | `trend=3` or `trend=12` | 3 months |
 
 The **From year** and **To year** dropdowns offer only years that have at least one non-deleted
@@ -165,7 +165,8 @@ figures; the table is the accessible version and works without JavaScript.
 
 ## Year-over-year
 
-The year-over-year table has one row per year in the report range. Each row shows the year's
+The year-over-year table has one row per year in the report range, up to the current year.
+Each row shows the year's
 **income** and **expenses**, then the change against the previous year for both: the absolute
 value and the percentage. Income growth is shown as good and an income drop as bad; an expense
 increase is shown as bad and a decrease as good. The signs and percentages carry the meaning, so

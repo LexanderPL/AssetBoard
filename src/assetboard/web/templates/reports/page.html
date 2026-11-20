@@ -104,7 +104,7 @@
             <span data-multi-select-summary>{{ view.category_summary }}</span>
             <span class="text-xs text-muted" aria-hidden="true">▾</span>
           </summary>
-          <div role="group" aria-labelledby="report-category-label" class="absolute left-0 right-0 z-30 mt-1 max-h-72 overflow-y-auto border border-line bg-surface p-2 shadow-lg">
+          <div role="group" aria-labelledby="report-category-label" class="mt-1 max-h-72 overflow-y-auto border border-line bg-surface p-2 shadow-lg">
             {% for option in view.category_options %}
             <label class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-subtle">
               <input type="checkbox" name="category" value="{{ option.id }}"{% if option.selected %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary" data-multi-select-option>
@@ -333,10 +333,10 @@
       <h2 id="reports-year-overview-heading" class="text-base font-semibold">{{ _("Year overview") }}</h2>
       <div class="flex flex-wrap items-center gap-2">
         <label for="report-year" class="text-sm font-medium">{{ _("Report year") }}</label>
-        <select id="report-year" name="year" form="report-filters" data-autosubmit class="form-select py-1.5 pl-2.5">
+        <select id="report-year" name="year" form="report-filters" data-autosubmit data-autosubmit-anchor="#year-overview" class="form-select py-1.5 pl-2.5">
           {% for option in view.data.year_options %}<option value="{{ option }}"{% if option == view.data.filters.year %} selected{% endif %}>{{ option }}</option>{% endfor %}
         </select>
-        <noscript><button type="submit" form="report-filters" class="btn-sm">{{ _("Show") }}</button></noscript>
+        <noscript><button type="submit" form="report-filters" formaction="{{ scoped_url(request, 'reports') }}#year-overview" class="btn-sm">{{ _("Show") }}</button></noscript>
       </div>
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Spending by category and month. Darker cells mean more spending in that month.") }}</p>

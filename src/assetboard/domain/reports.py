@@ -252,7 +252,20 @@ class YearOverYearTable:
 
     @property
     def empty(self) -> bool:
-        return not self.rows
+        if not self.rows:
+            return True
+        previous_earned = sum(
+            row.earned.amount_minor - row.earned_change.amount_minor for row in self.rows
+        )
+        previous_spent = sum(
+            row.spent.amount_minor - row.spent_change.amount_minor for row in self.rows
+        )
+        return (
+            self.earned.amount_minor == 0
+            and self.spent.amount_minor == 0
+            and previous_earned == 0
+            and previous_spent == 0
+        )
 
 
 @dataclass(frozen=True, slots=True)

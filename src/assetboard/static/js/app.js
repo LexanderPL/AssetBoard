@@ -523,6 +523,13 @@ document.addEventListener("change", (event) => {
       if ((target.min && value < target.min) || (target.max && value > target.max)) return;
     }
   }
+  if (target.hasAttribute("data-autosubmit-anchor") && target.form) {
+    const url = new URL(target.form.action, window.location.href);
+    url.search = new URLSearchParams(new FormData(target.form)).toString();
+    url.hash = target.getAttribute("data-autosubmit-anchor") || "";
+    window.location.assign(url.toString());
+    return;
+  }
   target.form?.requestSubmit();
 });
 

@@ -316,6 +316,18 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(picker).not_to_have_attribute("open", "")
             expect(picker.locator("summary")).to_be_focused()
 
+            # The primary action is still reachable while the picker is open: the panel is in
+            # flow, so clicking Show report submits the selected category instead of checking
+            # another checkbox under the submit button.
+            category_value = options.first.get_attribute("value")
+            picker.locator("summary").click()
+            expect(options.first).to_be_visible()
+            options.first.check()
+            page.locator("#report-filters button[type=submit]").click()
+            page.wait_for_url(f"**category={category_value}**")
+            expect(page.locator("[data-multi-select-summary]")).to_have_text("1 category selected")
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+
             # F9.2: the year grid has twelve heat-shaded month columns and its own year selector.
             grid = page.locator("[data-report-year-overview]")
             expect(grid).to_be_visible()
@@ -352,7 +364,9 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             # with the same months of the previous one.
             expect(page.locator("[data-report-yoy-partial]")).to_be_visible()
             expect(page.locator("[data-report-yoy-row]")).to_have_count(1)
-            expect(page.locator("[data-report-yoy-expense-percent]").last).to_contain_text("140.0%")
+            expect(page.locator("[data-report-yoy-expense-percent]").last).to_contain_text(
+                "+140.0%"
+            )
             expect(page.locator("[data-report-yoy-so-far]")).to_be_visible()
             accuracy = page.locator("[data-report-accuracy-row]")
             expect(accuracy).to_have_count(1)
@@ -403,12 +417,17 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             # The Report year selector inside the Year overview submits the filter form on
             # change, preserving the range and the other filters.
             page.set_viewport_size({"width": 1440, "height": 900})
-            page.goto(f"{base}/reports?from=2025&to=2026&step=month", wait_until="networkidle")
+            page.goto(
+                f"{base}/reports?from=2025&to=2026&step=month&savings=1&trend=12",
+                wait_until="networkidle",
+            )
             year_select = page.locator("#report-year")
             expect(year_select).to_have_value("2026")
             year_select.select_option("2025")
-            page.wait_for_url("**year=2025**")
+            page.wait_for_url("**year=2025#year-overview")
+            assert "savings=1" in page.url and "trend=12" in page.url
             expect(page.locator("#report-year")).to_have_value("2025")
+            expect(page.locator("#year-overview")).to_be_in_viewport()
 
             # A chart data point uses the same link as the table row.
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")

@@ -145,7 +145,7 @@ def test_the_default_page_is_the_current_year_when_there_is_no_data(
     for heading in ("Period", "Earned", "Spent", "Saved", "Net"):
         assert f">{heading}</th>" in html
     assert "data-report-total" in html
-    assert "data-chart-empty" in html  # no data yet
+    assert "No income or expenses in this range." in html
     assert "data-chart-table-toggle" in html
     assert 'data-chart-source="reports-data"' not in html  # no JSON without a chart
 
@@ -154,12 +154,14 @@ def test_the_year_dropdowns_only_offer_years_with_transactions(reports: OwnerApp
     food = _category(reports, "Year Food")
     for year in (2019, 2021, 2024, 2027):
         _tx(reports, food, date(year, 1, 10), 1_000)
+    _tx(reports, food, date(2017, 1, 10), 1_000, deleted=True)
     html = _page(reports)
     assert '<option value="2019" selected>2019</option>' in html
     assert '<option value="2021">2021</option>' in html
     assert '<option value="2024" selected>2024</option>' in html
     assert '<option value="2020">' not in html
     assert '<option value="2022">' not in html
+    assert '<option value="2017">' not in html  # soft-deleted-only years are not offered
     assert '<option value="2027">' not in html  # future-only years are not charted
     assert "data-report-range>2019 – 2024<" in html
     assert _row_labels(html) == ["2019", "2020", "2021", "2022", "2023", "2024"]
@@ -816,8 +818,8 @@ def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
     assert cells[:2] == ["€0.00", "€170.00"]
     assert cells[2] == "€0.00"
     assert "no income in the previous year" in cells[3]
-    assert cells[4] == "€20.00"
-    assert cells[5] == "13.3%"
+    assert cells[4] == "+€20.00"
+    assert cells[5] == "+13.3%"
     assert "#year-overview" in current
     assert "text-danger" in re.search(
         r'<td class="([^"]*)" data-report-yoy-expense-change>', current
@@ -826,11 +828,22 @@ def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
     previous = next(row for row in rows if "data-report-yoy-year>2025<" in row)
     previous_cells = _cells(previous)
     assert previous_cells[:2] == ["€0.00", "€150.00"]
-    assert previous_cells[4] == "€150.00"
+    assert previous_cells[4] == "+€150.00"
 
     total = re.search(r"<tr [^>]*data-report-yoy-total.*?</tr>", html, re.DOTALL)
     assert total is not None
     assert _cells(total.group(0))[:2] == ["€0.00", "€320.00"]
+
+    filtered = _page(
+        reports,
+        f"from=2025&to=2026&step=month&year=2026&category={food}",
+    )
+    filtered_row = next(
+        row
+        for row in re.findall(r"<tr data-report-yoy-row>.*?</tr>", filtered, re.DOTALL)
+        if "data-report-yoy-year>2026<" in row
+    )
+    assert _cells(filtered_row) == cells
 
 
 def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None:

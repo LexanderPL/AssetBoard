@@ -28,7 +28,7 @@ the M4 archive.
   - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the last three years that have
     transactions (the current year when there are none); at most 30 years; `from > to`,
     malformed or out-of-range values are marked on the form and show no charts. The dropdowns
-    offer only years with transactions.
+    offer only years with transactions, plus an explicitly requested endpoint.
   - **Granularity** `step=month|year` (default `month` for a range up to 3 years, `year`
     beyond).
   - **Currency** `currency=XXX`: defaults to the workspace base currency; the selector lists

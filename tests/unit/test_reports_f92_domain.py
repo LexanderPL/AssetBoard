@@ -344,6 +344,30 @@ def test_year_over_year_table_omits_future_years_and_keeps_empty_years() -> None
     assert empty.earned == Money(0, "EUR") and empty.spent == Money(0, "EUR")
 
 
+def test_year_over_year_table_is_not_empty_when_only_the_previous_year_has_data() -> None:
+    table = year_over_year_table(
+        [totals(2025, 1, 1_000, 500)],
+        start_year=2026,
+        end_year=2026,
+        today=date(2026, 10, 14),
+        currency="EUR",
+    )
+    assert not table.empty
+    assert table.rows[0].earned_change == Money(-1_000, "EUR")
+    assert table.rows[0].spent_change == Money(-500, "EUR")
+
+
+def test_year_over_year_table_is_empty_when_every_figure_is_zero() -> None:
+    table = year_over_year_table(
+        [totals(2026, 1, 0, 0)],
+        start_year=2026,
+        end_year=2026,
+        today=date(2026, 10, 14),
+        currency="EUR",
+    )
+    assert table.rows and table.empty
+
+
 def test_year_over_year_table_requires_monthly_periods() -> None:
     yearly = PeriodTotals(
         2026, Money(1_000, "EUR"), Money(500, "EUR"), Money(0, "EUR"), Money(500, "EUR")

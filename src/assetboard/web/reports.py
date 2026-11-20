@@ -204,7 +204,6 @@ class YearOverviewColumn:
 
 @dataclass(frozen=True, slots=True)
 class YearOverview:
-    year: int
     columns: tuple[YearOverviewColumn, ...]
     rows: tuple[YearGridRow, ...]
     totals: tuple[str, ...]
@@ -430,6 +429,18 @@ def _period_row(
         net=net,
         net_minor=net_minor,
     )
+
+
+def _signed_money(amount: Money, locale: str) -> str:
+    text = format_money(amount, locale)
+    return f"+{text}" if amount.amount_minor > 0 else text
+
+
+def _signed_rate(tenths: int | None, locale: str) -> str | None:
+    if tenths is None:
+        return None
+    text = format_rate_tenths(tenths, locale)
+    return f"+{text}" if tenths > 0 else text
 
 
 def _rate_text(rate: SavingsRate | None, locale: str) -> str | None:
@@ -770,7 +781,6 @@ def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOver
         for row in series.rows
     )
     return YearOverview(
-        year=data.filters.year,
         columns=columns,
         rows=rows,
         totals=tuple(format_money(total, locale) for total in series.totals),
@@ -888,23 +898,15 @@ def _trend_chart(data: ReportsData, locale: str, request: Request) -> dict[str, 
 def _year_over_year_view(data: ReportsData, locale: str, request: Request) -> YearOverYearView:
     rows: list[YearOverYearRowView] = []
     for row in data.yoy.rows:
-        earned_percent = (
-            format_rate_tenths(row.earned_change_tenths, locale)
-            if row.earned_change_tenths is not None
-            else None
-        )
-        spent_percent = (
-            format_rate_tenths(row.spent_change_tenths, locale)
-            if row.spent_change_tenths is not None
-            else None
-        )
+        earned_percent = _signed_rate(row.earned_change_tenths, locale)
+        spent_percent = _signed_rate(row.spent_change_tenths, locale)
         rows.append(
             YearOverYearRowView(
                 year=row.year,
                 href=_report_year_url(request, data.filters, row.year),
                 earned=format_money(row.earned, locale),
                 spent=format_money(row.spent, locale),
-                earned_change=format_money(row.earned_change, locale),
+                earned_change=_signed_money(row.earned_change, locale),
                 earned_change_minor=row.earned_change.amount_minor,
                 earned_percent=earned_percent,
                 earned_percent_note=(
@@ -912,7 +914,7 @@ def _year_over_year_view(data: ReportsData, locale: str, request: Request) -> Ye
                     if earned_percent is not None
                     else gettext(YEAR_OVER_YEAR_NO_INCOME, locale)
                 ),
-                spent_change=format_money(row.spent_change, locale),
+                spent_change=_signed_money(row.spent_change, locale),
                 spent_change_minor=row.spent_change.amount_minor,
                 spent_percent=spent_percent,
                 spent_percent_note=(

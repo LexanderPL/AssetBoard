@@ -84,7 +84,7 @@ class FilterError(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ReportFilters:
-    """The resolved form values (``*_text`` keeps what the visitor typed)."""
+    """The resolved form values (``*_text`` keeps the resolved or requested year text)."""
 
     start_year: int
     end_year: int
@@ -460,7 +460,6 @@ def reports_data(
     savings: str = "",
     year: str = "",
     trend: str = "",
-    with_phase_b: bool = True,
 ) -> ReportsData:
     """The Reports page's filters and every section's data for the current workspace."""
     require_role(ctx, Role.VIEWER)
@@ -690,29 +689,21 @@ def reports_data(
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
-        net_worth=(
-            net_worth_report(
-                factory,
-                ctx,
-                start_year=filters.start_year,
-                end_year=filters.end_year,
-                step=filters.step,
-                currency=selected_currency,
-            )
-            if with_phase_b
-            else None
+        net_worth=net_worth_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
         ),
-        portfolio=(
-            portfolio_report(
-                factory,
-                ctx,
-                start_year=filters.start_year,
-                end_year=filters.end_year,
-                step=filters.step,
-                currency=selected_currency,
-            )
-            if with_phase_b
-            else None
+        portfolio=portfolio_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
         ),
     )
 
