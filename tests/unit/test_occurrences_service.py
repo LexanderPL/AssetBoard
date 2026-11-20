@@ -233,31 +233,38 @@ def test_reschedule_checks_the_old_month(team):
         occurrences.reschedule_occurrence(team.factory, ctx, occurrence.id, date(2026, 4, 10))
     stored = occurrence_rows(team, item_id)[0]
     assert stored.due_date == occurrence.due_date
+    assert stored.rescheduled_at is None
 
 
 def test_skip_checks_every_child_month(team):
     ctx = team.ctx("owner", "owner")
     item_id = create_item(team)
     parent = occurrence_rows(team, item_id)[0]
-    child_due = date(2026, 3, 20)
     with team.factory.begin() as session:
-        ScheduledOccurrenceRepository(session, ctx).create(
-            scheduled_item_id=None,
-            income_source_id=None,
-            work_month=None,
-            parent_occurrence_id=parent.id,
-            income_source_tax_rule_id=None,
-            direction="expense",
-            category_id=parent.category_id,
-            nominal_date=child_due,
-            due_date=child_due,
-            expected_minor=100,
-            currency="EUR",
-            amount_state="estimated",
-            status="pending",
-            generated_by="tax",
-            label="Tax",
+        ScheduledOccurrenceRepository(session, ctx).update(
+            parent.id, nominal_date=date(2026, 2, 1), due_date=date(2026, 2, 1)
         )
+        for due, label in (
+            (date(2026, 2, 20), "Open child"),
+            (date(2026, 3, 20), "Closed child"),
+        ):
+            ScheduledOccurrenceRepository(session, ctx).create(
+                scheduled_item_id=None,
+                income_source_id=None,
+                work_month=None,
+                parent_occurrence_id=parent.id,
+                income_source_tax_rule_id=None,
+                direction="expense",
+                category_id=parent.category_id,
+                nominal_date=due,
+                due_date=due,
+                expected_minor=100,
+                currency="EUR",
+                amount_state="estimated",
+                status="pending",
+                generated_by="tax",
+                label=label,
+            )
     close_month(team.factory, ctx, YearMonth(2026, 3))
     with pytest.raises(occurrences.OccurrenceError, match="month_closed"):
         occurrences.skip_occurrence(team.factory, ctx, parent.id)
@@ -265,7 +272,7 @@ def test_skip_checks_every_child_month(team):
     assert stored.status == "pending"
     with team.factory() as session:
         children = ScheduledOccurrenceRepository(session, ctx).children(parent.id)
-    assert [row.status for row in children] == ["pending"]
+    assert [row.status for row in children] == ["pending", "pending"]
 
 
 def test_unskip_refuses_a_paused_item(team):

@@ -279,6 +279,31 @@ def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
     assert posted.status_code == 303 and f"posted={other_id}" in posted.headers["location"]
 
 
+def test_ledger_unskip_explains_a_paused_item(owner):
+    fixed_clock(owner)
+    assert create_recurring(owner, include_past="1").status_code == 303
+    with owner.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).first()
+        assert occurrence is not None
+        occurrence_id = occurrence.id
+        item = session.get(ScheduledItem, occurrence.scheduled_item_id)
+        assert item is not None
+        item_id = item.id
+    assert owner.post(f"/upcoming/{occurrence_id}/skip", token_from="/upcoming").status_code == 303
+    with owner.db() as session, session.begin():
+        item = session.get(ScheduledItem, item_id)
+        assert item is not None
+        item.paused_at = FixedClock("2026-03-01T12:00:00+00:00").now()
+    response = owner.post(
+        f"/upcoming/{occurrence_id}/unskip",
+        {"return_month": "2026-03"},
+        token_from="/upcoming",
+    )
+    assert response.status_code == 303 and "error=paused_item" in response.headers["location"]
+    page = owner.client.get(response.headers["location"])
+    assert "paused" in page.text
+
+
 def test_deleting_a_posted_transaction_in_the_ledger_returns_it_to_the_inbox(owner):
     fixed_clock(owner)
     assert create_recurring(owner).status_code == 303

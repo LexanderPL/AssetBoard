@@ -174,7 +174,7 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   As built (UI batch 4): each occurrence shows one primary **Mark paid/received** action and a
   compact overflow menu for reschedule, amount, skip, edit rule and one-time delete; the filters
   start collapsed on phones; **Skip** shows a status with **Undo**.
-  As built (UI batch 3): a recurring expected row on the month's Transactions page also has **Skip** (`upcoming_skip` with `return_month`); the skipped occurrence stays in that month's table, greyed out and labelled "Skipped", with **Undo** (`upcoming_unskip` → `services.occurrences.unskip_occurrence`: editor role, open month, not for an archived item, audited as `scheduled_occurrence.unskipped`; an income occurrence is recalculated so its tax payments return). Skipped occurrences are never pending, so the Month summary does not count them.
+  As built (UI batch 3): a recurring expected row on the month's Transactions page also has **Skip** (`upcoming_skip` with `return_month`); the skipped occurrence stays in that month's table, greyed out and labelled "Skipped", with **Undo** (`upcoming_unskip` → `services.occurrences.unskip_occurrence`: editor role, open month, not for an archived item, a paused item or an archived income source, audited as `scheduled_occurrence.unskipped`; an income occurrence is recalculated so its tax payments return). Skipped occurrences are never pending, so the Month summary does not count them.
 - Undo of "mark paid" within 10 seconds deletes the created transaction and restores `pending`.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.
 - **Plan/actual boundary (issue #164, owner decision of 2026-11-04).** Editing a one-time
@@ -186,7 +186,7 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   user records it when it happens or edits the recurring rule. A transaction posted from a recurring
   occurrence cannot be moved to a future date at all (skip the occurrence or edit the rule);
   the whole rule is in F3.1's "a plan becomes an actual" notes and F2.2's acceptance.
-- Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).
+- Posting into a closed month is blocked with a clear message; rescheduling out of a closed month is refused too (reopen the month first).
 - A posted occurrence cannot be changed by rule edits.
 
 **Implementation details**
