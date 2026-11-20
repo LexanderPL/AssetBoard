@@ -8,12 +8,11 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import Membership, User
+from assetboard.db.models.identity import User
 from assetboard.db.models.loans import Loan
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories import (
@@ -21,6 +20,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     LoanRepository,
+    MembershipRepository,
     MonthStateRepository,
     NotFound,
     ScheduledItemRepository,
@@ -207,19 +207,19 @@ def _valid_day(day: date) -> None:
 def _system_context(session: Session, scope: WorkspaceScope, clock: Clock) -> Context | None:
     """A trusted context for a background write; ``None`` when the workspace has no editor."""
     workspace = CurrentWorkspaceRepository(session, scope).get()
-    row = session.execute(
-        select(Membership, User)
-        .join(User, Membership.user_id == User.id)
-        .where(
-            Membership.workspace_id == workspace.id,
-            Membership.role.in_(("owner", "editor")),
-        )
-        .order_by(Membership.role)
-        .limit(1)
-    ).first()
-    if row is None:
+    member = next(
+        (
+            row
+            for row in MembershipRepository(session, scope).members()
+            if row.role in ("owner", "editor")
+        ),
+        None,
+    )
+    if member is None:
         return None
-    membership, owner = row
+    owner = session.get(User, member.user_id)
+    if owner is None:
+        return None
     return Context(
         user=UserRef(
             id=owner.id,
@@ -241,7 +241,7 @@ def _system_context(session: Session, scope: WorkspaceScope, clock: Clock) -> Co
             upcoming_days=workspace.upcoming_days,
             is_demo=workspace.is_demo,
         ),
-        role=Role(membership.role),
+        role=Role(member.role),
         clock=clock,
         auth_method="system",
     )
