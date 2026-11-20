@@ -13,7 +13,7 @@ Small, reviewable PRs; keep unrelated items out of the same PR.
 
 | WP | Items | Suggested branch / PR |
 | --- | --- | --- |
-| WP1 | R-1, R-2, R-3, R-6 | `reports-ui-polish` |
+| WP1 | R-1, R-2, R-6 (R-3 dropped) | `reports-ui-polish` |
 | WP2 | R-4, R-5 | `reports-analytics` |
 | WP3 | T-1 | `transactions-emphasis` |
 | WP4 | I-1 | `investment-price-history` |
@@ -74,26 +74,9 @@ same idea differently.
 `src/assetboard/static/css/input.css`, `src/assetboard/static/css/app.css`, `docs/reports.md`,
 report tests.
 
-### [ ] R-3 — Remove the “Show as table” feature from Category trends
+### [x] R-3 — Dropped: keep the Category trends table
 
-**Current.** Category trends always renders a real table. With JavaScript the chart is drawn and
-the table is made `sr-only`; the “Show as table” button reveals it. Without JavaScript the table
-is visible. R-3 removes the user-facing toggle.
-
-**Decision needed.** Two readings:
-- **Recommended:** remove only the toggle; keep the table in the DOM as the accessible and
-  no-JavaScript fallback. Charts must keep an accessible data table (UI guidelines).
-- Remove the table entirely. This loses the no-JavaScript version and the accessible data table;
-  it needs explicit approval.
-
-**Change (recommended).**
-- Delete the `data-chart-table-toggle` button in the Category trends section.
-- Keep `data-chart-table`; `charts.js` still adds `sr-only` when it draws the chart.
-- Do not change the Income vs expenses chart, which keeps its toggle.
-- Update the “Show as table” browser test to assert the toggle is absent and the table is
-  visually hidden with JavaScript but present for assistive technology.
-
-**Files.** `reports/page.html`, `tests/browser/test_f101_reports.py`, `docs/reports.md`.
+**Decision 2026-11-21:** keep the current table and “Show as table” toggle unchanged. No work.
 
 ### [ ] R-4 — Year-over-year: honest first row, full years, savings column
 
@@ -130,10 +113,9 @@ is visible. R-3 removes the user-facing toggle.
 5. Keep the per-year links, the range totals footer, and the empty state. On narrow screens the
    wider table scrolls horizontally inside its panel.
 
-**Decision needed.** Confirm the extra Savings columns (the table will have 10 columns and
-scroll on phones). Should a “Net” column (income − expenses − savings) also be added, or is the
-Savings column enough? Investment-module purchases currently stay out; including them would
-need a second data source and is out of scope unless requested.
+**Decision 2026-11-21:** add the Savings & investments columns only; no Net column. The table
+will be wider and scroll on phones. Investment-module purchases stay out (they would need a
+second data source).
 
 **Acceptance.**
 - A range whose first year has no prior data shows no change/change % in that row.
@@ -165,9 +147,8 @@ was strictly greater than the plan. It shows months planned, months over, and an
   existing “months over” detail.
 - Note: only planned regular expenses count; income and savings are excluded.
 
-**Decision needed.** Is absolute deviation the right score, or do you prefer the simpler
-“100% − over-plan rate” (current over % inverted)? The absolute version also penalises being far
-under plan, which is still a planning miss; the over-rate version only penalises overspending.
+**Decision 2026-11-21:** use the absolute-deviation score. It also penalises being far under
+plan, which is still a planning miss. Keep the existing over-plan table as the breakdown.
 
 **Acceptance.**
 - Domain golden tests for exact plan/actual combinations, zero planned total, and all-on-plan.
@@ -221,9 +202,8 @@ most of them.
 - Apply the same rule to expenses and income. Keep the per-user “Highlight large transactions”
   switch.
 
-**Decision needed.** Is the median rule acceptable, or do you prefer “top 20% of entries” or an
-absolute minimum amount? The median rule is the most direct reading of “only large transactions
-stand out” and needs no per-currency configuration.
+**Decision 2026-11-21:** use the median rule. It is the most direct reading of “only large
+transactions stand out” and needs no per-currency configuration.
 
 **Acceptance.**
 - Unit/property tests: one entry → no tint; two entries → no tint; three similar → none; clear
@@ -278,9 +258,8 @@ fills the 6xl base container.
   security keeps its two-column grid inside that width; the 2FA panel keeps `lg:col-span-2`.
 - Update the M1 spec if it still describes a different width.
 
-**Decision needed.** Confirm `max-w-3xl` is the wanted “standard”. The alternative is to widen
-Profile to 6xl to match today's Account security; the UI guidelines currently say settings and
-forms use `max-w-3xl`.
+**Decision 2026-11-21:** use `max-w-3xl` for both Profile and Account security, matching the
+settings/form standard in the UI guidelines.
 
 **Acceptance.**
 - At 1280 px the Taxes arrows are on the same row as “Taxes”, vertically aligned with the other
@@ -332,10 +311,17 @@ any membership blocks deletion. Ownership is membership-based; there is no `Work
 - No schema migration for a hard delete. All existing FKs already behave correctly.
 - Add the action to the admin allowlist, the audit-data allowlist, the row menu, docs and tests.
 
-**Decision needed.** Confirm the membership policy: remove memberships and block sole owners
-(recommended), or refuse deletion whenever any membership exists (admin must remove the user
-from each workspace first). Also confirm hard delete vs. an anonymised soft delete that keeps a
-“Deleted user” row for audit display.
+**Decision 2026-11-21:** hard delete; remove the user's memberships; refuse when the user is the
+sole owner of any workspace.
+
+**Why block the sole owner?** Ownership is membership-based, not a field on the workspace. A
+typical case is a family workspace: one person created it and is the only owner, while the
+partner uses it as an editor. If the owner's account is deleted, the workspace still exists but
+nobody can invite or remove members, change roles or settings, restore an export or delete the
+workspace; editors cannot promote themselves. The deactivated account is then the only recovery
+path: reactivate it, ask it to promote another owner, deactivate it again, then delete. A
+workspace that is no longer needed can instead be deleted first (Workspace settings → Danger
+zone), then the account. The refusal message must list the blocking workspaces and link to them.
 
 **Acceptance.**
 - Active user: no Delete action and a forged POST is refused.
@@ -363,9 +349,8 @@ Workspace settings.
 - Keep the dedicated page for the member list, roles, removal and invitations. This avoids
   moving a large list and dialog into the settings page.
 
-**Decision needed.** Is “rename + link/panel from settings” enough, or do you want tabs
-(“General” / “Members”) inside Workspace settings? Tabs are a larger refactor and need a
-settings/members route merge.
+**Decision 2026-11-21:** rename + an owner-only Members panel/link in Workspace settings. Keep
+the dedicated page; no settings/members route merge.
 
 **Acceptance.**
 - “Workspace members” appears in the user menu, page title and heading.
@@ -395,9 +380,8 @@ an unclassed `<span>` in `base.html:58`. They render at text size and vary by pl
   same entry.
 - Keep the 13-key coverage test and update exact-glyph assertions.
 
-**Decision needed.** Approve a third-party icon set (Heroicons, MIT) with attribution, or keep
-the Unicode glyphs and only make them larger (`text-lg`/fixed 20 px box)? The icon set is the
-better visual result and avoids platform font differences.
+**Decision 2026-11-21:** use Heroicons (MIT) outline SVGs with attribution, not larger Unicode
+glyphs.
 
 **Acceptance.**
 - Every sidebar destination has a distinct icon; all are 20 px and vertically centred with the
@@ -413,44 +397,41 @@ better visual result and avoids platform font differences.
 
 ## Workspace setup
 
-### [ ] W-1 — Country first, then auto-set currency (and timezone) from it
+### [ ] W-1 — Country before currency; auto-set currency and seed the timezone
 
 **Current.** The shared `workspace_fields` macro
 (`workspace/_fields.html`) orders: name → base currency → country → time zone → language.
 Defaults: currency = instance default (EUR), country = not set, timezone = UTC. Used by both
 first-run setup and Create workspace.
 
+**Decision 2026-11-21:** country after the workspace name and before base currency; browser
+timezone, no country→timezone table.
+
 **Change.**
 - Reorder: workspace name → **country** → base currency → time zone → language.
 - Add a country-defaults helper:
   - **Currency:** Babel `get_territory_currencies(code, tender=True)`; pick the first current
     tender currency. No new dependency (Babel is already a runtime dependency).
-  - **Timezone:** needs a decision. Options:
-    1. **Recommended:** seed from the browser's IANA zone
-       (`Intl.DateTimeFormat().resolvedOptions().timeZone`) on page load and only update it when
-       the country changes if the user has not overridden it. No country→timezone table.
-    2. Maintain a curated country→representative-timezone map (capital zone) for all countries.
-       More accurate to the request but a new data file/maintenance burden and wrong for
-       multi-timezone countries such as the US, Canada, Australia and Brazil.
-    3. Add a new dependency (not recommended).
+  - **Timezone:** seed from the browser's IANA zone
+    (`Intl.DateTimeFormat().resolvedOptions().timeZone`) on page load. When the country changes,
+    update the timezone only if the user has not overridden it. No country→timezone map.
 - JS lives in a small external module (`workspace-fields.js`) and is CSP-safe. Server-side, when
   a country is submitted with a blank currency, derive the currency; timezone falls back to UTC
   or the submitted value. This keeps crafted/no-JS submissions valid.
 - Apply the same behaviour to first-run setup (`auth/setup.html`) and Create workspace
   (`workspace/new.html`), since both use the shared macro.
-- Add a help line: “Picked from the country; change it if needed.”
-
-**Decision needed.** Choose timezone option 1 or 2 (or say timezone can stay manual for now).
-Also confirm the country should come before the workspace name or only before base currency.
+- Add a help line: “Picked from your country and browser; change it if needed.”
 
 **Acceptance.**
 - Both forms show Country before Base currency.
-- Selecting Poland sets PLN and a Europe/Warsaw default; United States sets USD; unknown/blank
-  leaves the previous value or the instance default.
+- Selecting Poland sets PLN; the United States sets USD; unknown/blank leaves the previous
+  value or the instance default.
+- The timezone select is seeded from the browser; a country change does not overwrite a value
+  the user chose. Without JavaScript the submitted timezone is kept.
 - First-run setup stores the chosen values; no-JS submission still works with the server
   fallbacks.
-- Unit tests for country→currency (and timezone if mapped); web tests for order/defaults;
-  Chromium test for the change event; docs updated.
+- Unit tests for country→currency; web tests for order/defaults; Chromium test for the change
+  event; docs updated.
 
 **Files.** `workspace/_fields.html`, `auth/setup.html`, `workspace/new.html`,
 `services/workspace_options.py`, `web/workspace_forms.py`, `web/auth_routes.py`,
@@ -501,21 +482,18 @@ For every item:
 - Conventional Commits; one small PR per work package.
 - Update this file's checkbox and add a short “as built” note when an item ships.
 
-## Decisions requested
+## Resolved decisions (2026-11-21)
 
-1. **R-3:** keep the accessible Category trends table but remove the toggle (recommended), or
-   remove the table entirely?
-2. **R-4:** add the Savings & investments columns (recommended) and hide all first-row changes;
-   should a “Net” column (income − expenses − savings) also be added? Investment-module
-   purchases stay out unless you want a second data source.
-3. **R-5:** absolute-deviation planning score (recommended) or inverse over-plan rate?
-4. **T-1:** median-based “2× the month's median, at least 3 entries” rule (recommended), or
-   top-N/absolute rule?
-5. **P-1:** unify Profile and Account security at `max-w-3xl` (recommended), or widen both to
-   6xl?
-6. **P-3:** remove memberships and block sole owners (recommended), or refuse any user with a
-   membership? Hard delete (recommended) or anonymised soft delete?
-7. **P-4:** rename + settings link/panel (recommended), or tabs inside Workspace settings?
-8. **P-5:** Heroicons SVG set (recommended) or just larger Unicode glyphs?
-9. **W-1:** timezone from the browser (recommended), curated country→timezone map, or leave
-   timezone manual for now? Country before name or only before base currency?
+1. **R-3:** dropped; keep the Category trends table and toggle.
+2. **R-4:** add Savings & investments columns only; no Net column; investment-module purchases
+   stay out.
+3. **R-5:** absolute-deviation planning score.
+4. **T-1:** median rule (at least 3 entries, 2× the month's median).
+5. **P-1:** `max-w-3xl` for Profile and Account security.
+6. **P-3:** hard delete; remove memberships; refuse sole owners of a workspace.
+7. **P-4:** rename + owner-only Members panel/link in Workspace settings; no tabs.
+8. **P-5:** Heroicons (MIT) outline SVGs with attribution.
+9. **W-1:** country after the workspace name; currency from Babel; timezone from the browser.
+
+No open decisions remain for the planned items. Add new decisions here with the date when they
+arise.
