@@ -1532,28 +1532,47 @@ function syncLinkedItemFields() {
   });
 }
 
+function setHiddenControl(wrapper, hidden) {
+  if (!(wrapper instanceof HTMLElement)) return;
+  const form = wrapper.closest("form");
+  if (form === null) return;
+  wrapper.querySelectorAll("input").forEach((control) => {
+    if (!(control instanceof HTMLInputElement)) return;
+    const companionId = `companion-${control.id}`;
+    let companion = form.querySelector(`input[data-companion-for="${companionId}"]`);
+    if (hidden) {
+      if (!(companion instanceof HTMLInputElement)) {
+        companion = document.createElement("input");
+        companion.type = "hidden";
+        companion.name = control.name;
+        companion.dataset.companionFor = companionId;
+        form.appendChild(companion);
+      }
+      // Disabling removes every constraint (required, min/max, bad input). Post the last valid
+      // value, or the field's default, through a hidden companion.
+      companion.value = control.validity.valid ? control.value : control.defaultValue || "";
+      control.disabled = true;
+    } else {
+      if (companion instanceof HTMLInputElement) companion.remove();
+      control.disabled = false;
+    }
+  });
+}
+
 function syncNotificationFields() {
   document.querySelectorAll("[data-notification-channel]").forEach((form) => {
     if (!(form instanceof HTMLElement)) return;
     const mode = form.querySelector("[data-notification-mode]");
     const time = form.querySelector("[data-digest-time]");
     if (mode instanceof HTMLSelectElement && time instanceof HTMLElement) {
-      const hidden = mode.value !== "digest";
-      time.classList.toggle("hidden", hidden);
-      // Keep the value posted (the server uses the saved time), but a hidden required input
-      // would block submission with no visible field to focus.
-      time.querySelectorAll("input").forEach((control) => {
-        if (control instanceof HTMLInputElement) control.required = !hidden;
-      });
+      setHiddenControl(time, mode.value !== "digest");
+      time.classList.toggle("hidden", mode.value !== "digest");
     }
     const due = form.querySelector("[data-notify-due-soon]");
     const lead = form.querySelector("[data-lead-days]");
     if (due instanceof HTMLInputElement && lead instanceof HTMLElement) {
-      const hidden = !due.checked;
-      lead.classList.toggle("hidden", hidden);
-      lead.querySelectorAll("input").forEach((control) => {
-        if (control instanceof HTMLInputElement) control.required = !hidden;
-      });
+      setHiddenControl(lead, !due.checked);
+      lead.classList.toggle("hidden", !due.checked);
     }
   });
 }

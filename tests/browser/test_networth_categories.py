@@ -100,6 +100,7 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
 
             # The add dialog keeps its primary fields and Save visible on a phone; the optional
             # fields sit behind a 44 px More options disclosure.
+            page.set_viewport_size({"width": 390, "height": 844})
             page.locator("[data-add-item]").click()
             item_dialog = page.locator("#item-dialog")
             expect(item_dialog).to_be_visible()
@@ -107,6 +108,9 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
             expect(more).to_be_visible()
             box = more.bounding_box()
             assert box is not None and box["height"] >= 44
+            save = item_dialog.get_by_role("button", name="Add item")
+            expect(save).to_be_visible()
+            expect(save).to_be_in_viewport()
             more.click()
             expect(item_dialog.locator("#new-item-valuation-note")).to_be_visible()
             item_dialog.get_by_role("link", name="Cancel").click()
