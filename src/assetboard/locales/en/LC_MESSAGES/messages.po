@@ -6569,10 +6569,6 @@ msgstr ""
 msgid "Imports waiting to be applied"
 msgstr ""
 
-#, fuzzy
-msgid "Open month"
-msgstr ""
-
 msgid "Add an expense category and an entry to see this chart."
 msgstr ""
 

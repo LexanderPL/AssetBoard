@@ -6,10 +6,10 @@
    version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
    slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
    script or style. #}
-{% macro donut(d, label=None, compact=false, actions=none, inline_json=false, heading=none, link_url=none, link_label=none, widget_key=none, canvas_size=none) -%}
+{% macro donut(d, label=none, compact=false, actions=none, inline_json=false, heading=none, link_url=none, widget_key=none, canvas_size=none, total_prominent=false) -%}
 {% set wrapper_class = "min-w-0" if compact else "panel p-4 sm:p-6" %}
 {% set heading_class = "text-sm font-semibold" if compact else "text-base font-semibold" %}
-{% set total_class = "text-xs tabular-nums text-muted" if compact else "text-sm tabular-nums text-muted" %}
+{% set total_class = "text-xl font-semibold tabular-nums" if total_prominent else ("text-xs tabular-nums text-muted" if compact else "text-sm tabular-nums text-muted") %}
 {% set chart_size = canvas_size or ("compact" if compact else "regular") %}
 {% set canvas_class = "mt-2 h-40 w-full" if chart_size == "compact" else "mt-3 h-80 w-full" %}
 {% set legend_class = "mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1.5 text-xs" if compact else "mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm" %}
@@ -21,7 +21,6 @@
     <h2 id="chart-{{ d.key }}-heading" class="{{ heading_class }}">{% if link_url %}<a href="{{ link_url }}" class="underline-offset-2 hover:underline">{{ chart_heading }}</a>{% else %}{{ chart_heading }}{% endif %}</h2>
     <div class="flex flex-wrap items-end justify-end gap-3">
       {% if actions %}{{ actions }}{% endif %}
-      {% if link_url and link_label %}<a href="{{ link_url }}" class="text-sm font-medium text-primary-ink underline">{{ link_label }}</a>{% endif %}
       {% if d.slices %}<p class="{{ total_class }}" data-chart-total>{{ d.total }}</p>{% endif %}
     </div>
   </div>
