@@ -224,8 +224,9 @@ def values_at(
     date onwards; that date itself is already excluded (the owner's decision).
 
     ``backfill`` enables the F5.6 straight-line estimate for manual items whose
-    ``estimate_between`` switch is on. F5.9 passes it for completed month-ends only; today's
-    live point is never estimated, and every other caller keeps the F5.3 rule.
+    ``estimate_between`` switch is on. F5.9 passes it for completed month-ends and F7.6 for
+    historical property LTV; today's live point is never estimated, and every other caller
+    keeps the F5.3 rule.
     """
     values: list[ItemValue] = []
     for item in items:

@@ -480,7 +480,9 @@ def current_values(
     (default) and any date. A valuation dated after ``as_of`` is ignored even when it exists in
     the history. The archived flag follows the owner's F5.3 rule: an item is archived from its
     workspace-local archive date onwards. ``item_ids`` narrows the read to a specific item for a
-    write response.
+    write response. ``backfill`` enables the F5.6 straight-line estimate for manual
+    ``estimate_between`` items (historical reads); ``today`` is the live date used to bound that
+    estimate and is required when ``backfill`` is true.
     """
     rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     category_by_id = {category.id: category for category in rows.categories}

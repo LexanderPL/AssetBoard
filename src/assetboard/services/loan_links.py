@@ -430,19 +430,6 @@ def loan_property_view(
                 "property_missing",
                 "property_missing",
             )
-        if item.currency != view.currency:
-            return LoanPropertyView(
-                as_of,
-                item.id,
-                item.name,
-                item.currency,
-                None,
-                None,
-                None,
-                None,
-                "property_currency",
-                "property_currency",
-            )
         values = current_values(
             session,
             ctx,
@@ -466,6 +453,19 @@ def loan_property_view(
                 None,
                 "property_archived",
                 "property_archived",
+            )
+        if item.currency != view.currency:
+            return LoanPropertyView(
+                as_of,
+                item.id,
+                item.name,
+                item.currency,
+                None,
+                None,
+                None,
+                None,
+                "property_currency",
+                "property_currency",
             )
         value = item_view.current if item_view is not None else None
         remaining = loan_balance_at(session, ctx, loan_id, as_of)
