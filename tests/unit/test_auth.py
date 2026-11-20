@@ -45,11 +45,12 @@ from assetboard.services.auth import (
     create_initial_admin,
     create_user_session,
     derive_subkey,
-    get_valid_session,
     hash_password,
     normalize_client_host,
     normalize_email,
     prune_auth_throttles,
+    prune_user_sessions,
+    read_web_session,
     register_user,
     reset_user_password,
     revoke_other_sessions,
@@ -72,7 +73,7 @@ def at(**delta: float) -> FixedClock:
 
 @pytest.fixture
 def auth_settings() -> Settings:
-    return Settings(_env_file=None, secret_key="test-master-key")
+    return Settings(_env_file=None, secret_key="test-key-94fc76f664e808de8653e04")
 
 
 @pytest.fixture
@@ -323,16 +324,13 @@ def test_idle_and_absolute_expiry_use_injected_clock_and_settings(
     )
     for touch in touches:
         touch_clock = at(seconds=touch.total_seconds())
-        row = get_valid_session(db_session, session_id, settings=settings, clock=touch_clock)
+        row = db_session.get(UserSession, session_id_hash(session_id))
         assert row is not None
         touch_session(row, touch_clock)
-    result = get_valid_session(
+    result = read_web_session(
         db_session, session_id, settings=settings, clock=at(seconds=check_at.total_seconds())
     )
     assert (result is not None) is valid
-    if not valid:
-        db_session.flush()
-        assert db_session.get(UserSession, session_id_hash(session_id)) is None
 
 
 def test_session_of_deactivated_user_is_invalid(
@@ -344,8 +342,36 @@ def test_session_of_deactivated_user_is_invalid(
     )
     user.is_active = False
     assert (
-        get_valid_session(db_session, session_id, settings=auth_settings, clock=fixed_clock) is None
+        read_web_session(db_session, session_id, settings=auth_settings, clock=fixed_clock) is None
     )
+
+
+def test_prune_removes_expired_and_idle_sessions_but_keeps_active_ones(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+    active = create_user_session(
+        db_session, user, settings=auth_settings, clock=fixed_clock, host=None
+    )
+    expired = create_user_session(
+        db_session, user, settings=auth_settings, clock=fixed_clock, host=None
+    )
+    idle = create_user_session(
+        db_session, user, settings=auth_settings, clock=fixed_clock, host=None
+    )
+    expired_row = db_session.get(UserSession, session_id_hash(expired))
+    idle_row = db_session.get(UserSession, session_id_hash(idle))
+    assert expired_row is not None and idle_row is not None
+    expired_row.expires_at = fixed_clock.now() - timedelta(seconds=1)
+    idle_row.last_seen_at = fixed_clock.now() - timedelta(
+        days=auth_settings.session_idle_timeout_days, seconds=1
+    )
+
+    assert prune_user_sessions(db_session, fixed_clock, auth_settings) == 2
+    db_session.expire_all()  # the bulk delete bypassed the identity map
+    assert db_session.get(UserSession, session_id_hash(active)) is not None
+    assert db_session.get(UserSession, session_id_hash(expired)) is None
+    assert db_session.get(UserSession, session_id_hash(idle)) is None
 
 
 def test_session_activity_is_written_no_more_than_every_five_minutes(
@@ -582,7 +608,7 @@ def test_ip_threshold_allows_twenty_distinct_accounts_before_backoff(
     assert other is not None and other.failure_count == 1
 
 
-def test_a_successful_sign_in_counts_in_the_account_bucket_and_resets_nothing(
+def test_a_successful_sign_in_releases_its_account_attempt_and_keeps_earlier_failures(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
@@ -591,23 +617,27 @@ def test_a_successful_sign_in_counts_in_the_account_bucket_and_resets_nothing(
     assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
     account = _throttle(db_session, "account", "test@example.com")
     ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
-    # The account bucket counts every attempt (decaying with time only); the address bucket,
-    # keyed by the requester, takes back the successful one.
-    assert account is not None and account.failure_count == 4 and account.blocked_until is None
+    # Failures only: the three wrong passwords remain, the successful attempt does not.
+    assert account is not None and account.failure_count == 3 and account.blocked_until is None
     assert ip_row is not None and ip_row.failure_count == 3
 
 
-def test_the_owners_own_sign_ins_use_the_free_attempts(
+def test_five_successful_sign_ins_do_not_self_lock_the_account(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
-    free = auth_settings.auth_account_free_failures
-    outcomes = [
-        _login(db_session, auth_settings, fixed_clock, password=PASSWORD) for _ in range(free + 2)
-    ]
-    # free + 1 sign-ins succeed (the last of them starts the backoff), then the wait applies.
-    assert [o.succeeded for o in outcomes] == [True] * (free + 1) + [False]
-    assert outcomes[-1].throttled_until == at(seconds=60).now()
+    for _ in range(auth_settings.auth_account_free_failures):
+        assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    account = _throttle(db_session, "account", "test@example.com")
+    assert account is None or account.failure_count == 0
+    # Five failures in the same window still count and still throttle.
+    for _ in range(auth_settings.auth_account_free_failures):
+        assert not _login(db_session, auth_settings, fixed_clock, password="wrong").succeeded
+    for _ in range(2):
+        assert not _login(db_session, auth_settings, fixed_clock, password="wrong").succeeded
+    blocked = _login(db_session, auth_settings, at(seconds=1), password=PASSWORD)
+    assert blocked.succeeded is False and blocked.throttled_until is not None
 
 
 def test_ip_counter_decays_only_with_its_time_window(

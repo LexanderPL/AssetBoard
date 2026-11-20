@@ -104,6 +104,7 @@ def test_ensure_secret_key_creates_private_persistent_file(tmp_path: Path) -> No
     secret_file = data_dir / "secret_key"
 
     assert secret
+    assert len(secret) >= 32
     assert secret_file.read_text(encoding="utf-8") == secret
     assert stat.S_IMODE(secret_file.stat().st_mode) == 0o600
     assert Settings(_env_file=None, data_dir=data_dir).ensure_secret_key() == secret
@@ -112,11 +113,13 @@ def test_ensure_secret_key_creates_private_persistent_file(tmp_path: Path) -> No
 def test_ensure_secret_key_strips_existing_file(tmp_path: Path) -> None:
     data_dir = tmp_path / "existing-secret"
     data_dir.mkdir()
-    (data_dir / "secret_key").write_text("  retained-secret\n", encoding="utf-8")
+    (data_dir / "secret_key").write_text(
+        "  retained-secret-0123456789abcdefghijklmn\n", encoding="utf-8"
+    )
 
     settings = Settings(_env_file=None, data_dir=data_dir)
 
-    assert settings.ensure_secret_key() == "retained-secret"
+    assert settings.ensure_secret_key() == "retained-secret-0123456789abcdefghijklmn"
 
 
 def test_ensure_secret_key_rejects_empty_values(tmp_path: Path) -> None:
@@ -133,6 +136,29 @@ def test_ensure_secret_key_rejects_empty_values(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="SECRET_KEY"):
         Settings(_env_file=None, secret_key=" \n")
+
+
+def test_a_configured_secret_key_needs_at_least_32_characters(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        Settings(_env_file=None, secret_key="too-short")
+    with pytest.raises(ValueError, match="at least 32 characters"):
+        Settings(_env_file=None, secret_key="x" * 31)
+    accepted = Settings(_env_file=None, secret_key="x" * 32)
+    assert accepted.secret_key == "x" * 32
+    # A generated key is long enough and needs no configuration.
+    generated = Settings(_env_file=None, data_dir=tmp_path).ensure_secret_key()
+    assert len(generated) >= 32
+
+
+def test_a_short_existing_secret_key_file_is_refused(tmp_path: Path) -> None:
+    data_dir = tmp_path / "short-secret"
+    data_dir.mkdir()
+    secret_file = data_dir / "secret_key"
+    secret_file.write_text("short\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="shorter than 32 characters") as error:
+        Settings(_env_file=None, data_dir=data_dir).ensure_secret_key()
+    assert str(secret_file) in str(error.value)
+    assert "Restore the original key" in str(error.value)
 
 
 def test_settings_validate_base_url_and_data_dir(tmp_path: Path) -> None:
@@ -193,6 +219,9 @@ def test_settings_parse_empty_trusted_proxies_from_environment(
 def test_settings_validate_trusted_proxy_networks() -> None:
     with pytest.raises(ValueError, match="TRUSTED_PROXIES"):
         Settings(_env_file=None, trusted_proxies=["not-a-cidr"])
+    for trust_all in ("0.0.0.0/0", "::/0", "0.0.0.0/0,10.0.0.0/8"):
+        with pytest.raises(ValueError, match="trust every address"):
+            Settings(_env_file=None, trusted_proxies=trust_all)
 
 
 def test_settings_reject_invalid_environment_logging_locale_and_currency() -> None:
@@ -384,8 +413,8 @@ def test_proxy_auth_settings_from_the_environment(
     ("overrides", "message"),
     [
         ({"trusted_proxies": ""}, "TRUSTED_PROXIES is required"),
-        ({"trusted_proxies": "0.0.0.0/0"}, "too wide"),
-        ({"trusted_proxies": "::/0"}, "too wide"),
+        ({"trusted_proxies": "0.0.0.0/0"}, "trust every address"),
+        ({"trusted_proxies": "::/0"}, "trust every address"),
         ({"trusted_proxies": "10.0.0.0/8"}, "too wide"),
         ({"trusted_proxies": "172.16.0.0/12"}, "too wide"),
         ({"trusted_proxies": "172.20.0.0/16"}, "too wide"),
@@ -429,9 +458,11 @@ def test_proxy_auth_settings_are_validated(
 
 
 def test_proxy_auth_rules_apply_only_when_enabled(tmp_path: Path) -> None:
-    # Forwarded headers alone keep accepting any CIDR, as before F1.4.
+    # Forwarded headers alone keep accepting a wider CIDR, as before F1.4, but never trust-all.
     settings = Settings(_env_file=None, data_dir=tmp_path, trusted_proxies="10.0.0.0/8")
     assert settings.trusted_proxies == ["10.0.0.0/8"]
+    with pytest.raises(ValueError, match="trust every address"):
+        Settings(_env_file=None, data_dir=tmp_path, trusted_proxies="0.0.0.0/0")
     # Header names are still checked, so a typo shows up before the feature is turned on.
     with pytest.raises(ValueError, match="reserved"):
         Settings(_env_file=None, data_dir=tmp_path, proxy_auth_user_header="Cookie")
@@ -444,6 +475,15 @@ def test_wide_trusted_proxies_names_every_entry_wider_than_one_address(tmp_path:
         **{**PROXY_BASE, "trusted_proxies": "172.20.0.2,172.20.1.0/24,::1,fd00::/64"},  # type: ignore[arg-type]
     )
     assert settings.wide_trusted_proxies() == ["172.20.1.0/24", "fd00::/64"]
+
+
+def test_broad_trusted_proxies_is_wider_than_slash_24_or_slash_64(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        trusted_proxies="10.0.0.0/8,192.0.2.0/24,2001:db8::/32,2001:db8:1::/64,127.0.0.1",
+    )
+    assert settings.broad_trusted_proxies() == ["10.0.0.0/8", "2001:db8::/32"]
 
 
 MAIL_BASE = {

@@ -71,8 +71,9 @@ instance administrator to reset the factor through the Users page, or an operato
 
 Accepted residual risk: after a correct password, sign-in decrypts the secret and computes a few
 HMACs before deciding, which a wrong password skips. The difference is well under a millisecond,
-far below network and argon2 jitter, and every attempt counts in the existing sign-in throttle,
-so it is not practical to measure; it is accepted rather than padded with dummy work.
+far below network and argon2 jitter, and every wrong code counts in the existing sign-in
+throttle (a completed sign-in releases only its own attempts, amendment of 2026-11-20), so it
+is not practical to measure; it is accepted rather than padded with dummy work.
 
 New direct dependencies are PyOTP (MIT, the spec's TOTP implementation; releases are infrequent,
 the latest being 2.9.0 in 2023, which suits a small, stable RFC 6238 implementation), Segno

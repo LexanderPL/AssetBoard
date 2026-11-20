@@ -38,7 +38,9 @@ def test_app_factory_ensures_secret_key_after_setup() -> None:
 
 
 def test_app_runs_migrations_during_lifespan_not_factory(tmp_path: Path) -> None:
-    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91"
+    )
     app = create_app(settings)
     engine = app.state.database_engine
 
@@ -62,7 +64,7 @@ def test_app_runs_migrations_during_lifespan_not_factory(tmp_path: Path) -> None
 
 def test_health_endpoints_report_process_and_database() -> None:
     app = create_app(
-        Settings(_env_file=None, secret_key="test-secret"),
+        Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91"),
         database_checker=lambda: True,
     )
 
@@ -78,7 +80,7 @@ def test_health_endpoints_report_process_and_database() -> None:
 
 def test_readyz_reports_database_failure() -> None:
     app = create_app(
-        Settings(_env_file=None, secret_key="test-secret"),
+        Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91"),
         database_checker=lambda: False,
     )
 
@@ -90,7 +92,9 @@ def test_readyz_reports_database_failure() -> None:
 
 
 def test_readyz_checks_the_real_database(tmp_path: Path) -> None:
-    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    app = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91")
+    )
 
     with TestClient(app) as client:
         response = client.get("/readyz")
@@ -282,7 +286,9 @@ def _capture_app_log(app: object) -> tuple[logging.Logger, io.StringIO, logging.
 def test_setup_token_is_generated_and_logged_once_at_startup_while_setup_is_open(
     tmp_path: Path,
 ) -> None:
-    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91"
+    )
     app = create_app(settings)
     logger, output, handler = _capture_app_log(app)
     try:
@@ -296,7 +302,9 @@ def test_setup_token_is_generated_and_logged_once_at_startup_while_setup_is_open
     finally:
         logger.removeHandler(handler)
 
-    restarted = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    restarted = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91")
+    )
     logger, output, handler = _capture_app_log(restarted)
     try:
         with TestClient(restarted):
@@ -314,7 +322,9 @@ def test_setup_token_is_generated_and_logged_once_at_startup_while_setup_is_open
     finally:
         logger.removeHandler(handler)
 
-    closed = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    closed = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91")
+    )
     logger, output, handler = _capture_app_log(closed)
     try:
         with TestClient(closed):
@@ -327,7 +337,12 @@ def test_setup_token_is_generated_and_logged_once_at_startup_while_setup_is_open
 def test_configured_setup_token_is_used_at_startup_and_never_logged(tmp_path: Path) -> None:
     configured = "operator-configured-setup-token"
     app = create_app(
-        Settings(_env_file=None, data_dir=tmp_path, secret_key="s", setup_token=configured)
+        Settings(
+            _env_file=None,
+            data_dir=tmp_path,
+            secret_key="test-key-043a718774c572bd8a25adb",
+            setup_token=configured,
+        )
     )
     logger, output, handler = _capture_app_log(app)
     logger.setLevel(logging.DEBUG)
@@ -358,11 +373,11 @@ def test_csrf_key_is_a_subkey_of_the_persisted_secret_and_survives_restart(
     assert csrf_key() != first  # lost key file: outstanding tokens stop verifying
 
     explicit = create_app(
-        Settings(_env_file=None, data_dir=tmp_path, secret_key="operator-secret"),
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-ec585b7be286a5088d8687a"),
         database_checker=lambda: True,
     )
     explicit.state.database_engine.dispose()
-    assert explicit.state.csrf_key == derive_subkey("operator-secret", "csrf")
+    assert explicit.state.csrf_key == derive_subkey("test-key-ec585b7be286a5088d8687a", "csrf")
 
 
 def test_dummy_hash_is_computed_once_at_startup_before_any_request(
@@ -371,7 +386,9 @@ def test_dummy_hash_is_computed_once_at_startup_before_any_request(
     from assetboard.services import auth
 
     monkeypatch.setattr(auth, "_cached_dummy_hashes", {})
-    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    app = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91")
+    )
     with TestClient(app):
         cached = dict(auth._cached_dummy_hashes)  # pyright: ignore[reportPrivateUsage]
         assert len(cached) == 1
@@ -402,7 +419,9 @@ def _startup_migration_lines(settings: Settings) -> list[str]:
 
 
 def test_startup_migrations_log_one_line_with_the_revisions(tmp_path: Path) -> None:
-    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91"
+    )
     head = ",".join(sorted(ScriptDirectory.from_config(alembic_config(settings)).get_heads()))
     # A new database.
     assert _startup_migration_lines(settings) == [
@@ -419,7 +438,10 @@ def test_startup_migrations_log_one_line_with_the_revisions(tmp_path: Path) -> N
 
 def test_no_migration_line_when_automatic_migration_is_off(tmp_path: Path) -> None:
     settings = Settings(
-        _env_file=None, data_dir=tmp_path, secret_key="test-secret", auto_migrate=False
+        _env_file=None,
+        data_dir=tmp_path,
+        secret_key="test-key-9caf06bb4436cdbfa20af91",
+        auto_migrate=False,
     )
     assert _startup_migration_lines(settings) == []
 
@@ -427,13 +449,18 @@ def test_no_migration_line_when_automatic_migration_is_off(tmp_path: Path) -> No
 def test_recurring_scheduler_follows_the_setting_and_warns_about_workers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    disabled = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    disabled = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91")
+    )
     with TestClient(disabled):  # the test suite sets ASSETBOARD_SCHEDULER_ENABLED=false
         assert not disabled.state.recurring_jobs.scheduler.running
     monkeypatch.setenv("WEB_CONCURRENCY", "2")
     enabled = create_app(
         Settings(
-            _env_file=None, data_dir=tmp_path, secret_key="test-secret", scheduler_enabled=True
+            _env_file=None,
+            data_dir=tmp_path,
+            secret_key="test-key-9caf06bb4436cdbfa20af91",
+            scheduler_enabled=True,
         )
     )
     logger, output, handler = _capture_app_log(enabled)

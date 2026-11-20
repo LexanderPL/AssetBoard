@@ -1,5 +1,6 @@
+import hashlib
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -7,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.config import Settings
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import UserSession, Workspace
 from assetboard.db.models.networth import NetWorthSnapshot
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.recurring_jobs import RecurringJobs
@@ -101,6 +102,51 @@ def test_scheduler_registers_the_daily_backup_only_when_enabled(db):
         assert disabled.scheduler.get_job("backup-startup") is None
     finally:
         disabled.stop()
+
+
+def test_the_daily_session_prune_removes_expired_rows_and_is_scheduled(db):
+    db.add_member("owner", "owner")
+    owner_id = db.users["owner"]
+    now = db.clock.now()
+
+    def session_row(name: str, *, expires_at, last_seen_at) -> UserSession:
+        return UserSession(
+            id_hash=hashlib.sha256(name.encode()).hexdigest(),
+            user_id=owner_id,
+            created_at=now,
+            last_seen_at=last_seen_at,
+            expires_at=expires_at,
+            auth_method="password",
+        )
+
+    with db.factory.begin() as session:
+        session.add_all(
+            [
+                session_row("active", expires_at=now + timedelta(days=60), last_seen_at=now),
+                session_row("expired", expires_at=now - timedelta(seconds=1), last_seen_at=now),
+                session_row(
+                    "idle",
+                    expires_at=now + timedelta(days=60),
+                    last_seen_at=now - timedelta(days=15),
+                ),
+            ]
+        )
+
+    jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, Mock())
+    jobs.prune_sessions()
+    with db.factory() as session:
+        remaining = {row.id_hash for row in session.scalars(select(UserSession))}
+    assert remaining == {hashlib.sha256(b"active").hexdigest()}
+
+    jobs.start()
+    try:
+        assert jobs.caught_up.wait(timeout=30)
+        job = jobs.scheduler.get_job("session-prune")
+        assert job is not None
+        fire = job.trigger.get_next_fire_time(None, datetime(2026, 3, 1, 12, tzinfo=UTC))
+        assert fire.isoformat() == "2026-03-02T04:10:00+00:00"
+    finally:
+        jobs.stop()
 
 
 def test_start_returns_before_the_catch_up_generates(db, monkeypatch):

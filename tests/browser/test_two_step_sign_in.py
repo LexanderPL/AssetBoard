@@ -38,7 +38,7 @@ def test_two_step_sign_in_with_an_authenticator_code(tmp_path: Path) -> None:
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
-            secret_key="browser-test-key",
+            secret_key="test-key-5d364b22dfd4d0ff6f63873",
         )
     )
     with live_server(app) as base:

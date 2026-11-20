@@ -62,9 +62,9 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
   memory, so the app must run as a single Uvicorn worker.
 - No user enumeration through sign-in: unknown email and wrong password get the same response.
   A throttled attempt says so, with the wait ("Too many attempts. Try again in N minutes."); the
-  sign-in bucket is keyed by the normalized email, counted the same way whether or not an
-  account has it, and decays with time only; nothing the account's owner does resets it, so it
-  looks the same for every email (amendment of 2026-10-17).
+  sign-in bucket is keyed by the normalized email, holds failures counted the same way whether
+  or not an account has it, and decays with time only; nothing the account's owner does resets
+  it, so it looks the same for every email (amendments of 2026-10-17 and 2026-11-20).
 - A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
   offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
   proxy rules count failures without parsing the page.
@@ -185,12 +185,13 @@ and someone who had to wait nothing about how long. Now:
 ### Buckets
 
 - **Sign-in (`account`)**, per normalized email (or `invalid:<input>` for malformed input):
-  **every attempt counts, successful ones included**; 5 free attempts by default, then the
-  usual backoff. It counts in a fixed window, the address bucket's
-  (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default): when the window has passed,
-  the next attempt starts a new count. **Nothing resets it**, and an attempt is taken back only
-  when no verify outcome exists yet (the hashing gate was saturated, or an error came before
-  the verify), which says nothing about the account.
+  **failures only**; 5 free failures by default, then the usual backoff. It counts in a fixed
+  window, the address bucket's (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default):
+  when the window has passed, the next attempt starts a new count. **Nothing resets it**, and
+  an attempt is taken back only when no verify outcome exists yet (the hashing gate was
+  saturated, or an error came before the verify) or when the password proved correct: a
+  successful sign-in releases its own attempt, never earlier failures (amendment of
+  2026-11-20).
 - **Password re-check (`confirm`)**, per user id: password change, password confirmation of
   sensitive actions (profile, administration, signing out other devices) and the password step
   of linking an identity provider or proxy sign-in by email. Same free failures and backoff, no
@@ -244,13 +245,13 @@ Reusing the setting keeps one sign-in window to explain and tune.
 
 ### Trade-off
 
-The owner's own attempts share the budget: 5 sign-in attempts per email per hour are free,
-**successful ones included**, and mistyped passwords are not cleared by a later success. A
-person who signs in more than 5 times within the hour (several devices, a script) reaches the
-backoff: the 6th attempt still goes through, then a 1-minute pause, doubling. The wait is
-shown, and the limit and window are configurable. A deliberate lockout by an attacker is
-bounded by the 15-minute backoff cap as before (and, as before, a correct password does not
-get through while the email is blocked).
+The owner's failures share the budget: 5 failed sign-ins per email per hour are free, and
+mistyped passwords are not cleared by a later success. A successful sign-in releases only its
+own attempt, so routine sign-ins on several devices no longer use the budget; the 6th failure
+still goes through, then a 1-minute pause, doubling. The wait is shown, and the limit and
+window are configurable. A deliberate lockout by an attacker is bounded by the 15-minute
+backoff cap as before (and, as before, a correct password does not get through while the
+email is blocked).
 
 A possible future improvement, not part of this change: a long-lived device cookie set at a
 successful sign-in, so that attempts from a device that has signed in before use their own
@@ -266,3 +267,19 @@ confirmation of sensitive actions (profile, administration, signing out other de
 password step of linking an identity provider or proxy sign-in by email. They return 401 with
 `Retry-After` when throttled. Registration and invitation sign-up keep their own per-address
 message.
+
+## Amendment (2026-11-20): successful sign-ins do not use the failure budget
+
+Signing in five times in an hour (a phone, a laptop, a few session expiries) could reach the
+per-email backoff, and an attacker who knew the email could make the victim's next sign-in the
+attempt that set it. The sign-in (`account`) bucket now counts **failures only**: a request
+that verifies the password releases its own attempt, while earlier failures stay in the window
+and every wrong password still counts. The dummy-hash and timing-uniform path for unknown
+emails, the uniform per-attempt response and the address bucket are unchanged.
+
+The state of the account bucket can now depend on a successful sign-in. An observer who probes
+the same email before and after someone signs in can see the block arrive one attempt later;
+this reveals that a sign-in succeeded, never whether an account exists. The bucket was already
+not exposed to the browser, and the audit accepted this trade-off (SEC-02). A successful
+password followed by a wrong two-factor code still counts the code attempt as a failure; a
+completed two-factor sign-in releases the password and code attempts it made.

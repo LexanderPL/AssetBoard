@@ -128,7 +128,13 @@ from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
 from assetboard.services.archive import workspace_is_empty
 from assetboard.services.categories import usage_by_category
-from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.context import (
+    Context,
+    Role,
+    require_not_demo,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.holding_rows import holding_transaction
 from assetboard.services.income import resync_work_month
 from assetboard.services.months import close_month_state, current_month, lock_month_writes
@@ -966,6 +972,9 @@ def upload_import(
         raise ImportError("invalid import mode")
     required_role = Role.OWNER if mode == "restore" else Role.EDITOR
     require_role(ctx, required_role)
+    # The shared demo workspace is open to anyone; uploads would fill the data volume and
+    # saturate the import workers until the daily reset (SEC-05).
+    require_not_demo(ctx)
     is_archive = content.startswith(ZIP_LOCAL_FILE_SIGNATURE)
     if mode == "restore" and not is_archive:
         raise ImportRestoreRequiresArchive
@@ -1169,6 +1178,7 @@ def plan_import(
     adapters: ImportAdapterRegistry | None = None,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
 
     def locate(session: Session) -> Path:
         require_role_now(session, ctx, Role.EDITOR)
@@ -1217,6 +1227,7 @@ def cancel_import(
     factory: sessionmaker[Session], ctx: Context, data_dir: Path, batch_id: UUID
 ) -> None:
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
 
     def cancel(session: Session) -> Path:
         require_role_now(session, ctx, Role.EDITOR)
@@ -1293,6 +1304,7 @@ def apply_import(
     instance_settings: Settings | None = None,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
     stored_path = _upload_path(data_dir, ctx.workspace.id, batch_id)
 
     def apply(session: Session) -> dict[str, Any]:
@@ -1454,6 +1466,7 @@ def update_import_preview(
 ) -> dict[str, Any]:
     """Save the mapping choices on the batch and re-run the dry-run (no rows are written)."""
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
 
     def prepare(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
@@ -1479,6 +1492,7 @@ def close_imported_months(
     close's locks, and each records a ``month.closed`` audit event.
     """
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
     current = current_month(ctx)
 
     def close(session: Session) -> list[YearMonth]:
@@ -2326,6 +2340,7 @@ def rollback_import(
     since ``applied_at``.
     """
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
 
     def rollback(session: Session) -> dict[str, int]:
         require_role_now(session, ctx, Role.EDITOR)

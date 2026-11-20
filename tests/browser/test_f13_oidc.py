@@ -90,7 +90,7 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
-            secret_key="browser-test-key",
+            secret_key="test-key-5d364b22dfd4d0ff6f63873",
             env="dev",  # http issuer and BASE_URL on loopback
             base_url=base,
             oidc_issuer=issuer,

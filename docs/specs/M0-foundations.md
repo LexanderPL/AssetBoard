@@ -41,7 +41,7 @@ Do not add any web framework code yet.
 
 **Acceptance**
 - `create_app(settings)` app factory (FastAPI); `uvicorn` entrypoint; `assetboard` CLI with `serve` and `migrate` (`migrate` reports that it is not implemented until F0.3 and exits non-zero).
-- `Settings` (pydantic-settings, prefix from `branding.ENV_PREFIX`): `DATA_DIR` (default `/data` in Docker, `./data` in dev), `DATABASE_URL` (default SQLite in `DATA_DIR`), `SECRET_KEY` (if absent: generate once, persist to `DATA_DIR/secret_key`, log a warning), `BASE_URL`, `ENV` (dev|prod), `LOG_LEVEL`, `LOG_FORMAT` (text|json), `TRUSTED_PROXIES`, `DEFAULT_LOCALE`, `DEFAULT_CURRENCY` (default `EUR`), `AUTO_MIGRATE` (default true).
+- `Settings` (pydantic-settings, prefix from `branding.ENV_PREFIX`): `DATA_DIR` (default `/data` in Docker, `./data` in dev), `DATABASE_URL` (default SQLite in `DATA_DIR`), `SECRET_KEY` (at least 32 characters when set; if absent: generate once, persist to `DATA_DIR/secret_key`, log a warning), `BASE_URL`, `ENV` (dev|prod), `LOG_LEVEL`, `LOG_FORMAT` (text|json), `TRUSTED_PROXIES`, `DEFAULT_LOCALE`, `DEFAULT_CURRENCY` (default `EUR`), `AUTO_MIGRATE` (default true).
 - `Clock` abstraction (`now()`, `today(tz)`), with a fixed-clock fake for tests.
 - Request-ID middleware; structured logging; `/healthz` (process up) and `/readyz` (DB reachable).
 - Settings are validated at startup with clear error messages for bad values.

@@ -33,6 +33,22 @@ new strings are translated; no release tag or image publish while the owner's v1
 | F11.14 | Prior-audit UI items | PA-01, PA-02, PA-03, PA-04 | P2/P3 | Net-worth add form is grouped; notification fields are conditional; summary totals are not repeated three times; disclosure targets are 44 px on phones |
 | F11.15 | Small correctness fixes | COR-05, COR-06, COR-07, COR-16, COR-18, COR-19 | P2/P3 | Domain block difference follows the spec; no-plan bars are neutral; future-dated undo is not offered; FIFO avg cost is correct; same-date XIRR is undefined; zero-total categories follow the chosen spec rule |
 
+## Decisions
+
+- **SEC-02:** the per-email bucket counts failures only; a successful sign-in releases its own
+  attempt while earlier failures stay. The uniform response and dummy-hash timing are unchanged.
+  A successful sign-in is therefore observable through the timing of a later block, which reveals
+  only that someone signed in (ADR-0012 amendment of 2026-11-20).
+- **SEC-04:** a daily job at 04:10 UTC deletes sessions past their absolute or idle expiry; the
+  `user_sessions.expires_at` index supports the scan, and the unused `get_valid_session` delete
+  path is removed.
+- **SEC-05:** import mutations call `require_not_demo` and the demo page hides the import UI. No
+  aggregate per-workspace import quota is added; the self-hosted scope keeps per-file caps.
+- **SEC-06:** `0.0.0.0/0` and `::/0` are refused always; other entries wider than IPv4 /24 or
+  IPv6 /64 log a startup warning even without proxy authentication.
+- **SEC-07:** an operator-supplied `SECRET_KEY` or key file shorter than 32 characters is refused;
+  generated keys and test fixtures use at least 32 characters.
+
 ## Suggested order
 
 1. F11.1, F11.2, F11.3, F11.4 — P1 correctness/security/i18n.

@@ -37,6 +37,7 @@ from assetboard.db.models.totp import TotpFactor
 from assetboard.services import (
     account_email,
     auth,
+    imports,
     invitations,
     navigation,
     notifications,
@@ -89,7 +90,7 @@ def _settings(tmp_path: Path) -> Settings:
     return Settings(
         _env_file=None,
         data_dir=tmp_path,
-        secret_key="demo-restrictions-secret",
+        secret_key="test-key-567a9cc36e2654a88a15373",
         base_url="https://money.example.test",
         smtp_host="smtp.example.test",
         smtp_from="finance@example.test",
@@ -459,7 +460,18 @@ def _totp_disable(env: DemoEnv) -> None:
     )
 
 
+def _import_upload(env: DemoEnv) -> None:
+    imports.upload_import(
+        env.db.factory,
+        env.ctx,
+        data_dir=env.settings.data_dir,
+        filename="transactions.csv",
+        content=b"date,direction,amount\n",
+    )
+
+
 CASES: list[tuple[str, Callable[[DemoEnv], Any]]] = [
+    ("imports.upload_import", _import_upload),
     ("navigation.save_sidebar", _sidebar_save),
     ("navigation.reset_sidebar", _sidebar_reset),
     ("profile.update_profile", _profile_update),

@@ -77,7 +77,9 @@ def _setup_form(client: httpx.Client, base_url: str, token: str, email: str) -> 
 def test_concurrent_setup_posts_get_one_success_and_one_409(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
 ) -> None:
-    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-9caf06bb4436cdbfa20af91"
+    )
     app = create_app(settings)
     if variant == "lock_timeout":
         engine = create_database_engine(settings.database_url or "", busy_timeout_ms=50)

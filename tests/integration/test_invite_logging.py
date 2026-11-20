@@ -66,7 +66,9 @@ def test_invitation_token_is_absent_from_every_log(
     tmp_path: Path, capfd: pytest.CaptureFixture[str], access_log: str
 ) -> None:
     web = WebHarness(tmp_path / "data")
-    settings = Settings(_env_file=None, data_dir=tmp_path / "data", secret_key="test-secret")
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path / "data", secret_key="test-key-9caf06bb4436cdbfa20af91"
+    )
     app = create_app(settings)
     options = server_options(settings) | {"log_level": "info"}
     if access_log == "control_access_log_on":

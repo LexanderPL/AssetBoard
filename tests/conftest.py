@@ -342,7 +342,10 @@ class WebHarness:
         self.migrated_database = migrated_database
 
     def settings(self, **overrides: object) -> Settings:
-        values: dict[str, object] = {"data_dir": self.data_dir, "secret_key": "test-secret"}
+        values: dict[str, object] = {
+            "data_dir": self.data_dir,
+            "secret_key": "test-secret-key-0123456789abcdef",
+        }
         values.update(overrides)
         if (
             self.migrated_database is not None

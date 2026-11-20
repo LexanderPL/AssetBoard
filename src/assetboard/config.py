@@ -18,6 +18,9 @@ from assetboard.branding import ENV_PREFIX
 
 # Proxy authentication (F1.4, ADR-0015): the narrowest TRUSTED_PROXIES entries allowed.
 PROXY_AUTH_MIN_PREFIX = {4: 24, 6: 64}
+# An operator-supplied SECRET_KEY (environment or *_FILE) feeds every derived key: CSRF,
+# OIDC state/link cookies, TOTP-secret and notification/provider encryption (SEC-07).
+MIN_SECRET_KEY_LENGTH = 32
 DEFAULT_RECURRENCE_HORIZON_MONTHS = 13
 # The Upcoming window (instance default and per-workspace setting), in days.
 MIN_UPCOMING_DAYS = 1
@@ -229,7 +232,14 @@ class Settings(BaseSettings):
             return None
         if not isinstance(value, str) or not value.strip():
             raise ValueError("SECRET_KEY must not be empty")
-        return value.strip()
+        secret = value.strip()
+        if len(secret) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters; use a "
+                "random value (for example `openssl rand -base64 32`) or leave it unset to "
+                "generate one under DATA_DIR"
+            )
+        return secret
 
     @field_validator("env")
     @classmethod
@@ -301,11 +311,16 @@ class Settings(BaseSettings):
     def validate_trusted_proxies(cls, value: list[str]) -> list[str]:
         for proxy in value:
             try:
-                ip_network(proxy, strict=False)
+                network = ip_network(proxy, strict=False)
             except ValueError as exc:
                 raise ValueError(
                     "TRUSTED_PROXIES must contain valid IPv4 or IPv6 CIDR networks"
                 ) from exc
+            if network.prefixlen == 0:
+                raise ValueError(
+                    f"TRUSTED_PROXIES entry {network} would trust every address, so any "
+                    "client could forge a forwarded address; list the proxy's own address"
+                )
         return value
 
     @field_validator(
@@ -486,6 +501,19 @@ class Settings(BaseSettings):
             if network.prefixlen < network.max_prefixlen
         ]
 
+    def broad_trusted_proxies(self) -> list[str]:
+        """Entries wider than /24 (IPv4) or /64 (IPv6).
+
+        Forwarded headers are trusted from these addresses even when proxy authentication is
+        off, so one reachable host in the range can spoof its client address and bypass the
+        per-address throttles. The audit hardening (SEC-06) warns about them at startup.
+        """
+        return [
+            str(network)
+            for network in self.trusted_proxy_networks
+            if network.prefixlen < PROXY_AUTH_MIN_PREFIX[network.version]
+        ]
+
     def _validate_proxy_auth(self) -> None:
         if not self.proxy_auth_enabled:
             return
@@ -646,6 +674,12 @@ class Settings(BaseSettings):
                 if not existing_secret:
                     raise ValueError(
                         f"SECRET_KEY file {secret_file} is empty; delete it to regenerate."
+                    ) from None
+                if len(existing_secret) < MIN_SECRET_KEY_LENGTH:
+                    raise ValueError(
+                        f"SECRET_KEY file {secret_file} is shorter than "
+                        f"{MIN_SECRET_KEY_LENGTH} characters. Restore the original key from a "
+                        "backup; replacing it makes encrypted authenticator secrets unreadable."
                     ) from None
                 self.secret_key = existing_secret
                 return existing_secret

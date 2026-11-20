@@ -40,7 +40,13 @@ AssetBoard refuses to start with proxy authentication on when the user or email 
 set, when two settings name the same header, when a header name is reserved (`Cookie`, `Host`,
 `Authorization`, `X-Forwarded-For` and similar), when `ASSETBOARD_TRUSTED_PROXIES` is empty, or
 when an entry is wider than IPv4 `/24` or IPv6 `/64`. Each entry that covers more than one
-address is named in a startup warning. Run AssetBoard with `assetboard serve` (as the image
+address is named in a startup warning.
+
+`0.0.0.0/0` and `::/0` are refused even with proxy authentication off: they would trust a
+forwarded address from anyone. With proxy authentication off, any other entry wider than IPv4
+`/24` or IPv6 `/64` still logs a prominent startup warning, because every host in that range
+could spoof its client address, bypass per-address throttles and poison audit records. List
+only the reverse proxy's own address. Run AssetBoard with `assetboard serve` (as the image
 does): only then does it see which address a connection really came from.
 
 ## What the headers are trusted for

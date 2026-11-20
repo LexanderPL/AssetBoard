@@ -110,7 +110,10 @@ def test_gate_releases_its_slot_when_the_operation_fails() -> None:
 
 def test_healthz_stays_responsive_while_hashing_is_saturated(tmp_path: Path) -> None:
     settings = Settings(
-        _env_file=None, data_dir=tmp_path, secret_key="test-secret", auth_max_concurrent_hashes=2
+        _env_file=None,
+        data_dir=tmp_path,
+        secret_key="test-key-9caf06bb4436cdbfa20af91",
+        auth_max_concurrent_hashes=2,
     )
     app = create_app(settings, database_checker=lambda: True)
     gate: HashGate = app.state.hash_gate
@@ -147,7 +150,10 @@ def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
     limiter and the 16-waiter cap leave enough of the 40 default tokens for sync routes.
     """
     settings = Settings(
-        _env_file=None, data_dir=tmp_path, secret_key="test-secret", auth_max_concurrent_hashes=8
+        _env_file=None,
+        data_dir=tmp_path,
+        secret_key="test-key-9caf06bb4436cdbfa20af91",
+        auth_max_concurrent_hashes=8,
     )
     app = create_app(settings)
     app.add_api_route("/sync-probe", lambda: {"ok": True})  # a plain def route: runs in a thread

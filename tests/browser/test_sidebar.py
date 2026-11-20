@@ -42,7 +42,7 @@ def test_the_sidebar_footer_stays_at_the_bottom_of_the_viewport(tmp_path: Path) 
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
-            secret_key="browser-test-key",
+            secret_key="test-key-5d364b22dfd4d0ff6f63873",
         )
     )
     listener = socket.socket()

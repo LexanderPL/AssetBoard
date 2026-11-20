@@ -35,7 +35,9 @@ def db(tmp_path):
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(_env_file=None, data_dir=tmp_path, secret_key="notification-test-secret")
+    return Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-50c1d54e276b55a994c9751"
+    )
 
 
 @pytest.fixture
@@ -152,7 +154,9 @@ def test_url_is_encrypted_bound_to_its_channel_and_never_audited(
         assert "reason=foreign_row" in caplog.text
     caplog.clear()
     # Another instance secret cannot read it.
-    changed = Settings(_env_file=None, data_dir=settings.data_dir, secret_key="another-secret")
+    changed = Settings(
+        _env_file=None, data_dir=settings.data_dir, secret_key="test-key-ce1807e913c97047dafef68"
+    )
     with caplog.at_level("WARNING"):
         assert notifications.decrypt_url(changed, channel_id, row.url_encrypted) is None
         assert "notification_url_unreadable" in caplog.text
@@ -188,7 +192,10 @@ def test_urls_are_validated_and_schemes_allowlisted(db, settings, notifier, url,
 
 def test_operator_can_change_the_scheme_allowlist(db, settings, notifier) -> None:
     narrow = Settings(
-        _env_file=None, data_dir=settings.data_dir, secret_key="x", notification_schemes="gotifys"
+        _env_file=None,
+        data_dir=settings.data_dir,
+        secret_key="test-key-2d711642b726b04401627ca",
+        notification_schemes="gotifys",
     )
     with pytest.raises(NotificationError, match="scheme_not_allowed"):
         add_channel(db, narrow, notifier)
@@ -311,7 +318,10 @@ def test_send_test_reports_a_failure_code_only(db, settings, notifier, caplog) -
 def test_send_test_when_delivery_is_off(db, settings, notifier) -> None:
     channel_id = add_channel(db, settings, notifier)
     off = Settings(
-        _env_file=None, data_dir=settings.data_dir, secret_key="x", notifications_enabled=False
+        _env_file=None,
+        data_dir=settings.data_dir,
+        secret_key="test-key-2d711642b726b04401627ca",
+        notifications_enabled=False,
     )
     outcome = notifications.send_test(
         db.factory, db.ctx("ana", "viewer"), off, notifier, channel_id
@@ -531,7 +541,10 @@ def test_kill_switch_and_time_budget(db, settings, notifier) -> None:
     add_channel(db, settings, notifier, name="Two")
     add_occurrence(db, date(2026, 3, 12))
     off = Settings(
-        _env_file=None, data_dir=settings.data_dir, secret_key="x", notifications_enabled=False
+        _env_file=None,
+        data_dir=settings.data_dir,
+        secret_key="test-key-2d711642b726b04401627ca",
+        notifications_enabled=False,
     )
     assert run(db, off, notifier, "2026-03-10T08:00:00+00:00").channels == 0
     calls = iter([False, True])

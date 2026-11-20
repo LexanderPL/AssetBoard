@@ -211,6 +211,7 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
     __table_args__ = (
         Index("ix_user_sessions_user_expires", "user_id", "expires_at"),
+        Index("ix_user_sessions_expires_at", "expires_at"),
         CheckConstraint("length(id_hash) = 64", name="id_hash_sha256_length"),
         CheckConstraint(
             "auth_method IN ('password', 'oidc', 'proxy', 'demo')", name="auth_method_valid"

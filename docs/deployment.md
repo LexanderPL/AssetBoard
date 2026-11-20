@@ -19,11 +19,11 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_MAX_REQUEST_BYTES` | `1048576` (1 MiB) | App | Maximum request body size on every route except the import upload; must be positive. |
 | `ASSETBOARD_IMPORT_MAX_UPLOAD_BYTES` | `20971520` (20 MiB) | App | Maximum request body size for `POST /workspace/data/import`; archive members have separate uncompressed limits; must be positive. |
 | `ASSETBOARD_DATABASE_URL` | `<DATA_DIR>/assetboard.db` | App | SQLite URL; this foundation supports SQLite only. |
-| `ASSETBOARD_SECRET_KEY` | unset | App | Optional explicit secret. If absent, a key is generated once and persisted under `DATA_DIR`. |
+| `ASSETBOARD_SECRET_KEY` | unset | App | Optional explicit secret, at least 32 characters when set. If absent, a random key is generated once and persisted under `DATA_DIR`. All derived keys (CSRF, OIDC state, TOTP and notification encryption) depend on it. |
 | `ASSETBOARD_BASE_URL` | `http://localhost:8000` | App | Public base URL. Set to the external URL when using a reverse proxy. |
 | `ASSETBOARD_LOG_LEVEL` | `INFO` | App | Minimum log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
 | `ASSETBOARD_LOG_FORMAT` | `text` (Compose: `json`) | App | Log output format: `text` or `json`. |
-| `ASSETBOARD_TRUSTED_PROXIES` | empty | App | Comma-separated proxy IPs/CIDRs allowed to supply forwarded headers. Empty trusts no proxy: forwarded headers are ignored and the TCP peer is the client address. |
+| `ASSETBOARD_TRUSTED_PROXIES` | empty | App | Comma-separated proxy IPs/CIDRs allowed to supply forwarded headers. Empty trusts no proxy: forwarded headers are ignored and the TCP peer is the client address. `0.0.0.0/0` and `::/0` are refused; entries wider than IPv4 `/24` or IPv6 `/64` log a startup warning even when proxy authentication is off, because every host in the range could spoof its address. |
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | App | Two-letter lowercase default locale. |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
 | `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
@@ -38,9 +38,9 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_ALLOW_REGISTRATION` | unset | App | **Removed** (pre-release B). Open registration is turned on in **Instance settings** and needs SMTP. `true` refuses to start with a message; `false` is ignored with a warning. Remove the variable. |
 | `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |
 | `ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS` | `60` | App | Sessions expire this many days after login regardless of activity. |
-| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Sign-in attempts per email (successful ones included) within the window of `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` before exponential backoff starts; nothing resets the count. The same number of wrong current passwords (password change, confirming a change) is allowed per user, in a separate count that a correct password resets. |
+| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Failed sign-in attempts per email within the window of `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` before exponential backoff starts. A successful sign-in takes back only its own attempt, so earlier failures stay counted but routine sign-ins never lock the account; nothing resets the count. The same number of wrong current passwords (password change, confirming a change) is allowed per user, in a separate count that a correct password resets. |
 | `ASSETBOARD_AUTH_IP_FREE_FAILURES` | `20` | App | Failed logins per client address (IPv4 address or IPv6 /64) within the IP window before backoff starts. |
-| `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which the per-address login and setup-token failure counters and the per-email sign-in counter decay. Successful logins do not reset them. |
+| `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which the per-address login and setup-token failure counters and the per-email failure counter decay. Successful logins do not reset them. |
 | `ASSETBOARD_AUTH_THROTTLE_BASE_SECONDS` | `60` | App | First backoff delay; it doubles with each further failure. |
 | `ASSETBOARD_AUTH_THROTTLE_MAX_SECONDS` | `900` | App | Maximum backoff delay (bounds how long an attacker can lock an account). |
 | `ASSETBOARD_SETUP_THROTTLE_FREE_FAILURES` | `5` | App | Wrong setup-token attempts per client address before backoff starts. |
@@ -105,14 +105,18 @@ creates the administrator and the first workspace and signs you in; afterwards `
 alternative that needs no token.
 
 Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
-(`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. For MFA,
-users with local passwords can enroll TOTP in their profile
-(see [account security](accounts.md#two-factor-authentication)).
+(`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. A
+daily housekeeping job (04:10 UTC) deletes sessions past either timeout, so their stored hash,
+address prefix and user agent do not accumulate. For MFA, users with local passwords can enroll
+TOTP in their profile (see [account security](accounts.md#two-factor-authentication)).
 OIDC and reverse-proxy sign-ins delegate MFA to their identity provider. Run a single application
 process (one Uvicorn worker): the setup token, the password-hashing limit and some caches live in
 the process.
 
 ### Secret key and two-factor authentication
+
+An operator-supplied `ASSETBOARD_SECRET_KEY` must be at least 32 characters (a short file under
+`DATA_DIR/secret_key` is refused too). Leave it unset to let AssetBoard generate a strong key.
 
 Back up `ASSETBOARD_SECRET_KEY` or the persistent `DATA_DIR/secret_key` together with the database:
 TOTP secrets are encrypted with a key derived from it. Keep the key outside database-only exports.
@@ -649,14 +653,15 @@ pre-tag and post-publish sequence, including the operator-only tag and publish s
   response is still `401`, now with a `Retry-After` header when throttled, so fail2ban or proxy
   rules that count 401s on `POST /login` keep working. Rules that match the old page text ("or
   there were too many attempts") need updating.
-- **Sign-in counting changed.** The per-email sign-in count now covers every attempt,
-  successful ones included, within a window equal to `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` (60
-  by default), and is never cleared, so it reveals nothing about which accounts exist. Someone
-  who signs in more than `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` (5) times within the window
-  gets a short pause; raise the setting if your users sign in often. Wrong passwords on
-  password change and confirmation pages have their own per-user count and no longer block
-  sign-in. Existing counters carry over; no migration
-  ([ADR-0012](adr/0012-local-authentication.md), amendment of 2026-10-17).
+- **Sign-in counting changed.** The per-email sign-in count covers failed attempts only,
+  within a window equal to `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` (60 by default), and is never
+  reset by the account owner. A successful sign-in takes back only the attempt it reserved,
+  so routine sign-ins on several devices no longer use up the budget; after
+  `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` (5) failures in the window the next failure starts
+  a short pause. The response stays uniform, so the bucket reveals nothing about which
+  accounts exist. Wrong passwords on password change and confirmation pages have their own
+  per-user count and never block sign-in. Existing counters carry over; no migration
+  ([ADR-0012](adr/0012-local-authentication.md), amendments of 2026-10-17 and 2026-11-20).
 
 ### Unreleased: navigation restructure (F2.7)
 

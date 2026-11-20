@@ -35,7 +35,7 @@ def team(db: WorkspaceDb) -> WorkspaceDb:
     return db
 
 
-SETTINGS = Settings(_env_file=None, secret_key="test-secret")
+SETTINGS = Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91")
 
 
 def _owner(db: WorkspaceDb) -> Context:

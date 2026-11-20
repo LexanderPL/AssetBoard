@@ -42,7 +42,7 @@ def _app(tmp_path: Path):
             _env_file=None,
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser-sidebar.db'}",
-            secret_key="browser-sidebar-test-key",
+            secret_key="test-key-cb204ffa891a6a56e860db7",
         )
     )
     return app

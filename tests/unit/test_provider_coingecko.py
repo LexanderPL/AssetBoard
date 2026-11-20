@@ -24,7 +24,7 @@ from tests.fake_provider_http import FakeProviderHttpClient, FakeTime
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "providers"
 NOW = FixedClock("2026-03-02T12:00:00+00:00")
-SETTINGS = Settings(_env_file=None, secret_key="test-secret")
+SETTINGS = Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91")
 
 
 def _provider(

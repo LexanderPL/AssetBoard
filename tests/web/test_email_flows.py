@@ -889,7 +889,10 @@ def test_unencrypted_smtp_to_another_host_is_warned_at_startup(
 
 def test_the_log_key_comes_from_the_ensured_secret_key(web: WebHarness) -> None:
     generated = web.mail_app(secret_key=None)  # the key file under DATA_DIR, as by default
-    assert generated.state.mail_log_key != web.mail_app(secret_key="another").state.mail_log_key
+    assert (
+        generated.state.mail_log_key
+        != web.mail_app(secret_key="test-key-ae448ac86c4e8e4dec64572").state.mail_log_key
+    )
     assert generated.state.mail_log_key == web.mail_app(secret_key=None).state.mail_log_key
 
 

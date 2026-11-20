@@ -487,7 +487,9 @@ def test_liability_helper_is_tenant_scoped(team: WorkspaceDb) -> None:
 
 
 def _settings(tmp_path) -> Settings:
-    return Settings(_env_file=None, data_dir=tmp_path, secret_key="test")
+    return Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-key-9f86d081884c7d659a2feaa"
+    )
 
 
 def _loan_item_occurrences(team: WorkspaceDb, item_id: UUID):

@@ -38,7 +38,7 @@ def team(db: WorkspaceDb) -> WorkspaceDb:
     return db
 
 
-SETTINGS = Settings(_env_file=None, secret_key="test-secret")
+SETTINGS = Settings(_env_file=None, secret_key="test-key-9caf06bb4436cdbfa20af91")
 
 
 def _owner(db: WorkspaceDb) -> Context:
@@ -136,7 +136,7 @@ def test_settings_are_encrypted_and_bound_to_the_config(db: WorkspaceDb, team: W
         assert "super-secret-token" not in row.settings_encrypted
         assert provider_settings(SETTINGS, row) == {"api_key": "super-secret-token"}
 
-    changed = Settings(_env_file=None, secret_key="another-secret")
+    changed = Settings(_env_file=None, secret_key="test-key-ce1807e913c97047dafef68")
     with db.factory() as session:
         row = PriceSourceConfigRepository(session, ctx).for_provider("nbp")
         assert row is not None
