@@ -243,6 +243,7 @@ def _system_context(session: Session, scope: WorkspaceScope, clock: Clock) -> Co
         ),
         role=Role(membership.role),
         clock=clock,
+        auth_method="system",
     )
 
 
@@ -363,7 +364,12 @@ def _post_in_session(
                 actor_user_id=actor_user_id,
                 now=clock.now(),
             )
-        elif loan is not None and loan.archived_at is None and loan.auto_record_payments:
+        elif (
+            loan is not None
+            and loan.archived_at is None
+            and loan.auto_record_payments
+            and actor_user_id is not None
+        ):
             with contextlib.suppress(LoanError, LoanValidationError):
                 loan_payments.record_loan_payment_in_session(
                     session,

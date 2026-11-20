@@ -505,6 +505,15 @@ def apply_posted_occurrence(
         )
 
 
+def _reactivate_loan_item(session: Session, ctx: Context, loan_id: UUID) -> None:
+    """Reuse an archived loan item before regenerating, so its old rows are not duplicated."""
+    items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+    for item in reversed(items):
+        if item.archived_at is not None:
+            ScheduledItemRepository(session, ctx).update(item.id, archived_at=None, paused_at=None)
+            return
+
+
 def revert_posted_occurrence(
     session: Session,
     ctx: Context,
@@ -521,8 +530,6 @@ def revert_posted_occurrence(
     """
     plan = InstallmentPlanRepository(session, ctx).for_loan(loan.id)
     if plan is None:
-        return
-    if plan.closed_at is not None and plan.remaining_count > 0:
         return
     count = plan.remaining_count + 1
     pending = [
@@ -556,6 +563,7 @@ def revert_posted_occurrence(
     )
     from assetboard.services.loan_scheduled import create_loan_schedule_item_in_session
 
+    _reactivate_loan_item(session, ctx, loan.id)
     create_loan_schedule_item_in_session(
         session, ctx, loan.id, plan.category_id, DEFAULT_RECURRENCE_HORIZON_MONTHS
     )
@@ -616,6 +624,7 @@ def restore_installment_plan(factory: sessionmaker[Session], ctx: Context, loan_
         InstallmentPlanRepository(session, ctx).update(plan.id, closed_at=None, end_date=end_date)
         from assetboard.services.loan_scheduled import create_loan_schedule_item_in_session
 
+        _reactivate_loan_item(session, ctx, loan.id)
         create_loan_schedule_item_in_session(
             session,
             ctx,

@@ -431,8 +431,12 @@ decrement-on-post behaviour, linked liability and overview table. Tests for coun
   and keeps posted/past history. No `LoanPayment` is created for a plan.
 - The count is symmetric across the lifecycle: undo, ledger delete and restore call
   `revert_posted_occurrence()` / `apply_posted_occurrence()` so the count, progress, end date and
-  liability do not drift; auto-post runs the same hooks through a trusted system context. A
-  manually archived plan is not unarchived by undoing one of its old installments.
+  liability do not drift; auto-post runs the same hooks through a trusted system context. Undoing
+  an installment of an archived plan reopens the plan and reuses its archived scheduled item, so
+  the regenerated rows do not duplicate. Restoring a plan does the same.
+- Auto-post keeps the item's `auto_post` flag and reminder lead, uses a system context that
+  bypasses the interactive two-factor gate, and does not create ordinary-loan payments; the M7
+  F7.6 rule that only manual Upcoming posting auto-records a payment is unchanged.
 - Overdue installments stay postable: generation uses the earliest pending occurrence date, not
   today's nominal date, so a plan whose end date has passed but still has pending rows can post
   them one by one and close at zero.

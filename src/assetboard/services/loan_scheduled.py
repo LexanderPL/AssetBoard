@@ -137,6 +137,8 @@ def create_loan_schedule_item_in_session(
         ),
         amount_mode=AmountMode.FROM_LOAN,
         loan_id=loan.id,
+        auto_post=existing.auto_post if existing is not None else False,
+        reminder_lead_days=existing.reminder_lead_days if existing is not None else None,
     )
     return scheduled.save_item_in_session(
         session,
