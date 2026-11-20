@@ -149,6 +149,10 @@ def networth_history(
                 if dates
                 else ()
             )
+            earliest = _earliest_recorded(histories, today=today, timezone=ctx.workspace.timezone)
+            # A report date before the first recorded value is a gap, not a zero: drop it
+            # instead of letting values_at/summarize_values invent a leading point.
+            dates = tuple(day for day in dates if earliest is not None and day >= earliest)
         if not dates:
             return NetWorthHistoryData(
                 base_currency=base_currency,
