@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -288,6 +288,76 @@ def test_list_active_and_closed(team: WorkspaceDb) -> None:
     page = installment_plans.list_installment_plans(team.factory, team.ctx("viewer", "viewer"))
     assert [row.loan.id for row in page.active] == [first]
     assert [row.loan.id for row in page.closed] == [second]
+
+
+def test_plan_balance_at_as_of_uses_posted_occurrences(team: WorkspaceDb) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 2, 1)
+            )
+            == 0
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 300_000
+        )
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        rows = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)
+        first, second, third = rows
+    team.clock._value = datetime(2026, 3, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 300_000
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 5)
+            )
+            == 200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 5)) == _money(
+            200_000
+        )
+    team.clock._value = datetime(2026, 4, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, second.id, amount_minor=100_000, day=date(2026, 4, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 4, 5)
+            )
+            == 100_000
+        )
+    team.clock._value = datetime(2026, 5, 5, 12, tzinfo=UTC)
+    occurrences.post_occurrence(
+        team.factory, ctx, third.id, amount_minor=100_000, day=date(2026, 5, 5)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 4, 5)
+            )
+            == 100_000
+        )
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 5, 5)
+            )
+            == 0
+        )
 
 
 def test_plan_balance_and_installments_liability(team: WorkspaceDb) -> None:

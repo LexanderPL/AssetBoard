@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -236,6 +237,36 @@ def post_next_installment(factory: sessionmaker[Session], ctx: Context, loan_id:
     return occurrence_service.post_occurrence(
         factory, ctx, occurrence_id, amount_minor=amount_minor, day=today
     )
+
+
+def plan_remaining_minor_at_in_session(
+    session: Session, ctx: Context, loan_id: UUID, as_of: date
+) -> int | None:
+    """The plan's remaining principal at ``as_of`` from its posted occurrences.
+
+    ``remaining_count`` is the current count, so the original count is reconstructed as
+    ``remaining_count + posted_count``. A plan created after ``as_of`` is 0; a plan closed or
+    archived on or before ``as_of`` is 0; otherwise only posted occurrences due on or before
+    ``as_of`` are subtracted.
+    """
+    plan = InstallmentPlanRepository(session, ctx).for_loan(loan_id)
+    if plan is None:
+        return None
+    loan = LoanRepository(session, ctx).get(loan_id)
+    if loan is None:
+        return None
+    local = ZoneInfo(ctx.workspace.timezone)
+    if as_of < plan.created_at.astimezone(local).date():
+        return 0
+    closed = plan.closed_at.astimezone(local).date() if plan.closed_at is not None else None
+    archived = loan.archived_at.astimezone(local).date() if loan.archived_at is not None else None
+    if (closed is not None and closed <= as_of) or (archived is not None and archived <= as_of):
+        return 0
+    occurrences = _occurrences_for_loan(session, ctx, loan.id)
+    posted = [row for row in occurrences if row.status == "posted" and row.direction == "expense"]
+    original = plan.remaining_count + len(posted)
+    posted_by_as_of = sum(1 for row in posted if row.due_date <= as_of)
+    return plan.installment_minor * max(0, original - posted_by_as_of)
 
 
 def plan_remaining_minor_in_session(
@@ -539,6 +570,7 @@ __all__ = [
     "next_due_on_or_after",
     "plan_due_dates_in_session",
     "plan_installment_in_session",
+    "plan_remaining_minor_at_in_session",
     "plan_remaining_minor_in_session",
     "post_next_installment",
     "restore_installment_plan",
