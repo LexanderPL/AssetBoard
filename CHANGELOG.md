@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.8.6](https://github.com/LexanderPL/AssetBoard/compare/v0.8.5...v0.8.6) (2026-11-20)
+
+
+### Features
+
+* **home:** make month category widget totals prominent ([#429](https://github.com/LexanderPL/AssetBoard/issues/429)) ([f808d3a](https://github.com/LexanderPL/AssetBoard/commit/f808d3a2aa2f5cb34fb35dc6530c6a0d054be82a))
+* **reports:** refine filters, year comparisons and period links ([#421](https://github.com/LexanderPL/AssetBoard/issues/421)) ([ed96c9a](https://github.com/LexanderPL/AssetBoard/commit/ed96c9abf770d4b160bd7eb6a4292a3132e22c21))
+
+
+### Bug Fixes
+
+* **admin:** confirm and audit backup and demo actions ([#425](https://github.com/LexanderPL/AssetBoard/issues/425)) ([20db3c6](https://github.com/LexanderPL/AssetBoard/commit/20db3c67f303638687d7bbc45a3d2812e82c6302))
+* apply the small correctness findings ([#432](https://github.com/LexanderPL/AssetBoard/issues/432)) ([2f2d33f](https://github.com/LexanderPL/AssetBoard/commit/2f2d33fb09099bd6228ac7f0057812c915922cbd))
+* **auth:** harden sign-in, logging, sessions, imports and config (F11.11) ([#437](https://github.com/LexanderPL/AssetBoard/issues/437)) ([d9c95d7](https://github.com/LexanderPL/AssetBoard/commit/d9c95d792a86fbd059484e24f10c154922aed960))
+* **i18n:** keep the catalog header out of the Polish UI ([#422](https://github.com/LexanderPL/AssetBoard/issues/422)) ([9649144](https://github.com/LexanderPL/AssetBoard/commit/964914468c3dc73eb64291522222e392c9c1ab55))
+* **loans:** compare a property archive with the requested date ([#431](https://github.com/LexanderPL/AssetBoard/issues/431)) ([7cb9be7](https://github.com/LexanderPL/AssetBoard/commit/7cb9be70d341cc9c933f9c27edb019db1921b28f))
+* **loans:** complete the installment-plan lifecycle ([#427](https://github.com/LexanderPL/AssetBoard/issues/427)) ([4147e1a](https://github.com/LexanderPL/AssetBoard/commit/4147e1a046d9f2618d5d862e43479c600f6133ca))
+* **loans:** keep later checkpoints from breaking the schedule ([#426](https://github.com/LexanderPL/AssetBoard/issues/426)) ([2f9588f](https://github.com/LexanderPL/AssetBoard/commit/2f9588fead6b699c0a1d3e316e4448da26fd98a1))
+* **networth:** clarify bulk-add category matching ([#428](https://github.com/LexanderPL/AssetBoard/issues/428)) ([770b6ef](https://github.com/LexanderPL/AssetBoard/commit/770b6efb693d99e87927fc530752165cda80738e))
+* **recurring:** guard closed months and inactive skips ([#434](https://github.com/LexanderPL/AssetBoard/issues/434)) ([d381866](https://github.com/LexanderPL/AssetBoard/commit/d3818662be5ad49003de5fa17116a3fcae4138e1))
+* **release:** stop duplicating the latest image tag ([#403](https://github.com/LexanderPL/AssetBoard/issues/403)) ([803dbea](https://github.com/LexanderPL/AssetBoard/commit/803dbea6d874fe9e94091b494fb35a742c4e106c))
+* **restore:** use the archive currency and clear empty-state rows ([#424](https://github.com/LexanderPL/AssetBoard/issues/424)) ([63b8057](https://github.com/LexanderPL/AssetBoard/commit/63b8057c76b7fa5924905ef0d34260e162b44bbb))
+* **ui:** frame portfolio tables like transactions ([#430](https://github.com/LexanderPL/AssetBoard/issues/430)) ([1b0c92d](https://github.com/LexanderPL/AssetBoard/commit/1b0c92dd29861ca4b7cd7134485afca4145f23b1))
+* **ui:** simplify the net-worth add form and conditional fields ([#433](https://github.com/LexanderPL/AssetBoard/issues/433)) ([9cd6bdb](https://github.com/LexanderPL/AssetBoard/commit/9cd6bdbfe467aab97ab2979e5c7e2089670cf9db))
+
+
+### Performance Improvements
+
+* bound Home widget and Phase B report reads, tighten benchmarks (F11.12) ([#436](https://github.com/LexanderPL/AssetBoard/issues/436)) ([7ef3f2c](https://github.com/LexanderPL/AssetBoard/commit/7ef3f2c97c51c2571169269e035e1c1d9918d45c))
+
+
+### Documentation
+
+* add the M11 audit hardening plan ([#420](https://github.com/LexanderPL/AssetBoard/issues/420)) ([33c1267](https://github.com/LexanderPL/AssetBoard/commit/33c1267cc0e7fd5ff11a7f72658b82fc62fc50e7))
+* reconcile release docs with the 2026-11-20 audit (F11.13) ([#435](https://github.com/LexanderPL/AssetBoard/issues/435)) ([2db5f8a](https://github.com/LexanderPL/AssetBoard/commit/2db5f8a740138fc3bbb3513a37f7579761efa359))
+
 ## [0.8.5](https://github.com/LexanderPL/AssetBoard/compare/v0.8.4...v0.8.5) (2026-11-19)
 
 
