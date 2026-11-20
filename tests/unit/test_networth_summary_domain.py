@@ -87,6 +87,14 @@ def test_golden_example() -> None:
     assert summary.excluded_item_ids == ()
 
 
+def test_zero_total_liability_remains_without_a_share() -> None:
+    zero = uuid4()
+    summary = summarize_net_worth([_item(zero, 0, side=Side.LIABILITY)], currency="EUR")
+    assert [
+        (row.category_id, row.total, row.share_tenths) for row in summary.liability_categories
+    ] == [(zero, _eur(0), None)]
+
+
 def test_liabilities_only_has_negative_net_and_no_asset_shares() -> None:
     mortgage = uuid4()
     summary = summarize_net_worth([_item(mortgage, 10_000, side=Side.LIABILITY)], currency="EUR")

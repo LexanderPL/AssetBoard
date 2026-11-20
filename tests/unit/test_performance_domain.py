@@ -112,6 +112,13 @@ def test_xirr_is_undefined_for_same_date_flows() -> None:
         )
     )
     assert result.reason is XirrFailure.NO_SOLUTION
+    unequal = xirr(
+        (
+            CashFlow(date(2020, 1, 1), Money(-100_000, "EUR")),
+            CashFlow(date(2020, 1, 1), Money(150_000, "EUR")),
+        )
+    )
+    assert unequal.reason is XirrFailure.NO_SOLUTION
 
 
 def test_xirr_undefined_reasons() -> None:

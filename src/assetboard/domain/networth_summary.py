@@ -46,7 +46,7 @@ class CategoryTotal:
     category_id: UUID
     side: Side
     total: Money
-    share_tenths: int | None  # None when the side total is zero
+    share_tenths: int | None  # None when the side or the category total is zero
 
 
 @dataclass(frozen=True, slots=True)

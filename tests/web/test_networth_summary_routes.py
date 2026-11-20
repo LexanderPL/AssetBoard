@@ -184,9 +184,13 @@ def test_a_zero_value_asset_shows_a_dash_and_the_empty_bar(owner: OwnerApp) -> N
     assert _text(page, "assets-total") == "€0.00"
     assert 'data-bar-empty="true"' in page
     assert _text(page, "bar-caption") == "No assets or liabilities yet."
-    assert "data-summary-category" not in page
-    assert "data-summary-empty" in page
-    assert "—" in page
+    row = re.search(
+        r'<tr data-summary-category="[^"]+">.*?Vehicles.*?<td[^>]*>€0\.00</td>.*?<td[^>]*>—</td>',
+        page,
+        re.S,
+    )
+    assert row is not None
+    assert "data-summary-empty" in page  # the liabilities side is still empty
 
 
 def test_no_liabilities_show_a_full_green_bar(owner: OwnerApp) -> None:

@@ -307,7 +307,12 @@ def _bar(key: str, planned: Money, actual: Money, expected: Money, locale: str) 
         pending=_pending(expected, locale),
         pending_end=_width(forecast, scale),
         forecast=format_money(Money(forecast, actual.currency), locale),
-        pending_over=not over and pending > 0 and forecast > planned.amount_minor,
+        pending_over=(
+            planned.amount_minor > 0
+            and not over
+            and pending > 0
+            and forecast > planned.amount_minor
+        ),
     )
 
 

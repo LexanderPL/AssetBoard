@@ -899,12 +899,11 @@ def pending_undo(
         today = ctx.clock.today(CurrentWorkspaceRepository(session, ctx).get().timezone)
         if row.date > today:
             return None
-        today = ctx.clock.today(ctx.workspace.timezone)
         return DeletedTransaction(
             id=row.id,
             month=YearMonth.from_date(row.date),
             undo_until=row.deleted_at + UNDO_WINDOW,
-            can_undo=row.date <= today,
+            can_undo=True,
         )
 
 
