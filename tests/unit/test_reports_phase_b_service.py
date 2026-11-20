@@ -244,18 +244,9 @@ def test_an_incomplete_portfolio_point_is_dashed_and_noted() -> None:
     assert view.chart["value"] == [None]
 
 
-def test_phase_b_is_skipped_for_the_csv_and_empty_future_ranges(team: WorkspaceDb) -> None:
+def test_phase_b_sections_are_absent_for_empty_future_ranges(team: WorkspaceDb) -> None:
     _net_worth_item(team)
     _portfolio(team)
-    csv = reports_data(
-        team.factory,
-        team.ctx("vic", "viewer"),
-        from_year="2024",
-        to_year="2026",
-        step="year",
-        with_phase_b=False,
-    )
-    assert csv.net_worth is None and csv.portfolio is None
     future = _data(team, from_year="2030", to_year="2030")
     assert future.net_worth is None and future.portfolio is None
 

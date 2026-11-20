@@ -185,7 +185,18 @@ def test_net_worth_report_section_reuses_the_derived_series(reports: OwnerApp) -
     data = _chart_data(section, "net-worth")
     assert data["series"][0]["values"][-1] == 20_000
     assert data["labels"] == ["2024", "2025", "2026"]
-    assert "another currency was not counted" in section
+    assert len(data["links"]) == 3 and "year=2024" in data["links"][0]
+    assert all(
+        "not counted" not in line and "estimated value" not in line
+        for tooltip in data["tooltips"]
+        for line in tooltip
+    )
+    assert "data-chart-table-toggle" in section
+    assert 'id="reports-net-worth-table"' in section
+    assert "data-report-series-period" in section
+    assert "another currency was not counted" not in section
+    assert "had no value yet" not in section
+    assert "estimated value" not in section
     rows = _rows(section)
     assert len(rows) == 3
     assert "2024" in rows[0] and "2026" in rows[-1]
@@ -202,27 +213,19 @@ def test_portfolio_report_section_reuses_the_performance_series(reports: OwnerAp
     data = _chart_data(section, "portfolio")
     assert data["value"][-1] == 130_000
     assert data["labels"] == ["2024", "2025", "2026"]
+    assert len(data["links"]) == 3 and "year=2024" in data["links"][0]
+    assert all(
+        "not counted" not in line and "estimated value" not in line
+        for tooltip in data["tooltips"]
+        for line in tooltip
+    )
+    assert "data-chart-table-toggle" in section
+    assert 'id="reports-portfolio-table"' in section
     assert data["invested"][-1] == 100_000
     rows = _rows(section)
     assert len(rows) == 3
     assert "2024" in rows[0] and "2026" in rows[-1]
     assert "data-report-series-so-far" in rows[-1]
-
-
-def test_csv_route_skips_phase_b(reports: OwnerApp, monkeypatch: pytest.MonkeyPatch) -> None:
-    from assetboard.web import report_routes
-
-    calls: list[dict[str, object]] = []
-    real = report_routes.reports_data
-
-    def spy(*args: Any, **kwargs: Any) -> Any:
-        calls.append(kwargs)
-        return real(*args, **kwargs)
-
-    monkeypatch.setattr(report_routes, "reports_data", spy)
-    response = reports.client.get("/reports/year-overview.csv")
-    assert response.status_code == 200
-    assert calls and calls[0]["with_phase_b"] is False
 
 
 def test_phase_b_sections_follow_the_report_period_step(reports: OwnerApp) -> None:

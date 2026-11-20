@@ -90,7 +90,6 @@ def _data(
     step: str = "month",
     year: str = "",
     trend: str = "",
-    yoy_category: str = "",
     category: tuple[str, ...] = (),
     savings: str = "",
 ):
@@ -102,7 +101,6 @@ def _data(
         step=step,
         year=year,
         trend=trend,
-        yoy_category=yoy_category,
         category=category,
         savings=savings,
     )
@@ -185,11 +183,63 @@ def test_the_section_year_defaults_to_the_report_end_or_current_year(team: Works
     assert _data(team, from_year="2024", to_year="2026", year="2031").filters.year == 2031
 
 
-def test_the_year_options_include_the_range_and_the_selected_year(team: WorkspaceDb) -> None:
+def test_the_year_options_only_offer_years_with_transactions(team: WorkspaceDb) -> None:
+    _seed_year(team)
+    _entry(team, YearMonth(2024, 3), _category(team, "Old Option"), "10.00")
     data = _data(team, from_year="2024", to_year="2026", year="2019")
-    assert {2024, 2025, 2026, 2019}.issubset(data.year_options)
-    assert data.year_options == tuple(sorted(data.year_options))
-    assert all(1900 <= year <= 2199 for year in data.year_options)
+    assert data.range_year_options == (2024, 2026)
+    assert data.year_options == (2019, 2024, 2026)
+    assert all(1900 <= year <= 2199 for year in data.range_year_options)
+
+
+def test_year_options_are_workspace_scoped(team: WorkspaceDb) -> None:
+    other = team.add_workspace("Other Years")
+    team.add_member("ed", "editor", other)
+    category = create_category(
+        team.factory,
+        team.ctx("ed", "editor", other),
+        name="Foreign Year",
+        kind="expense",
+        treatment="regular",
+        color="#16a34a",
+    ).id
+    create_transaction(
+        team.factory,
+        team.ctx("ed", "editor", other),
+        month=YearMonth(2018, 1),
+        direction="expense",
+        day="7",
+        amount="10.00",
+        description="",
+        category_id=category,
+        locale="en",
+    )
+    data = _data(team)
+    assert 2018 not in data.range_year_options
+
+
+def test_an_empty_workspace_still_offers_the_current_year(team: WorkspaceDb) -> None:
+    data = _data(team)
+    assert data.range_year_options == (2026,)
+    assert data.year_options == (2026,)
+    assert data.filters.start_year == 2026 and data.filters.end_year == 2026
+
+
+def test_the_default_range_never_exceeds_thirty_years(team: WorkspaceDb) -> None:
+    for year in (1990, 2000, 2025):
+        _entry(team, YearMonth(year, 1), _category(team, f"Span {year}"), "10.00")
+    data = _data(team, from_year="", to_year="")
+    assert (data.filters.start_year, data.filters.end_year) == (2000, 2025)
+    assert data.range_year_options == (1990, 2000, 2025)
+
+
+def test_the_default_range_uses_the_last_three_data_years(team: WorkspaceDb) -> None:
+    for year in (2019, 2021, 2022, 2023, 2025):
+        _entry(team, YearMonth(year, 1), _category(team, f"Year {year}"), "10.00")
+    data = _data(team, from_year="", to_year="")
+    assert (data.filters.start_year, data.filters.end_year) == (2022, 2025)
+    assert data.range_year_options == (2019, 2021, 2022, 2023, 2025)
+    assert data.year_options == (2022, 2023, 2025)
 
 
 def test_category_trends_use_the_displayed_categories_and_the_window(team: WorkspaceDb) -> None:
@@ -220,55 +270,52 @@ def test_category_trends_are_empty_for_a_yearly_step(team: WorkspaceDb) -> None:
     assert data.category_trends.periods == () and data.category_trends.rows == ()
 
 
-def test_year_over_year_compares_a_category_or_the_total(team: WorkspaceDb) -> None:
+def test_year_over_year_table_has_a_row_per_data_year(team: WorkspaceDb) -> None:
     categories = _seed_year(team)
     _entry(team, YearMonth(2025, 1), categories["food"], "500.00")
     _entry(team, YearMonth(2025, 2), categories["food"], "500.00")
     _entry(team, YearMonth(2025, 1), categories["rent"], "800.00")
 
-    food = _data(team, year="2026", yoy_category=str(categories["food"])).yoy
-    assert food is not None
-    assert food.category_id == categories["food"]
-    assert food.current == Money(105_500, "EUR")
-    assert food.previous == Money(100_000, "EUR")
-    assert food.change == Money(5_500, "EUR")
-    assert food.change_tenths == 55  # +5.5 %
-    total = _data(team, year="2026").yoy
-    assert total is not None and total.category_id is None
-    assert total.current == Money(1_005_500, "EUR")
-    assert total.previous == Money(180_000, "EUR")
-    assert total.change == Money(825_500, "EUR")
+    table = _data(team, from_year="2025", to_year="2026").yoy
+    assert [row.year for row in table.rows] == [2025, 2026]
+    first, current = table.rows
+    assert first.earned == Money(0, "EUR")
+    assert first.spent == Money(180_000, "EUR")
+    assert current.earned == Money(3_000_000, "EUR")
+    assert current.spent == Money(1_005_500, "EUR")
+    assert current.earned_change == Money(3_000_000, "EUR")
+    assert current.spent_change == Money(825_500, "EUR")
+    assert current.earned_change_tenths is None
+    assert current.spent_change_tenths == 4_586  # +458.6 %
+    assert current.partial
+    assert table.earned == Money(3_000_000, "EUR")
+    assert table.spent == Money(1_185_500, "EUR")
 
 
-def test_an_unknown_or_other_workspace_yoy_category_falls_back_to_the_total(
+def test_the_current_year_yoy_compares_the_same_months_in_both_years(
     team: WorkspaceDb,
 ) -> None:
-    categories = _seed_year(team)
-    other = team.add_workspace("Other")
-    team.add_member("ed", "editor", other)
-    foreign = create_category(
-        team.factory,
-        team.ctx("ed", "editor", other),
-        name="Foreign",
-        kind="expense",
-        treatment="regular",
-        color="#16a34a",
-    ).id
-    for value in ("junk", str(uuid4()), str(foreign)):
-        data = _data(team, year="2026", yoy_category=value)
-        assert data.filters.yoy_category_id is None
-        assert data.yoy is not None and data.yoy.category_id is None
-    chosen = _data(team, year="2026", yoy_category=str(categories["food"]))
-    assert chosen.filters.yoy_category_id == categories["food"]
-    assert chosen.yoy is not None and chosen.yoy.category_id == categories["food"]
+    food = _category(team, "YTD Food")
+    for month in range(1, 13):
+        _entry(team, YearMonth(2025, month), food, "100.00")
+    for month in range(1, 11):
+        _entry(team, YearMonth(2026, month), food, "100.00")
+
+    table = _data(team, from_year="2026", to_year="2026").yoy
+    row = table.rows[0]
+    assert row.partial is True
+    assert (row.earned, row.spent) == (Money(0, "EUR"), Money(100_000, "EUR"))
+    # No income in either year; the expense comparison uses Jan-Oct 2025, not the full year.
+    assert row.spent_change == Money(0, "EUR")
+    assert row.spent_change_tenths == 0
 
 
-def test_yoy_percent_is_none_without_previous_spending(team: WorkspaceDb) -> None:
-    categories = _seed_year(team)
-    data = _data(team, year="2026", yoy_category=str(categories["food"]))
-    assert data.yoy is not None
-    assert data.yoy.previous == Money(0, "EUR")
-    assert data.yoy.change_tenths is None
+def test_yoy_percent_is_none_without_previous_data(team: WorkspaceDb) -> None:
+    _seed_year(team)
+    table = _data(team, from_year="2026", to_year="2026").yoy
+    row = table.rows[0]
+    assert row.earned_change_tenths is None
+    assert row.spent_change_tenths is None
 
 
 def test_plan_accuracy_counts_planned_months_and_strictly_over_months(
@@ -354,29 +401,10 @@ def test_one_transaction_read_covers_section_years_outside_the_range(team: Works
     finally:
         event.remove(team.engine, "before_cursor_execute", capture)
     transaction_statements = [line for line in statements if "FROM transactions" in line]
-    assert len(transaction_statements) == 2  # the currency lookup and the one column stream
+    # The year selector, the currency lookup and the one column stream.
+    assert len(transaction_statements) == 3
     assert data.year_grid.total == Money(1_000, "EUR")
     assert data.filters.year == 2024
-
-
-def test_the_current_year_yoy_compares_the_same_months_in_both_years(
-    team: WorkspaceDb,
-) -> None:
-    food = _category(team, "YTD Food")
-    for month in range(1, 13):
-        _entry(team, YearMonth(2025, month), food, "100.00")
-    for month in range(1, 11):
-        _entry(team, YearMonth(2026, month), food, "100.00")
-
-    data = _data(team, year="2026", yoy_category=str(food))
-    assert data.yoy is not None
-    assert data.yoy.partial is True
-    assert (data.yoy.current, data.yoy.previous) == (
-        Money(100_000, "EUR"),
-        Money(100_000, "EUR"),
-    )
-    assert data.yoy.change.amount_minor == 0
-    assert data.yoy.change_tenths == 0
 
 
 def test_an_archived_category_that_only_spent_in_the_grid_year_is_still_offered(
@@ -389,21 +417,6 @@ def test_an_archived_category_that_only_spent_in_the_grid_year_is_still_offered(
     data = _data(team, from_year="2026", to_year="2026", year="2024")
     assert [row.category_id for row in data.year_grid.rows] == [archived]
     assert archived in {option.id for option in data.category_options}
-
-
-def test_yoy_options_keep_every_archived_category_with_spending(team: WorkspaceDb) -> None:
-    active = _category(team, "Active YoY")
-    old_a = _category(team, "Old YoY A")
-    old_b = _category(team, "Old YoY B")
-    _entry(team, YearMonth(2025, 1), old_a, "10.00")
-    _entry(team, YearMonth(2025, 2), old_b, "20.00")
-    archive_category(team.factory, _editor(team), old_a)
-    archive_category(team.factory, _editor(team), old_b)
-    _entry(team, YearMonth(2026, 1), active, "30.00")
-
-    data = _data(team, year="2026", yoy_category=str(active))
-    option_ids = {option.id for option in data.yoy_category_options}
-    assert {active, old_a, old_b}.issubset(option_ids)
 
 
 def test_section_years_outside_the_report_range_do_not_skew_the_notes(

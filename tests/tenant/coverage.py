@@ -323,6 +323,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "by_ids",
             "iter_ledger_columns",
             "currencies_in_window",
+            "years_with_transactions",
         )
     },
     **{

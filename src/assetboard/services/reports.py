@@ -50,16 +50,17 @@ from assetboard.domain.reports import (
     ReportCategory,
     ReportStep,
     ReportTotals,
-    YearOverYear,
+    YearOverYearTable,
     category_series,
     ledger_and_category_series,
+    ledger_series,
     plan_accuracy,
     rolling_category_averages,
     select_categories,
     top_categories,
     totals_of,
     year_grid,
-    year_over_year,
+    year_over_year_table,
 )
 from assetboard.domain.summary import block_of
 from assetboard.services.context import Context, Role, require_role
@@ -83,7 +84,7 @@ class FilterError(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ReportFilters:
-    """The resolved form values (``*_text`` keeps what the visitor typed)."""
+    """The resolved form values (``*_text`` keeps the resolved or requested year text)."""
 
     start_year: int
     end_year: int
@@ -95,7 +96,6 @@ class ReportFilters:
     savings: bool = False
     year: int = 0
     trend_months: int = TREND_MONTHS_DEFAULT
-    yoy_category_id: UUID | None = None
     errors: Mapping[str, FilterError] = field(default_factory=dict[str, FilterError])
 
 
@@ -115,12 +115,12 @@ class ReportsData:
     totals: ReportTotals
     category_series: CategorySeries
     category_options: tuple[CategoryOption, ...]
+    range_year_options: tuple[int, ...]
     year_options: tuple[int, ...]
     year_grid: CategorySeries
     category_trends: CategoryTrends
-    yoy: YearOverYear | None
+    yoy: YearOverYearTable
     plan_accuracy: PlanAccuracy
-    yoy_category_options: tuple[CategoryOption, ...]
     available_currencies: tuple[str, ...]
     show_currency_selector: bool
     future_count: int
@@ -158,6 +158,21 @@ def _default_step(start_year: int, end_year: int) -> ReportStep:
     return ReportStep.MONTH if years <= MAX_MONTHLY_ONLY_YEARS else ReportStep.YEAR
 
 
+def _default_range(data_years: tuple[int, ...], today: date) -> tuple[int, int]:
+    """The last few data years, kept inside the 30-year limit, or the current year when empty."""
+    if not data_years:
+        return today.year, today.year
+    end = data_years[-1]
+    recent: list[int] = []
+    for year in reversed(data_years):
+        if end - year + 1 > MAX_YEARS:
+            break
+        recent.append(year)
+        if len(recent) == DEFAULT_YEARS:
+            break
+    return recent[-1], end
+
+
 def _resolve_filters(
     *,
     raw_from: str,
@@ -165,19 +180,20 @@ def _resolve_filters(
     raw_step: str,
     raw_year: str,
     raw_trend: str,
+    data_years: tuple[int, ...],
     today: date,
 ) -> ReportFilters:
     current_year = today.year
-    default_from = current_year - (DEFAULT_YEARS - 1)
+    default_from, default_to = _default_range(data_years, today)
     errors: dict[str, FilterError] = {}
     start_year = _parse_year(raw_from) if raw_from.strip() else default_from
-    end_year = _parse_year(raw_to) if raw_to.strip() else current_year
+    end_year = _parse_year(raw_to) if raw_to.strip() else default_to
     if start_year is None:
         errors["from"] = FilterError.INVALID_YEAR
         start_year = default_from
     if end_year is None:
         errors["to"] = FilterError.INVALID_YEAR
-        end_year = current_year
+        end_year = default_to
     if not errors:
         if start_year > end_year:
             errors["to"] = FilterError.FROM_AFTER_TO
@@ -186,8 +202,10 @@ def _resolve_filters(
     defaulted = _default_step(start_year, end_year)
     step = ReportStep(raw_step) if raw_step in ("month", "year") else defaulted
     # The section year is not a range filter: an unknown or malformed value is ignored and the
-    # report's end year (but never a future one) is used, so an old bookmark still opens.
-    default_year = min(end_year, current_year)
+    # latest data year in the range (but never a future one) is used. A year with no data is
+    # kept when it is explicitly requested, so an old bookmark still opens.
+    in_range = [year for year in data_years if start_year <= year <= end_year]
+    default_year = max(in_range) if in_range else min(end_year, current_year)
     year = _parse_year(raw_year) if raw_year.strip() else default_year
     if year is None:
         year = default_year
@@ -229,34 +247,17 @@ def _category_blocks(include_savings: bool) -> set[str]:
     return {"expense", "saved"} if include_savings else {"expense"}
 
 
-def _resolve_yoy_category(
-    raw: str, categories: Mapping[UUID, ReportCategory], *, include_savings: bool
-) -> UUID | None:
-    """The single year-over-year category, or ``None`` for the whole category series.
-
-    The value is one ``yoy_category`` parameter (not the repeatable ``category`` filter). An
-    unknown, malformed or other-workspace id, or a category that does not fit the current
-    savings option, is ignored and falls back to the total.
-    """
-    try:
-        category_id = UUID(raw)
-    except ValueError:
-        return None
-    category = categories.get(category_id)
-    if category is None:
-        return None
-    if block_of(category.kind, category.treatment) not in _category_blocks(include_savings):
-        return None
-    return category.id
+def _range_year_options(data_years: tuple[int, ...], filters: ReportFilters) -> tuple[int, ...]:
+    """Years the from/to selectors offer: data years plus the selected endpoints."""
+    years = set(data_years)
+    years.update((filters.start_year, filters.end_year))
+    return tuple(sorted(year for year in years if MIN_YEAR <= year <= MAX_YEAR))
 
 
-def _year_options(today: date, filters: ReportFilters) -> tuple[int, ...]:
-    """The year selector's choices: the last 30 years, the report range and the selected year."""
-    years = {
-        *range(max(MIN_YEAR, today.year - MAX_YEARS + 1), today.year + 1),
-        *range(filters.start_year, filters.end_year + 1),
-        filters.year,
-    }
+def _report_year_options(data_years: tuple[int, ...], filters: ReportFilters) -> tuple[int, ...]:
+    """Years the report-year selector offers: data years inside the range, plus the selection."""
+    years = {year for year in data_years if filters.start_year <= year <= filters.end_year}
+    years.add(filters.year)
     return tuple(sorted(year for year in years if MIN_YEAR <= year <= MAX_YEAR))
 
 
@@ -459,8 +460,6 @@ def reports_data(
     savings: str = "",
     year: str = "",
     trend: str = "",
-    yoy_category: str = "",
-    with_phase_b: bool = True,
 ) -> ReportsData:
     """The Reports page's filters and every section's data for the current workspace."""
     require_role(ctx, Role.VIEWER)
@@ -480,12 +479,18 @@ def reports_data(
             )
             for row in ordered
         }
+        data_years = tuple(
+            year
+            for year in TransactionRepository(session, ctx).years_with_transactions(until=today)
+            if MIN_YEAR <= year <= MAX_YEAR
+        )
         filters = _resolve_filters(
             raw_from=from_year,
             raw_to=to_year,
             raw_step=step,
             raw_year=year,
             raw_trend=trend,
+            data_years=data_years,
             today=today,
         )
         if filters.errors:
@@ -495,12 +500,12 @@ def reports_data(
                 totals=totals_of((), currency=base_currency),
                 category_series=_empty_category_series(base_currency),
                 category_options=(),
-                year_options=_year_options(today, filters),
+                range_year_options=_range_year_options(data_years, filters),
+                year_options=_report_year_options(data_years, filters),
                 year_grid=_empty_category_series(base_currency),
                 category_trends=CategoryTrends((), filters.trend_months, ()),
-                yoy=None,
+                yoy=YearOverYearTable((), Money(0, base_currency), Money(0, base_currency)),
                 plan_accuracy=PlanAccuracy((), 0, 0, None),
-                yoy_category_options=(),
                 available_currencies=(base_currency,),
                 show_currency_selector=False,
                 future_count=0,
@@ -516,8 +521,8 @@ def reports_data(
         series_end = min(today, report_end)
         grid_start = date(filters.year, 1, 1)
         grid_end = date(filters.year, 12, 31)
-        yoy_start = date(max(MIN_YEAR, filters.year - 1), 1, 1)
-        yoy_end = grid_end
+        yoy_start = date(max(MIN_YEAR, filters.start_year - 1), 1, 1)
+        yoy_end = date(filters.end_year, 12, 31)
         read_start, read_end = _read_window(
             report_start=report_start,
             report_end=report_end,
@@ -536,12 +541,10 @@ def reports_data(
         )
         available = tuple(dict.fromkeys((base_currency, *observed)))
         selected_currency = _select_currency(currency, available, base_currency)
-        yoy_id = _resolve_yoy_category(yoy_category, categories, include_savings=include_savings)
         filters = replace(
             filters,
             currency=selected_currency,
             savings=include_savings,
-            yoy_category_id=yoy_id,
         )
         stats = _StreamStats()
         stream = _entries(
@@ -570,11 +573,6 @@ def reports_data(
                 grid_entries.append(entry)
             if yoy_start <= entry.day <= yoy_end:
                 yoy_entries.append(entry)
-        partial_yoy = filters.year == today.year
-        if partial_yoy:
-            # A partial current year is compared with the same months of the previous year,
-            # never with the previous year's full total.
-            yoy_entries = [entry for entry in yoy_entries if entry.day.month <= today.month]
         series, all_categories = ledger_and_category_series(
             report_entries,
             categories,
@@ -638,33 +636,13 @@ def reports_data(
                 for line in BudgetLineRepository(session, ctx).for_range(plan_start, plan_end)
                 if line.currency == selected_currency
             )
-        yoy_series = category_series(
+        yoy_monthly = ledger_series(
             yoy_entries,
             categories,
             start=yoy_start,
-            end=yoy_end,
-            step=ReportStep.YEAR,
+            end=min(yoy_end, today),
+            step=ReportStep.MONTH,
             currency=selected_currency,
-            include_savings=include_savings,
-            selected=(yoy_id,) if yoy_id is not None else None,
-        )
-        yoy_all_series = category_series(
-            yoy_entries,
-            categories,
-            start=yoy_start,
-            end=yoy_end,
-            step=ReportStep.YEAR,
-            currency=selected_currency,
-            include_savings=include_savings,
-        )
-        yoy_spending_ids = {
-            row.category_id for row in yoy_all_series.rows if row.category_id is not None
-        }
-        yoy_category_options = tuple(
-            CategoryOption(row.id, row.name, archived=row.archived_at is not None)
-            for row in ordered
-            if row.id in eligible_ids
-            and (row.archived_at is None or row.id in yoy_spending_ids or row.id == yoy_id)
         )
     if not series or series_end < series_start:
         accuracy_series = _empty_category_series(selected_currency)
@@ -691,12 +669,18 @@ def reports_data(
         totals=totals_of(series, currency=selected_currency),
         category_series=displayed_categories,
         category_options=category_options,
-        year_options=_year_options(today, filters),
+        range_year_options=_range_year_options(data_years, filters),
+        year_options=_report_year_options(data_years, filters),
         year_grid=grid,
         category_trends=trends,
-        yoy=year_over_year(yoy_series, year=filters.year, category_id=yoy_id, partial=partial_yoy),
+        yoy=year_over_year_table(
+            yoy_monthly,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            today=today,
+            currency=selected_currency,
+        ),
         plan_accuracy=plan_accuracy(accuracy_series, plans, categories),
-        yoy_category_options=yoy_category_options,
         available_currencies=available,
         show_currency_selector=len(available) > 1,
         future_count=stats.future,
@@ -705,29 +689,21 @@ def reports_data(
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
-        net_worth=(
-            net_worth_report(
-                factory,
-                ctx,
-                start_year=filters.start_year,
-                end_year=filters.end_year,
-                step=filters.step,
-                currency=selected_currency,
-            )
-            if with_phase_b
-            else None
+        net_worth=net_worth_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
         ),
-        portfolio=(
-            portfolio_report(
-                factory,
-                ctx,
-                start_year=filters.start_year,
-                end_year=filters.end_year,
-                step=filters.step,
-                currency=selected_currency,
-            )
-            if with_phase_b
-            else None
+        portfolio=portfolio_report(
+            factory,
+            ctx,
+            start_year=filters.start_year,
+            end_year=filters.end_year,
+            step=filters.step,
+            currency=selected_currency,
         ),
     )
 

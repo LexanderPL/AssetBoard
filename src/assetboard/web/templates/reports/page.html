@@ -4,7 +4,6 @@
    version. No inline script or style. #}
 {% extends "base.html" %}
 {% set label_class = "block text-sm font-medium" %}
-{% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set error_class = "mt-1 text-xs text-danger" %}
 
 {% macro field_error(name) -%}
@@ -27,7 +26,10 @@
   <div class="mt-4" data-chart="{{ series.chart_type }}" data-chart-source="reports-{{ key }}-data">
     <script type="application/json" id="reports-{{ key }}-data">{{ series.chart|tojson }}</script>
     <div class="h-72 w-full sm:h-80" hidden aria-hidden="true" data-chart-canvas></div>
-    <div class="mt-3 relative overflow-x-auto" data-chart-table>
+    <div class="mt-3">
+      <button type="button" hidden data-chart-table-toggle data-show-label="{{ _('Show as table') }}" data-hide-label="{{ _('Hide table') }}" aria-controls="reports-{{ key }}-table" aria-expanded="false" class="text-sm font-medium text-primary-ink underline">{{ _("Show as table") }}</button>
+    </div>
+    <div id="reports-{{ key }}-table" class="relative overflow-x-auto" data-chart-table>
       <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ series.caption }}</caption>
         <thead>
@@ -42,7 +44,7 @@
           {% for row in series.rows %}
           <tr data-report-series-row>
             <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">
-              {{ row.label }}{% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-series-so-far>{{ _("so far") }}</span>{% endif %}
+              {% if row.href %}<a href="{{ row.href }}" class="text-primary-ink underline" data-report-series-period>{{ row.label }}</a>{% else %}<span data-report-series-period>{{ row.label }}</span>{% endif %}{% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-series-so-far>{{ _("so far") }}</span>{% endif %}
               {% for note in row.notes %}<span class="mt-1 block text-xs font-normal text-warning-strong">{{ note }}</span>{% endfor %}
             </th>
             {% for cell in row.cells %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ cell }}</td>{% endfor %}
@@ -59,18 +61,22 @@
 {% block heading %}{{ _("Reports") }}{% endblock %}
 {% block scripts %}{% if view.chart or view.category_chart or view.trend_chart or view.net_worth or view.portfolio %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-4xl space-y-6" data-reports>
+<div class="mx-auto max-w-6xl space-y-6" data-reports>
   <section class="panel p-4 sm:p-6" aria-labelledby="reports-filters-heading">
     <h2 id="reports-filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
-    <form method="get" action="{{ scoped_url(request, 'reports') }}" class="mt-4 grid gap-4 sm:grid-cols-4 sm:items-end" novalidate data-report-filters>
+    <form id="report-filters" method="get" action="{{ scoped_url(request, 'reports') }}" class="mt-4 grid gap-4 sm:grid-cols-4 sm:items-end" novalidate data-report-filters>
       <div>
         <label for="report-from" class="{{ label_class }}">{{ _("From year") }}</label>
-        <input id="report-from" name="from" type="number" min="1900" max="2199" step="1" inputmode="numeric" value="{{ view.data.filters.from_text }}"{{ invalid("from") }} class="{{ input_class }}">
+        <select id="report-from" name="from" class="form-select w-full py-1.5 pl-2.5"{{ invalid("from") }}>
+          {% for option in view.data.range_year_options %}<option value="{{ option }}"{% if option|string == view.data.filters.from_text %} selected{% endif %}>{{ option }}</option>{% endfor %}
+        </select>
         {{ field_error("from") }}
       </div>
       <div>
         <label for="report-to" class="{{ label_class }}">{{ _("To year") }}</label>
-        <input id="report-to" name="to" type="number" min="1900" max="2199" step="1" inputmode="numeric" value="{{ view.data.filters.to_text }}"{{ invalid("to") }} class="{{ input_class }}">
+        <select id="report-to" name="to" class="form-select w-full py-1.5 pl-2.5"{{ invalid("to") }}>
+          {% for option in view.data.range_year_options %}<option value="{{ option }}"{% if option|string == view.data.filters.to_text %} selected{% endif %}>{{ option }}</option>{% endfor %}
+        </select>
         {{ field_error("to") }}
       </div>
       <div>
@@ -89,10 +95,24 @@
       </div>
       {% endif %}
       <div class="sm:col-span-2">
-        <label for="report-category" class="{{ label_class }}">{{ _("Categories") }}</label>
-        <select id="report-category" name="category" multiple size="6" class="form-select w-full py-1.5 pl-2.5">
-          {% for option in view.category_options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.name }}{% if option.archived %} ({{ _("archived") }}){% endif %}</option>{% endfor %}
-        </select>
+        <span id="report-category-label" class="{{ label_class }}">{{ _("Categories") }}</span>
+        <details class="relative" data-multi-select aria-labelledby="report-category-label"
+                 data-all-label="{{ _('All categories') }}"
+                 data-one-label="{{ _('1 category selected') }}"
+                 data-many-label="{{ view.category_many_label }}">
+          <summary class="form-control flex w-full cursor-pointer list-none items-center justify-between gap-2 py-1.5 pl-2.5 pr-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
+            <span data-multi-select-summary>{{ view.category_summary }}</span>
+            <span class="text-xs text-muted" aria-hidden="true">▾</span>
+          </summary>
+          <div role="group" aria-labelledby="report-category-label" class="mt-1 max-h-72 overflow-y-auto border border-line bg-surface p-2 shadow-lg">
+            {% for option in view.category_options %}
+            <label class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-subtle">
+              <input type="checkbox" name="category" value="{{ option.id }}"{% if option.selected %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary" data-multi-select-option>
+              <span>{{ option.name }}{% if option.archived %} ({{ _("archived") }}){% endif %}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </details>
         <p class="mt-1 text-xs text-muted">{{ _("Leave empty for all categories in the year overview and the 8 largest in the category charts.") }}</p>
       </div>
       <div class="sm:col-span-2">
@@ -103,24 +123,10 @@
         <p class="mt-1 text-xs text-muted">{{ _("Saved and invested amounts get their own category series.") }}</p>
       </div>
       <div>
-        <label for="report-year" class="{{ label_class }}">{{ _("Report year") }}</label>
-        <select id="report-year" name="year" class="form-select w-full py-1.5 pl-2.5">
-          {% for option in view.data.year_options %}<option value="{{ option }}"{% if option == view.data.filters.year %} selected{% endif %}>{{ option }}</option>{% endfor %}
-        </select>
-        <p class="mt-1 text-xs text-muted">{{ _("Used by the year overview and year-over-year sections.") }}</p>
-      </div>
-      <div>
         <label for="report-trend" class="{{ label_class }}">{{ _("Category trends window") }}</label>
         <select id="report-trend" name="trend" class="form-select w-full py-1.5 pl-2.5">
           <option value="3"{% if view.data.filters.trend_months == 3 %} selected{% endif %}>{{ _("3-month average") }}</option>
           <option value="12"{% if view.data.filters.trend_months == 12 %} selected{% endif %}>{{ _("12-month average") }}</option>
-        </select>
-      </div>
-      <div class="sm:col-span-2">
-        <label for="report-yoy-category" class="{{ label_class }}">{{ _("Year-over-year category") }}</label>
-        <select id="report-yoy-category" name="yoy_category" class="form-select w-full py-1.5 pl-2.5">
-          <option value="">{{ _("Total (all categories)") }}</option>
-          {% for option in view.yoy_category_options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.name }}{% if option.archived %} ({{ _("archived") }}){% endif %}</option>{% endfor %}
         </select>
       </div>
       <div class="flex flex-wrap items-center gap-3 sm:col-span-4">
@@ -322,12 +328,15 @@
     </div>
   </section>
 
-  <section class="panel p-4 sm:p-6" aria-labelledby="reports-year-overview-heading" data-report-year-overview>
+  <section id="year-overview" class="panel p-4 sm:p-6" aria-labelledby="reports-year-overview-heading" data-report-year-overview>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="reports-year-overview-heading" class="text-base font-semibold">{{ _("Year overview") }}</h2>
       <div class="flex flex-wrap items-center gap-2">
-        <p class="text-sm tabular-nums text-muted" data-report-grid-year>{{ view.year_overview.year }}</p>
-        <a href="{{ view.year_overview.csv_url }}" class="btn-sm" data-report-year-csv>{{ _("Download CSV") }}</a>
+        <label for="report-year" class="text-sm font-medium">{{ _("Report year") }}</label>
+        <select id="report-year" name="year" form="report-filters" data-autosubmit data-autosubmit-anchor="#year-overview" class="form-select py-1.5 pl-2.5">
+          {% for option in view.data.year_options %}<option value="{{ option }}"{% if option == view.data.filters.year %} selected{% endif %}>{{ option }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit" form="report-filters" formaction="{{ scoped_url(request, 'reports') }}#year-overview" class="btn-sm">{{ _("Show") }}</button></noscript>
       </div>
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Spending by category and month. Darker cells mean more spending in that month.") }}</p>
@@ -340,7 +349,7 @@
         <thead>
           <tr class="text-left text-xs text-muted">
             <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
-            {% for column in view.year_overview.columns %}<th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ column }}{% if view.year_overview.so_far_month == loop.index %}<span class="ml-1 inline-block rounded-full bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-primary-ink" data-report-grid-so-far>{{ _("so far") }}</span>{% endif %}</th>{% endfor %}
+            {% for column in view.year_overview.columns %}<th scope="col" class="whitespace-nowrap py-1.5 pr-2 text-right font-medium"><a href="{{ column.href }}" class="text-primary-ink underline">{{ column.label }}</a>{% if view.year_overview.so_far_month == loop.index %}<span class="ml-1 inline-block rounded-full bg-primary-soft px-1.5 py-0.5 text-xs font-medium text-primary-ink" data-report-grid-so-far>{{ _("so far") }}</span>{% endif %}</th>{% endfor %}
             <th scope="col" class="py-1.5 text-right font-medium">{{ _("Total") }}</th>
           </tr>
         </thead>
@@ -425,38 +434,58 @@
   <section class="panel p-4 sm:p-6" aria-labelledby="reports-yoy-heading" data-report-year-over-year>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2 id="reports-yoy-heading" class="text-base font-semibold">{{ _("Year-over-year") }}</h2>
-      <p class="text-sm tabular-nums text-muted" data-report-yoy-range>{{ view.year_over_year.year_label if view.year_over_year else view.data.filters.year }}</p>
+      <p class="text-sm tabular-nums text-muted" data-report-yoy-range>{{ view.range_years }}</p>
     </div>
-    <p class="mt-1 text-sm text-muted">{{ _("Actual spending in the selected year compared with the year before.") }}</p>
-    {% if view.year_over_year and view.year_over_year.partial %}<p class="mt-2 text-sm text-muted" data-report-yoy-partial>{{ view.year_over_year.partial_note }}</p>{% endif %}
-    {% if view.year_over_year and view.year_over_year.empty %}
-    <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No spending in either year.") }}</p>
-    {% elif view.year_over_year %}
+    <p class="mt-1 text-sm text-muted">{{ _("Income and expenses per year, compared with the previous year.") }}</p>
+    {% if view.year_over_year.partial_note %}<p class="mt-2 text-sm text-muted" data-report-yoy-partial>{{ view.year_over_year.partial_note }}</p>{% endif %}
+    {% if view.year_over_year.empty %}
+    <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No income or expenses in this range.") }}</p>
+    {% else %}
     <div class="relative mt-4 overflow-x-auto">
       <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ _("Year-over-year comparison") }}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">
-            <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
-            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ view.year_over_year.year_label }}</th>
-            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ view.year_over_year.previous_year_label }}</th>
-            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Change") }}</th>
-            <th scope="col" class="py-1.5 text-right font-medium">{{ _("Change %%") }}</th>
+            <th scope="col" rowspan="2" class="py-1.5 pr-2 font-medium">{{ _("Year") }}</th>
+            <th scope="col" rowspan="2" class="py-1.5 pr-2 text-right font-medium">{{ _("Income") }}</th>
+            <th scope="col" rowspan="2" class="py-1.5 pr-2 text-right font-medium">{{ _("Expenses") }}</th>
+            <th scope="colgroup" colspan="2" class="py-1.5 pr-2 text-center font-medium">{{ _("Income change") }}</th>
+            <th scope="colgroup" colspan="2" class="py-1.5 text-center font-medium">{{ _("Expenses change") }}</th>
+          </tr>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Value") }}</th>
+            <th scope="col" class="py-1.5 pr-2 text-right font-medium">%</th>
+            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Value") }}</th>
+            <th scope="col" class="py-1.5 text-right font-medium">%</th>
           </tr>
         </thead>
         <tbody>
+          {% for row in view.year_over_year.rows %}
           <tr data-report-yoy-row>
             <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">
-              {% if view.year_over_year.color %}<svg class="mr-2 inline h-3 w-3 align-baseline" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="6" fill="{{ view.year_over_year.color }}"/></svg>{% endif %}{{ view.year_over_year.label }}
+              <a href="{{ row.href }}" class="text-primary-ink underline" data-report-yoy-year>{{ row.year }}</a>{% if row.partial %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-yoy-so-far>{{ _("so far") }}</span>{% endif %}
             </th>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ view.year_over_year.current }}</td>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ view.year_over_year.previous }}</td>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if view.year_over_year.change_minor > 0 %}text-danger {% elif view.year_over_year.change_minor < 0 %}text-success-strong {% endif %}" data-report-yoy-change>{{ view.year_over_year.change }}</td>
-            <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-yoy-percent>
-              {% if view.year_over_year.percent is not none %}{{ view.year_over_year.percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ view.year_over_year.percent_note }}</span>{% endif %}
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.earned }}</td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.spent }}</td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.earned_change_minor > 0 %}text-success-strong{% elif row.earned_change_minor < 0 %}text-danger{% endif %}" data-report-yoy-income-change>{{ row.earned_change }}</td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-report-yoy-income-percent>
+              {% if row.earned_percent is not none %}{{ row.earned_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ row.earned_percent_note }}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.spent_change_minor > 0 %}text-danger{% elif row.spent_change_minor < 0 %}text-success-strong{% endif %}" data-report-yoy-expense-change>{{ row.spent_change }}</td>
+            <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-yoy-expense-percent>
+              {% if row.spent_percent is not none %}{{ row.spent_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ row.spent_percent_note }}</span>{% endif %}
             </td>
           </tr>
+          {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="border-t-2 border-line font-semibold" data-report-yoy-total>
+            <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+            <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.year_over_year.earned }}</td>
+            <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.year_over_year.spent }}</td>
+            <td colspan="4" class="py-2"></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
     {% endif %}

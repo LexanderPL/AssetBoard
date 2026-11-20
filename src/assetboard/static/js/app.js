@@ -523,7 +523,56 @@ document.addEventListener("change", (event) => {
       if ((target.min && value < target.min) || (target.max && value > target.max)) return;
     }
   }
+  if (target.hasAttribute("data-autosubmit-anchor") && target.form) {
+    const url = new URL(target.form.action, window.location.href);
+    url.search = new URLSearchParams(new FormData(target.form)).toString();
+    url.hash = target.getAttribute("data-autosubmit-anchor") || "";
+    window.location.assign(url.toString());
+    return;
+  }
   target.form?.requestSubmit();
+});
+
+// Multi-select dropdowns: keep the summary text in step with the checked boxes. The checkboxes
+// are ordinary form fields inside <details>, so the control also works without this script.
+function updateMultiSelect(details) {
+  const summary = details.querySelector("[data-multi-select-summary]");
+  if (!summary) return;
+  const count = details.querySelectorAll("[data-multi-select-option]:checked").length;
+  let text;
+  if (count === 0) {
+    text = details.getAttribute("data-all-label") || "";
+  } else if (count === 1) {
+    text = details.getAttribute("data-one-label") || "";
+  } else {
+    text = (details.getAttribute("data-many-label") || "").replace("%(num)d", String(count));
+  }
+  summary.textContent = text;
+}
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (!target.hasAttribute("data-multi-select-option")) return;
+  const details = target.closest("details[data-multi-select]");
+  if (details) updateMultiSelect(details);
+});
+
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Node)) return;
+  document.querySelectorAll("details[data-multi-select][open]").forEach((details) => {
+    if (!details.contains(event.target)) details.removeAttribute("open");
+  });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  if (document.querySelector("dialog:modal")) return;
+  document.querySelectorAll("details[data-multi-select][open]").forEach((details) => {
+    details.removeAttribute("open");
+    const summary = details.querySelector("summary");
+    if (summary instanceof HTMLElement) summary.focus();
+  });
 });
 
 // What-if scenario cards (F7.4): a preset button fills the card it belongs to and a Clear card

@@ -1711,11 +1711,22 @@ def _bulk_preview(
 ) -> BulkPreview:
     workspace = CurrentWorkspaceRepository(session, ctx).get()
     base_currency = workspace.base_currency
-    categories = NetWorthCategoryRepository(session, ctx).ordered(side.value)
+    categories = NetWorthCategoryRepository(session, ctx).ordered()
     active = {
-        category.name_key: category for category in categories if category.archived_at is None
+        category.name_key: category
+        for category in categories
+        if category.side == side.value and category.archived_at is None
     }
-    archived = {category.name_key for category in categories if category.archived_at is not None}
+    active_other_side = {
+        category.name_key
+        for category in categories
+        if category.side != side.value and category.archived_at is None
+    }
+    archived = {
+        category.name_key
+        for category in categories
+        if category.side == side.value and category.archived_at is not None
+    }
     existing_names = {
         text_key(item.name)
         for item in NetWorthItemRepository(session, ctx).ordered(side.value, include_archived=False)
@@ -1737,12 +1748,15 @@ def _bulk_preview(
             errors.append("invalid_amount")
         except InvalidNetWorth as exc:
             errors.append(exc.code)
-        category = active.get(category_name_key(raw.category))
+        category_key = category_name_key(raw.category)
+        category = active.get(category_key)
         category_id: UUID | None = None
         if category is not None:
             category_id = category.id
-        elif category_name_key(raw.category) in archived:
+        elif category_key in archived:
             errors.append("category_archived")
+        elif category_key in active_other_side:
+            errors.append("wrong_side")
         else:
             errors.append("category_unknown")
         warnings: list[str] = []

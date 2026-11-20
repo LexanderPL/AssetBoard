@@ -350,6 +350,25 @@ class TransactionRepository(ScopedRepository[Transaction]):
         )
         return tuple(self._session.scalars(statement))
 
+    def years_with_transactions(self, *, until: date) -> tuple[int, ...]:
+        """Distinct calendar years of non-deleted rows dated on or before ``until``.
+
+        The reports page uses this for its year selectors, so a year with no transactions is
+        never offered. The date is a plain ``DATE``; ``extract`` is portable to PostgreSQL.
+        """
+        year = cast(extract("year", Transaction.date), Integer)
+        statement = (
+            select(year)
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+                Transaction.date <= until,
+            )
+            .distinct()
+            .order_by(year)
+        )
+        return tuple(int(value) for value in self._session.scalars(statement))
+
     def counts_by_category(self) -> dict[UUID, CategoryCounts]:
         """Per category: all rows (deleted included) and non-deleted rows."""
         active = func.sum(case((Transaction.deleted_at.is_(None), 1), else_=0))

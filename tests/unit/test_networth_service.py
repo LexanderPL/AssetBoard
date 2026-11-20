@@ -904,6 +904,23 @@ def test_bulk_preview_and_create_are_all_or_nothing(team: WorkspaceDb) -> None:
     assert sum(len(group.items) for group in _side(team, ctx).groups) == 2
 
 
+def test_bulk_preview_matches_an_active_asset_category_by_name(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    _category(team, ctx, "Hobby")
+    preview = preview_bulk(team.factory, ctx, side="asset", text="abc; 15; Hobby", locale="en")
+    assert preview.can_create
+    assert preview.lines[0].category_id is not None
+
+
+def test_bulk_preview_distinguishes_a_category_on_the_other_side(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    _category(team, ctx, "Hobby", side="liability")
+    preview = preview_bulk(team.factory, ctx, side="asset", text="abc; 15; Hobby", locale="en")
+    assert preview.lines[0].errors == ("wrong_side",)
+
+
 def test_bulk_preview_reports_archived_categories_and_duplicate_warnings(
     team: WorkspaceDb,
 ) -> None:

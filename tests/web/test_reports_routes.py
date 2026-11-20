@@ -3,8 +3,6 @@ access."""
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 import re
 from datetime import UTC, date, datetime
@@ -123,16 +121,6 @@ def _page(app: OwnerApp, query: str = "") -> str:
     return response.text
 
 
-def _csv_response(app: OwnerApp, query: str = ""):
-    return app.client.get(
-        "/reports/year-overview.csv" + (f"?{query}" if query else ""), follow_redirects=False
-    )
-
-
-def _csv_rows(text: str) -> list[list[str]]:
-    return list(csv.reader(io.StringIO(text)))
-
-
 def _row_labels(html: str) -> list[str]:
     return re.findall(r"data-report-period>([^<]*)<", html)
 
@@ -143,17 +131,40 @@ def _sidebar(html: str) -> str:
     return match.group(0)
 
 
-def test_the_default_page_is_the_current_and_two_previous_years(reports: OwnerApp) -> None:
+def test_the_default_page_is_the_current_year_when_there_is_no_data(
+    reports: OwnerApp,
+) -> None:
     html = _page(reports)
     assert "<h1" in html and ">Reports</h1>" in html
-    assert "data-report-range>2024 – 2026<" in html
-    assert len(_row_labels(html)) == 34  # January 2024 through October 2026
+    assert 'class="mx-auto max-w-6xl space-y-6" data-reports' in html
+    assert "data-report-range>2026<" in html
+    assert len(_row_labels(html)) == 10  # January through October 2026 (today)
+    assert '<select id="report-from" name="from"' in html
+    assert '<select id="report-to" name="to"' in html
+    assert '<option value="2026" selected>2026</option>' in html
     for heading in ("Period", "Earned", "Spent", "Saved", "Net"):
         assert f">{heading}</th>" in html
     assert "data-report-total" in html
-    assert "data-chart-empty" in html  # no data yet
+    assert "No income or expenses in this range." in html
     assert "data-chart-table-toggle" in html
     assert 'data-chart-source="reports-data"' not in html  # no JSON without a chart
+
+
+def test_the_year_dropdowns_only_offer_years_with_transactions(reports: OwnerApp) -> None:
+    food = _category(reports, "Year Food")
+    for year in (2019, 2021, 2024, 2027):
+        _tx(reports, food, date(year, 1, 10), 1_000)
+    _tx(reports, food, date(2017, 1, 10), 1_000, deleted=True)
+    html = _page(reports)
+    assert '<option value="2019" selected>2019</option>' in html
+    assert '<option value="2021">2021</option>' in html
+    assert '<option value="2024" selected>2024</option>' in html
+    assert '<option value="2020">' not in html
+    assert '<option value="2022">' not in html
+    assert '<option value="2017">' not in html  # soft-deleted-only years are not offered
+    assert '<option value="2027">' not in html  # future-only years are not charted
+    assert "data-report-range>2019 – 2024<" in html
+    assert _row_labels(html) == ["2019", "2020", "2021", "2022", "2023", "2024"]
 
 
 def test_the_sidebar_entry_follows_history(reports: OwnerApp) -> None:
@@ -192,14 +203,15 @@ def test_monthly_and_yearly_steps_and_month_links(reports: OwnerApp) -> None:
     data = json.loads(chart_source.group(1))
     assert [series["key"] for series in data["series"]] == ["earned", "spent", "saved"]
     assert data["labels"][0] == "January 2025" and data["labels"][-1] == "October 2026"
+    assert data["links"][0].endswith("/m/2025-01")
+    assert data["links"][-1].endswith("/m/2026-10")
 
     yearly = _page(reports, "from=2025&to=2026&step=year")
     assert _row_labels(yearly) == ["2025", "2026"]
-    assert 'href="/m/2025"' not in yearly
+    assert "year=2025" in yearly and "#year-overview" in yearly
     assert '"labels": ["2025", "2026"]' in yearly
-    assert re.search(
-        r"data-report-period>2026</span>.*?data-report-so-far>so far<", yearly, re.DOTALL
-    )
+    assert '"links": [' in yearly
+    assert re.search(r"data-report-period>2026</a>.*?data-report-so-far>so far<", yearly, re.DOTALL)
 
 
 def test_errors_mark_the_field_and_hide_the_chart(reports: OwnerApp) -> None:
@@ -358,6 +370,7 @@ def test_the_rate_line_table_and_rolling_rate(reports: OwnerApp) -> None:
     assert data["series"][0]["values"][13] is None
     assert data["y_labels"]["0"] == "0.0%"
     assert data["series"][0]["amounts"][13] == ""
+    assert data["links"][0].endswith("/m/2025-01")
 
     january = _rate_row(html, "January 2026")
     assert _cells(january) == ["0.0%", "55.0%"]
@@ -444,7 +457,7 @@ def test_the_category_section_has_a_stacked_chart_and_its_table(reports: OwnerAp
     assert ">Expenses by category over time</h2>" in html
     assert "Spending by category and period" in html
     assert 'data-chart="report-category-bars"' in html
-    assert 'name="category"' in html and "multiple" in html
+    assert 'name="category"' in html and "data-multi-select" in html
     assert "Golden Food" in html and "Golden Rent" in html
     assert "Golden Salary" not in html  # income is not offered
     assert "Golden Savings" not in html  # savings only with the option
@@ -459,6 +472,7 @@ def test_the_category_section_has_a_stacked_chart_and_its_table(reports: OwnerAp
     assert data["labels"][0] == "January 2026"
     assert "Golden Rent: €900.00" in data["tooltips"][0]
     assert "Total: €1,020.00" in data["tooltips"][0]
+    assert data["links"][0].endswith("/m/2026-01")
 
     rent_row = _category_row(html, "Golden Rent")
     assert _category_cells(rent_row)[-1] == "€900.00"
@@ -490,8 +504,8 @@ def test_the_category_filter_is_repeatable_and_shows_no_other(reports: OwnerApp)
         f"category={categories[index]}" for index in (0, 2)
     )
     html = _page(reports, query)
-    assert f'<option value="{categories[0]}" selected>' in html
-    assert f'<option value="{categories[1]}" selected>' not in html
+    assert f'value="{categories[0]}" checked' in html
+    assert f'value="{categories[1]}" checked' not in html
     data = _category_data(html)
     assert [series["name"] for series in data["series"]] == [
         "Filter Category 3",
@@ -538,8 +552,8 @@ def test_an_archived_category_appears_with_its_name(reports: OwnerApp) -> None:
     data = _category_data(html)
     assert [series["name"] for series in data["series"]] == ["Archived Food (archived)"]
     assert "Archived Empty" not in html
-    assert f'<option value="{old}">Archived Food (archived)</option>' in html
-    assert f'<option value="{empty}">' not in html
+    assert f'value="{old}"' in html and "Archived Food (archived)" in html
+    assert f'value="{empty}"' not in html
 
 
 def test_a_range_without_spending_shows_the_category_empty_state(reports: OwnerApp) -> None:
@@ -590,8 +604,8 @@ def test_an_active_and_an_archived_category_with_the_same_name_are_distinct(
     html = _page(reports, "from=2026&to=2026&step=month")
     names = [series["name"] for series in _category_data(html)["series"]]
     assert names == ["Duplicate Name (archived)", "Duplicate Name"]
-    assert f'<option value="{archived}">Duplicate Name (archived)</option>' in html
-    assert f'<option value="{active}">Duplicate Name</option>' in html
+    assert f'value="{archived}"' in html and "Duplicate Name (archived)" in html
+    assert f'value="{active}"' in html and "Duplicate Name" in html
 
 
 def test_a_selected_archived_category_without_spending_stays_in_the_filter(
@@ -603,7 +617,7 @@ def test_a_selected_archived_category_without_spending_stays_in_the_filter(
         reports,
         f"from=2026&to=2026&step=month&category={archived}",
     )
-    assert f'<option value="{archived}" selected>Old Filter (archived)</option>' in html
+    assert f'value="{archived}" checked' in html and "Old Filter (archived)" in html
     assert "No spending for the selected categories." in html
 
 
@@ -665,10 +679,11 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     html = _page(reports, "from=2026&to=2026&step=month&year=2026")
     assert "data-report-year-overview" in html
     assert ">Year overview</h2>" in html
-    assert "data-report-grid-year>2026<" in html
+    assert 'id="report-year" name="year" form="report-filters"' in html
+    assert '<option value="2026" selected>2026</option>' in html
     assert "data-report-grid-so-far>so far<" in html
-    assert "data-report-year-csv" in html
-    assert "/reports/year-overview.csv" in html
+    assert "data-report-year-csv" not in html
+    assert "/reports/year-overview.csv" not in html
     for month in (
         "Jan",
         "Feb",
@@ -705,6 +720,10 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     zero_classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>€0\.00</td>', food)
     assert zero_classes and all("heat-" not in value for value in zero_classes)
     assert "Grid Savings" not in html and "Grid Transfer" not in html
+    grid_section = re.search(
+        r"<section [^>]*data-report-year-overview.*?</section>", html, re.DOTALL
+    )
+    assert grid_section is not None and 'href="/m/2026-01"' in grid_section.group(0)
 
     with_savings = _page(reports, "from=2026&to=2026&step=month&year=2026&savings=1")
     assert "Grid Savings" in with_savings
@@ -722,64 +741,8 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     assert _cells(_grid_row(empty_selection, "Unused"))[-1] == "€0.00"
 
 
-def test_the_year_overview_csv_matches_the_grid(reports: OwnerApp) -> None:
-    categories = _seed_grid(reports)
-    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/csv")
-    assert response.headers["content-disposition"] == (
-        'attachment; filename="reports-year-overview.csv"'
-    )
-    assert response.headers["cache-control"] == "no-store"
-    rows = _csv_rows(response.content.decode("utf-8"))
-    assert rows[0][:3] == ["category_id", "category", "archived"]
-    assert rows[0][3] == "2026-01" and rows[0][-2] == "2026-12" and rows[0][-1] == "total"
-    food = next(row for row in rows if row[1] == "Grid Food")
-    assert food[3:5] == ["120.00", "130.00"]
-    assert food[-1] == "250.00"
-    total = rows[-1]
-    assert total[:3] == ["", "Total", "false"]
-    assert total[3] == "1020.00" and total[-1] == "1150.00"
-
-    filtered = _csv_response(
-        reports,
-        f"from=2026&to=2026&step=month&year=2026&category={categories['food']}",
-    )
-    filtered_rows = _csv_rows(filtered.content.decode("utf-8"))
-    assert [row[1] for row in filtered_rows[1:-1]] == ["Grid Food"]
-    assert filtered_rows[-1][-1] == "250.00"
-
-
-def test_the_year_overview_csv_escapes_names_and_requires_sign_in(reports: OwnerApp) -> None:
-    tricky = _category(reports, 'CSV, "Tricky"')
-    _tx(reports, tricky, date(2026, 3, 4), 1_000)
-    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
-    rows = _csv_rows(response.content.decode("utf-8"))
-    assert any(row[1] == 'CSV, "Tricky"' for row in rows[1:-1])
-
-    bad = _csv_response(reports, "from=2026&to=2025")
-    assert bad.status_code == 400
-    assert "Fix the filters to export the year overview." in bad.text
-
-    reports.client.cookies.clear()
-    anonymous = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
-    assert anonymous.status_code == 303
-    assert anonymous.headers["location"].startswith("/login")
-
-
-def test_a_viewer_can_export_the_year_overview_csv(reports: OwnerApp) -> None:
-    _seed_grid(reports)
-    user_id = reports.add_user("vic")
-    reports.join(user_id, reports.home_id, "viewer")
-    reports.client.cookies.clear()
-    assert (
-        reports.web.sign_in(
-            reports.client, email="vic@example.com", password=reports.web.admin_password
-        ).status_code
-        == 303
-    )
-    response = _csv_response(reports, "from=2026&to=2026&step=month&year=2026")
-    assert response.status_code == 200
+def test_the_year_overview_csv_endpoint_is_gone(reports: OwnerApp) -> None:
+    assert reports.client.get("/reports/year-overview.csv").status_code == 404
 
 
 def test_category_trends_show_three_and_twelve_month_windows(reports: OwnerApp) -> None:
@@ -807,6 +770,7 @@ def test_category_trends_show_three_and_twelve_month_windows(reports: OwnerApp) 
     )
     assert data["series"][0]["name"] == "Trend Food"
     assert data["series"][0]["values"][:5] == [None, None, 20_000, 16_667, 10_000]
+    assert data["links"][0].endswith("/m/2026-01")
     assert 'data-chart="report-trend"' in html
     assert 'data-chart-source="reports-trend-data"' in html
     assert '<option value="3" selected>' in html
@@ -834,7 +798,9 @@ def test_category_trends_follow_the_selected_categories(reports: OwnerApp) -> No
     assert "Trend Rent" not in trend_section.group(0)
 
 
-def test_year_over_year_compares_a_category_or_the_total(reports: OwnerApp) -> None:
+def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
+    reports: OwnerApp,
+) -> None:
     food = _category(reports, "YOY Food")
     rent = _category(reports, "YOY Rent")
     _tx(reports, food, date(2025, 1, 10), 10_000)
@@ -842,29 +808,42 @@ def test_year_over_year_compares_a_category_or_the_total(reports: OwnerApp) -> N
     _tx(reports, rent, date(2025, 1, 11), 5_000)
     _tx(reports, rent, date(2026, 1, 11), 2_000)
 
-    html = _page(reports, f"from=2025&to=2026&step=month&year=2026&yoy_category={food}")
+    html = _page(reports, "from=2025&to=2026&step=month&year=2026")
     assert "data-report-year-over-year" in html
     assert "data-report-yoy-partial" in html
-    row = re.search(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
-    assert row is not None
-    assert _cells(row.group(0)) == ["€150.00", "€100.00", "€50.00", "50.0%"]
-    assert "text-danger" in re.search(r'<td class="([^"]*)" data-report-yoy-change>', html).group(1)  # type: ignore[union-attr]
-    assert "YOY Food" in row.group(0)
+    rows = re.findall(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
+    assert len(rows) == 2
+    current = next(row for row in rows if "data-report-yoy-year>2026<" in row)
+    cells = _cells(current)
+    assert cells[:2] == ["€0.00", "€170.00"]
+    assert cells[2] == "€0.00"
+    assert "no income in the previous year" in cells[3]
+    assert cells[4] == "+€20.00"
+    assert cells[5] == "+13.3%"
+    assert "#year-overview" in current
+    assert "text-danger" in re.search(
+        r'<td class="([^"]*)" data-report-yoy-expense-change>', current
+    ).group(1)  # type: ignore[union-attr]
 
-    total = _page(reports, "from=2025&to=2026&step=month&year=2026")
-    total_row = re.search(r"<tr data-report-yoy-row>.*?</tr>", total, re.DOTALL)
-    assert total_row is not None
-    assert "Total (all categories)" in total_row.group(0)
-    assert _cells(total_row.group(0))[3] == "13.3%"
+    previous = next(row for row in rows if "data-report-yoy-year>2025<" in row)
+    previous_cells = _cells(previous)
+    assert previous_cells[:2] == ["€0.00", "€150.00"]
+    assert previous_cells[4] == "+€150.00"
 
-    ignored = _page(reports, f"from=2025&to=2026&step=month&year=2026&yoy_category={uuid4()}")
-    assert "Total (all categories)" in ignored
+    total = re.search(r"<tr [^>]*data-report-yoy-total.*?</tr>", html, re.DOTALL)
+    assert total is not None
+    assert _cells(total.group(0))[:2] == ["€0.00", "€320.00"]
 
-    no_previous = _page(reports, f"from=2025&to=2026&step=month&year=2025&yoy_category={rent}")
-    no_previous_row = re.search(r"<tr data-report-yoy-row>.*?</tr>", no_previous, re.DOTALL)
-    assert no_previous_row is not None
-    assert "Not available: nothing spent in the previous year." in no_previous_row.group(0)
-    assert '<option value="2025" selected>' in no_previous
+    filtered = _page(
+        reports,
+        f"from=2025&to=2026&step=month&year=2026&category={food}",
+    )
+    filtered_row = next(
+        row
+        for row in re.findall(r"<tr data-report-yoy-row>.*?</tr>", filtered, re.DOTALL)
+        if "data-report-yoy-year>2026<" in row
+    )
+    assert _cells(filtered_row) == cells
 
 
 def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None:
@@ -918,7 +897,8 @@ def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
     assert "Rok do roku" in html
     assert "Dokładność planu i rzeczywistości" in html
     assert "Okno: 3 mies." in html
-    assert "Zmiana %" in html
+    assert "Zmiana dochodów" in html
+    assert "Zmiana wydatków" in html
     assert "Przekroczenie %" in html
 
 

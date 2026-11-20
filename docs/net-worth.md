@@ -269,7 +269,8 @@ Camera; 1 250,50; Electronics
 - The workspace base currency and today's date are used; notes and the switches stay at their
   defaults.
 - A line must have exactly three semicolon-separated parts. Blank lines are ignored.
-- The category must be an active category of the selected side, matched by name ignoring case.
+- The category must be an active **Net worth** category of the selected side, matched by name
+  ignoring case. Spending and income categories are separate.
 - At most 500 non-blank lines and 64 KiB of text are accepted.
 - **Preview** checks every line and shows per-line errors. **Create** is all-or-nothing: if any
   line is invalid, no item is created.
