@@ -232,8 +232,9 @@ multi-select and the savings option, and the category x period table. Property t
 - Line chart per period: assets, liabilities and net worth, from F5.9's derived history service.
   The report reuses that service rather than reading `NetWorthSnapshot`; stored snapshots are
   legacy archive data.
-- Base currency only, as the derived service already is. Non-base items stay excluded with the
-  same warning as the Summary.
+- Base currency only, as the derived service already is. Non-base, valueless and unavailable
+  linked items stay excluded; the report omits the per-period warning notes, while the Net worth
+  Summary keeps the breakdown.
 - Periods without a derived point are gaps, never interpolated.
 
 **Agent prompt**
@@ -246,8 +247,9 @@ service (last point per period, gaps not interpolated), hidden when there are no
 **As built (2026-11-19).** `services.reports.net_worth_report` calls F5.9's `networth_history`
 in its all-time form and keeps the last point of each report month/year. The `/reports` section
 reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
-the chart and accessible table. The section is absent without values or outside the base
-currency. Tests cover year/month selection, the base-currency rule and the empty workspace.
+the chart and accessible table, with the per-period not-counted/estimated notes suppressed. The
+section is absent without values or outside the base currency. Tests cover year/month selection,
+the base-currency rule and the empty workspace.
 
 ---
 

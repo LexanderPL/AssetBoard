@@ -1025,7 +1025,7 @@ def _net_worth_series(
     if data is None:
         return None
     labels = [_series_label(point.as_of, step, locale) for point in data.points]
-    trend = build_trend_view(data, locale, labels=labels)
+    trend = build_trend_view(data, locale, labels=labels, include_notes=False)
     if trend.chart is None:
         return None
     links = [href_for(point.as_of) if href_for is not None else "" for point in data.points]
@@ -1037,9 +1037,7 @@ def _net_worth_series(
             label=label,
             href=href or None,
             cells=(row.net, row.assets, row.liabilities),
-            notes=(
-                (*row.not_counted, row.estimated_note) if row.estimated_note else row.not_counted
-            ),
+            notes=(),
             so_far=_series_is_partial(point.as_of, step, today),
         )
         for point, row, label, href in zip(data.points, trend.rows, labels, links, strict=True)

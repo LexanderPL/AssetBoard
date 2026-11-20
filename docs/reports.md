@@ -206,7 +206,9 @@ shown. There is no interpolation between periods.
 The section appears only when the workspace has net-worth values and the selected currency is
 the workspace base currency. It is absent otherwise. The chart and table carry the same figures;
 the data table is collapsed behind **Show as table** with JavaScript and stays visible without
-JavaScript. Period rows link to the month page or the focused Year overview.
+JavaScript. Period rows link to the month page or the focused Year overview. The report does not
+repeat the per-period “not counted” and “estimated values” notes; the Net worth Summary keeps
+that detail in its breakdown.
 
 ## Portfolio value over time
 
