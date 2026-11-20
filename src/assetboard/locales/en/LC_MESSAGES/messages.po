@@ -4436,7 +4436,7 @@ msgstr ""
 msgid "No installment is due yet."
 msgstr ""
 
-msgid "The month is closed. Reopen it before posting the installment."
+msgid "The month is closed. Reopen it before changing this plan or posting."
 msgstr ""
 
 msgid "That installment is no longer pending."
@@ -15287,5 +15287,8 @@ msgstr ""
 #~ "Available only in an empty workspace."
 #~ " The untouched suggested categories are "
 #~ "fine."
+#~ msgstr ""
+
+#~ msgid "The month is closed. Reopen it before posting the installment."
 #~ msgstr ""
 

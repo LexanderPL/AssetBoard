@@ -171,7 +171,7 @@ ERRORS = {
     "invalid_loan": _("The loan is no longer available."),
     "installment_plan_closed": _("A closed installment plan cannot be restored."),
     "no_due_installment": _("No installment is due yet."),
-    "month_closed": _("The month is closed. Reopen it before posting the installment."),
+    "month_closed": _("The month is closed. Reopen it before changing this plan or posting."),
     "not_pending": _("That installment is no longer pending."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
