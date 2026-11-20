@@ -78,6 +78,8 @@ ERRORS = {
     "not_planned": _("Only a one-time planned entry can be deleted here."),
     "not_skipped": _("This occurrence is not skipped."),
     "archived_item": _("This recurring item is archived, so its skipped date cannot come back."),
+    "paused_item": _("This recurring item is paused. Resume it before restoring the skipped date."),
+    "archived_source": _("This income source is archived, so its skipped date cannot come back."),
     "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
     "plan_category_archived": PLAN_ERRORS["category_archived"],
     "plan_category_transfer": PLAN_ERRORS["category_transfer"],

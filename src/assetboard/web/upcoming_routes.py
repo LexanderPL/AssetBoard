@@ -48,6 +48,8 @@ ACTION_ERRORS = {
     "not_planned": _("Only a one-time planned entry can be deleted here."),
     "not_skipped": _("This occurrence is not skipped."),
     "archived_item": _("This recurring item is archived, so its skipped date cannot come back."),
+    "paused_item": _("This recurring item is paused. Resume it before restoring the skipped date."),
+    "archived_source": _("This income source is archived, so its skipped date cannot come back."),
 }
 INVALID_DIRECTION = _("Choose a valid direction.")
 
