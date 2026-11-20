@@ -61,8 +61,9 @@ the M4 archive.
 - **Performance:** 10 years × 5 000 transactions a year renders the Phase A page in < 500 ms
   on the CI runner (benchmark test with a generous margin), with one streamed read of the
   transactions per request, not one per month. Phase B passes the report's exact period-end
-  dates to the net-worth and portfolio services; a short range reads that window plus the
-  carry-forward (and estimate/backfill) anchors, not every historical valuation and price.
+  dates to the net-worth and portfolio services; a short range reads from its start through
+  today plus the carry-forward (and estimate/backfill) anchors, not every historical valuation
+  and price.
 
 **Phases**
 
