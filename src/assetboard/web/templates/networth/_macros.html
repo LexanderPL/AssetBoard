@@ -62,7 +62,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% else %}
 {% if item.valuations %}
 <details class="mt-2" data-valuations{% if editing_valuation and editing_valuation.item_id == item.id %} open{% endif %}>
-  <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
+  <summary class="flex min-h-11 cursor-pointer items-center text-xs font-medium text-muted sm:min-h-0">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
   {% if item.estimate_between %}
   <p class="mt-2 text-xs text-muted" data-estimate-between>{{ _("Estimates values between entries") }}</p>
   {% endif %}

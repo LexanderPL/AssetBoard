@@ -43,7 +43,7 @@
               {% if point.live %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-trend-today-label>{{ _("Today") }}</span>{% endif %}
               {% if point.breakdown or point.not_counted %}
               <details class="mt-1" data-history-breakdown>
-                <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Breakdown") }}</summary>
+                <summary class="flex min-h-11 cursor-pointer items-center text-xs font-medium text-muted sm:min-h-0">{{ _("Breakdown") }}</summary>
                 {% if point.breakdown %}
                 <ul class="mt-1 space-y-1 text-xs">
                   {% for row in point.breakdown %}

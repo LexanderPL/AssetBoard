@@ -1510,3 +1510,55 @@ function registerServiceWorker() {
 
 if (document.readyState === "complete") registerServiceWorker();
 else window.addEventListener("load", registerServiceWorker, { once: true });
+
+
+// The net-worth add form hides the manual value fields for a linked item, and a notification
+// channel only shows the digest time / lead days when those choices apply. Without JavaScript
+// every field stays visible and the server ignores the irrelevant ones.
+function syncLinkedItemFields() {
+  const select = document.querySelector("[data-item-link]");
+  if (!(select instanceof HTMLSelectElement)) return;
+  const linked = select.value !== "";
+  document.querySelectorAll("[data-item-value-field]").forEach((field) => {
+    if (!(field instanceof HTMLElement)) return;
+    field.classList.toggle("hidden", linked);
+    field.querySelectorAll("input, select").forEach((control) => {
+      if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+        control.disabled = linked;
+      }
+    });
+  });
+}
+
+function syncNotificationFields() {
+  document.querySelectorAll("[data-notification-channel]").forEach((form) => {
+    if (!(form instanceof HTMLElement)) return;
+    const mode = form.querySelector("[data-notification-mode]");
+    const time = form.querySelector("[data-digest-time]");
+    if (mode instanceof HTMLSelectElement && time instanceof HTMLElement) {
+      time.classList.toggle("hidden", mode.value !== "digest");
+    }
+    const due = form.querySelector("[data-notify-due-soon]");
+    const lead = form.querySelector("[data-lead-days]");
+    if (due instanceof HTMLInputElement && lead instanceof HTMLElement) {
+      lead.classList.toggle("hidden", !due.checked);
+    }
+  });
+}
+
+function syncConditionalFields() {
+  syncLinkedItemFields();
+  syncNotificationFields();
+}
+document.addEventListener("DOMContentLoaded", syncConditionalFields);
+document.addEventListener("htmx:load", syncConditionalFields);
+document.addEventListener("change", (event) => {
+  if (!(event.target instanceof HTMLElement)) return;
+  if (
+    event.target.matches("[data-item-link]") ||
+    event.target.matches("[data-notification-mode]") ||
+    event.target.matches("[data-notify-due-soon]")
+  ) {
+    syncConditionalFields();
+  }
+});

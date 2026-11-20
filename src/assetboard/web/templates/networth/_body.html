@@ -112,24 +112,12 @@
         </select>
         {% if create_item_errors.get("category") %}<p id="new-item-category-error" class="text-xs text-danger">{{ create_item_errors.get("category") }}</p>{% endif %}
       </div>
-      {% if link_options %}
-      <div class="space-y-1">
-        <label for="new-item-link" class="block text-xs text-muted">{{ _("Link to…") }}</label>
-        <select id="new-item-link" name="link" class="form-select py-1.5 w-full">
-          <option value="">{{ _("Manual value") }}</option>
-          {% for option in link_options %}
-          <option value="{{ option.link_type }}:{{ option.choice.link_id }}"{% if create_item_values.link == option.link_type ~ ":" ~ (option.choice.link_id|string) %} selected{% endif %}>{{ _(option.link_type_label) }} — {{ option.choice.label }}</option>
-          {% endfor %}
-        </select>
-        <p class="text-xs text-muted">{{ _("A linked item takes its value and currency from the target. The value fields below are ignored.") }}</p>
-      </div>
-      {% endif %}
-      <div class="space-y-1">
+      <div class="space-y-1" data-item-value-field>
         <label for="new-item-value" class="block text-xs text-muted">{{ _("Current value") }}</label>
         <input id="new-item-value" name="value" type="text" inputmode="decimal" value="{{ create_item_values.value }}" required maxlength="64" class="form-control px-2 py-1.5 w-full"{% if create_item_errors.get("value") %} aria-invalid="true" aria-describedby="new-item-value-error"{% endif %}>
         {% if create_item_errors.get("value") %}<p id="new-item-value-error" class="text-xs text-danger">{{ create_item_errors.get("value") }}</p>{% endif %}
       </div>
-      <div class="space-y-1">
+      <div class="space-y-1" data-item-value-field>
         <label for="new-item-currency" class="block text-xs text-muted">{{ _("Currency") }}</label>
         <select id="new-item-currency" name="currency" class="form-select py-1.5 w-full">
           {% for code, _name in currency_options %}<option value="{{ code }}"{% if create_item_values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}
@@ -141,26 +129,45 @@
         <input id="new-item-as-of" name="as_of" type="date" value="{{ create_item_values.as_of }}" required class="form-control px-2 py-1.5 w-full">
         {% if create_item_errors.get("as_of") %}<p class="text-xs text-danger">{{ create_item_errors.get("as_of") }}</p>{% endif %}
       </div>
-      <div class="space-y-1">
-        <label for="new-item-valuation-note" class="block text-xs text-muted">{{ _("Value note (optional)") }}</label>
-        <input id="new-item-valuation-note" name="valuation_note" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.valuation_note }}" class="form-control px-2 py-1.5 w-full">
-        {% if create_item_errors.get("valuation_note") %}<p class="text-xs text-danger">{{ create_item_errors.get("valuation_note") }}</p>{% endif %}
-      </div>
-      <div class="space-y-1">
-        <label for="new-item-acquired" class="block text-xs text-muted">{{ _("Acquired on (optional)") }}</label>
-        <input id="new-item-acquired" name="acquired_on" type="date" value="{{ create_item_values.acquired_on }}" class="form-control px-2 py-1.5 w-full">
-        {% if create_item_errors.get("acquired_on") %}<p class="text-xs text-danger">{{ create_item_errors.get("acquired_on") }}</p>{% endif %}
-      </div>
-      <div class="space-y-1">
-        <label for="new-item-notes" class="block text-xs text-muted">{{ _("Notes (optional)") }}</label>
-        <input id="new-item-notes" name="notes" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.notes }}" class="form-control px-2 py-1.5 w-full">
-        {% if create_item_errors.get("notes") %}<p class="text-xs text-danger">{{ create_item_errors.get("notes") }}</p>{% endif %}
-      </div>
       <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-4">
         <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if create_item_values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
-        <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if create_item_values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
-        <label class="flex items-center gap-2" data-estimate-between-field><input type="checkbox" name="estimate_between" value="1"{% if create_item_values.estimate_between == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Estimate values between entries") }}</label>
       </div>
+      <details class="sm:col-span-2 lg:col-span-4" data-more-options>
+        <summary class="cursor-pointer py-2 text-sm font-medium text-muted">{{ _("More options") }}</summary>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {% if link_options %}
+          <div class="space-y-1">
+            <label for="new-item-link" class="block text-xs text-muted">{{ _("Link to…") }}</label>
+            <select id="new-item-link" name="link" data-item-link class="form-select py-1.5 w-full">
+              <option value="">{{ _("Manual value") }}</option>
+              {% for option in link_options %}
+              <option value="{{ option.link_type }}:{{ option.choice.link_id }}"{% if create_item_values.link == option.link_type ~ ":" ~ (option.choice.link_id|string) %} selected{% endif %}>{{ _(option.link_type_label) }} — {{ option.choice.label }}</option>
+              {% endfor %}
+            </select>
+            <p class="text-xs text-muted">{{ _("A linked item takes its value and currency from the target. The value fields are ignored.") }}</p>
+          </div>
+          {% endif %}
+          <div class="space-y-1">
+            <label for="new-item-valuation-note" class="block text-xs text-muted">{{ _("Value note (optional)") }}</label>
+            <input id="new-item-valuation-note" name="valuation_note" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.valuation_note }}" class="form-control px-2 py-1.5 w-full">
+            {% if create_item_errors.get("valuation_note") %}<p class="text-xs text-danger">{{ create_item_errors.get("valuation_note") }}</p>{% endif %}
+          </div>
+          <div class="space-y-1">
+            <label for="new-item-acquired" class="block text-xs text-muted">{{ _("Acquired on (optional)") }}</label>
+            <input id="new-item-acquired" name="acquired_on" type="date" value="{{ create_item_values.acquired_on }}" class="form-control px-2 py-1.5 w-full">
+            {% if create_item_errors.get("acquired_on") %}<p class="text-xs text-danger">{{ create_item_errors.get("acquired_on") }}</p>{% endif %}
+          </div>
+          <div class="space-y-1">
+            <label for="new-item-notes" class="block text-xs text-muted">{{ _("Notes (optional)") }}</label>
+            <input id="new-item-notes" name="notes" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.notes }}" class="form-control px-2 py-1.5 w-full">
+            {% if create_item_errors.get("notes") %}<p class="text-xs text-danger">{{ create_item_errors.get("notes") }}</p>{% endif %}
+          </div>
+          <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-4">
+            <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if create_item_values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
+            <label class="flex items-center gap-2" data-estimate-between-field><input type="checkbox" name="estimate_between" value="1"{% if create_item_values.estimate_between == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Estimate values between entries") }}</label>
+          </div>
+        </div>
+      </details>
       <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Estimates draw a straight line between recorded values on the net-worth chart for past month-ends; today's value is never estimated.") }}</p>
       <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Enter values as positive amounts. For a liability, enter the amount owed.") }}</p>
       <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">

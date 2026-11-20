@@ -12372,6 +12372,12 @@ msgstr "Użyj przycisku „Dodaj pozycję” lub „Dodaj pozycje zbiorczo” po
 msgid "Add an item"
 msgstr "Dodaj pozycję"
 
+msgid "Include in net worth"
+msgstr "Uwzględnij w majątku netto"
+
+msgid "More options"
+msgstr "Więcej opcji"
+
 msgid "Link to…"
 msgstr "Powiąż z…"
 
@@ -12380,19 +12386,16 @@ msgstr "Wartość ręczna"
 
 msgid ""
 "A linked item takes its value and currency from the target. The value "
-"fields below are ignored."
+"fields are ignored."
 msgstr ""
-"Powiązana pozycja pobiera wartość i walutę z celu. Pola wartości poniżej "
-"są ignorowane."
+"Pozycja połączona przyjmuje wartość i walutę celu. Pola wartości są "
+"ignorowane."
 
 msgid "Value note (optional)"
 msgstr "Notatka do wartości (opcjonalnie)"
 
 msgid "Acquired on (optional)"
 msgstr "Data nabycia (opcjonalnie)"
-
-msgid "Include in net worth"
-msgstr "Uwzględnij w majątku netto"
 
 msgid "Estimate values between entries"
 msgstr "Szacuj wartości między wpisami"
