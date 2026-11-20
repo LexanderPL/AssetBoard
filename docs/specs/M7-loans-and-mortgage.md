@@ -434,10 +434,10 @@ decrement-on-post behaviour, linked liability and overview table. Tests for coun
   omitted. Archive and restore use the same close/disable machinery. Ordinary `loans` list
   queries exclude plan rows, and `/loans/{id}` redirects a plan to its installment detail page.
 - `loan_links.loan_balance_at()` special-cases plans with an `as_of`-aware helper: the original
-  count is reconstructed from `remaining_count + posted_count`, posted occurrences due on or
-  before `as_of` are subtracted, and the result is zero before the plan existed and on/after
-  closure or archiving. The current UI and scheduling keep using
-  `plan_remaining_minor_in_session()` (`installment × remaining_count`). The linked liability
+  count is reconstructed from `remaining_count + posted_count`, posted occurrences whose linked
+  transaction date (or due date when unlinked) is on or before `as_of` are subtracted, and the
+  result is zero before the plan existed and on/after closure or archiving. The current UI and
+  scheduling use `installment × remaining_count` directly. The linked liability
   helper creates a translated **Installments** category for plans instead of **Mortgage**; the
   resolver choices/describe and idempotent link behavior are shared with ordinary loans.
 - Plan scheduled items use the plan dates and a fixed `from_loan` amount; ordinary loan

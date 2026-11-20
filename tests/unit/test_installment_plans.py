@@ -301,6 +301,7 @@ def test_plan_balance_at_as_of_uses_posted_occurrences(team: WorkspaceDb) -> Non
     loan_id = _create(team, remaining_count=3)
     ctx = team.ctx("owner", "owner")
     with team.factory() as session:
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 2, 1)) == _money(0)
         assert (
             installment_plans.plan_remaining_minor_at_in_session(
                 session, ctx, loan_id, date(2026, 2, 1)
@@ -365,6 +366,10 @@ def test_plan_balance_at_as_of_uses_posted_occurrences(team: WorkspaceDb) -> Non
             )
             == 0
         )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 4, 5)) == _money(
+            100_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 5, 5)) == _money(0)
 
 
 def test_post_undo_and_repost_keep_the_plan_count(team: WorkspaceDb) -> None:
@@ -430,6 +435,31 @@ def test_overdue_installments_post_one_by_one(team: WorkspaceDb) -> None:
     with pytest.raises(loans.LoanError) as closed:
         installment_plans.post_next_installment(team.factory, ctx, loan_id)
     assert closed.value.code == "loan_paid_off"
+
+
+def test_plan_balance_counts_an_early_post_on_the_posting_date(team: WorkspaceDb) -> None:
+    team.clock._value = datetime(2026, 3, 1, 12, tzinfo=UTC)
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory, ctx, first.id, amount_minor=100_000, day=date(2026, 3, 1)
+    )
+    with team.factory() as session:
+        assert (
+            installment_plans.plan_remaining_minor_at_in_session(
+                session, ctx, loan_id, date(2026, 3, 1)
+            )
+            == 200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 1)) == _money(
+            200_000
+        )
+        assert loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 4)) == _money(
+            200_000
+        )
 
 
 def test_plan_balance_and_installments_liability(team: WorkspaceDb) -> None:

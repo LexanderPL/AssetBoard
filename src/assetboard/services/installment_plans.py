@@ -24,6 +24,7 @@ from assetboard.db.repositories import (
     NotFound,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
+    TransactionRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.loans import (
@@ -246,8 +247,8 @@ def plan_remaining_minor_at_in_session(
 
     ``remaining_count`` is the current count, so the original count is reconstructed as
     ``remaining_count + posted_count``. A plan created after ``as_of`` is 0; a plan closed or
-    archived on or before ``as_of`` is 0; otherwise only posted occurrences due on or before
-    ``as_of`` are subtracted.
+    archived on or before ``as_of`` is 0; otherwise posted occurrences whose linked transaction
+    date (or due date when unlinked) is on or before ``as_of`` are subtracted.
     """
     plan = InstallmentPlanRepository(session, ctx).for_loan(loan_id)
     if plan is None:
@@ -263,22 +264,24 @@ def plan_remaining_minor_at_in_session(
     if (closed is not None and closed <= as_of) or (archived is not None and archived <= as_of):
         return 0
     occurrences = _occurrences_for_loan(session, ctx, loan.id)
-    posted = [row for row in occurrences if row.status == "posted" and row.direction == "expense"]
-    original = plan.remaining_count + len(posted)
-    posted_by_as_of = sum(1 for row in posted if row.due_date <= as_of)
+    posted_dates: list[date] = []
+    transactions = TransactionRepository(session, ctx)
+    for row in occurrences:
+        if row.status != "posted" or row.direction != "expense":
+            continue
+        transaction = (
+            transactions.get(row.transaction_id) if row.transaction_id is not None else None
+        )
+        # The count is decremented when the occurrence is posted, so the linked transaction's
+        # date is the right boundary for an early or late post; fall back to the due date.
+        posted_dates.append(
+            transaction.date
+            if transaction is not None and transaction.deleted_at is None
+            else row.due_date
+        )
+    original = plan.remaining_count + len(posted_dates)
+    posted_by_as_of = sum(1 for day in posted_dates if day <= as_of)
     return plan.installment_minor * max(0, original - posted_by_as_of)
-
-
-def plan_remaining_minor_in_session(
-    session: Session, ctx: WorkspaceScope, loan_id: UUID
-) -> int | None:
-    plan = InstallmentPlanRepository(session, ctx).for_loan(loan_id)
-    if plan is None:
-        return None
-    loan = LoanRepository(session, ctx).get(loan_id)
-    if loan is None or plan.closed_at is not None or loan.archived_at is not None:
-        return 0
-    return plan.installment_minor * plan.remaining_count
 
 
 def plan_installment_in_session(session: Session, ctx: WorkspaceScope, loan_id: UUID) -> int | None:
@@ -646,7 +649,6 @@ __all__ = [
     "plan_installment_in_session",
     "plan_remaining_minor_at_in_session",
     "revert_posted_occurrence",
-    "plan_remaining_minor_in_session",
     "post_next_installment",
     "restore_installment_plan",
     "update_installment_plan",
