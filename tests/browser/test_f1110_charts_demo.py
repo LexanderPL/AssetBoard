@@ -216,8 +216,8 @@ def test_chart_labels_fit_and_the_fire_table_collapses(tmp_path: Path) -> None:
             color_scheme="light",
             viewport={"width": 1440, "height": 900},
             java_script_enabled=False,
+            storage_state=context.storage_state(),
         )
-        no_js.add_cookies(context.cookies())
         no_js_page = no_js.new_page()
         no_js_page.goto(f"{base}/fire", wait_until="networkidle")
         no_js_section = no_js_page.locator("[data-fire-table-section]")
