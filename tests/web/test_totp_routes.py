@@ -736,7 +736,7 @@ def test_deleting_an_account_requires_the_administrators_second_factor(
         data={
             "csrf_token": owner.web.csrf(page.text),
             "confirm_password": owner.web.admin_password,
-            "second_factor": pyotp.TOTP(admin_secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(admin_secret).at(owner.app.state.clock.now()),
         },
         follow_redirects=False,
     )
