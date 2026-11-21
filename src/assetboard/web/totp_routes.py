@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
-import pyotp
 import segno
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from pyotp.totp import TOTP
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
@@ -53,7 +53,7 @@ async def _page(
     )
     qr = None
     if factor.secret is not None:
-        uri = pyotp.TOTP(factor.secret).provisioning_uri(current.email, issuer_name=APP_NAME)
+        uri = TOTP(factor.secret).provisioning_uri(name=current.email, issuer_name=APP_NAME)
         qr = segno.make_qr(uri).svg_inline(scale=4, light="white")
     has_password = await run_in_threadpool(user_has_password, app.session_factory, current.user_id)
     response = render_template(

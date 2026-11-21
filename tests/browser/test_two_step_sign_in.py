@@ -10,6 +10,7 @@ from pathlib import Path
 import pyotp
 import pytest
 from playwright.sync_api import expect, sync_playwright
+from pyotp.totp import TOTP
 
 from assetboard.app import create_app
 from assetboard.config import Settings
@@ -88,7 +89,7 @@ def test_two_step_sign_in_with_an_authenticator_code(tmp_path: Path) -> None:
             expect(page.get_by_role("alert")).to_be_visible()
             expect(page.get_by_label("Authenticator or recovery code")).to_be_visible()
 
-            page.get_by_label("Authenticator or recovery code").fill(pyotp.TOTP(secret).now())
+            page.get_by_label("Authenticator or recovery code").fill(TOTP(secret).now())
             page.get_by_role("button", name="Continue").click()
             page.wait_for_url(f"{base}/")
             names = {c.get("name") for c in context.cookies()}

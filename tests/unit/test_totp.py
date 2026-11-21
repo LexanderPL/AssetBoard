@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-import pyotp
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from pyotp.totp import TOTP
 
 from assetboard.domain.totp import (
     TOTP_INTERVAL_SECONDS,
@@ -53,7 +53,7 @@ def test_accepted_step_is_fresh_within_the_window_and_never_replayable(
     moment = datetime.fromtimestamp(now, UTC)
     current = now // TOTP_INTERVAL_SECONDS
     last_step = current + last_offset
-    code = pyotp.TOTP(RFC_SECRET).at((current + offset) * TOTP_INTERVAL_SECONDS)
+    code = TOTP(RFC_SECRET).at((current + offset) * TOTP_INTERVAL_SECONDS)
     step = matching_step(RFC_SECRET, code, moment, last_step)
     if step is None:
         return

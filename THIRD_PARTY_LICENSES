@@ -241,11 +241,11 @@ SOFTWARE.
 
 ------------------------------------------------------------------------------
 Package: Authlib
-Version: 1.9.5
+Version: 1.9.9
 License: BSD-3-Clause
 Project: https://docs.authlib.org/
 
---- authlib-1.9.5.dist-info/licenses/LICENSE ---
+--- authlib-1.9.9.dist-info/licenses/LICENSE ---
 BSD 3-Clause License
 
 Copyright (c) 2017, Hsiaoming Yang
@@ -723,11 +723,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 Package: fastapi
-Version: 0.162.4
+Version: 0.163.2
 License: MIT
 Project: https://github.com/fastapi/fastapi
 
---- fastapi-0.162.4.dist-info/licenses/LICENSE ---
+--- fastapi-0.163.2.dist-info/licenses/LICENSE ---
 The MIT License (MIT)
 
 Copyright (c) 2018 Sebastián Ramírez
@@ -782,11 +782,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Package: holidays
-Version: 0.108
+Version: 0.109
 License: MIT
 Project: https://github.com/vacanza/holidays/releases/
 
---- holidays-0.108.dist-info/licenses/LICENSE ---
+--- holidays-0.109.dist-info/licenses/LICENSE ---
 Copyright (c) Vacanza Team and individual contributors (see CONTRIBUTORS file)
 Copyright (c) dr-prodigy <dr.prodigy.github@gmail.com>, 2017-2023
 Copyright (c) ryanss <ryanssdev@icloud.com>, 2014-2017
@@ -1469,11 +1469,11 @@ SOFTWARE.
 
 ------------------------------------------------------------------------------
 Package: pydantic-settings
-Version: 2.16.2
+Version: 2.16.3
 License: MIT
 Project: https://github.com/pydantic/pydantic-settings
 
---- pydantic_settings-2.16.2.dist-info/licenses/LICENSE ---
+--- pydantic_settings-2.16.3.dist-info/licenses/LICENSE ---
 The MIT License (MIT)
 
 Copyright (c) 2022 Samuel Colvin and other contributors
@@ -1531,12 +1531,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 Package: PyOTP
-Version: 2.10.0
+Version: 2.12.0
 License: MIT
 Project: https://github.com/pyauth/pyotp
 
---- pyotp-2.10.0.dist-info/licenses/LICENSE ---
-Copyright (C) 2011-2021 Mark Percival <m@mdp.im>,
+--- pyotp-2.12.0.dist-info/licenses/LICENSE ---
+Copyright (C) 2011-2026 Mark Percival <m@mdp.im>,
 Nathan Reynolds <email@nreynolds.co.uk>, Andrey Kislyuk <kislyuk@gmail.com>,
 and PyOTP contributors
 
@@ -1657,11 +1657,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 Package: python-multipart
-Version: 0.0.33
+Version: 0.0.34
 License: Apache-2.0
 Project: https://github.com/Kludex/python-multipart
 
---- python_multipart-0.0.33.dist-info/licenses/LICENSE.txt ---
+--- python_multipart-0.0.34.dist-info/licenses/LICENSE.txt ---
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2214,11 +2214,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Package: SQLAlchemy
-Version: 2.1.8
+Version: 2.1.9
 License: MIT
 Project: https://www.sqlalchemy.org
 
---- sqlalchemy-2.1.8.dist-info/licenses/LICENSE ---
+--- sqlalchemy-2.1.9.dist-info/licenses/LICENSE ---
 Copyright 2005-2026 SQLAlchemy authors and contributors <see AUTHORS file>.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -2276,11 +2276,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 Package: typer
-Version: 0.29.0
+Version: 0.29.1
 License: MIT
 Project: https://github.com/fastapi/typer
 
---- typer-0.29.0.dist-info/licenses/LICENSE ---
+--- typer-0.29.1.dist-info/licenses/LICENSE ---
 The MIT License (MIT)
 
 Copyright (c) 2019 Sebastián Ramírez

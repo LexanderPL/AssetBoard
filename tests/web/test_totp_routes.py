@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pyotp
 import pytest
 from fastapi.testclient import TestClient
+from pyotp.totp import TOTP
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
@@ -55,7 +56,7 @@ def _enable(owner: OwnerApp) -> tuple[str, list[str]]:
     secret = _begin(owner)
     response = owner.post(
         "/account/totp/verify",
-        {"code": pyotp.TOTP(secret).at(owner.app.state.clock.now())},
+        {"code": TOTP(secret).at(owner.app.state.clock.now())},
         token_from="/account/totp",
     )
     assert response.status_code == 200, response.text
@@ -128,7 +129,7 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     assert "data-two-factor-disabled" in security.text
     assert owner.post("/account/totp/verify", {"code": "invalid"}).status_code == 400
     response = owner.post(
-        "/account/totp/verify", {"code": pyotp.TOTP(secret).at(owner.app.state.clock.now())}
+        "/account/totp/verify", {"code": TOTP(secret).at(owner.app.state.clock.now())}
     )
     codes = re.findall(CODE_PATTERN, response.text)
     assert len(set(codes)) == 10
@@ -168,7 +169,7 @@ def test_recovery_codes_can_be_regenerated_only_with_password_and_factor(owner: 
         "/account/totp/recovery-codes",
         {
             "confirm_password": owner.web.admin_password,
-            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(secret).at(owner.app.state.clock.now()),
         },
     )
     assert response.status_code == 200
@@ -199,10 +200,10 @@ def test_password_login_requires_factor_prevents_replay_and_consumes_recovery_on
         "set-cookie" not in failed.headers
         or "assetboard_session=" not in failed.headers["set-cookie"]
     )
-    enrollment_code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    enrollment_code = TOTP(secret).at(owner.app.state.clock.now())
     assert _login(owner, client, enrollment_code).status_code == 401
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _login(owner, client, code).status_code == 303
     other = TestClient(owner.app)
     assert _login(owner, other, code).status_code == 401
@@ -264,7 +265,7 @@ def test_password_and_factor_are_separate_steps_with_a_hashed_single_use_ticket(
         "/login/verify",
         data={
             "csrf_token": owner.web.csrf(retry_page.text),
-            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(secret).at(owner.app.state.clock.now()),
         },
         follow_redirects=False,
     )
@@ -304,7 +305,7 @@ def test_pending_enrollment_is_session_bound_and_expires(owner: OwnerApp) -> Non
     response = other.post(
         "/account/totp/verify",
         data={
-            "code": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+            "code": TOTP(secret).at(owner.app.state.clock.now()),
             "csrf_token": owner.web.csrf(other.get("/account/totp").text),
         },
     )
@@ -313,7 +314,7 @@ def test_pending_enrollment_is_session_bound_and_expires(owner: OwnerApp) -> Non
     assert secret not in owner.client.get("/account/totp").text
     assert (
         owner.post(
-            "/account/totp/verify", {"code": pyotp.TOTP(secret).at(owner.app.state.clock.now())}
+            "/account/totp/verify", {"code": TOTP(secret).at(owner.app.state.clock.now())}
         ).status_code
         == 400
     )
@@ -435,7 +436,7 @@ def test_workspace_policy_is_scoped_owner_only_and_blocks_existing_local_session
         "/account/totp/disable",
         {
             "confirm_password": owner.web.admin_password,
-            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(secret).at(owner.app.state.clock.now()),
         },
     )
     assert owner.client.get("/", follow_redirects=False).headers["location"] == "/account/totp"
@@ -617,9 +618,7 @@ def test_recovery_still_works_if_the_instance_key_changes(owner: OwnerApp) -> No
     owner.app.state.settings.secret_key = "replacement-instance-secret-0123456789abcdef"
     client = TestClient(owner.app)
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    assert (
-        _login(owner, client, pyotp.TOTP(secret).at(owner.app.state.clock.now())).status_code == 401
-    )
+    assert _login(owner, client, TOTP(secret).at(owner.app.state.clock.now())).status_code == 401
     assert _login(owner, client, codes[0]).status_code == 303
 
 
@@ -684,7 +683,7 @@ def test_instance_admin_can_reset_another_users_factor(owner: OwnerApp) -> None:
         data={
             "csrf_token": owner.web.csrf(confirm_page.text),
             "confirm_password": owner.web.admin_password,
-            "second_factor": pyotp.TOTP(admin_secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(admin_secret).at(owner.app.state.clock.now()),
         },
         follow_redirects=False,
     )
@@ -758,7 +757,7 @@ def test_disable_service_requires_a_second_factor_with_the_password(owner: Owner
         assert len(list(session.scalars(select(TotpRecoveryCode)))) == 10
 
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     outcome = totp.disable(factory, **_service_kwargs(owner, code))
     assert outcome.status == "confirmed" and outcome.value is True
     with owner.db() as session:
@@ -867,7 +866,7 @@ def test_password_rehash_is_applied_only_after_a_correct_code(
         assert stored is not None and stored.password_hash == before
 
     app.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    assert complete(pyotp.TOTP(secret).at(app.clock.now())).succeeded
+    assert complete(TOTP(secret).at(app.clock.now())).succeeded
     with owner.db() as session:
         stored = session.get(User, owner.admin_id)
         assert stored is not None and stored.password_hash != before
@@ -959,7 +958,7 @@ def test_secret_and_recovery_code_pages_are_never_cached(owner: OwnerApp) -> Non
     assert secret
     shown = owner.post(
         "/account/totp/verify",
-        {"code": pyotp.TOTP(secret.group(1)).at(owner.app.state.clock.now())},
+        {"code": TOTP(secret.group(1)).at(owner.app.state.clock.now())},
         token_from="/account/totp",
     )
     assert re.findall(CODE_PATTERN, shown.text)
@@ -1002,7 +1001,7 @@ def test_cli_password_reset_keeps_the_second_factor(owner: OwnerApp) -> None:
 
     assert sign_in("").status_code == 401
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    assert sign_in(pyotp.TOTP(secret).at(owner.app.state.clock.now())).status_code == 303
+    assert sign_in(TOTP(secret).at(owner.app.state.clock.now())).status_code == 303
 
 
 def test_cli_mfa_reset_removes_factor_and_password_sessions_only(owner: OwnerApp) -> None:
@@ -1096,7 +1095,7 @@ def test_expired_ticket_returns_to_login_with_a_neutral_message(owner: OwnerApp)
         "/login/verify",
         data={
             "csrf_token": owner.web.csrf(challenge.text),
-            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+            "second_factor": TOTP(secret).at(owner.app.state.clock.now()),
         },
         follow_redirects=False,
     )
@@ -1131,7 +1130,7 @@ def test_consumed_ticket_cannot_be_replayed(owner: OwnerApp) -> None:
     assert _password_step(owner, client).status_code == 303
     ticket = client.cookies["assetboard_login_ticket"]
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")  # past the enrollment code
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).status_code == 303
     replay = TestClient(owner.app)
     replay.cookies.set("assetboard_login_ticket", ticket)
@@ -1159,7 +1158,7 @@ def test_each_wrong_code_counts_and_a_ticket_allows_at_most_five(owner: OwnerApp
     assert "assetboard_session" not in client.cookies
     # The used-up ticket is gone even with a correct code.
     client.cookies.set("assetboard_login_ticket", ticket)
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
 
 
@@ -1179,7 +1178,7 @@ def test_wrong_codes_hit_the_sign_in_throttle_and_keep_the_ticket(owner: OwnerAp
     assert statuses[-1][0] == 401 and statuses[-1][1] is not None, statuses
     assert client.cookies.get("assetboard_login_ticket") == ticket
     # Throttled: even the right code is refused without consuming the ticket.
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     throttled = _code_step(client, owner, code)
     assert throttled.status_code == 401 and throttled.headers.get("retry-after")
     assert "assetboard_session" not in client.cookies
@@ -1216,7 +1215,7 @@ def test_break_glass_ticket_is_bound_to_its_flow_and_to_an_admin(owner: OwnerApp
         user = session.get(User, owner.admin_id)
         assert user is not None
         user.is_instance_admin = False
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     response = _code_step(client, owner, code, path="/login/local/verify")
     assert response.headers["location"] == "/login/local?expired=1"
     assert "assetboard_session" not in client.cookies
@@ -1230,7 +1229,7 @@ def test_break_glass_ticket_succeeds_with_a_code(owner: OwnerApp) -> None:
     client = TestClient(owner.app)
     assert _password_step(owner, client, path="/login/local").status_code == 303
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")  # past the enrollment code
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     response = _code_step(client, owner, code, path="/login/local/verify")
     assert response.status_code == 303 and client.cookies.get("assetboard_session")
     assert client.cookies.get("assetboard_login_ticket") is None
@@ -1247,7 +1246,7 @@ def test_ticket_cookie_is_scoped_to_the_login_routes(owner: OwnerApp) -> None:
     first = _password_step(owner, client)
     assert "Path=/login" in first.headers["set-cookie"]
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     success = _code_step(client, owner, code)
     cleared = [h for h in success.headers.get_list("set-cookie") if "login_ticket" in h]
     assert cleared and all("Path=/login" in h and "Max-Age=0" in h for h in cleared)
@@ -1281,7 +1280,7 @@ def test_pending_ticket_ends_when_the_password_changes(owner: OwnerApp) -> None:
         )
     assert _ticket_count(owner) == 0
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
 
 
@@ -1294,7 +1293,7 @@ def test_pending_ticket_ends_when_the_password_hash_changes_behind_it(owner: Own
         assert user is not None
         user.password_hash = auth.argon2_hash("A Brand New Password 1")
     owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
 
 
@@ -1311,7 +1310,7 @@ def test_pending_ticket_ends_when_totp_is_disabled(owner: OwnerApp) -> None:
     with owner.db() as session:
         assert session.get(TotpFactor, owner.admin_id) is None
     assert _ticket_count(owner) == 0
-    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    code = TOTP(secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
 
 
@@ -1331,7 +1330,7 @@ def test_pending_ticket_ends_on_reset_and_re_enrolment(owner: OwnerApp) -> None:
     new_secret, _new_codes = _enable(owner)
     owner.app.state.clock = FixedClock("2026-10-21T12:01:30+00:00")
     client.cookies.set("assetboard_login_ticket", ticket, path="/login")
-    code = pyotp.TOTP(new_secret).at(owner.app.state.clock.now())
+    code = TOTP(new_secret).at(owner.app.state.clock.now())
     assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
     assert "assetboard_session" not in client.cookies
 
@@ -1389,7 +1388,7 @@ def test_https_two_step_login_keeps_the_path_scoped_ticket_and_completes(
             "/login/verify",
             data={
                 "csrf_token": owner.web.csrf(challenge.text),
-                "second_factor": pyotp.TOTP(secret).at(app.state.clock.now()),
+                "second_factor": TOTP(secret).at(app.state.clock.now()),
             },
             follow_redirects=False,
         )
