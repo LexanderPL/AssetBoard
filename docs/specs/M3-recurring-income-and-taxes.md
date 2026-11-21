@@ -124,9 +124,11 @@ owner decision of 2026-11-04):**
   Pause/Resume and Delete for editors. **Archived items are not listed** (their history stays
   in transactions); the Archive button is gone from the page (the `archive` action route
   stays). Delete keeps its confirmation, now worded "its planned dates are removed; payments
-  already recorded or skipped stay in your history". There is no link to Upcoming (owner rule:
-  no buttons or links to other sections). Empty state: one "New recurring item" button; with
-  items, the same primary button sits at the top.
+  already recorded or skipped stay in your history". A compact related-links row above the
+  list points to **Income** for salary/variable income sources and, when taxes are enabled, to
+  **Taxes** for income tax rules (added 2026-11-21). There is still no link to Upcoming.
+  Empty state: one "New recurring item" button; with items, the same primary button sits at the
+  top.
 - The schedule sentence is `web/schedule_text.describe_rule(rule, locale, today)` (gettext
   words, CLDR month and date names): "Monthly on the 10th", "Every 3 months on the 15th, from
   January 2027", "Yearly on 31 March", "Weekly on Monday", ", until December 2027",
@@ -308,8 +310,8 @@ effect/`record_as` model above.
   this tax only); `/taxes/calculator` redirects to `/taxes`. The warning box is replaced by an
   intro line; `users.tax_warning_dismissed` stays but is unused.
 - `workspaces.taxes_enabled` (Workspace settings → Menu, owners) hides the Taxes menu item, the
-  tax pages (404) and the tax parts of income; it cannot be turned off while a non-archived
-  income source has a tax attached.
+  tax pages (404), the tax parts of income and the Recurring page's income-tax link; it cannot
+  be turned off while a non-archived income source has a tax attached.
 - "Other taxes" are `scheduled_items.is_tax` recurring items created on the Taxes page.
 
 **Agent prompt**
