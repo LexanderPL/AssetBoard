@@ -133,7 +133,8 @@ def test_wizard_steps_keep_values_and_save_without_taxes(owner):
     assert "The end month cannot be before the start month." in reversed_range.text
 
     saved = _save(owner, _fixed(owner), 3)
-    assert saved.status_code == 303 and saved.headers["location"].endswith("/income")
+    assert saved.status_code == 303
+    assert saved.headers["location"] == "/income?notice=created"
     with owner.db() as session:
         source = session.scalars(select(IncomeSource)).one()
         assert (source.kind, source.fixed_minor, source.pay_day, source.pay_lag_months) == (

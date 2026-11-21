@@ -1,4 +1,4 @@
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, toast with context %}
 {# F3.7: the HTMX target; every action swaps this whole element. #}
 {% set source_id = calendar.source_id|string %}
 {% set page_url = scoped_url(request, 'income_calendar', source_id=source_id) %}
@@ -30,7 +30,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
     {% if can_override %}<a href="{{ override_url }}" hx-get="{{ override_url }}" hx-target="#work-calendar" hx-swap="outerHTML" class="btn" data-edit-anyway>{{ _("Edit anyway") }}</a>{% endif %}
   </div>
   {% endif %}
-  {% if notice == "transaction_updated" %}<p role="status" class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-transaction-updated>{{ _("The transaction now matches the logged days.") }}</p>{% endif %}
+  {% if toast_notice %}{{ toast(toast_notice, none, none) }}{% endif %}
   {% if posted_change %}
   <div id="posted-change" role="status" class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-posted-change>
     <p>{{ _("Logged days changed. The received payment was %(received)s; the new days give %(recalculated)s.", received=format_money(posted_change.received, locale), recalculated=format_money(posted_change.recalculated, locale)) }}</p>

@@ -176,7 +176,8 @@ def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
     )
     (row,) = _rows(ledger)
     assert (str(row.date), row.amount_minor, row.currency) == ("2026-08-31", 1250, "EUR")
-    assert "Entry added." in _page(ledger, "/transactions/2026-08?notice=transaction_added")
+    page = _page(ledger, "/transactions/2026-08?notice=transaction_added")
+    assert "Entry added." in page and "data-toast" in page and "data-notice" not in page
 
 
 def test_a_future_dated_tombstone_has_no_undo_toast(ledger: OwnerApp) -> None:

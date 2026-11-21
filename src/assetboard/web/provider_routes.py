@@ -91,6 +91,7 @@ def _render(
     status_code: int = 200,
 ) -> Response:
     page = provider_page(request.app.state.session_factory, ctx)
+    notice_message = _t(request, notice) if notice else None
     context: dict[str, Any] = {
         "page": page,
         "can_manage_providers": has_role(ctx, Role.OWNER),
@@ -98,7 +99,8 @@ def _render(
             card.definition.key == "coingecko" and card.enabled for card in page.cards
         ),
         "base_currency": ctx.workspace.base_currency,
-        "notice": _t(request, notice) if notice else None,
+        "notice": notice_message,
+        "toast_notice": notice_message if is_htmx_fragment_request(request) else None,
         "error": _t(request, error) if error else None,
         "refresh_message": _refresh_message(request, refresh) if refresh else None,
         "format_day": format_day,

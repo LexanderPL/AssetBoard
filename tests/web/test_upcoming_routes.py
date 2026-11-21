@@ -488,6 +488,7 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
         occurrence_id = occurrence.id
     page = owner.client.get(created.headers["location"]).text
     assert "One-time payment added for" in page
+    assert "data-toast" in page and "data-upcoming-notice" not in page
     card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
     assert card is not None
     # A one-time row: Mark paid in the row, Edit and Delete in the overflow menu; no Skip,
@@ -515,7 +516,9 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
         token_from="/upcoming",
     )
     assert edited.headers["location"] == "/upcoming?notice=one_time_saved"
-    assert "One-time payment saved." in owner.client.get(edited.headers["location"]).text
+    edited_page = owner.client.get(edited.headers["location"]).text
+    assert "One-time payment saved." in edited_page
+    assert "data-toast" in edited_page and "data-upcoming-notice" not in edited_page
     with owner.db() as session:
         stored = session.get(ScheduledOccurrence, occurrence_id)
         assert stored is not None

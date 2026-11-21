@@ -12,7 +12,6 @@
   <a href="?form=rate#rate-dialog" class="btn-primary" data-dialog-open="rate-dialog" aria-haspopup="dialog">{{ _("New reference rate") }}</a>
 </div>
 {% endif %}
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error and not field_error_shown %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 <p class="mb-6 max-w-2xl text-sm text-muted">{{ _("A reference rate is a series you maintain, like WIBOR or EURIBOR. Add a value with the date it starts; variable-rate loans use the latest value plus their margin.") }}</p>
 

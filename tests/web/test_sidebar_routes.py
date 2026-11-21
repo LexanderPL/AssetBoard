@@ -182,11 +182,8 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
     ]
     page = owner.client.get("/account?sidebar=saved#sidebar-settings").text
     settings = panel(page)
-    notice = re.search(r'<p [^>]*role="status"[^>]*data-sidebar-notice[^>]*>.*?</p>', settings,
-                       re.DOTALL)  # fmt: skip
-    assert notice is not None and "Your sidebar is saved." in notice.group(0)
-    # The status is inside the Sidebar panel, not the OIDC notice at the top.
-    assert "data-profile-notice" not in page
+    assert 'id="toast-container"' in page and "data-toast" in page
+    assert "Your sidebar is saved." in page
     assert nav_hooks(owner.client.get("/").text) == [
         "home",
         "investments",
@@ -233,7 +230,8 @@ def test_reset_restores_the_canonical_order(owner: OwnerApp) -> None:
         HOOKS[key] for key in CANONICAL_KEYS if key != "taxes"
     ]
     page = owner.client.get("/account?sidebar=reset").text
-    assert "Your sidebar is back to the default order." in panel(page)
+    assert "Your sidebar is back to the default order." in page
+    assert 'id="toast-container"' in page and "data-toast" in page
 
 
 def test_the_sidebar_posts_need_the_csrf_token(owner: OwnerApp) -> None:
@@ -448,7 +446,7 @@ def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:
 
 def test_unknown_sidebar_status_query_is_ignored(owner: OwnerApp) -> None:
     page = owner.client.get("/account?sidebar=evil").text
-    assert "data-sidebar-notice" not in page
+    assert "data-toast" not in page
 
 
 def _demo_app(web: WebHarness):

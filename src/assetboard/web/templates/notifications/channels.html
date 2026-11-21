@@ -58,7 +58,6 @@
 {% if demo_session %}<p class="text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>{% endif %}
 {% if not page.delivery_enabled %}<p role="status" class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-notifications-disabled>{{ _("The administrator has turned notifications off on this server. Channels are kept, but nothing is sent.") }}</p>{% endif %}
 {% if error and not new_channel_open %}<p role="alert" class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
-{% if notice %}<p role="status" class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-notice>{{ notice }}</p>{% endif %}
 <div class="space-y-6">
 {% for channel in page.channels %}
 <section class="panel p-4 sm:p-6" data-channel="{{ channel.id }}">

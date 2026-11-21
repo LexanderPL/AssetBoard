@@ -552,6 +552,7 @@ def _list_page(
         except (NotFound, InvestmentTransactionError):
             editing = None
             edit_values = None
+    notice_message = _list_notice(request, notice)
     context: dict[str, Any] = {
         "result": result,
         "instruments": instruments,
@@ -569,7 +570,8 @@ def _list_page(
         "edit_errors": {
             field: _t(request, message) for field, message in (edit_errors or {}).items()
         },
-        "notice": _list_notice(request, notice),
+        "notice": notice_message,
+        "toast_notice": notice_message if is_htmx_fragment_request(request) else None,
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
@@ -627,6 +629,7 @@ def _history_page(
 ) -> Response:
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
+    notice_message = _t(request, NOTICES[notice]) if notice in NOTICES else None
     income_categories, default_income_category = _income_options(
         request.app.state.session_factory, ctx
     )
@@ -716,7 +719,8 @@ def _history_page(
         "edit_errors": {
             field: _t(request, message) for field, message in (edit_errors or {}).items()
         },
-        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice": notice_message,
+        "toast_notice": notice_message if is_htmx_fragment_request(request) else None,
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),

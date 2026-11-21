@@ -4,12 +4,10 @@
 {% from "macros/components.html" import toast with context %}
 {% set target = "instrument-history-body" %}
 <div id="instrument-history-body" class="space-y-6">
-  {% if notice %}
-  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
-  {% endif %}
   {% if error %}
   <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
+  {% if toast_notice %}{{ toast(toast_notice, none, none) }}{% endif %}
   {% if toast_undo %}{{ toast(toast_message, toast_undo, _("Undo"), toast_seconds) }}{% endif %}
 
   {{ tabs("instruments") }}

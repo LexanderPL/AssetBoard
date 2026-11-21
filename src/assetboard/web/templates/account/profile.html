@@ -4,8 +4,8 @@
 {% block heading %}{{ _("Profile") }}{% endblock %}
 {% block content %}
 <div class="max-w-4xl space-y-6" data-page-width="4xl">
-{% if notice %}
-<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-profile-notice>{{ notice }}</p>
+{% if identity_notice %}
+<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-profile-notice>{{ identity_notice }}</p>
 {% endif %}
 {% if error %}
 <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-profile-error>{{ error }}</p>
@@ -45,9 +45,6 @@
   <section id="sidebar-settings" class="panel p-6 sm:p-7" aria-labelledby="sidebar-heading" data-sidebar-settings>
     <h2 id="sidebar-heading" class="text-base font-semibold">{{ _("Sidebar") }}</h2>
     <p class="mt-2 text-sm text-muted">{{ _("Choose which pages appear in the sidebar and in which order. Press Save sidebar to apply your changes. Some pages appear only where the workspace enables the feature, such as Taxes.") }}</p>
-    {% if sidebar_notice %}
-    <p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-sidebar-notice>{{ sidebar_notice }}</p>
-    {% endif %}
     {% if demo_session %}
     <p class="mt-4 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
     {% else %}

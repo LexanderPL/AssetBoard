@@ -151,7 +151,9 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
             one_time.get_by_label("Category").select_option(label="Gifts")
             one_time.get_by_role("button", name="Add payment").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-upcoming-notice]")).to_contain_text("One-time payment")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "One-time payment"
+            )
             # An existing one-time item's rule form still hides the repeat fields.
             with app.state.session_factory() as session:
                 item_id = session.scalars(

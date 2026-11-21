@@ -50,6 +50,18 @@ def test_a_toast_without_undo_is_not_strict() -> None:
     assert "data-toast-strict" not in rendered and "data-toast-countdown" not in rendered
 
 
+def test_toast_item_has_no_out_of_band_attribute() -> None:
+    templates = templates_for("en")
+    rendered = templates.env.from_string(
+        '{% from "macros/components.html" import toast_item %}{{ toast_item("Saved") }}'
+    ).render()
+
+    assert "hx-swap-oob" not in rendered
+    assert rendered.count('data-toast role="status"') == 1
+    assert "data-toast-strict" not in rendered and "data-toast-countdown" not in rendered
+    assert "data-toast-dismiss" in rendered
+
+
 def test_vendored_javascript_matches_documented_hashes() -> None:
     repository = Path(__file__).parents[2]
     vendor_directory = repository / "src/assetboard/static/vendor"

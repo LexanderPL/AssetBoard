@@ -336,7 +336,10 @@ def test_profile_saves_name_language_and_theme(h: Harness, value: str, stored: s
         },
         follow_redirects=False,
     )
-    assert response.status_code == 303 and response.headers["location"] == "/account"
+    assert response.status_code == 303 and response.headers["location"] == "/account?saved=1"
+    page = client.get(response.headers["location"]).text
+    assert 'id="toast-container"' in page and "data-toast" in page
+    assert ("Profil został zapisany." if stored == "pl" else "Profile saved.") in page
     saved = h.user(h.web.admin_email)
     assert (saved.display_name, saved.locale, saved.theme) == ("Ola Admin", stored, "dark")
 

@@ -45,9 +45,6 @@
     <a href="{{ filters_url }}" data-dialog-open="filters-dialog" aria-haspopup="dialog" class="btn" data-filters-open>{{ _("Filters") }}</a>
     <a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="btn" data-export-open>{{ _("Export CSV") }}</a>
   </div>
-  {% if notice %}
-  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
-  {% endif %}
   {# The search bar stays outside #history-results: a live search replaces that block, and the
      focused field must survive the swap. The results, their page links, the bulk action and the
      dialogs (with their hidden filter state) are inside and follow the search. #}

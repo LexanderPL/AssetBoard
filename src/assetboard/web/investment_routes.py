@@ -255,12 +255,14 @@ def _class_body_context(
     edit_values: dict[str, object] | None = None,
     edit_errors: dict[str, str] | None = None,
 ) -> dict[str, object]:
+    message = _t(request, CLASS_NOTICES[notice]) if notice in CLASS_NOTICES else None
     return {
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": page.coingecko_enabled,
-        "notice": _t(request, CLASS_NOTICES[notice]) if notice in CLASS_NOTICES else None,
+        "notice": message,
+        "toast_notice": message if is_htmx_fragment_request(request) else None,
         "error": _t(request, error) if error else None,
         "create_values": create_values or _class_values(),
         "create_errors": {f: _t(request, m) for f, m in (create_errors or {}).items()},
@@ -292,13 +294,15 @@ def _instrument_body_context(
     )
     edit_weights = _weights(edit_values) if edit_values else {}
     create_weights = _weights(values)
+    message = _t(request, INSTRUMENT_NOTICES[notice]) if notice in INSTRUMENT_NOTICES else None
     return {
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": page.coingecko_enabled,
         "provider_choices": page.provider_choices,
-        "notice": _t(request, INSTRUMENT_NOTICES[notice]) if notice in INSTRUMENT_NOTICES else None,
+        "notice": message,
+        "toast_notice": message if is_htmx_fragment_request(request) else None,
         "error": _t(request, error) if error else None,
         "create_values": values,
         "create_errors": {f: _t(request, m) for f, m in (create_errors or {}).items()},

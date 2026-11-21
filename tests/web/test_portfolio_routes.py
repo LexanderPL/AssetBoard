@@ -536,7 +536,11 @@ def test_risk_policy_editor_saves_and_recomputes(owner: OwnerApp) -> None:
     assert "notice=risk_policy_saved" in response.headers["location"]
     page = owner.client.get(response.headers["location"]).text
     assert "Risk targets saved." in page
+    assert "data-toast" in page
     assert "20%" in page and "70%" in page
+    unknown = owner.client.get(f"{PORTFOLIO}?notice=unknown")
+    assert unknown.status_code == 200
+    assert "data-toast" not in unknown.text
     with owner.db() as session:
         row = session.scalars(select(RiskTargetPolicy)).one()
     assert (row.mode, row.safe_bp, row.growth_bp, row.speculative_bp) == (

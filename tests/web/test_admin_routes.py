@@ -263,7 +263,7 @@ def test_deactivation_ends_every_session_and_every_sign_in(h: Harness) -> None:
     assert sorted(m for e, m in h.sessions() if e == OLA) == ["oidc", "password", "proxy"]
 
     response = act(h, admin(h), user_id(h, OLA), "deactivate")
-    assert response.status_code == 200 and "data-admin-notice" in response.text
+    assert response.status_code == 200 and "data-toast" in response.text
     assert [e for e, _m in h.sessions() if e == OLA] == []
     assert h.audits("admin.user_deactivated") == [{"sessions_revoked": 3}]
     assert not h.user(OLA).is_active

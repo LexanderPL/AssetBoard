@@ -420,6 +420,8 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
     )
     assert response.status_code == 303
     assert response.headers["location"] == "/?saved=1"
+    saved_page = owner.client.get(response.headers["location"]).text
+    assert "data-toast" in saved_page and "Home saved." in saved_page
     assert _widget_order(owner.client.get("/").text) == chosen
     with owner.db() as session:
         row = DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id)
@@ -429,6 +431,8 @@ def test_customise_saves_the_enabled_widgets_in_order(owner: OwnerApp) -> None:
 
     reset = owner.post("/dashboard/customise/reset", token_from="/dashboard/customise")
     assert reset.status_code == 303 and reset.headers["location"] == "/?reset=1"
+    reset_page = owner.client.get(reset.headers["location"]).text
+    assert "data-toast" in reset_page and "Home reset to the default widgets." in reset_page
     assert _widget_order(owner.client.get("/").text) == list(WIDGET_KEYS)
     with owner.db() as session:
         assert DashboardPreferenceRepository(session, _ctx(owner)).for_user(owner.admin_id) is None

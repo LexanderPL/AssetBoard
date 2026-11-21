@@ -153,6 +153,7 @@ def transactions_context(
         message = PLANNED_IN if planned else SAVED_IN
         context["notice"] = _t(request, message) % {"month": format_month(saved_in, locale)}
         context["notice_href"] = transactions_path(request, saved_in)
+        context["notice_inline"] = True
     return {**context, "ledger": ledger, "deleted": pending.id if pending is not None else None}
 
 

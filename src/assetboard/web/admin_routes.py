@@ -553,6 +553,8 @@ async def _settings_page(
     wanted: tuple[bool, bool, bool] | None = None,
     wanted_retention: tuple[int, int, int] | None = None,
     notice: str | None = None,
+    backup_notice: str | None = None,
+    backup_notice_tone: str = "success",
     error: str | None = None,
     status_code: int = 200,
 ) -> Response:
@@ -591,6 +593,8 @@ async def _settings_page(
             "registration_blocker": _t(request, SETTINGS_RESULTS[blocker]) if blocker else None,
             "confirm": await confirm_view(request, current),
             "notice": notice,
+            "backup_notice": backup_notice,
+            "backup_notice_tone": backup_notice_tone,
             "error": error,
             **_demo_panel_context(request, demo_status, state.settings, state.clock.now()),
         },
@@ -605,7 +609,12 @@ async def _settings_page(
 async def settings_form(request: Request) -> Response:
     notice_key = request.query_params.get("backup", "")
     notice = _t(request, BACKUP_NOTICES[notice_key]) if notice_key in BACKUP_NOTICES else None
-    return await _settings_page(request, _require_admin(request), notice=notice)
+    tone = {"created": "success", "failed": "danger", "unavailable": "warning"}.get(
+        notice_key, "success"
+    )
+    return await _settings_page(
+        request, _require_admin(request), backup_notice=notice, backup_notice_tone=tone
+    )
 
 
 def _retention_values(

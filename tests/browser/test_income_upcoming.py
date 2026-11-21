@@ -215,7 +215,9 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             one_time.get_by_role("button", name="Add payment").click()
             page.wait_for_load_state("networkidle")
             expect(one_time_dialog).to_be_hidden()
-            expect(page.locator("[data-upcoming-notice]")).to_contain_text("One-time payment")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "One-time payment"
+            )
 
             # At 390 px the filters start collapsed, so the first occurrence is visible in the
             # first viewport. A row has one primary action and the overflow menu only; Mark paid

@@ -645,6 +645,9 @@ def test_rollback_removes_the_batch_and_keeps_later_changes(owner: OwnerApp) -> 
     )
 
     assert rolled_back.status_code == 303
+    assert rolled_back.headers["location"] == "/workspace/data?notice=rolled_back"
+    rolled_back_page = owner.client.get(rolled_back.headers["location"]).text
+    assert "data-import-notice" in rolled_back_page and "Import rolled back." in rolled_back_page
     assert all(row.deleted_at is not None for row in _imported(owner))
     with owner.db() as session:
         remaining = session.scalars(

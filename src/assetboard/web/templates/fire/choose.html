@@ -4,7 +4,6 @@
 {% block title %}{{ _("Choose your FIRE plan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Choose your FIRE plan") }}{% endblock %}
 {% block content %}
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
 <section class="panel p-6 sm:p-7" aria-labelledby="choose-heading" data-fire-choose>

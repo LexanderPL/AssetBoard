@@ -93,7 +93,7 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             editing.get_by_label("Name").fill("Groceries")
             editing.get_by_role("button", name="Save").click()
             expect(expense.first).to_have_text("Groceries")
-            expect(page.locator("[data-notice]")).to_have_text("Category saved.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text("Category saved.")
 
             # At phone width every row action is a 44 px touch target. The overflow menu (swapped
             # in by the save above) opens, closes on an outside press, and Escape returns the
@@ -130,9 +130,17 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             expect(category_dialog).to_be_visible()
             category_dialog.get_by_label("Name").fill("Pets")
             category_dialog.get_by_role("button", name="Add", exact=True).click()
-            expect(page.locator("[data-notice]")).to_have_text("Category added.")
+            toast = page.locator("#toast-container [data-toast]").last
+            expect(toast).to_contain_text("Category added.")
+            box = toast.bounding_box()
+            viewport = page.viewport_size
+            assert box is not None and viewport is not None
+            assert box["x"] + box["width"] >= viewport["width"] - 40
+            assert box["y"] + box["height"] >= viewport["height"] - 40
             expect(category_dialog).to_be_hidden()
             expect(page.locator("li[data-category]", has_text="Pets")).to_have_count(1)
+            # With JavaScript the toast dismisses itself after five seconds.
+            expect(toast).to_have_count(0, timeout=6000)
 
             # Delete asks for confirmation through the CSP-safe dialog.
             gifts = page.locator("li[data-category]", has_text="Gifts")
@@ -143,7 +151,9 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             assert accept.evaluate("el => el.classList.contains('btn-danger')")
             assert not accept.evaluate("el => el.classList.contains('btn-primary')")
             page.get_by_role("button", name="Continue").click()
-            expect(page.locator("[data-notice]")).to_have_text("Category deleted.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Category deleted."
+            )
             expect(page.locator("li[data-category]", has_text="Gifts")).to_have_count(0)
 
             # A workspace without any category (one created before the automatic seed) is

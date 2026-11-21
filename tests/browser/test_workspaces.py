@@ -131,7 +131,7 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             admin_page.get_by_label("Who can create workspaces").select_option("off")
             admin_page.get_by_label("Your password").fill(PASSWORD)
             admin_page.get_by_role("button", name="Save settings").click()
-            expect(admin_page.locator("[data-admin-notice]")).to_have_text(
+            expect(admin_page.locator("#toast-container [data-toast]")).to_contain_text(
                 "Instance settings saved."
             )
             assert admin_page.evaluate("window.__cspViolations") == []

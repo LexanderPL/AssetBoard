@@ -133,7 +133,7 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
 
             editing.get_by_label("Name").fill("Cars")
             editing.get_by_role("button", name="Save").click()
-            expect(page.locator("[data-notice]")).to_have_text("Category saved.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text("Category saved.")
             renamed = page.locator("li[data-category]", has_text="Cars").first
             expect(renamed).to_be_visible()
             expect(renamed).to_be_in_viewport()

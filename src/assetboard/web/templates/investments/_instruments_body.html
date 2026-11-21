@@ -1,11 +1,9 @@
 {% from "investments/_instrument_form.html" import instrument_form with context %}
 {% from "investments/_macros.html" import htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input, row_menu with context %}
+{% from "macros/components.html" import csrf_input, row_menu, toast with context %}
 <div id="investments-body" class="space-y-6">
-  {% if notice %}
-  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
-  {% endif %}
+  {% if toast_notice %}{{ toast(toast_notice, none, none) }}{% endif %}
   {% if error %}
   <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}

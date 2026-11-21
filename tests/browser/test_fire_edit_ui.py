@@ -463,7 +463,7 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-fire-discard]").click()
             page.wait_for_url(f"{base}/fire/edit?discarded=1")
             assert page.locator('input[name="expenses_manual"]').input_value() == "30000.00"
-            expect(page.locator("[data-action-notice]")).to_contain_text(
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
                 "Unsaved changes discarded."
             )
 
@@ -473,7 +473,7 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             with page.expect_navigation(wait_until="networkidle"):
                 page.locator("[data-fire-save]").click()
             assert page.url == f"{base}/fire?notice=saved"
-            expect(page.locator("[data-action-notice]")).to_be_visible()
+            expect(page.locator("#toast-container [data-toast]")).to_be_visible()
             page.locator("#plan-inputs > summary").click()
             expect(page.locator("[data-fire-plan-values]")).to_contain_text("€80,000.00")
 
@@ -552,6 +552,10 @@ def test_view_and_edit_modes_in_a_browser(tmp_path: Path) -> None:
             with no_js_page.expect_navigation(wait_until="load"):
                 no_js_page.locator("[data-fire-save]").click()
             assert "/fire?notice=saved" in no_js_page.url
+            no_js_toast = no_js_page.locator("#toast-container [data-toast]")
+            expect(no_js_toast).to_be_visible()
+            no_js_page.wait_for_timeout(6000)
+            expect(no_js_toast).to_be_visible()  # without JavaScript the server toast stays
             no_js_page.locator("#plan-inputs > summary").click()
             expect(no_js_page.locator("[data-fire-plan-values]")).to_contain_text("€51,000.00")
             no_js_page.set_viewport_size({"width": 390, "height": 844})

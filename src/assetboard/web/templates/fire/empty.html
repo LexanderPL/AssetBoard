@@ -2,7 +2,6 @@
 {% block title %}{{ _("FIRE plan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("FIRE plan") }}{% endblock %}
 {% block content %}
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 <section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="fire-empty-heading" data-fire-no-plan{% if cancelled %} data-fire-cancelled{% endif %}>
   <h2 id="fire-empty-heading" class="text-base font-semibold">{% if cancelled %}{{ _("Setup cancelled") }}{% else %}{{ _("No FIRE plan yet") }}{% endif %}</h2>
   {% if cancelled %}

@@ -166,7 +166,9 @@ def test_calendar_received_month_is_read_only_until_edit_anyway(owner):
     )
     assert updated.headers["location"].endswith(f"{base}?month=2026-08&notice=transaction_updated")
     assert _amount(owner, transaction_id) == 492_000
-    assert "data-transaction-updated" in owner.client.get(updated.headers["location"]).text
+    updated_page = owner.client.get(updated.headers["location"]).text
+    assert "data-toast" in updated_page
+    assert "The transaction now matches the logged days." in updated_page
 
 
 def test_a_closed_month_refuses_changes_even_with_override(owner):

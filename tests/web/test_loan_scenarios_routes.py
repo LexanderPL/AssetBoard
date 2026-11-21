@@ -203,7 +203,7 @@ def test_a_named_row_saves_and_reuses_the_name(owner) -> None:
     )
     assert first.status_code == 200
     assert "data-saved-scenario=" in first.text
-    assert "data-action-notice" in first.text
+    assert "data-toast" in first.text
     with owner.db() as session:
         rows = list(session.query(LoanScenario).filter_by(loan_id=UUID(loan_id)))
     assert len(rows) == 1

@@ -2695,6 +2695,9 @@ msgstr "Pasek boczny wrócił do domyślnej kolejności."
 msgid "Browser language"
 msgstr "Język przeglądarki"
 
+msgid "Profile saved."
+msgstr "Profil został zapisany."
+
 msgid "The sign-in method was removed from your account."
 msgstr "Metoda logowania została usunięta z Twojego konta."
 
@@ -4056,6 +4059,18 @@ msgid "The income source could not be saved. Check the form and try again."
 msgstr ""
 "Nie udało się zapisać źródła przychodu. Sprawdź formularz i spróbuj "
 "ponownie."
+
+msgid "Income source created."
+msgstr "Utworzono źródło przychodu."
+
+msgid "Income source saved."
+msgstr "Zapisano źródło przychodu."
+
+msgid "Income source archived."
+msgstr "Zarchiwizowano źródło przychodu."
+
+msgid "The transaction now matches the logged days."
+msgstr "Transakcja odpowiada teraz zapisanym dniom."
 
 #, python-format
 msgid "Work done in %(month)s is paid on %(date)s."
@@ -5888,11 +5903,20 @@ msgstr ""
 "Ta pozycja przesuwa daty na dni robocze, a dla kraju obszaru roboczego "
 "brak danych o świętach."
 
+msgid "Recurring item created."
+msgstr "Utworzono pozycję cykliczną."
+
+msgid "Recurring item saved."
+msgstr "Zapisano pozycję cykliczną."
+
 msgid "Recurring item paused."
 msgstr "Wstrzymano pozycję cykliczną."
 
 msgid "Recurring item resumed."
 msgstr "Wznowiono pozycję cykliczną."
+
+msgid "Recurring item archived."
+msgstr "Zarchiwizowano pozycję cykliczną."
 
 msgid "Recurring item deleted."
 msgstr "Usunięto pozycję cykliczną."
@@ -6276,12 +6300,21 @@ msgstr "Metoda kosztu inwestycji"
 msgid "Risk targets"
 msgstr "Cele ryzyka"
 
+msgid "Member role changed."
+msgstr "Zmieniono rolę członka."
+
+msgid "Member removed."
+msgstr "Usunięto członka."
+
 #, python-format
 msgid "Closed %(num)d imported month."
 msgid_plural "Closed %(num)d imported months."
 msgstr[0] "Zamknięto %(num)d zaimportowany miesiąc."
 msgstr[1] "Zamknięto %(num)d zaimportowane miesiące."
 msgstr[2] "Zamknięto %(num)d zaimportowanych miesięcy."
+
+msgid "Import rolled back."
+msgstr "Cofnięto import."
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -8858,9 +8891,6 @@ msgstr "Otwórz transakcję"
 
 msgid "Edit anyway"
 msgstr "Edytuj mimo to"
-
-msgid "The transaction now matches the logged days."
-msgstr "Transakcja odpowiada teraz zapisanym dniom."
 
 #, python-format
 msgid ""

@@ -14,7 +14,6 @@
 {% set field_error_shown = error_field in ("effective_from", "rate_percent", "name", "mode", "fixed_amount", "effective_to", "date", "amount", "note", "overpayment_mode", "overpayment_amount", "overpayment_strategy", "property_item_id", "category_id") %}
 {{ tabs("loans") }}
 {{ loan_tabs("settings") }}
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error and not field_error_shown %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
 <section class="panel mb-6 p-4 sm:p-6" id="terms" aria-labelledby="terms-heading" data-loan-terms data-loan-settings-page>

@@ -1004,6 +1004,7 @@ def _wizard_context(
     error: str | None = None,
     error_field: str | None = None,
     notice: str | None = None,
+    notice_inline: bool = False,
     extreme_confirmation: bool = False,
 ) -> dict[str, object]:
     locale = request.state.locale
@@ -1034,6 +1035,7 @@ def _wizard_context(
         "error_field": error_field,
         "error_is_field": error_field is not None and error_field in STEP_FIELDS[step],
         "notice": notice,
+        "notice_inline": notice_inline,
         "can_edit": True,
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "format_money": format_money,
@@ -1134,6 +1136,7 @@ async def _render_wizard(
     error: str | None = None,
     error_field: str | None = None,
     notice: str | None = None,
+    notice_inline: bool = False,
     extreme_confirmation: bool = False,
     status_code: int = 200,
 ) -> Response:
@@ -1166,6 +1169,7 @@ async def _render_wizard(
         error=error,
         error_field=error_field,
         notice=notice,
+        notice_inline=notice_inline,
         extreme_confirmation=extreme_confirmation,
     )
     return render_template(request, "fire/wizard.html", context=context, status_code=status_code)
@@ -1589,6 +1593,7 @@ async def fire_wizard_step(request: Request, ctx: CurrentContext) -> Response:
             defaults,
             review=review,
             notice=_notice(request, "review_updated"),
+            notice_inline=True,
             extreme_confirmation=bool(validated.needs_extreme_confirmation),
         )
     if validated.needs_extreme_confirmation and not confirmed:

@@ -9,7 +9,6 @@
 {{ tabs("loans") }}
 {{ loan_tabs("payments") }}
 <p class="mb-6 max-w-3xl text-sm text-muted" data-payments-intro>{{ _("Record what you actually paid and the balance your bank reports. An actual installment is split against the projected row; a balance checkpoint re-anchors the schedule from the real balance. The two together show whether the loan is ahead of or behind the plan.") }}</p>
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
 <section class="panel mb-6 p-4 sm:p-6" id="payments" aria-labelledby="payments-heading" data-loan-payments-list>

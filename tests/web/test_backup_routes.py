@@ -32,6 +32,19 @@ def test_settings_page_shows_backup_status_and_retention_defaults(owner: OwnerAp
     assert 'value="6"' in page.text
 
 
+def test_backup_failures_do_not_render_as_success(owner: OwnerApp) -> None:
+    failed = owner.client.get("/admin/settings?backup=failed")
+    assert failed.status_code == 200
+    assert 'data-backup-notice="danger"' in failed.text
+    assert "border-danger-line" in failed.text and 'role="alert"' in failed.text
+    assert "The backup failed." in failed.text
+
+    unavailable = owner.client.get("/admin/settings?backup=unavailable")
+    assert unavailable.status_code == 200
+    assert 'data-backup-notice="warning"' in unavailable.text
+    assert "border-warning-line" in unavailable.text
+
+
 def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
     _set_clock(owner)
     confirm = owner.client.get("/admin/backups/now")
@@ -45,7 +58,9 @@ def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
     assert response.status_code == 303
     assert response.headers["location"].endswith("?backup=created")
     page = owner.client.get(response.headers["location"])
-    assert "Backup created." in page.text
+    assert 'data-backup-notice="success"' in page.text and "Backup created." in page.text
+    assert "border-success-line" in page.text
+    assert "data-toast" not in page.text
     settings = owner.app.state.settings
     files = list((settings.data_dir / "backups").glob("assetboard-manual-*.db"))
     assert len(files) == 1
@@ -153,6 +168,7 @@ def test_retention_settings_are_saved_and_audited(owner: OwnerApp) -> None:
     )
     assert response.status_code == 200
     assert "Instance settings saved." in response.text
+    assert 'id="toast-container"' in response.text and "data-toast" in response.text
     with owner.db() as session:
         row = session.get(InstanceSettings, 1)
         assert row is not None

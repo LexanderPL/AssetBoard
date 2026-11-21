@@ -102,6 +102,19 @@ ERRORS = {
     "invalid_range": _("The end month cannot be before the start month."),
     "failed": _("The income source could not be saved. Check the form and try again."),
 }
+NOTICES = {
+    "created": _("Income source created."),
+    "saved": _("Income source saved."),
+    "archived": _("Income source archived."),
+}
+
+
+def _notice_text(request: Request, notice: str | None) -> str | None:
+    if notice in NOTICES:
+        return gettext(NOTICES[notice], request.state.locale)
+    if notice == "transaction_updated":
+        return gettext("The transaction now matches the logged days.", request.state.locale)
+    return None
 
 
 def _id(value: str) -> UUID:
@@ -180,10 +193,15 @@ def _redirect(
     *,
     extra: dict[str, str] | None = None,
     anchor: str = "",
+    notice: str | None = None,
 ) -> Response:
     """Back to the sources page; ``form`` names the collapsed form to reopen with the error."""
     target = request.url_for("income_sources").path
-    query = ({"error": error} | ({"form": form} if form else {}) | (extra or {})) if error else {}
+    query: dict[str, str] = {}
+    if error:
+        query.update({"error": error} | ({"form": form} if form else {}) | (extra or {}))
+    if notice:
+        query["notice"] = notice
     fragment = f"#{anchor}" if anchor else ""
     return RedirectResponse(
         target + ("?" + urlencode(query) if query else "") + fragment, status_code=303
@@ -352,7 +370,7 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "log_month": log_month,
             # ``?override=1`` (from "Edit anyway") opens the Log form already overriding.
             "log_override": request.query_params.get("override") == "1",
-            "notice": request.query_params.get("notice"),
+            "notice": _notice_text(request, request.query_params.get("notice")),
             **_change_context(request, change),
             **_common(request, ctx),
         },
@@ -379,7 +397,7 @@ async def create_source(request: Request, ctx: CurrentContext) -> Response:
         return _redirect(request, exc.code)
     except (ValueError, ArithmeticError):
         return _redirect(request, "invalid_source")
-    return _redirect(request)
+    return _redirect(request, notice="created")
 
 
 # "Add income": four steps without JavaScript. Every step posts all values; the fields of the
@@ -670,7 +688,7 @@ async def new_income_step(request: Request, ctx: CurrentContext) -> Response:
         return await _render_wizard(request, ctx, step, raw, form_rules, error=exc.code)
     except (ValueError, ArithmeticError):
         return await _render_wizard(request, ctx, step, raw, form_rules, error="invalid_source")
-    return _redirect(request)
+    return _redirect(request, notice="created")
 
 
 @router.post("/income/new/example", name="income_new_example")
@@ -790,7 +808,7 @@ async def update_source(request: Request, ctx: CurrentContext, source_id: str) -
         return _edit_redirect(request, source_id, exc.code)
     except (ValueError, ArithmeticError):
         return _edit_redirect(request, source_id, "invalid_source")
-    return _redirect(request)
+    return _redirect(request, notice="saved")
 
 
 def _edit_redirect(request: Request, source_id: str, error: str) -> Response:
@@ -809,7 +827,7 @@ async def archive_source(request: Request, ctx: CurrentContext, source_id: str) 
         )
     except income.IncomeError as exc:
         return _redirect(request, exc.code)
-    return _redirect(request)
+    return _redirect(request, notice="archived")
 
 
 @router.post("/income/{source_id}/taxes", name="income_taxes_save")
@@ -995,9 +1013,9 @@ def _render_calendar(
         closed = lock.closed_month
     year_month = YearMonth.from_date(month)
     previous_month, next_month = year_month.prev(), year_month.next()
-    template = (
-        "income/_calendar.html" if is_htmx_fragment_request(request) else "income/calendar.html"
-    )
+    fragment = is_htmx_fragment_request(request)
+    notice_message = _notice_text(request, notice)
+    template = "income/_calendar.html" if fragment else "income/calendar.html"
     response = render_template(
         request,
         template,
@@ -1015,7 +1033,8 @@ def _render_calendar(
                 else None
             ),
             "closed_href": _closed_href(request, closed) if closed is not None else None,
-            "notice": notice,
+            "notice": notice_message,
+            "toast_notice": notice_message if fragment else None,
             **_change_context(request, change),
             "month_heading": format_month_heading(year_month, locale),
             "month_value": f"{month:%Y-%m}",
