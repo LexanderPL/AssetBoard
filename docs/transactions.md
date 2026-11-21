@@ -123,9 +123,12 @@ yet saved in an entry row is dropped.
 
 ## Larger entries stand out
 
-Like a spreadsheet colour scale, larger entries get a background tint: expenses red, income
-green. Each entry is compared with the largest expense (or the largest income) of the month, in
-the same currency, even when only one category is shown:
+Only genuinely large entries get a background tint: expenses red, income green. Before
+anything is tinted, the month needs at least three entries of the same kind (expense or
+income) and currency. Their median amount is taken (with an even count, the average of the
+two middle amounts), and only entries at or above twice that median are eligible. Eligible
+entries then use the same four-step scale, relative to the month's largest entry of that
+kind and currency:
 
 | Share of the month's largest | Tint |
 | --- | --- |
@@ -135,11 +138,16 @@ the same currency, even when only one category is shown:
 | 75% to under 90% | medium |
 | 90% and more | strongest |
 
-The tint fills the whole row, its Edit and Delete buttons included; the strongest step is the
-same colour as a category above plan on the Month page. The colour is a visual aid only; the
-amounts say the same. Turn it off under **Highlight large
-transactions** on your profile page (see [Your account](accounts.md)). Saving, deleting or
-restoring an entry recolours its table.
+An entry can clear the median gate and still stay neutral when it is under 25% of the
+month's largest amount. One or two entries, or a month of similar amounts, stay neutral; a
+clear outlier such as rent or a bonus stands out.
+
+The gate, the median and the largest amount always come from the whole month, in the same
+currency, even when only one category is shown. The tint fills the whole row, its Edit and
+Delete buttons included; the strongest step is the same colour as a category above plan on
+the Month page. The colour is a visual aid only; the amounts say the same. Turn it off under
+**Highlight large transactions** on your profile page (see [Your account](accounts.md)).
+Saving, deleting or restoring an entry recolours its table.
 
 ## History
 

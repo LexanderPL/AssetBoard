@@ -101,8 +101,10 @@ A CLI password reset does not remove your second factor.
   English or Polish pins that language on every device.
 - **Theme**: the saved theme applies on every device. The dark-mode button in the menu changes
   the theme on one device only; "Use the saved theme on this device" undoes that.
-- **Highlight large transactions** (on by default): tints larger entries on the Transactions
-  page, red for expenses and green for income (see [Transactions](transactions.md)).
+- **Highlight large transactions** (on by default): tints genuinely large entries on the
+  Transactions page, red for expenses and green for income. A month needs at least three
+  entries of the same kind and currency; only amounts at least twice their median can be
+  tinted (see [Transactions](transactions.md#larger-entries-stand-out)).
 - **Birth year** (optional) and **Life expectancy** (50–120, default 90): used by age-based
   investment risk targets (see [Investments](investments.md#risk-balance)) and by the FIRE
   projection. Leave the birth year empty to disable age-based targets for yourself.
