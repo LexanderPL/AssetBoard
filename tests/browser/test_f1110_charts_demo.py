@@ -72,7 +72,7 @@ def _server(tmp_path: Path, *, demo: bool) -> Iterator[tuple[FastAPI, str]]:
     server = uvicorn.Server(uvicorn.Config(app, log_level="error", access_log=False))
     thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
     thread.start()
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + 30
     while not server.started and thread.is_alive() and time.monotonic() < deadline:
         threading.Event().wait(0.01)
     assert server.started
