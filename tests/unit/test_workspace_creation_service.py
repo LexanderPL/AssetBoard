@@ -158,6 +158,22 @@ def test_a_blank_currency_uses_the_country_currency(
     )
 
 
+def test_a_whitespace_currency_also_uses_the_country_currency(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    ola = _user(db, "ola")
+    workspace_id = _create(
+        db,
+        ola,
+        _session_hash(db, ola, tmp_path),
+        base_currency="   ",
+        country_code="PL",
+    )
+    with db.factory() as session:
+        workspace = session.get(Workspace, workspace_id)
+    assert workspace is not None and workspace.base_currency == "PLN"
+
+
 def test_an_explicit_currency_wins_over_the_country(db: WorkspaceDb, tmp_path: Path) -> None:
     ola = _user(db, "ola")
     workspace_id = _create(
@@ -177,9 +193,12 @@ def test_a_blank_currency_without_a_country_is_refused(db: WorkspaceDb, tmp_path
     assert _workspace_count(db) == before
 
 
-def test_a_blank_time_zone_falls_back_to_utc(db: WorkspaceDb, tmp_path: Path) -> None:
+@pytest.mark.parametrize("timezone", ["", "   "])
+def test_a_blank_time_zone_falls_back_to_utc(
+    db: WorkspaceDb, tmp_path: Path, timezone: str
+) -> None:
     ola = _user(db, "ola")
-    workspace_id = _create(db, ola, _session_hash(db, ola, tmp_path), timezone="")
+    workspace_id = _create(db, ola, _session_hash(db, ola, tmp_path), timezone=timezone)
     with db.factory() as session:
         workspace = session.get(Workspace, workspace_id)
     assert workspace is not None and workspace.timezone == "UTC"

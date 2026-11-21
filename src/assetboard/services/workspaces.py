@@ -626,9 +626,11 @@ def create_own_workspace(
     clean_name = _workspace_name(name)
     try:
         options = validate_workspace_options(
-            base_currency=base_currency or country_default_currency(country_code) or "",
+            base_currency=(base_currency or "").strip()
+            or country_default_currency(country_code)
+            or "",
             country_code=country_code,
-            timezone=timezone or "UTC",
+            timezone=(timezone or "").strip() or "UTC",
             locale=locale,
         )
     except WorkspaceOptionError as exc:

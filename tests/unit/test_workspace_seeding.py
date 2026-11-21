@@ -191,6 +191,7 @@ def test_first_run_setup_seeds_in_the_page_language(
     ("base_currency", "country", "expected"),
     [
         ("", "PL", "PLN"),
+        ("   ", "PL", "PLN"),
         ("", "US", "USD"),
         ("GBP", "PL", "GBP"),  # a submitted currency always wins
         ("", "", "EUR"),  # no country: the instance default
@@ -216,6 +217,22 @@ def test_first_run_setup_derives_a_blank_currency(
     )
     assert workspace.base_currency == expected
     # The server never picks a time zone from the country (W-1).
+    assert workspace.timezone == "UTC"
+
+
+def test_first_run_setup_treats_a_whitespace_time_zone_as_utc(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    _user, workspace = run_initial_setup(
+        db.factory,
+        email="admin@example.com",
+        display_name="Admin",
+        password=PASSWORD,
+        workspace_name="Setup Home",
+        settings=Settings(_env_file=None, data_dir=tmp_path),
+        clock=db.clock,
+        timezone="   ",
+    )
     assert workspace.timezone == "UTC"
 
 

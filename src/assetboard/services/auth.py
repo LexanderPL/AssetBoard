@@ -1713,11 +1713,11 @@ def _workspace_options(
 ) -> WorkspaceOptions:
     try:
         return validate_workspace_options(
-            base_currency=base_currency
+            base_currency=(base_currency or "").strip()
             or country_default_currency(country_code)
             or settings.default_currency,
             country_code=country_code,
-            timezone=timezone or "UTC",
+            timezone=(timezone or "").strip() or "UTC",
             locale=workspace_locale or settings.default_locale,
         )
     except ValueError as exc:
