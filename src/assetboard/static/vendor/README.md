@@ -25,6 +25,19 @@ the shipped assets, so no standalone Tailwind license file is kept here.
 
 Apache ECharts 6.1.0 ships an upstream `NOTICE`; its exact text is included in `ECHARTS-NOTICE.txt`.
 
+### Embedded icon paths (not served as separate files)
+
+The sidebar's outline icons are Heroicons v2.2.0 path data copied into
+`src/assetboard/web/rendering.py` (`SIDEBAR_ICONS`). The upstream SVGs are not shipped as files;
+the tag and commit below identify the exact revision. The rendered SVG uses `currentColor`
+instead of the upstream hard-coded stroke colour; the path geometry is unchanged.
+
+| Asset | Version | License | SHA-256 | License file | Source |
+|---|---:|---|---|---|---|
+| Heroicons outline paths (`SIDEBAR_ICONS`, 13 icons) | 2.2.0 | MIT | `60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985` (of `HEROICONS-LICENSE.txt`; the paths are embedded, not a separate file) | `HEROICONS-LICENSE.txt` | https://github.com/tailwindlabs/heroicons/tree/v2.2.0/src/24/outline (commit `0435d4ca364a608cc75e2f8683d374e55abbae26`) |
+
+MIT is compatible with AGPL-3.0-or-later. The upstream licence text is kept beside this file.
+
 ### Bundled data (not served)
 
 | File | Upstream revision | License | SHA-256 | License file | Source |

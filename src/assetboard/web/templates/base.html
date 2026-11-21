@@ -31,6 +31,7 @@
 <body class="min-h-full">
   <a href="#main-content" class="skip-link" data-skip-link>{{ _("Skip to content") }}</a>
   {% from "macros/components.html" import confirm_dialog, flashes %}
+  {% from "macros/sidebar_icons.html" import sidebar_icon %}
   <div class="min-h-screen">
     {# Desktop: the sidebar is fixed to the viewport (top to bottom, so its height never depends on
        100vh or on the main content's length), the nav scrolls inside it and the footer (version,
@@ -56,7 +57,7 @@
         {# F9.12: the user's visible destinations in their saved order; aria-current marks the
            page shown. Home is always present; without a workspace Context only Home shows. #}
         {% for link in sidebar_links(request, workspace_nav) %}
-        <a class="nav-link" href="{{ link.href }}" data-{{ link.key | replace('_', '-') }}-link{% if link.current %} aria-current="page"{% endif %}><span aria-hidden="true">{{ sidebar_glyphs[link.key] }}</span>{{ sidebar_labels[link.key] }}{% if link.key == "upcoming" and workspace_nav and workspace_nav.overdue_count %}<span class="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger" data-overdue-badge="{{ workspace_nav.overdue_count }}"><span aria-hidden="true">{{ workspace_nav.overdue_count }}</span><span class="sr-only">{{ ngettext('%(num)d overdue occurrence', '%(num)d overdue occurrences', workspace_nav.overdue_count) }}</span></span>{% endif %}</a>
+        <a class="nav-link" href="{{ link.href }}" data-{{ link.key | replace('_', '-') }}-link{% if link.current %} aria-current="page"{% endif %}>{{ sidebar_icon(sidebar_icons[link.key]) }}{{ sidebar_labels[link.key] }}{% if link.key == "upcoming" and workspace_nav and workspace_nav.overdue_count %}<span class="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger" data-overdue-badge="{{ workspace_nav.overdue_count }}"><span aria-hidden="true">{{ workspace_nav.overdue_count }}</span><span class="sr-only">{{ ngettext('%(num)d overdue occurrence', '%(num)d overdue occurrences', workspace_nav.overdue_count) }}</span></span>{% endif %}</a>
         {% endfor %}
       </nav>
       <div class="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-line px-2 pt-4 lg:mt-auto" data-sidebar-footer>

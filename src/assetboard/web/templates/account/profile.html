@@ -55,17 +55,19 @@
       {{ csrf_input() }}
       <ul class="divide-y divide-line" data-sidebar-list>
         {% for item in sidebar_items %}
-        {% set row_class = "flex flex-wrap items-center gap-3 py-3 opacity-60" if not item.visible else "flex flex-wrap items-center gap-3 py-3" %}
-        {% set label_class = "text-sm text-muted line-through" if not item.visible and item.key != "home" else "text-sm" %}
+        {% set row_class = "flex items-start gap-3 py-3 opacity-60" if not item.visible else "flex items-start gap-3 py-3" %}
+        {% set label_class = "block text-sm text-muted line-through" if not item.visible and item.key != "home" else "block text-sm" %}
         <li class="{{ row_class }}" data-sidebar-item="{{ item.key }}">
           <input type="hidden" name="item" value="{{ item.key }}">
-          <input type="checkbox" id="sidebar-visible-{{ item.key }}" name="visible" value="{{ item.key }}" class="h-4 w-4 rounded border-line accent-primary"{% if item.visible or item.key == "home" %} checked{% endif %}{% if item.key == "home" %} disabled{% endif %} data-sidebar-visible="{{ item.key }}">
-          <label for="sidebar-visible-{{ item.key }}" class="{{ label_class }}">{{ sidebar_labels[item.key] }}</label>
-          {% if item.key == "taxes" %}<span class="w-full text-xs text-muted" data-sidebar-taxes-note>{{ _("Only shown when Taxes is turned on in the workspace settings.") }}</span>{% endif %}
+          <input type="checkbox" id="sidebar-visible-{{ item.key }}" name="visible" value="{{ item.key }}" class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{% if item.visible or item.key == "home" %} checked{% endif %}{% if item.key == "home" %} disabled{% endif %} data-sidebar-visible="{{ item.key }}">
+          <div class="min-w-0 flex-1">
+            <label for="sidebar-visible-{{ item.key }}" class="{{ label_class }}">{{ sidebar_labels[item.key] }}</label>
+            {% if item.key == "taxes" %}<p class="mt-0.5 break-words text-xs text-muted" data-sidebar-taxes-note>{{ _("Only shown when Taxes is turned on in the workspace settings.") }}</p>{% endif %}
+          </div>
           {% if item.key == "home" %}
-          <span class="ml-auto text-xs text-muted">{{ _("Always shown") }}</span>
+          <span class="shrink-0 text-xs text-muted">{{ _("Always shown") }}</span>
           {% else %}
-          <div class="ml-auto flex flex-wrap items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <button type="submit" name="move" value="{{ item.key }}:up" data-sidebar-move="{{ item.key }}:up" class="btn-sm" aria-label="{{ _('Move %(name)s up', name=sidebar_labels[item.key]) }}"{% if loop.index0 <= 1 %} disabled{% endif %}>↑</button>
             <button type="submit" name="move" value="{{ item.key }}:down" data-sidebar-move="{{ item.key }}:down" class="btn-sm" aria-label="{{ _('Move %(name)s down', name=sidebar_labels[item.key]) }}"{% if loop.last %} disabled{% endif %}>↓</button>
           </div>

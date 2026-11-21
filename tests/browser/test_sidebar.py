@@ -2,7 +2,8 @@
 viewport on long pages, before and after scrolling, whatever the window height (the nav scrolls
 inside the sidebar instead); on a phone the sidebar is a bar above the content whose Menu button
 unfolds the navigation (Escape folds it again). The Home item marks the dashboard as the current
-page. The user menu sits at the top of the page."""
+page. The user menu sits at the top of the page. Every destination icon is a 20 px Heroicons
+outline SVG, hidden from assistive technology and centred with its label."""
 
 from __future__ import annotations
 
@@ -11,13 +12,16 @@ import socket
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
 from playwright.sync_api import Page, expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.identity import User
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
@@ -29,6 +33,44 @@ MENU_BOX = """() => {
   const box = document.querySelector('[data-sidebar-footer]').getBoundingClientRect();
   return {top: box.top, bottom: box.bottom, height: innerHeight};
 }"""
+ICON_METRICS = """() => Array.from(
+  document.querySelectorAll('[data-sidebar] nav a.nav-link')
+).map((link) => {
+  const svg = link.querySelector('svg');
+  const box = svg.getBoundingClientRect();
+  const linkBox = link.getBoundingClientRect();
+  const key = link.getAttributeNames().find(
+    (name) => name.startsWith('data-') && name.endsWith('-link')
+  );
+  return {
+    key: key ? key.slice(5, -5) : null,
+    width: box.width,
+    height: box.height,
+    iconCenter: box.y + box.height / 2,
+    linkCenter: linkBox.y + linkBox.height / 2,
+    ariaHidden: svg.getAttribute('aria-hidden'),
+    stroke: svg.getAttribute('stroke'),
+    strokeWidth: svg.getAttribute('stroke-width'),
+    paths: Array.from(svg.querySelectorAll('path')).map((path) => path.getAttribute('d')),
+  };
+})"""
+
+
+def _icon_metrics(page: Page) -> list[dict[str, Any]]:
+    return page.evaluate(ICON_METRICS)
+
+
+def _assert_sidebar_icons(page: Page) -> None:
+    metrics = _icon_metrics(page)
+    assert len(metrics) == 12  # every default destination except Taxes
+    assert len({tuple(metric["paths"]) for metric in metrics}) == 12
+    for metric in metrics:
+        assert metric["width"] == pytest.approx(20, abs=0.5), metric
+        assert metric["height"] == pytest.approx(20, abs=0.5), metric
+        assert metric["ariaHidden"] == "true", metric
+        assert metric["stroke"] == "currentColor", metric
+        assert metric["strokeWidth"] == "1.5", metric
+        assert abs(metric["iconCenter"] - metric["linkCenter"]) <= 1, metric
 
 
 def _menu_in_viewport(page: Page) -> None:
@@ -121,6 +163,32 @@ def test_the_sidebar_footer_stays_at_the_bottom_of_the_viewport(tmp_path: Path) 
             page.set_viewport_size({"width": 1280, "height": 800})
             expect(menu).to_be_hidden()
             expect(page.locator("[data-home-link]")).to_be_visible()
+
+            # Icons are 20 px decorative SVGs, centred with their labels. Screenshots at the
+            # two review widths; the Polish pass proves they do not shrink when labels wrap.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.goto(f"{base}/", wait_until="networkidle")
+            menu = page.locator("[data-sidebar-toggle]")
+            menu.click()
+            expect(page.locator("[data-home-link]")).to_be_visible()
+            _assert_sidebar_icons(page)
+            page.screenshot(path=tmp_path / "sidebar-390.png")
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.goto(f"{base}/", wait_until="networkidle")
+            _assert_sidebar_icons(page)
+            page.screenshot(path=tmp_path / "sidebar-1440.png")
+            with app.state.session_factory.begin() as session:
+                user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+                user.locale = "pl"
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.goto(f"{base}/", wait_until="networkidle")
+            menu = page.locator("[data-sidebar-toggle]")
+            if menu.is_visible():
+                menu.click()
+                expect(page.locator("[data-home-link]")).to_be_visible()
+            _assert_sidebar_icons(page)
+            assert (tmp_path / "sidebar-390.png").is_file()
+            assert (tmp_path / "sidebar-1440.png").is_file()
             browser.close()
     finally:
         server.should_exit = True

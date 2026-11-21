@@ -372,6 +372,16 @@ def test_the_sidebar_order_and_current_page(nav: OwnerApp) -> None:
     assert re.search(r'<a class="nav-link" href="/loans"[^>]*data-loans-link', nav_html)
     assert re.search(r'<a class="nav-link" href="/fire"[^>]*data-fire-link', nav_html)
     assert 'href="#loans"' not in nav_html
-    # Month and Upcoming use different glyphs while keeping their accessible labels.
-    assert '<span aria-hidden="true">◷</span>Month' in nav_html
-    assert '<span aria-hidden="true">◔</span>Upcoming' in nav_html
+
+    # Month and Upcoming use different SVG icons while keeping their accessible labels.
+    def icon_path(key: str) -> str:
+        link = re.search(rf"data-{key}-link.*?</a>", nav_html, re.DOTALL)
+        assert link is not None
+        path = re.search(r'<path [^>]*d="([^"]+)"', link.group(0))
+        assert path is not None
+        return path.group(1)
+
+    assert icon_path("month") != icon_path("upcoming")
+    assert ">Month" in nav_html and ">Upcoming" in nav_html
+    assert '<span aria-hidden="true">◷</span>' not in nav_html
+    assert '<span aria-hidden="true">◔</span>' not in nav_html

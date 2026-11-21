@@ -1,0 +1,5 @@
+{# Heroicons v2.2.0 outline paths (MIT); see static/vendor/README.md. Decorative: the link text
+   is the accessible name. The 24x24 viewBox is rendered at 20x20. #}
+{% macro sidebar_icon(paths) -%}
+<svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">{% for path in paths %}<path stroke-linecap="round" stroke-linejoin="round" d="{{ path }}"/>{% endfor %}</svg>
+{%- endmacro %}

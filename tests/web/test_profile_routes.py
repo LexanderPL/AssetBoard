@@ -225,6 +225,16 @@ def test_profile_cards_share_one_column(h: Harness) -> None:
     assert "w-full rounded-xl bg-primary" not in page
 
 
+def test_profile_and_account_security_share_the_settings_width(h: Harness) -> None:
+    client = admin(h)
+    profile = client.get("/account").text
+    security = client.get("/account/password").text
+    for page in (profile, security):
+        assert page.count('<div class="max-w-3xl space-y-6">') == 1
+    assert '<div class="grid gap-6 lg:grid-cols-2">' in security
+    assert "lg:col-span-2" in security
+
+
 def test_profile_saves_birth_year_and_life_expectancy(h: Harness) -> None:
     client = admin(h)
     response = client.post(

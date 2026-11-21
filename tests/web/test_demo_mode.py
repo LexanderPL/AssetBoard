@@ -220,6 +220,10 @@ def test_admin_panel_resets_now_and_hides_the_demo_account(
         assert web.sign_in(client).status_code == 303
         page = client.get("/admin/settings")
         assert "data-demo-panel" in page.text
+        assert (
+            '<section class="panel p-6 sm:p-7" aria-labelledby="demo-mode-heading" '
+            'data-demo-panel data-demo-on="true">'
+        ) in page.text
         assert 'data-demo-on="true"' in page.text
         assert "data-demo-reset-form" in page.text
         assert "data-demo-next-reset" in page.text
@@ -286,6 +290,10 @@ def test_turning_demo_off_revokes_sessions_and_offers_delete(
         assert web.sign_in(client).status_code == 303
         page = client.get("/admin/settings")
         assert "data-demo-panel" in page.text
+        assert (
+            '<section class="panel p-6 sm:p-7" aria-labelledby="demo-mode-heading" '
+            'data-demo-panel data-demo-on="false">'
+        ) in page.text
         assert 'data-demo-on="false"' in page.text
         assert "data-demo-delete-form" in page.text
         assert "Delete demo data" in page.text
