@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.8](https://github.com/LexanderPL/AssetBoard/compare/v0.8.7...v0.8.8) (2026-11-21)
+
+
+### Features
+
+* **recurring:** link to income sources and income taxes ([#456](https://github.com/LexanderPL/AssetBoard/issues/456)) ([7c985aa](https://github.com/LexanderPL/AssetBoard/commit/7c985aafcd024bc1a8562c06836507ffc7884da6))
+* **reports:** remember filters, wrap section nav and refine year heat ([#459](https://github.com/LexanderPL/AssetBoard/issues/459)) ([f5e443c](https://github.com/LexanderPL/AssetBoard/commit/f5e443c37a7aa82607d8d1625011f283617eadaa))
+* **web:** unify successful write feedback as toasts ([#460](https://github.com/LexanderPL/AssetBoard/issues/460)) ([a36ba36](https://github.com/LexanderPL/AssetBoard/commit/a36ba36943e9416e7e5877af90736cc6cdccda06))
+
+
+### Bug Fixes
+
+* **sidebar:** put Reports last in the default order ([#457](https://github.com/LexanderPL/AssetBoard/issues/457)) ([851a9a6](https://github.com/LexanderPL/AssetBoard/commit/851a9a68fc72507ebdd7b552a9b2b55eb924ce19))
+* **ui:** use one max-w-4xl frame for user-menu pages ([#458](https://github.com/LexanderPL/AssetBoard/issues/458)) ([7f31cd4](https://github.com/LexanderPL/AssetBoard/commit/7f31cd49dc3c807dc882107275b4607e410eb32c))
+
+
+### Documentation
+
+* record the shipped UI improvement plan ([#454](https://github.com/LexanderPL/AssetBoard/issues/454)) ([e15aafe](https://github.com/LexanderPL/AssetBoard/commit/e15aafe8d99ebcd228eeaeff291cc460e1e14cea))
+
 ## [0.8.7](https://github.com/LexanderPL/AssetBoard/compare/v0.8.6...v0.8.7) (2026-11-21)
 
 
