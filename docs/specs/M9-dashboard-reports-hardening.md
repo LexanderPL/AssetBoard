@@ -645,7 +645,7 @@ enable (today Taxes) are still hidden by that feature gate.
 **Acceptance**
 - The canonical keys, in the current sidebar order, are `home`, `month`, `transactions`,
   `history`, `upcoming`, `recurring`, `income`, `taxes`, `net_worth`, `investments`, `loans`,
-  `fire`. A frozen `SidebarItem(key, visible)` and `DEFAULT_SIDEBAR` (all visible, canonical
+  `fire`, `reports`. A frozen `SidebarItem(key, visible)` and `DEFAULT_SIDEBAR` (all visible, canonical
   order) live in the pure `domain/navigation.py`.
 - `normalize_sidebar(raw)` accepts only a list of mappings with a known string `key` and a
   boolean `visible`; unknown keys and malformed entries are ignored, a duplicated key keeps its
