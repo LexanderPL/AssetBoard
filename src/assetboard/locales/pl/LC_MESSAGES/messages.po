@@ -6461,11 +6461,15 @@ msgid "Highlight large transactions"
 msgstr "Wyróżniaj duże transakcje"
 
 msgid ""
-"On the Transactions page, larger expenses get a stronger red background "
-"and larger income a stronger green one."
+"On the Transactions page, only clearly large entries are tinted: red for "
+"expenses, green for income. A month needs at least three entries of the "
+"same kind and currency, and only amounts at least twice their median "
+"qualify."
 msgstr ""
-"Na stronie Transakcje większe wydatki mają mocniejsze czerwone tło, a "
-"większe przychody mocniejsze zielone."
+"Na stronie Transakcje wyróżniane są tylko naprawdę duże transakcje: wydatki "
+"na czerwono, przychody na zielono. W miesiącu muszą być co najmniej trzy "
+"transakcje tego samego rodzaju i w tej samej walucie, a kwalifikują się "
+"tylko kwoty co najmniej dwukrotnie większe od ich mediany."
 
 msgid "Save"
 msgstr "Zapisz"
@@ -9994,6 +9998,10 @@ msgstr "Transakcja"
 msgid "Unknown"
 msgstr "Nieznane"
 
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr "Usunąć cenę ręczną z dnia %(date)s?"
+
 msgid "Prices"
 msgstr "Ceny"
 
@@ -10065,8 +10073,15 @@ msgid "Price history of %(name)s"
 msgstr "Historia cen: %(name)s"
 
 #, python-format
-msgid "Delete the manual price of %(date)s?"
-msgstr "Usunąć cenę ręczną z dnia %(date)s?"
+msgid "Show %(num)d older price point"
+msgid_plural "Show %(num)d older price points"
+msgstr[0] "Pokaż %(num)d starszy punkt cenowy"
+msgstr[1] "Pokaż %(num)d starsze punkty cenowe"
+msgstr[2] "Pokaż %(num)d starszych punktów cenowych"
+
+#, python-format
+msgid "Older price history of %(name)s"
+msgstr "Starsza historia cen: %(name)s"
 
 msgid "No stored or transaction prices for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
@@ -12848,15 +12863,6 @@ msgstr ""
 "Pozostaw puste, aby pokazać wszystkie kategorie w przeglądzie rocznym i 8"
 " największych na wykresach kategorii."
 
-msgid "Category trends window"
-msgstr "Okno trendów kategorii"
-
-msgid "3-month average"
-msgstr "Średnia 3-miesięczna"
-
-msgid "12-month average"
-msgstr "Średnia 12-miesięczna"
-
 msgid "Show report"
 msgstr "Pokaż raport"
 
@@ -12902,11 +12908,11 @@ msgid "Report year"
 msgstr "Rok raportu"
 
 msgid ""
-"Spending by category and month. Darker cells mean more spending in that "
+"Spending by category and month. Stronger red means more spending in that "
 "month."
 msgstr ""
-"Wydatki według kategorii i miesiąca. Ciemniejsze komórki oznaczają "
-"większe wydatki w danym miesiącu."
+"Wydatki według kategorii i miesiąca. Mocniejsza czerwień oznacza większe "
+"wydatki w danym miesiącu."
 
 msgid "No spending in this year."
 msgstr "Brak wydatków w tym roku."
@@ -12914,9 +12920,14 @@ msgstr "Brak wydatków w tym roku."
 msgid "Spending by category and month"
 msgstr "Wydatki według kategorii i miesiąca"
 
-#, python-format
-msgid "Window: %(num)d months"
-msgstr "Okno: %(num)d mies."
+msgid "Category trends window"
+msgstr "Okno trendów kategorii"
+
+msgid "3-month average"
+msgstr "Średnia 3-miesięczna"
+
+msgid "12-month average"
+msgstr "Średnia 12-miesięczna"
 
 msgid "Rolling average spending by category."
 msgstr "Średnia krocząca wydatków według kategorii."
@@ -12997,11 +13008,11 @@ msgid ""
 "excluded. A month counts as over when actual spending is greater than the"
 " plan."
 msgstr ""
-"Wynik porównuje rzeczywiste wydatki z planem dla zaplanowanych regularnych "
-"wydatków. Wynik 100 oznacza, że każdy zaplanowany miesiąc zgadzał się "
-"dokładnie. Liczą się tylko zaplanowane regularne wydatki; dochody i "
-"oszczędności są wyłączone. Miesiąc jest przekroczony, gdy rzeczywiste "
-"wydatki są większe niż plan."
+"Wynik porównuje rzeczywiste wydatki z planem dla zaplanowanych "
+"regularnych wydatków. Wynik 100 oznacza, że każdy zaplanowany miesiąc "
+"zgadzał się dokładnie. Liczą się tylko zaplanowane regularne wydatki; "
+"dochody i oszczędności są wyłączone. Miesiąc jest przekroczony, gdy "
+"rzeczywiste wydatki są większe niż plan."
 
 msgid "No transactions in this range"
 msgstr "Brak transakcji w tym zakresie"
@@ -16467,4 +16478,17 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Invite someone"
 #~ msgstr "Zaproś kogoś"
+
+#~ msgid ""
+#~ "On the Transactions page, larger "
+#~ "expenses get a stronger red background"
+#~ " and larger income a stronger green"
+#~ " one."
+#~ msgstr ""
+#~ "Na stronie Transakcje większe wydatki "
+#~ "mają mocniejsze czerwone tło, a większe"
+#~ " przychody mocniejsze zielone."
+
+#~ msgid "Window: %(num)d months"
+#~ msgstr "Okno: %(num)d mies."
 

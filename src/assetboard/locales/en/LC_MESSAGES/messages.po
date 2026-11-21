@@ -5949,8 +5949,10 @@ msgid "Highlight large transactions"
 msgstr ""
 
 msgid ""
-"On the Transactions page, larger expenses get a stronger red background "
-"and larger income a stronger green one."
+"On the Transactions page, only clearly large entries are tinted: red for "
+"expenses, green for income. A month needs at least three entries of the "
+"same kind and currency, and only amounts at least twice their median "
+"qualify."
 msgstr ""
 
 msgid "Save"
@@ -9076,6 +9078,10 @@ msgstr ""
 msgid "Unknown"
 msgstr ""
 
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr ""
+
 msgid "Prices"
 msgstr ""
 
@@ -9145,7 +9151,13 @@ msgid "Price history of %(name)s"
 msgstr ""
 
 #, python-format
-msgid "Delete the manual price of %(date)s?"
+msgid "Show %(num)d older price point"
+msgid_plural "Show %(num)d older price points"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Older price history of %(name)s"
 msgstr ""
 
 msgid "No stored or transaction prices for this instrument yet."
@@ -11660,15 +11672,6 @@ msgid ""
 "the category charts."
 msgstr ""
 
-msgid "Category trends window"
-msgstr ""
-
-msgid "3-month average"
-msgstr ""
-
-msgid "12-month average"
-msgstr ""
-
 msgid "Show report"
 msgstr ""
 
@@ -11712,7 +11715,7 @@ msgid "Report year"
 msgstr ""
 
 msgid ""
-"Spending by category and month. Darker cells mean more spending in that "
+"Spending by category and month. Stronger red means more spending in that "
 "month."
 msgstr ""
 
@@ -11722,8 +11725,13 @@ msgstr ""
 msgid "Spending by category and month"
 msgstr ""
 
-#, fuzzy, python-format
-msgid "Window: %(num)d months"
+msgid "Category trends window"
+msgstr ""
+
+msgid "3-month average"
+msgstr ""
+
+msgid "12-month average"
 msgstr ""
 
 msgid "Rolling average spending by category."
@@ -15507,5 +15515,21 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Invite someone"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "On the Transactions page, larger "
+#~ "expenses get a stronger red background"
+#~ " and larger income a stronger green"
+#~ " one."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Spending by category and month. Darker"
+#~ " cells mean more spending in that "
+#~ "month."
+#~ msgstr ""
+
+#~ msgid "Window: %(num)d months"
 #~ msgstr ""
 
