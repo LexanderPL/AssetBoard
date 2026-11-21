@@ -105,6 +105,8 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             page.get_by_label("Country").select_option("PL")
             expect(page.get_by_label("Base currency")).to_have_value("PLN")
             expect(page.get_by_label("Time zone")).to_have_value("Europe/Warsaw")
+            # The recorder lives on this document: check it before the form navigates away.
+            assert page.evaluate("window.__cspViolations") == []
             page.get_by_role("button", name="Create workspace").click()
             page.wait_for_url(f"{base}/")
             expect(page.locator("[data-current-workspace]")).to_have_text("Bea's budget")
