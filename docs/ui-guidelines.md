@@ -49,13 +49,23 @@ belongs to the tab currently shown.
   it clearly belongs to the active tab. Do not put primary actions at the top right beside the
   user menu.
 - Page widths:
-  - dashboards and lists: `max-w-6xl` (the base default);
-  - settings and forms: `max-w-3xl`;
+  - dashboards and lists: `max-w-6xl` (the base default), except pages reached from the
+    user menu;
+  - pages reached from the user menu: `max-w-4xl`;
+  - other settings and forms: `max-w-3xl`;
   - focused confirmations: `max-w-2xl`;
   - report pages: `max-w-6xl` (the same as dashboards and lists);
-  - import pages: `max-w-4xl`.
-- Profile, Account security and Instance settings use `max-w-3xl space-y-6`; their panels fill
-  that width instead of carrying their own narrower caps.
+  - import pages: `max-w-4xl` (the same as the user-menu standard).
+- Every page reached from the user menu — Categories, Workspace settings, Workspace members,
+  Audit log (workspace and instance), Export and import, Notifications, Profile, Account
+  security, Users and Instance settings — uses one outer
+  `<div class="max-w-4xl space-y-6" data-page-width="4xl">`. Panels and tables fill that frame;
+  no panel inside it sets `max-w-xl`, `max-w-2xl` or `max-w-3xl`, and sibling spacing comes from
+  `space-y-6`, not `mt-6`. Tables keep an `overflow-x-auto` region or card rows below `sm` so
+  the frame never causes horizontal page overflow at 390 px.
+- Focused flows opened from those pages keep their narrower frame: New workspace, Delete
+  workspace, import rollback and TOTP setup at `max-w-2xl`; admin create/confirm and backup
+  confirmation at `max-w-xl`. Do not wrap them in the 4xl frame or widen their dialogs.
 - Detail pages (income edit, tax edit, instrument, work calendar, recurring edit) start with one
   consistent back control. Prefer a `.btn` “Back to …” in the content header, not a one-off
   rounded link on some pages and an underlined text link on others.
@@ -253,6 +263,7 @@ Rules:
 - [ ] Forms use the shared field/button components; no one-off button class strings.
 - [ ] Optional fields are hidden until needed; no field that is irrelevant to the chosen mode.
 - [ ] Row actions have adequate targets and meaningful accessible names.
+- [ ] User-menu pages use one `max-w-4xl` frame; panels have no narrower max widths.
 - [ ] Tables use `.sheet`; phone layout checked; no horizontal page scroll.
 - [ ] Tabs fit or scroll; no `role="tab"` without keyboard behaviour.
 - [ ] Empty states use the shared macro.
