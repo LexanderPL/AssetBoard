@@ -154,6 +154,14 @@ def test_representative_user_menu_pages_share_one_frame(tmp_path: Path) -> None:
                 )
                 if width == 1280:
                     assert 880 <= frame["width"] <= 897, (label, width, frame)
+                if label == "users":
+                    assert (
+                        page.eval_on_selector(
+                            'section[aria-label="Users"]',
+                            "element => getComputedStyle(element).overflowX",
+                        )
+                        == "visible"
+                    ), (label, width)
                 assert page.evaluate(NO_OVERFLOW), (label, width)
                 frames.append(frame)
 
@@ -192,6 +200,6 @@ def test_every_user_menu_page_fits_a_phone(tmp_path: Path) -> None:
                 'section[aria-label="Users"]',
                 "element => getComputedStyle(element).overflowX",
             )
-            == "auto"
+            == "visible"
         )
         browser.close()

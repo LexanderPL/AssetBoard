@@ -68,7 +68,7 @@
     <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Last backup") }}</dt><dd data-backup-last>{% if backup_panel.last_success %}{{ format_moment_utc(backup_panel.last_success.started_at, locale) }}{% else %}{{ _("Never") }}{% endif %}</dd></div>
     <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Last failure") }}</dt><dd data-backup-last-failure>{% if backup_panel.last_failure %}{{ format_moment_utc(backup_panel.last_failure.started_at, locale) }}{% else %}{{ _("None") }}{% endif %}</dd></div>
     <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Next scheduled backup") }}</dt><dd data-backup-next>{% if backup_panel.next_run_at %}{{ format_moment_utc(backup_panel.next_run_at, locale) }}{% else %}{{ _("Not scheduled") }}{% endif %}</dd></div>
-    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Location") }}</dt><dd><code class="text-xs">{{ backup_panel.directory }}</code></dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Location") }}</dt><dd class="min-w-0"><code class="break-all text-xs">{{ backup_panel.directory }}</code></dd></div>
   </dl>
   <a class="btn-primary mt-5" href="{{ scoped_url(request, 'backup_now_confirm') }}" data-backup-now>{{ _("Back up now") }}</a>
   {% if backup_panel.runs %}
