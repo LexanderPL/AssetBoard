@@ -449,7 +449,8 @@ def _render(
     factory = request.app.state.session_factory
     locale = request.state.locale
     page = portfolio_page(factory, ctx, scope=scope)
-    notice_message = gettext(PORTFOLIO_NOTICES[notice], locale) if notice else None
+    message = PORTFOLIO_NOTICES.get(notice or "")
+    notice_message = gettext(message, locale) if message is not None else None
     context = {
         "view": build_view(
             request,

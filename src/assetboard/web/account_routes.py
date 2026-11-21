@@ -97,7 +97,7 @@ UNLINK_LAST = _(
     "This is your last way to sign in, so it cannot be removed. Link another sign-in method "
     "or set a password first."
 )
-# ``/account?sidebar=saved|reset`` after the customiser posts; shown inside the Sidebar panel.
+# ``/account?sidebar=saved|reset`` after the customiser posts; rendered as a base toast.
 SIDEBAR_MESSAGES: dict[str, str] = {
     "saved": _("Your sidebar is saved."),
     "reset": _("Your sidebar is back to the default order."),

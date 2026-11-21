@@ -182,7 +182,6 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
     ]
     page = owner.client.get("/account?sidebar=saved#sidebar-settings").text
     settings = panel(page)
-    assert "data-sidebar-notice" not in page
     assert 'id="toast-container"' in page and "data-toast" in page
     assert "Your sidebar is saved." in page
     assert nav_hooks(owner.client.get("/").text) == [
@@ -447,7 +446,7 @@ def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:
 
 def test_unknown_sidebar_status_query_is_ignored(owner: OwnerApp) -> None:
     page = owner.client.get("/account?sidebar=evil").text
-    assert "data-sidebar-notice" not in page and "data-toast" not in page
+    assert "data-toast" not in page
 
 
 def _demo_app(web: WebHarness):

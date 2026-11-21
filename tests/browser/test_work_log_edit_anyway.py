@@ -189,7 +189,9 @@ def test_edit_anyway_in_a_browser(tmp_path: Path) -> None:
             assert _amount(app, monthly_tx) == 20_000
             notice.locator("[data-update-transaction]").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-transaction-updated]")).to_be_visible()
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "The transaction now matches the logged days."
+            )
             assert _amount(app, monthly_tx) == 30_000
 
             # Work calendar: read-only, then "Edit anyway" reveals the editable days.
@@ -205,7 +207,9 @@ def test_edit_anyway_in_a_browser(tmp_path: Path) -> None:
             assert _amount(app, days_tx) == 20_000
             change.locator("[data-update-transaction]").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-transaction-updated]")).to_be_visible()
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "The transaction now matches the logged days."
+            )
             assert _amount(app, days_tx) == 30_000
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

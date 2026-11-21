@@ -259,14 +259,14 @@ and donut pair. A user cannot tell from the top of the page which of the two the
 | Page | What works | Main gaps |
 | --- | --- | --- |
 | **Upcoming** | Week headings outside panels; overdue is clear; edit/reschedule are available. | 5–7 equal-weight actions per item; filters always open (292 px on phone; first item at y = 574); mark-paid form on phone extends to y = 946 in an 844 px viewport; future default date errors; skip is silent; full reload loses place. |
-| **Recurring** | Compact table/card layout; schedule sentence is readable; pause state is clear. | Actions are 26 px; no success notice for pause/resume/delete; full reload; archived items absent (documented but can surprise). |
+| **Recurring** | Compact table/card layout; schedule sentence is readable; pause state is clear. | Actions are 26 px; full reload; archived items absent (documented but can surprise). Resolved: create/save/pause/resume/archive/delete now show success toasts. |
 | **Recurring form** | Guided sections, live next-dates panel, good explanations. | 1973 px desktop / 2712 px phone; “Options” always open; without JS all repeat panels render open; preview is below the form on phone. |
 
 ### Income and tax
 
 | Page | What works | Main gaps |
 | --- | --- | --- |
-| **Income** | One card per source; next payments table; tax chips; inline log form. | Actions live in a row at the bottom of each card; inline log form expands the card; archive has no success notice; preview table scrolls sideways on phone. |
+| **Income** | One card per source; next payments table; tax chips; inline log form. | Actions live in a row at the bottom of each card; inline log form expands the card; preview table scrolls sideways on phone. Resolved: create/save/archive show success toasts. |
 | **Add income** | Four-step wizard; only the current step's fields show; good progressive disclosure. | Each step is a full POST and returns to the top; no step summary before saving; “Back”/“Cancel” are one-off styles. |
 | **Work calendar** | Day grid is readable; holiday/weekend states are clear; fill/clear actions. | No back link; month heading is `text-lg`; day buttons are only as large as the grid cell; “Save” for each day repeats a small form. |
 | **Taxes** | Clean cards; rates behind “Rate changes”; “Add another tax” is a disclosure. | Adding an “other tax” is a form at the bottom; the page is very sparse for one rule; rate change forms have four fields in a row that becomes a tall stack on phone. |
@@ -288,7 +288,7 @@ and donut pair. A user cannot tell from the top of the page which of the two the
 | **Instruments** | Add is a dialog; allocations and risk tiers are clear; archive is discoverable. | Row Edit/Archive are bare links; no pending state; add dialog can be tall on phone. |
 | **Performance** | Range strip, class filter, chart, period returns; data disclosure. | Duplicate `h1`; range/class controls are two separate rows; chart is 320 px fixed height on phone; “Plotted data” is a 20 px summary. |
 | **Income** | Clear yearly table; empty state explains what to record. | Table is not a `.sheet`; duplicate `h1`; no filter/year selection; outstanding dividends warnings are dense paragraphs. |
-| **Asset classes** | Simple list; risk tier/investable chips; archive and restore. | 26 px arrow buttons; add form at the bottom; no confirmation/notice for archive. |
+| **Asset classes** | Simple list; risk tier/investable chips; archive and restore. | 26 px arrow buttons; add form at the bottom. Resolved: archive/restore show success toasts. |
 | **Providers** | Cards explain each provider, quota and errors; keys are masked. | Very long page (1550 px) with one form per card; no top-level save; “Enabled” and key forms are mixed; provider error codes are exposed. |
 | **Transactions** | Filters, pagination, bulk add, edit in row. | 3847 px page; 53 rows; Edit/Delete stacked in a narrow cell; 44 small links; filter form consumes the top of the phone screen; tab bar wraps. |
 
@@ -299,7 +299,7 @@ and donut pair. A user cannot tell from the top of the page which of the two the
 | **Categories** | Clear split expense/income; create form has Kind/Treatment/Colour; archive/restore. | Huge empty middle; actions at the far right; arrows 26 × 28; add form at the bottom; edit row loses visible labels. |
 | **Notifications** | Channels are understandable; test/delete are clear; masked URL. | New-channel form at the bottom; “Daily at” irrelevant for per-item; 514 px form; no conditional grouping. |
 | **Workspace settings** | Logical top group; switch for Taxes has a good explanation; danger zone separated. | 806 px General panel mixes basic and advanced; full-width Save; advanced settings not collapsed. |
-| **Members** | Member list and invitation form are clear; roles and expiry. | Invite form is below the member list; Copy gives no feedback; role change is a full reload with no notice. |
+| **Members** | Member list and invitation form are clear; roles and expiry. | Invite form is below the member list; Copy gives no feedback; role change is a full reload. Resolved: role change and removal show success toasts. |
 | **Export/import** | Templates, validation, mapping, rollback and reports are all present. | Very dense; `text-lg` headings; long definition lists; mapping rows are one large fieldset each; no progress state. |
 | **Admin users** | Table shows sign-in methods, status and last sign-in. | Bare links instead of buttons; actions separated by `·`; no primary action in the header; 19 px targets. |
 | **Admin settings** | Clear registration/update switches; password confirmation; demo panel. | Save is inline while other settings use full width; demo status is a long list; no separate “Advanced”. |

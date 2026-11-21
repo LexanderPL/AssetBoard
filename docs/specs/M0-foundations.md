@@ -89,7 +89,7 @@ Wire /readyz to a real DB check, and make the check synchronous but run in a thr
 - Jinja2 environment with gettext extension; Babel config; `locales/en`, `locales/pl`; `make i18n-extract|update|compile`; locale resolution: user setting → workspace default → `Accept-Language` → `en`.
 - Base layout: top bar, left navigation with placeholders for Month, Recurring, Net worth, Investments, Loans, FIRE (disabled until implemented), user menu; responsive down to ~375 px; dark mode (class-based, persisted in `localStorage`).
 - Tailwind built via standalone CLI (pinned version) through `make css`; HTMX and Alpine.js (**CSP build**) and ECharts vendored under `static/vendor/` with pinned versions; **no CDN calls at runtime**.
-- Components (Jinja macros): form field with error display, flash messages, confirm dialog, toast with undo (HTMX OOB swap), empty state, money display.
+- Components (Jinja macros): form field with error display, confirm dialog, toast item/server toast and toast with undo (HTMX OOB swap), empty state, money display.
 - Number helpers `parse_amount(text, locale)` / `format_money(Money, locale)` with tests: `"1 234,56"`, `"1.234,56"`, `"1,234.56"`, `"12,5"`, `"-3"`, invalid input → clear error.
 - Error pages 404/403/500, HTMX-aware (partial error responses).
 - Strict security headers (CSP without `unsafe-inline`/`unsafe-eval`, `X-Content-Type-Options`, `Referrer-Policy`).
