@@ -182,6 +182,7 @@ def _setup_page(
     values: dict[str, str] | None = None,
     errors: dict[str, str] | None = None,
     status_code: int = 200,
+    seed_timezone: bool = False,
 ) -> Response:
     settings = _state(request).settings
     defaults = {
@@ -200,8 +201,8 @@ def _setup_page(
         "display_name",
         "password",
         "workspace_name",
-        "base_currency",
         "country_code",
+        "base_currency",
         "timezone",
         "workspace_locale",
     )
@@ -214,6 +215,7 @@ def _setup_page(
             "errors": translated_errors,
             "focus": focus,
             "options": workspace_form_options(request.state.locale),
+            "seed_timezone": seed_timezone,
         },
         status_code=status_code,
     )
@@ -223,7 +225,7 @@ def _setup_page(
 async def setup_form(request: Request) -> Response:
     if not await _setup_is_open(request):
         raise HTTPException(status_code=404)
-    return _setup_page(request)
+    return _setup_page(request, seed_timezone=True)
 
 
 @router.post("/setup")

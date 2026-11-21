@@ -147,6 +147,70 @@ def test_create_a_workspace_switches_to_it_with_the_suggested_categories(owner: 
     assert f"data-category-name>{gettext('Food', 'pl')}<" in categories_page
 
 
+def test_the_form_is_country_first_and_carries_each_country_currency(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspaces/new")
+    assert page.status_code == 200
+    html = page.text
+    assert (
+        html.index('id="workspace_name"')
+        < html.index('id="country_code"')
+        < html.index('id="base_currency"')
+        < html.index('id="timezone"')
+        < html.index('id="workspace_locale"')
+    )
+    assert 'data-currency="PLN"' in html and 'data-currency="USD"' in html
+    assert "data-workspace-fields" in html and 'data-seed-timezone="1"' in html
+    assert "js/workspace-fields.js" in html
+    _csp_safe(html)
+
+
+def test_a_rejected_creation_does_not_seed_the_time_zone_again(owner: OwnerApp) -> None:
+    form = _form(owner.client, owner, workspace_name="x" * 121)
+    response = owner.client.post("/workspaces/new", data=form)
+    assert response.status_code == 400
+    assert "data-workspace-fields" in response.text
+    assert "data-seed-timezone" not in response.text
+
+
+@pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("US", "USD")])
+def test_a_blank_currency_uses_the_country_currency(
+    owner: OwnerApp, country: str, currency: str
+) -> None:
+    bea = owner.add_user("bea")
+    with signed_in_as(owner, "bea") as client:
+        response = client.post(
+            "/workspaces/new",
+            data=_form(client, owner, base_currency="", country_code=country),
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+    [workspace] = _owned(owner, bea)
+    assert (workspace.base_currency, workspace.country_code) == (currency, country)
+
+
+def test_a_blank_time_zone_falls_back_to_utc(owner: OwnerApp) -> None:
+    bea = owner.add_user("bea")
+    with signed_in_as(owner, "bea") as client:
+        response = client.post(
+            "/workspaces/new", data=_form(client, owner, timezone=""), follow_redirects=False
+        )
+        assert response.status_code == 303
+    [workspace] = _owned(owner, bea)
+    assert workspace.timezone == "UTC"
+
+
+def test_a_blank_currency_without_a_country_is_still_refused(owner: OwnerApp) -> None:
+    bea = owner.add_user("bea")
+    with signed_in_as(owner, "bea") as client:
+        response = client.post(
+            "/workspaces/new",
+            data=_form(client, owner, base_currency="", country_code=""),
+        )
+    assert response.status_code == 400
+    assert "Choose a supported currency." in response.text
+    assert _owned(owner, bea) == []
+
+
 def test_a_blank_name_uses_the_display_name(owner: OwnerApp) -> None:
     bea = owner.add_user("bea")
     with signed_in_as(owner, "bea") as client:

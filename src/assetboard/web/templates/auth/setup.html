@@ -6,7 +6,7 @@
 {% block heading %}{{ _("First-run setup") }}{% endblock %}
 {% block content %}
 <p class="mt-2 text-sm text-muted">{{ _("Create the administrator account and the first workspace. The setup token is printed once in the application log at startup, unless you set ASSETBOARD_SETUP_TOKEN.") }}</p>
-<form method="post" action="{{ scoped_url(request, 'setup') }}" class="mt-6 space-y-6" novalidate>
+<form method="post" action="{{ scoped_url(request, 'setup') }}" class="mt-6 space-y-6" novalidate data-workspace-fields{% if seed_timezone %} data-seed-timezone="1"{% endif %}>
   {{ csrf_input() }}
   {{ field("setup_token", _("Setup token"), type="password", error=errors.get("setup_token"), required=true, autocomplete="off", maxlength=256, autofocus=focus == "setup_token") }}
   <fieldset class="space-y-4">
@@ -22,3 +22,4 @@
   {{ primary_button(_("Create administrator")) }}
 </form>
 {% endblock %}
+{% block scripts %}<script defer src="{{ static_url(request, 'js/workspace-fields.js') }}" referrerpolicy="no-referrer"></script>{% endblock %}

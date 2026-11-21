@@ -12283,6 +12283,9 @@ msgstr ""
 msgid "Not set"
 msgstr ""
 
+msgid "Picked from your country and browser; change it if needed."
+msgstr ""
+
 msgid "Workspace language"
 msgstr ""
 

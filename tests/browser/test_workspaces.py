@@ -82,7 +82,7 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             browser = playwright.chromium.launch()
 
             # Bea has no workspace: the 403 page offers to create one.
-            bea = browser.new_context(color_scheme="light")
+            bea = browser.new_context(color_scheme="light", timezone_id="America/New_York")
             bea.add_init_script(VIOLATION_RECORDER)
             page = bea.new_page()
             _sign_in(page, base, "bea@example.com")
@@ -91,7 +91,20 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_url(f"{base}/workspaces/new")
             expect(page.get_by_label("Workspace name")).to_have_value("Bea")
             page.get_by_label("Workspace name").fill("Bea's budget")
-            page.get_by_label("Base currency").select_option("PLN")
+            # W-1: a fresh form seeds the time zone from the browser.
+            expect(page.get_by_label("Time zone")).to_have_value("America/New_York")
+            # The country picks the base currency; a blank country keeps the previous value.
+            page.get_by_label("Country").select_option("PL")
+            expect(page.get_by_label("Base currency")).to_have_value("PLN")
+            page.get_by_label("Country").select_option("US")
+            expect(page.get_by_label("Base currency")).to_have_value("USD")
+            page.get_by_label("Country").select_option("")
+            expect(page.get_by_label("Base currency")).to_have_value("USD")
+            # A time zone the user chose survives a later country change.
+            page.get_by_label("Time zone").select_option("Europe/Warsaw")
+            page.get_by_label("Country").select_option("PL")
+            expect(page.get_by_label("Base currency")).to_have_value("PLN")
+            expect(page.get_by_label("Time zone")).to_have_value("Europe/Warsaw")
             page.get_by_role("button", name="Create workspace").click()
             page.wait_for_url(f"{base}/")
             expect(page.locator("[data-current-workspace]")).to_have_text("Bea's budget")
@@ -100,6 +113,10 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_url(f"{base}/categories")
             expense = page.locator('[data-section="expense"] [data-category-name]')
             expect(expense.first).to_have_text("Food")
+            # The chosen defaults were stored with the new workspace.
+            page.goto(f"{base}/workspace/settings", wait_until="networkidle")
+            expect(page.get_by_label("Base currency")).to_have_value("PLN")
+            expect(page.get_by_label("Time zone")).to_have_value("Europe/Warsaw")
             assert page.evaluate("window.__cspViolations") == []
 
             # The administrator turns self-service creation off.

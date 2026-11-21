@@ -187,6 +187,38 @@ def test_first_run_setup_seeds_in_the_page_language(
     assert user.id is not None
 
 
+@pytest.mark.parametrize(
+    ("base_currency", "country", "expected"),
+    [
+        ("", "PL", "PLN"),
+        ("", "US", "USD"),
+        ("GBP", "PL", "GBP"),  # a submitted currency always wins
+        ("", "", "EUR"),  # no country: the instance default
+    ],
+)
+def test_first_run_setup_derives_a_blank_currency(
+    db: WorkspaceDb,
+    tmp_path: Path,
+    base_currency: str,
+    country: str,
+    expected: str,
+) -> None:
+    _user, workspace = run_initial_setup(
+        db.factory,
+        email="admin@example.com",
+        display_name="Admin",
+        password=PASSWORD,
+        workspace_name="Setup Home",
+        settings=Settings(_env_file=None, data_dir=tmp_path),
+        clock=db.clock,
+        base_currency=base_currency,
+        country_code=country,
+    )
+    assert workspace.base_currency == expected
+    # The server never picks a time zone from the country (W-1).
+    assert workspace.timezone == "UTC"
+
+
 def test_without_a_seed_language_the_workspace_locale_is_used(
     db: WorkspaceDb, tmp_path: Path
 ) -> None:

@@ -13495,6 +13495,9 @@ msgstr "Domyślnie Twoja wyświetlana nazwa."
 msgid "Not set"
 msgstr "Nie ustawiono"
 
+msgid "Picked from your country and browser; change it if needed."
+msgstr "Wybrano na podstawie kraju i przeglądarki; zmień w razie potrzeby."
+
 msgid "Workspace language"
 msgstr "Język obszaru roboczego"
 

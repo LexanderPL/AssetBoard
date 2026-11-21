@@ -79,7 +79,11 @@ from assetboard.services.scheduled import (
 )
 from assetboard.services.taxes import workspace_has_fixed_tax_amounts
 from assetboard.services.transactions import workspace_has_transactions
-from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
+from assetboard.services.workspace_options import (
+    WorkspaceOptionError,
+    country_default_currency,
+    validate_workspace_options,
+)
 
 MAX_WORKSPACE_NAME_LENGTH = 120
 INVITATION_EXPIRY_DAYS = (1, 7, 30)
@@ -622,9 +626,9 @@ def create_own_workspace(
     clean_name = _workspace_name(name)
     try:
         options = validate_workspace_options(
-            base_currency=base_currency,
+            base_currency=base_currency or country_default_currency(country_code) or "",
             country_code=country_code,
-            timezone=timezone,
+            timezone=timezone or "UTC",
             locale=locale,
         )
     except WorkspaceOptionError as exc:

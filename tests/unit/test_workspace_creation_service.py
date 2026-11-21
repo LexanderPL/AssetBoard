@@ -138,6 +138,53 @@ def test_any_signed_in_user_creates_a_workspace_they_own(db: WorkspaceDb, tmp_pa
     assert db.roles(workspace_id) == {"ola": "owner"}
 
 
+@pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("US", "USD")])
+def test_a_blank_currency_uses_the_country_currency(
+    db: WorkspaceDb, tmp_path: Path, country: str, currency: str
+) -> None:
+    ola = _user(db, "ola")
+    workspace_id = _create(
+        db,
+        ola,
+        _session_hash(db, ola, tmp_path),
+        base_currency="",
+        country_code=country,
+    )
+    with db.factory() as session:
+        workspace = session.get(Workspace, workspace_id)
+    assert workspace is not None and (workspace.base_currency, workspace.country_code) == (
+        currency,
+        country,
+    )
+
+
+def test_an_explicit_currency_wins_over_the_country(db: WorkspaceDb, tmp_path: Path) -> None:
+    ola = _user(db, "ola")
+    workspace_id = _create(
+        db, ola, _session_hash(db, ola, tmp_path), base_currency="EUR", country_code="PL"
+    )
+    with db.factory() as session:
+        workspace = session.get(Workspace, workspace_id)
+    assert workspace is not None and workspace.base_currency == "EUR"
+
+
+def test_a_blank_currency_without_a_country_is_refused(db: WorkspaceDb, tmp_path: Path) -> None:
+    ola = _user(db, "ola")
+    before = _workspace_count(db)
+    with pytest.raises(InvalidWorkspaceSettings) as invalid:
+        _create(db, ola, _session_hash(db, ola, tmp_path), base_currency="", country_code="")
+    assert (invalid.value.field, invalid.value.code) == ("base_currency", "invalid_base_currency")
+    assert _workspace_count(db) == before
+
+
+def test_a_blank_time_zone_falls_back_to_utc(db: WorkspaceDb, tmp_path: Path) -> None:
+    ola = _user(db, "ola")
+    workspace_id = _create(db, ola, _session_hash(db, ola, tmp_path), timezone="")
+    with db.factory() as session:
+        workspace = session.get(Workspace, workspace_id)
+    assert workspace is not None and workspace.timezone == "UTC"
+
+
 def test_the_new_workspace_is_seeded_and_audited_in_its_own_log(
     db: WorkspaceDb, tmp_path: Path
 ) -> None:
