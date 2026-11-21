@@ -5,10 +5,6 @@ change items; viewers can read the list.
 
 ## The list
 
-At the top, **Salary and variable income** links to **Income**, and **Income tax rules** links to
-**Taxes** when taxes are enabled. These are configured in their own sections; only independent
-recurring items appear in the list below.
-
 The page has two sections, **Expenses** and **Income**. Each item is one row: its name, the
 amount (marked **estimate** when the amount varies), the schedule as a sentence such as
 "Monthly on the 10th", "Every 3 months on the 15th, from January 2027", "Yearly on 31 March"

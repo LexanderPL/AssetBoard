@@ -1,4 +1,3 @@
-import re
 from uuid import uuid4
 
 from assetboard.clock import FixedClock
@@ -9,6 +8,8 @@ from assetboard.web.scheduled_routes import _rule
 def form(owner, **overrides):
     page = owner.client.get("/recurring/new")
     # Seeded categories are expense first; choose the option from the actual form.
+    import re
+
     category = re.search(r'<option value="([a-f0-9-]{36})"', page.text)
     assert category
     return {
@@ -60,25 +61,6 @@ def test_crud_preview_pause_resume_archive_and_delete(owner):
         ).one()
     assert owner.post(f"/recurring/{delete_id}/delete").status_code == 303
     assert "Delete me" not in owner.client.get("/recurring").text
-
-
-def test_recurring_links_to_income_and_income_taxes(owner):
-    page = owner.client.get("/recurring").text
-    related = re.search(r"<div[^>]*data-related-schedules.*?</div>", page, re.S)
-    assert related is not None
-    block = related.group(0)
-    assert re.search(r'href="[^"]*/income"', block)
-    assert "Income tax rules:" not in block
-    assert not re.search(r'href="[^"]*/taxes"', block)
-
-    owner.post("/workspace/settings/menu", {"taxes_enabled": "1"})
-    page = owner.client.get("/recurring").text
-    related = re.search(r"<div[^>]*data-related-schedules.*?</div>", page, re.S)
-    assert related is not None
-    block = related.group(0)
-    assert re.search(r'href="[^"]*/income"', block)
-    assert "Income tax rules:" in block
-    assert re.search(r'href="[^"]*/taxes"', block)
 
 
 def test_invalid_input_csrf_roles_and_other_workspace_ids(owner):

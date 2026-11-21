@@ -12019,12 +12019,6 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
-msgid "Salary and variable income:"
-msgstr ""
-
-msgid "Income tax rules:"
-msgstr ""
-
 msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 
