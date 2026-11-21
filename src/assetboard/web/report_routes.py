@@ -2,8 +2,9 @@
 
 A plain GET form: every view is a bookmarkable URL and works without JavaScript. The category
 filter is repeatable (``?category=<id>&category=<id>``). The last resolved filters are kept in a
-one-year browser cookie; any explicit report query parameter wins and refreshes it, while
-``?clear=1`` deletes it and redirects to the clean page.
+one-year browser cookie; a valid explicit report query parameter wins and refreshes it, while
+an invalid one shows its errors without replacing it. ``?clear=1`` deletes it and redirects to
+the clean page.
 """
 
 from __future__ import annotations
@@ -87,12 +88,15 @@ async def reports(
             trend=source.trend,
         )
     )
-    # A malformed or stale cookie must not surface validation errors: ignore it and show the
+    # A malformed or stale cookie must not surface validation errors: forget it and show the
     # current defaults. An explicit invalid URL keeps its errors and does not refresh the cookie.
-    if not explicit and data.filters.errors:
+    stale_cookie = not explicit and bool(data.filters.errors)
+    if stale_cookie:
         data = await run_in_threadpool(lambda: reports_data(factory, ctx))
     view = build_reports_view(request, data, request.state.locale)
     response = render_template(request, "reports/page.html", context={"view": view})
+    if stale_cookie:
+        clear_cookie(response, settings, cookie_name)
     if explicit and not data.filters.errors:
         value = serialize_report_filters(data.filters)
         if len(value) <= MAX_REPORT_FILTER_COOKIE_LENGTH:

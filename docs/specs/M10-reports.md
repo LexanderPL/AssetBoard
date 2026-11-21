@@ -27,10 +27,11 @@ the M4 archive.
 - **Filters** (a plain GET form, so a view is a bookmarkable URL; works without JavaScript):
   - **Remembered settings.** The last resolved filters (years, granularity, currency, categories,
     savings, report year and trend window) are kept in a one-year browser cookie (`HttpOnly`,
-    `SameSite=Lax`; no amounts). Any explicit report query parameter wins and refreshes it; a
-    bare `/reports` reads it; an invalid cookie falls back to the current defaults. `clear=1`
-    deletes it and redirects to the clean page. The filter panel is closed by default and opens
-    automatically when a field has a validation error.
+    `SameSite=Lax`; no amounts). A valid explicit report query parameter wins and refreshes it;
+    an invalid explicit request shows its errors and keeps the previous settings. A bare
+    `/reports` reads it; a cookie whose values no longer validate falls back to the current
+    defaults and is cleared. `clear=1` deletes it and redirects to the clean page. The filter
+    panel is closed by default and opens automatically when a field has a validation error.
   - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the last three years that have
     transactions (the current year when there are none); at most 30 years; `from > to`,
     malformed or out-of-range values are marked on the form and show no charts. The dropdowns

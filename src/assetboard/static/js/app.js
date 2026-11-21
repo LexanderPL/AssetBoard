@@ -341,10 +341,10 @@ document.addEventListener("htmx:load", (event) => {
   if (event.target instanceof Element) revealCurrentTabs(event.target);
 });
 
-// A filters panel is rendered open, so it works without JavaScript and stays open on a desktop.
-// On a phone it starts collapsed, so the page title and the first data row fit in the first
-// viewport; the user opens it with the always-visible summary. A choice made by the user is
-// never overridden later.
+// Filters panels work without JavaScript. A panel rendered open stays open on a desktop; Reports
+// renders its panel closed. On a phone an open panel starts collapsed, so the page title and the
+// first data row fit in the first viewport; the user opens it with the always-visible summary.
+// A choice made by the user is never overridden later.
 const FILTER_PHONE = window.matchMedia("(max-width: 639.98px)");
 document.querySelectorAll("details[data-filter-disclosure]").forEach((details) => {
   if (!(details instanceof HTMLDetailsElement) || !FILTER_PHONE.matches) return;
