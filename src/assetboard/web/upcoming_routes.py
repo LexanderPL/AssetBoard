@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 from datetime import date, timedelta
 from urllib.parse import urlencode
 from uuid import UUID
@@ -66,6 +67,16 @@ async def _values(request: Request) -> dict[str, str]:
     return {key: value for key, value in form.items() if isinstance(value, str)}
 
 
+# A redirect anchor is supplied by the Upcoming page's own forms. Only its two generated shapes
+# are accepted, so a tampered value cannot add an arbitrary fragment.
+ANCHOR = re.compile(r"(?:week-[0-9]{4}-[0-9]{2}-[0-9]{2}|occurrence-[0-9a-f-]{36})")
+
+
+def _anchor(values: dict[str, str]) -> str:
+    anchor = values.get("anchor", "")
+    return anchor if ANCHOR.fullmatch(anchor) else ""
+
+
 def _redirect(
     request: Request,
     *,
@@ -75,11 +86,13 @@ def _redirect(
     skipped: UUID | None = None,
     back: str = "",
     return_month: YearMonth | None = None,
+    anchor: str = "",
 ) -> Response:
     """Back to the Upcoming page, or to Home after a successful action sent from there (F2.7:
     ``back=home``; any other value means the Upcoming page). A confirm sent from an expected row
     of the Transactions page (F3.5: ``return_month``) returns to that month's Transactions page.
-    Errors are shown on Upcoming."""
+    Errors are shown on Upcoming. ``anchor`` keeps a posted or skipped row's week in view
+    (F11.9/UX-05)."""
     if back == "home" and error is None:
         return RedirectResponse(request.url_for("home").path, status_code=303)
     params: dict[str, str] = {}
@@ -97,7 +110,15 @@ def _redirect(
         if return_month is not None
         else request.url_for("scheduled_upcoming").path
     )
-    return RedirectResponse(target + ("?" + urlencode(params) if params else ""), status_code=303)
+    fragment = ""
+    if anchor and return_month is None:
+        # The fragment is the no-JavaScript path; the query parameter survives a service-worker
+        # navigation response, where some browsers drop the fragment, and app.js scrolls to it.
+        params["at"] = anchor
+        fragment = f"#{anchor}"
+    return RedirectResponse(
+        target + ("?" + urlencode(params) if params else "") + fragment, status_code=303
+    )
 
 
 ONE_TIME_ERRORS = {
@@ -172,6 +193,7 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
         "can_edit": has_role(ctx, Role.EDITOR),
         "undo": undo,
         "notice": notice,
+        "notice_code": notice_code,
         "skipped_id": skipped_id,
         "open_form": request.query_params.get("form"),
         "one_time_values": {"direction": "expense", "day": today.isoformat()},
@@ -356,7 +378,11 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     with contextlib.suppress(InvalidMonth):
         return_month = YearMonth.parse(values.get("return_month", ""))
     return _redirect(
-        request, posted=_id(occurrence_id), back=values.get("back", ""), return_month=return_month
+        request,
+        posted=_id(occurrence_id),
+        back=values.get("back", ""),
+        return_month=return_month,
+        anchor=_anchor(values),
     )
 
 
@@ -386,7 +412,7 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     if values.get("back"):
         return _redirect(request, back=values["back"])
     # The Upcoming page's status line offers Undo of this occurrence's skip.
-    return _redirect(request, notice="skipped", skipped=target)
+    return _redirect(request, notice="skipped", skipped=target, anchor=_anchor(values))
 
 
 @router.post("/upcoming/{occurrence_id}/unskip", name="upcoming_unskip")
@@ -402,8 +428,11 @@ async def unskip(request: Request, ctx: CurrentContext, occurrence_id: str) -> R
             _id(occurrence_id),
         )
     except occurrences.OccurrenceError as exc:
+        # An error belongs at the top of the page, where the alert is rendered.
         return _redirect(request, error=exc.code, return_month=return_month)
-    return _redirect(request, notice="skip_undone", return_month=return_month)
+    return _redirect(
+        request, notice="skip_undone", return_month=return_month, anchor=_anchor(values)
+    )
 
 
 @router.post("/upcoming/{occurrence_id}/delete", name="upcoming_delete")
@@ -471,6 +500,7 @@ async def edit_amount(request: Request, ctx: CurrentContext, occurrence_id: str)
 
 @router.post("/upcoming/{occurrence_id}/undo", name="upcoming_undo")
 async def undo(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    values = await _values(request)
     try:
         await run_in_threadpool(
             occurrences.undo_post,
@@ -480,4 +510,4 @@ async def undo(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request)
+    return _redirect(request, anchor=_anchor(values))

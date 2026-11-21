@@ -429,13 +429,19 @@
     };
   }
 
+  function setChartTableHidden(table, hidden) {
+    table.classList.toggle("sr-only", hidden);
+    const region = table.querySelector("[data-table-scroll]");
+    if (region instanceof HTMLElement) region.tabIndex = hidden ? -1 : 0;
+  }
+
   function revealReportTable(element) {
     const table = element.querySelector("[data-chart-table]");
     const toggle = element.querySelector("[data-chart-table-toggle]");
     if (toggle instanceof HTMLElement && toggle.hidden) {
       // First draw: hide the no-JS table and reveal its toggle. A redraw (theme change, HTMX
       // swap) keeps whatever the visitor chose, including the button's aria-expanded state.
-      table?.classList.add("sr-only");
+      if (table instanceof HTMLElement) setChartTableHidden(table, true);
       toggle.hidden = false;
     }
   }
@@ -451,7 +457,8 @@
       option = donutOptions(data);
       const legend = element.querySelector("[data-chart-legend]");
       if (legend) legend.hidden = false;
-      element.querySelector("[data-chart-table]")?.classList.add("sr-only");
+      const table = element.querySelector("[data-chart-table]");
+      if (table instanceof HTMLElement) setChartTableHidden(table, true);
     } else if (kind === "line" && Array.isArray(data.series)) {
       option = lineOptions(data);
       revealReportTable(element);
@@ -539,7 +546,8 @@
     const chart = button.closest("[data-chart]");
     const table = chart ? chart.querySelector("[data-chart-table]") : null;
     if (!table) return;
-    const hidden = table.classList.toggle("sr-only");
+    const hidden = !table.classList.contains("sr-only");
+    setChartTableHidden(table, hidden);
     button.setAttribute("aria-expanded", hidden ? "false" : "true");
     button.textContent = hidden
       ? button.getAttribute("data-show-label") || ""

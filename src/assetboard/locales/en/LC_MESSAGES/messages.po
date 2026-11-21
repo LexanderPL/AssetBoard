@@ -5734,6 +5734,9 @@ msgid ""
 " named below and confirm again."
 msgstr ""
 
+msgid "Skip to content"
+msgstr ""
+
 msgid "Menu"
 msgstr ""
 
@@ -5801,6 +5804,9 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+msgid "Customise"
+msgstr ""
+
 #, python-format
 msgid "Loading %(widget)s…"
 msgstr ""
@@ -5816,12 +5822,6 @@ msgid "Your Home is empty"
 msgstr ""
 
 msgid "Choose the widgets you want to see."
-msgstr ""
-
-msgid "Choose which widgets appear on Home and in what order."
-msgstr ""
-
-msgid "Customise"
 msgstr ""
 
 msgid "You are offline"
@@ -12238,6 +12238,9 @@ msgstr ""
 msgid "Create an expense category first."
 msgstr ""
 
+msgid "Add entry"
+msgstr ""
+
 msgid "Reopen it on the month page."
 msgstr ""
 
@@ -15334,5 +15337,8 @@ msgstr ""
 #~ "A linked item takes its value and"
 #~ " currency from the target. The value"
 #~ " fields below are ignored."
+#~ msgstr ""
+
+#~ msgid "Choose which widgets appear on Home and in what order."
 #~ msgstr ""
 

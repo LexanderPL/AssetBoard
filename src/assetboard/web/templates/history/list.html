@@ -2,7 +2,7 @@
    forms, the bulk change posts to a confirmation page. Row checkboxes join the bulk form with
    the ``form`` attribute. No inline script or style. #}
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, table_scroll with context %}
 {% from "categories/_macros.html" import swatch, category_options %}
 {% set label_class = "block text-sm font-medium" %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
@@ -198,7 +198,7 @@
     <p class="mt-1 text-sm text-muted" data-result-count>{% if window.total %}{{ ngettext("%(first)d–%(last)d of %(num)d entry", "%(first)d–%(last)d of %(num)d entries", window.total, first=window.first_item, last=window.last_item) }}{% else %}{{ _("No entries match these filters.") }}{% endif %}</p>
     {% endif %}
     {% if rows %}
-    <div class="relative mt-3 overflow-x-auto">
+    {% call table_scroll(_("Entries matching the filters")) %}
       <table class="sheet bg-surface w-full min-w-[40rem] text-sm">
         <caption class="sr-only">{{ _("Entries matching the filters") }}{% if window and window.pages > 1 %}, {{ _("page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}{% endif %}</caption>
         <thead>
@@ -225,7 +225,7 @@
           {% endfor %}
         </tbody>
       </table>
-    </div>
+    {% endcall %}
     {% endif %}
     {% if window and window.pages > 1 %}
     <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="{{ _('Pages') }}" data-pages>

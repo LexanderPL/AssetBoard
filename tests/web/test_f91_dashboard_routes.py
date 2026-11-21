@@ -277,10 +277,10 @@ def test_home_shell_lists_the_default_widgets_in_order(owner: OwnerApp) -> None:
     html = owner.client.get("/").text
     assert _widget_order(html) == list(WIDGET_KEYS)
     assert "data-customise-link" in html
-    # The Customise control sits after the widget grid, not in the page header.
-    assert html.index("data-customise-link") > html.index("data-home-widgets")
-    header = html.split("data-header-actions")[1].split("</div>")[0]
-    assert "data-customise-link" not in header
+    # F11.9/UX-17: Customise sits in the header action row, not below the widget grid.
+    assert html.index("data-customise-link") < html.index("data-home-widgets")
+    header = html.split("data-header-actions")[1].split("</header>")[0]
+    assert "data-customise-link" in header
     assert "data-home-month" in html and "March 2026" in html
     assert "data-summary-kpis" not in html  # the shell has no widget data
     assert 'hx-trigger="load"' in html and 'hx-swap="outerHTML"' in html

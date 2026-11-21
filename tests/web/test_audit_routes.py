@@ -514,7 +514,8 @@ def test_the_member_column_with_the_real_writers(h: Harness) -> None:
 def test_no_dangling_separator_on_your_own_row(h: Harness) -> None:
     page = admin(h).get("/admin/users").text
     own = page.split(f'data-user="{h.web.admin_email}"')[1].split("</tr>")[0]
-    actions = re.sub(r"<[^>]+>", " ", own.split('text-right whitespace-nowrap">')[1])
+    # The actions cell is the row's last <td> (card rows on phones keep the same cells).
+    actions = re.sub(r"<[^>]+>", " ", own.rsplit("<td", 1)[1].split(">", 1)[1])
     words = actions.split()
     # History's sr-only row name sits before the "You" marker; there is no dangling separator.
     assert words == ["History", "Admin", "You"], words
