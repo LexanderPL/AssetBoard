@@ -244,6 +244,35 @@ def test_templates_use_only_colour_tokens(path: Path) -> None:
     assert not problems, f"{path.name}: {problems}"
 
 
+def test_the_danger_shade_scale_is_monotonic_in_both_themes() -> None:
+    light, dark = _theme(":root"), _theme(":root.dark")
+    steps = ("danger-shade-1", "danger-shade-2", "danger-shade-3", "danger-tint")
+    # Light: each stronger heat step is darker. Dark: each stronger step is lighter.
+    assert all(
+        _luminance(light[first]) > _luminance(light[second])
+        for first, second in zip(steps, steps[1:], strict=False)
+    )
+    assert all(
+        _luminance(dark[first]) < _luminance(dark[second])
+        for first, second in zip(steps, steps[1:], strict=False)
+    )
+
+
+def test_the_dead_heat_classes_are_gone() -> None:
+    for path in (INPUT_CSS, APP_CSS):
+        css = path.read_text(encoding="utf-8")
+        assert re.search(r"\.heat-[1-4]\s*\{", css) is None, path.name
+
+
+def test_built_css_keeps_the_heat_utilities() -> None:
+    # The report heat classes are chosen in Python, so Tailwind's template scanner cannot see
+    # them. They are shared with the Transactions row tints; this guard fails if a change there
+    # drops them from the build and silently unshades the year overview.
+    css = APP_CSS.read_text(encoding="utf-8")
+    for name in ("danger-shade-1", "danger-shade-2", "danger-shade-3", "danger-tint"):
+        assert f".bg-{name}{{" in css, name
+
+
 def test_the_colour_guard_catches_what_it_should() -> None:
     tokens = _tokens()
 

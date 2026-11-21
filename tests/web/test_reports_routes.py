@@ -148,6 +148,59 @@ def test_the_default_page_is_the_current_year_when_there_is_no_data(
     assert "data-filter-disclosure" in html
 
 
+def test_the_filter_form_fills_the_panel_and_aligns_controls(reports: OwnerApp) -> None:
+    html = _page(reports, "from=2026&to=2026&step=month")
+    form = re.search(r'<form id="report-filters".*?</form>', html, re.DOTALL)
+    assert form is not None
+    form_html = form.group(0)
+    assert 'class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-4"' in form_html
+    assert "sm:items-end" not in form_html
+    assert "sm:grid-cols-4" not in form_html
+    # Every field is a min-width-zero grid item; the controls stay full width.
+    assert '<div class="min-w-0">' in form_html
+    assert '<div class="min-w-0 sm:col-span-2 lg:col-span-2">' in form_html  # Granularity
+    assert form_html.count('<div class="min-w-0 sm:col-span-2">') == 2  # Categories, savings
+    assert (
+        '<div class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">' in form_html
+    )
+    for control in (
+        'id="report-from"',
+        'id="report-to"',
+        'id="report-step"',
+        "data-multi-select",
+    ):
+        assert control in form_html
+    assert "w-full" in form_html
+    # Helper text sits after its control, never above it.
+    assert form_html.index('id="report-from"') < form_html.index("Leave empty for all categories")
+    assert form_html.index("data-multi-select") < form_html.index("Leave empty for all categories")
+    assert form_html.index('name="savings"') < form_html.index(
+        "Saved and invested amounts get their own category series."
+    )
+
+    # The moved trend window leaves a hidden field so Show report keeps the active window.
+    assert '<input type="hidden" name="trend" value="3">' in form_html
+
+    # With a second currency the selector appears and Granularity keeps one column.
+    _tx(reports, _category(reports, "Form USD"), date(2026, 3, 5), 1_000, currency="USD")
+    with_currency = re.search(
+        r'<form id="report-filters".*?</form>',
+        _page(reports, "from=2026&to=2026&step=month"),
+        re.DOTALL,
+    )
+    assert with_currency is not None
+    assert 'id="report-currency" name="currency"' in with_currency.group(0)
+    assert "min-w-0 sm:col-span-2 lg:col-span-2" not in with_currency.group(0)
+
+    # A field error is rendered below its control, inside the same grid item.
+    invalid = _page(reports, "from=20x6&to=2026")
+    assert invalid.index('id="report-from"') < invalid.index('id="report-from-error"')
+    assert re.search(
+        r'id="report-from-error"[^>]*>Enter a year between 1900 and 2199\.</p>',
+        invalid,
+    )
+
+
 def test_the_year_dropdowns_only_offer_years_with_transactions(reports: OwnerApp) -> None:
     food = _category(reports, "Year Food")
     for year in (2019, 2021, 2024, 2027):
@@ -240,12 +293,12 @@ def test_the_currency_selector_appears_only_with_a_second_currency(reports: Owne
     food = _category(reports, "Golden Food")
     _tx(reports, food, date(2026, 3, 5), 1_000, currency="EUR")
     html = _page(reports, "from=2026&to=2026&step=month")
-    assert 'name="currency"' not in html
+    assert 'id="report-currency"' not in html
     assert "Amounts in EUR." in html
 
     _tx(reports, food, date(2026, 3, 6), 2_000, currency="USD")
     html = _page(reports, "from=2026&to=2026&step=month")
-    assert 'name="currency"' in html
+    assert 'id="report-currency" name="currency"' in html
     assert '<option value="EUR" selected>EUR</option>' in html
     assert '<option value="USD">USD</option>' in html
     assert "entry in another currency is left out" in html
@@ -756,14 +809,15 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     assert totals is not None
     assert _cells(totals.group(0))[:2] == ["€1,020.00", "€130.00"]
     assert _cells(totals.group(0))[-1] == "€1,150.00"
-    assert "heat-4" in re.search(
+    assert "bg-danger-tint" in re.search(
         r'<td class="([^"]*)" data-report-grid-cell>€900\.00</td>', html
     ).group(1)  # type: ignore[union-attr]
-    assert "heat-1" in re.search(
+    assert "bg-danger-shade-1" in re.search(
         r'<td class="([^"]*)" data-report-grid-cell>€120\.00</td>', html
     ).group(1)  # type: ignore[union-attr]
     zero_classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>€0\.00</td>', food)
-    assert zero_classes and all("heat-" not in value for value in zero_classes)
+    assert zero_classes and all("bg-danger-" not in value for value in zero_classes)
+    assert "heat-" not in html
     assert "Grid Savings" not in html and "Grid Transfer" not in html
     grid_section = re.search(
         r"<section [^>]*data-report-year-overview.*?</section>", html, re.DOTALL
@@ -788,6 +842,21 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
 
 def test_the_year_overview_csv_endpoint_is_gone(reports: OwnerApp) -> None:
     assert reports.client.get("/reports/year-overview.csv").status_code == 404
+
+
+def test_the_year_overview_heat_steps_are_monotonic(reports: OwnerApp) -> None:
+    food = _category(reports, "Heat Food")
+    for month, minor in ((1, 10_000), (2, 30_000), (3, 50_000), (4, 90_000)):
+        _tx(reports, food, date(2026, month, 10), minor)
+    html = _page(reports, "from=2026&to=2026&step=month&year=2026")
+    row = _grid_row(html, "Heat Food")
+    classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>', row)
+    assert len(classes) == 12
+    assert "bg-danger-shade-1" in classes[0]
+    assert "bg-danger-shade-2" in classes[1]
+    assert "bg-danger-shade-3" in classes[2]
+    assert "bg-danger-tint" in classes[3]
+    assert all("bg-danger-" not in value for value in classes[4:])
 
 
 def test_category_trends_show_three_and_twelve_month_windows(reports: OwnerApp) -> None:
@@ -841,6 +910,50 @@ def test_category_trends_follow_the_selected_categories(reports: OwnerApp) -> No
     assert trend_section is not None
     assert "Trend Food" in trend_section.group(0)
     assert "Trend Rent" not in trend_section.group(0)
+
+
+def test_the_category_trends_window_is_its_own_form(reports: OwnerApp) -> None:
+    food = _category(reports, "Trend Form Food")
+    _tx(reports, food, date(2026, 1, 10), 10_000)
+    html = _page(
+        reports,
+        f"from=2025&to=2026&step=month&currency=EUR&category={food}&savings=1&year=2025&trend=12",
+    )
+    top_form = re.search(r'<form id="report-filters".*?</form>', html, re.DOTALL)
+    assert top_form is not None
+    assert 'id="report-trend"' not in top_form.group(0)
+    assert '<input type="hidden" name="trend" value="12">' in top_form.group(0)
+
+    section = re.search(r"<section [^>]*data-report-trends.*?</section>", html, re.DOTALL)
+    assert section is not None
+    trend_form = section.group(0)
+    assert '<form method="get" action="/reports"' in trend_form
+    assert "data-report-trend-form" in trend_form
+    assert 'id="report-trend" name="trend"' in trend_form
+    assert "data-autosubmit" in trend_form
+    assert 'data-autosubmit-anchor="#category-trends"' in trend_form
+    assert '<option value="12" selected>12-month average</option>' in trend_form
+    assert "Window:" not in trend_form
+    assert '<noscript><button type="submit" formaction="/reports#category-trends"' in trend_form
+    assert 'class="btn-sm">Show</button></noscript>' in trend_form
+    for field, value in (
+        ("from", "2025"),
+        ("to", "2026"),
+        ("step", "month"),
+        ("currency", "EUR"),
+        ("category", str(food)),
+        ("savings", "1"),
+        ("year", "2025"),
+    ):
+        assert f'<input type="hidden" name="{field}" value="{value}">' in trend_form
+
+    without_savings = _page(reports, "from=2026&to=2026&step=month")
+    plain_section = re.search(
+        r"<section [^>]*data-report-trends.*?</section>", without_savings, re.DOTALL
+    )
+    assert plain_section is not None
+    assert 'name="savings"' not in plain_section.group(0)
+    assert '<input type="hidden" name="year" value="2026">' in plain_section.group(0)
 
 
 def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
@@ -941,7 +1054,12 @@ def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
     assert "Trendy kategorii" in html
     assert "Rok do roku" in html
     assert "Dokładność planu i rzeczywistości" in html
-    assert "Okno: 3 mies." in html
+    assert "Okno trendów kategorii" in html
+    assert "Średnia 3-miesięczna" in html
+    assert (
+        "Wydatki według kategorii i miesiąca. Mocniejsza czerwień oznacza większe wydatki "
+        "w danym miesiącu." in html
+    )
     assert "Zmiana dochodów" in html
     assert "Zmiana wydatków" in html
     assert "Przekroczenie %" in html

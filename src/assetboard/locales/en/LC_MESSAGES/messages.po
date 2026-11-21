@@ -11601,15 +11601,6 @@ msgid ""
 "the category charts."
 msgstr ""
 
-msgid "Category trends window"
-msgstr ""
-
-msgid "3-month average"
-msgstr ""
-
-msgid "12-month average"
-msgstr ""
-
 msgid "Show report"
 msgstr ""
 
@@ -11653,7 +11644,7 @@ msgid "Report year"
 msgstr ""
 
 msgid ""
-"Spending by category and month. Darker cells mean more spending in that "
+"Spending by category and month. Stronger red means more spending in that "
 "month."
 msgstr ""
 
@@ -11663,8 +11654,13 @@ msgstr ""
 msgid "Spending by category and month"
 msgstr ""
 
-#, fuzzy, python-format
-msgid "Window: %(num)d months"
+msgid "Category trends window"
+msgstr ""
+
+msgid "3-month average"
+msgstr ""
+
+msgid "12-month average"
 msgstr ""
 
 msgid "Rolling average spending by category."
@@ -15382,5 +15378,14 @@ msgstr ""
 #~ "expenses get a stronger red background"
 #~ " and larger income a stronger green"
 #~ " one."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Spending by category and month. Darker"
+#~ " cells mean more spending in that "
+#~ "month."
+#~ msgstr ""
+
+#~ msgid "Window: %(num)d months"
 #~ msgstr ""
 

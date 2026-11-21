@@ -70,22 +70,22 @@
 {% block content %}
 <div class="mx-auto max-w-6xl space-y-6" data-reports>
   {% call filter_panel(count=view.active_filter_count) %}
-    <form id="report-filters" method="get" action="{{ scoped_url(request, 'reports') }}" class="grid gap-4 sm:grid-cols-4 sm:items-end" novalidate data-report-filters>
-      <div>
+    <form id="report-filters" method="get" action="{{ scoped_url(request, 'reports') }}" class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-4" novalidate data-report-filters>
+      <div class="min-w-0">
         <label for="report-from" class="{{ label_class }}">{{ _("From year") }}</label>
         <select id="report-from" name="from" class="form-select w-full py-1.5 pl-2.5"{{ invalid("from") }}>
           {% for option in view.data.range_year_options %}<option value="{{ option }}"{% if option|string == view.data.filters.from_text %} selected{% endif %}>{{ option }}</option>{% endfor %}
         </select>
         {{ field_error("from") }}
       </div>
-      <div>
+      <div class="min-w-0">
         <label for="report-to" class="{{ label_class }}">{{ _("To year") }}</label>
         <select id="report-to" name="to" class="form-select w-full py-1.5 pl-2.5"{{ invalid("to") }}>
           {% for option in view.data.range_year_options %}<option value="{{ option }}"{% if option|string == view.data.filters.to_text %} selected{% endif %}>{{ option }}</option>{% endfor %}
         </select>
         {{ field_error("to") }}
       </div>
-      <div>
+      <div class="min-w-0{% if not view.show_currency_selector %} sm:col-span-2 lg:col-span-2{% endif %}">
         <label for="report-step" class="{{ label_class }}">{{ _("Granularity") }}</label>
         <select id="report-step" name="step" class="form-select w-full py-1.5 pl-2.5">
           <option value="month"{% if view.data.filters.step.value == "month" %} selected{% endif %}>{{ _("Monthly") }}</option>
@@ -93,14 +93,15 @@
         </select>
       </div>
       {% if view.show_currency_selector %}
-      <div>
+      <div class="min-w-0">
         <label for="report-currency" class="{{ label_class }}">{{ _("Currency") }}</label>
         <select id="report-currency" name="currency" class="form-select w-full py-1.5 pl-2.5">
           {% for code in view.data.available_currencies %}<option value="{{ code }}"{% if code == view.data.filters.currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
         </select>
       </div>
       {% endif %}
-      <div class="sm:col-span-2">
+      <input type="hidden" name="trend" value="{{ view.data.filters.trend_months }}">
+      <div class="min-w-0 sm:col-span-2">
         <span id="report-category-label" class="{{ label_class }}">{{ _("Categories") }}</span>
         <details class="relative" data-multi-select aria-labelledby="report-category-label"
                  data-all-label="{{ _('All categories') }}"
@@ -121,21 +122,14 @@
         </details>
         <p class="mt-1 text-xs text-muted">{{ _("Leave empty for all categories in the year overview and the 8 largest in the category charts.") }}</p>
       </div>
-      <div class="sm:col-span-2">
+      <div class="min-w-0 sm:col-span-2">
         <label class="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" name="savings" value="1"{% if view.include_savings %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary">
           {{ _("Include saved / invested") }}
         </label>
         <p class="mt-1 text-xs text-muted">{{ _("Saved and invested amounts get their own category series.") }}</p>
       </div>
-      <div>
-        <label for="report-trend" class="{{ label_class }}">{{ _("Category trends window") }}</label>
-        <select id="report-trend" name="trend" class="form-select w-full py-1.5 pl-2.5">
-          <option value="3"{% if view.data.filters.trend_months == 3 %} selected{% endif %}>{{ _("3-month average") }}</option>
-          <option value="12"{% if view.data.filters.trend_months == 12 %} selected{% endif %}>{{ _("12-month average") }}</option>
-        </select>
-      </div>
-      <div class="flex flex-wrap items-center gap-3 sm:col-span-4">
+      <div class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
         <button type="submit" class="btn-primary">{{ _("Show report") }}</button>
         {% if not view.show_currency_selector %}<p class="text-xs text-muted">{{ _("Amounts in %(currency)s.", currency=view.data.filters.currency) }}</p>{% endif %}
       </div>
@@ -363,7 +357,7 @@
         <noscript><button type="submit" form="report-filters" formaction="{{ scoped_url(request, 'reports') }}#year-overview" class="btn-sm">{{ _("Show") }}</button></noscript>
       </div>
     </div>
-    <p class="mt-1 text-sm text-muted">{{ _("Spending by category and month. Darker cells mean more spending in that month.") }}</p>
+    <p class="mt-1 text-sm text-muted">{{ _("Spending by category and month. Stronger red means more spending in that month.") }}</p>
     {% if view.year_overview.empty %}
     <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No spending in this year.") }}</p>
     {% else %}
@@ -400,10 +394,26 @@
     {% endif %}
   </section>
 
-  <section class="panel scroll-mt-24 p-4 sm:p-6" aria-labelledby="reports-trends-heading" data-report-trends>
-    <div class="flex flex-wrap items-baseline justify-between gap-2">
+  <section id="category-trends" class="panel scroll-mt-24 p-4 sm:p-6" aria-labelledby="reports-trends-heading" data-report-trends>
+    <div class="flex flex-wrap items-start justify-between gap-2">
       <h2 id="reports-trends-heading" class="text-base font-semibold">{{ _("Category trends") }}</h2>
-      <p class="text-sm tabular-nums text-muted">{{ _("Window: %(num)d months", num=view.category_trends.months) }}</p>
+      <form method="get" action="{{ scoped_url(request, 'reports') }}" class="flex flex-wrap items-end gap-2" data-report-trend-form>
+        <input type="hidden" name="from" value="{{ view.data.filters.start_year }}">
+        <input type="hidden" name="to" value="{{ view.data.filters.end_year }}">
+        <input type="hidden" name="step" value="{{ view.data.filters.step.value }}">
+        <input type="hidden" name="currency" value="{{ view.data.filters.currency }}">
+        {% for category_id in view.data.filters.category_ids %}<input type="hidden" name="category" value="{{ category_id }}">{% endfor %}
+        {% if view.include_savings %}<input type="hidden" name="savings" value="1">{% endif %}
+        <input type="hidden" name="year" value="{{ view.data.filters.year }}">
+        <div class="min-w-0">
+          <label for="report-trend" class="{{ label_class }}">{{ _("Category trends window") }}</label>
+          <select id="report-trend" name="trend" class="form-select py-1.5 pl-2.5" data-autosubmit data-autosubmit-anchor="#category-trends">
+            <option value="3"{% if view.data.filters.trend_months == 3 %} selected{% endif %}>{{ _("3-month average") }}</option>
+            <option value="12"{% if view.data.filters.trend_months == 12 %} selected{% endif %}>{{ _("12-month average") }}</option>
+          </select>
+        </div>
+        <noscript><button type="submit" formaction="{{ scoped_url(request, 'reports') }}#category-trends" class="btn-sm">{{ _("Show") }}</button></noscript>
+      </form>
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Rolling average spending by category.") }}</p>
     {% if view.category_trends.year_step %}

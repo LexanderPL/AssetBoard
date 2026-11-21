@@ -746,12 +746,20 @@ def _category_notes(data: ReportsData, locale: str) -> tuple[str, ...]:
     return ()
 
 
+HEAT_STEP_CLASSES = (
+    "bg-danger-shade-1",
+    "bg-danger-shade-2",
+    "bg-danger-shade-3",
+    "bg-danger-tint",
+)
+
+
 def _heat_class(amount_minor: int, maximum_minor: int) -> str:
     """A four-step heat class for one cell; zero and negative amounts stay unshaded."""
     if amount_minor <= 0 or maximum_minor <= 0:
         return ""
     step = max(1, min(4, (amount_minor * 4 + maximum_minor - 1) // maximum_minor))
-    return f"heat-{step}"
+    return HEAT_STEP_CLASSES[step - 1]
 
 
 def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOverview:

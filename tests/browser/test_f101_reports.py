@@ -328,6 +328,95 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-multi-select-summary]")).to_have_text("1 category selected")
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
 
+            # R-1: the filter grid fills the panel and top-aligns its controls. At 1280 px the
+            # first row shares one top edge; with the currency selector hidden, Granularity
+            # spans the remaining columns and reaches the panel's right edge.
+            page.set_viewport_size({"width": 1280, "height": 900})
+            page.reload(wait_until="networkidle")
+            metrics = page.evaluate(
+                """() => {
+                  const rect = (sel) => {
+                    const box = document.querySelector(sel).getBoundingClientRect();
+                    return {top: box.top, right: box.right, bottom: box.bottom,
+                            left: box.left, width: box.width, height: box.height};
+                  };
+                  return {
+                    form: rect("#report-filters"),
+                    from: rect("#report-from"),
+                    to: rect("#report-to"),
+                    step: rect("#report-step"),
+                  };
+                }"""
+            )
+            assert abs(metrics["from"]["top"] - metrics["to"]["top"]) <= 1
+            assert abs(metrics["from"]["top"] - metrics["step"]["top"]) <= 1
+            assert abs(metrics["step"]["right"] - metrics["form"]["right"]) <= 1
+
+            # A field error appears below its control and does not move the first row.
+            page.goto(f"{base}/reports?from=20x6&to=2026", wait_until="networkidle")
+            expect(page.locator("#report-from-error")).to_be_visible()
+            invalid = page.evaluate(
+                """() => {
+                  const rect = (sel) => {
+                    const box = document.querySelector(sel).getBoundingClientRect();
+                    return {top: box.top, right: box.right, bottom: box.bottom,
+                            left: box.left, width: box.width, height: box.height};
+                  };
+                  return {
+                    form: rect("#report-filters"),
+                    from: rect("#report-from"),
+                    to: rect("#report-to"),
+                    step: rect("#report-step"),
+                    error: rect("#report-from-error"),
+                  };
+                }"""
+            )
+            for name in ("from", "to", "step"):
+                assert (
+                    abs(
+                        (invalid[name]["top"] - invalid["form"]["top"])
+                        - (metrics[name]["top"] - metrics["form"]["top"])
+                    )
+                    <= 1
+                )
+            assert invalid["error"]["top"] >= invalid["from"]["bottom"] - 1
+            summary = page.locator("[data-multi-select] summary").bounding_box()
+            category_help = page.get_by_text(
+                "Leave empty for all categories", exact=False
+            ).bounding_box()
+            assert summary is not None and category_help is not None
+            assert category_help["y"] >= summary["y"] + summary["height"] - 1
+            savings = page.locator('[name="savings"]').bounding_box()
+            savings_help = page.get_by_text(
+                "Saved and invested amounts get their own category series.", exact=True
+            ).bounding_box()
+            assert savings is not None and savings_help is not None
+            assert savings_help["y"] >= savings["y"] + savings["height"] - 1
+
+            # At 390 px the same form is one column and stays usable.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            phone = page.evaluate(
+                """() => {
+                  const rect = (sel) => {
+                    const box = document.querySelector(sel).getBoundingClientRect();
+                    return {top: box.top, left: box.left, width: box.width};
+                  };
+                  return {
+                    from: rect("#report-from"),
+                    to: rect("#report-to"),
+                    step: rect("#report-step"),
+                  };
+                }"""
+            )
+            assert abs(phone["from"]["left"] - phone["to"]["left"]) <= 1
+            assert abs(phone["from"]["width"] - phone["step"]["width"]) <= 1
+            assert phone["from"]["top"] < phone["to"]["top"] < phone["step"]["top"]
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+
             # F9.2: the year grid has twelve heat-shaded month columns and its own year selector.
             grid = page.locator("[data-report-year-overview]")
             expect(grid).to_be_visible()
@@ -337,10 +426,37 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(grid).to_contain_text("Jan")
             expect(grid).to_contain_text("Dec")
             expect(grid.locator("[data-report-grid-so-far]")).to_be_visible()
-            heat_classes = grid.locator("[data-report-grid-cell]").evaluate_all(
-                "(cells) => cells.map((cell) => cell.className)"
+            heat = page.evaluate(
+                """() => {
+                  const style = getComputedStyle(document.documentElement);
+                  const rgb = (name) => {
+                    const [r, g, b] = style
+                      .getPropertyValue(`--color-${name}`)
+                      .trim()
+                      .split(/\\s+/);
+                    return `rgb(${r}, ${g}, ${b})`;
+                  };
+                  return {
+                    tint: rgb("danger-tint"),
+                    cells: [...document.querySelectorAll("[data-report-grid-cell]")].map(
+                      (cell) => ({
+                        text: cell.textContent.trim(),
+                        className: cell.className,
+                        background: getComputedStyle(cell).backgroundColor,
+                      })
+                    ),
+                  };
+                }"""
             )
-            assert any("heat-" in value for value in heat_classes)
+            tinted = next(cell for cell in heat["cells"] if cell["text"] == "€1,200.00")
+            assert "bg-danger-tint" in tinted["className"].split()
+            assert tinted["background"] == heat["tint"]
+            assert all(
+                cell["background"] == "rgba(0, 0, 0, 0)"
+                for cell in heat["cells"]
+                if cell["text"] == "€0.00"
+            )
+            assert all("heat-" not in cell["className"] for cell in heat["cells"])
             year_select = grid.locator("#report-year")
             expect(year_select).to_be_visible()
             expect(year_select).to_have_value("2026")
@@ -418,7 +534,8 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             # change, preserving the range and the other filters.
             page.set_viewport_size({"width": 1440, "height": 900})
             page.goto(
-                f"{base}/reports?from=2025&to=2026&step=month&savings=1&trend=12",
+                f"{base}/reports?from=2025&to=2026&step=month&savings=1"
+                f"&category={category_value}&trend=12",
                 wait_until="networkidle",
             )
             year_select = page.locator("#report-year")
@@ -428,6 +545,22 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             assert "savings=1" in page.url and "trend=12" in page.url
             expect(page.locator("#report-year")).to_have_value("2025")
             expect(page.locator("#year-overview")).to_be_in_viewport()
+
+            # The Category trends window now lives in its panel and submits its own form; every
+            # other filter survives the change.
+            expect(page.locator("#report-filters #report-trend")).to_have_count(0)
+            trend_select = page.locator("[data-report-trends] #report-trend")
+            expect(trend_select).to_be_visible()
+            expect(trend_select).to_have_value("12")
+            trend_select.select_option("3")
+            page.wait_for_url("**trend=3**")
+            assert "from=2025" in page.url and "to=2026" in page.url
+            assert "step=month" in page.url and "savings=1" in page.url
+            assert f"category={category_value}" in page.url
+            assert "year=2025" in page.url
+            assert page.url.endswith("#category-trends")
+            expect(page.locator("[data-report-trends] #report-trend")).to_have_value("3")
+            expect(page.locator("#category-trends")).to_be_in_viewport()
 
             # A chart data point uses the same link as the table row.
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")

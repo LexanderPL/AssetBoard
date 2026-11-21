@@ -12777,15 +12777,6 @@ msgstr ""
 "Pozostaw puste, aby pokazać wszystkie kategorie w przeglądzie rocznym i 8"
 " największych na wykresach kategorii."
 
-msgid "Category trends window"
-msgstr "Okno trendów kategorii"
-
-msgid "3-month average"
-msgstr "Średnia 3-miesięczna"
-
-msgid "12-month average"
-msgstr "Średnia 12-miesięczna"
-
 msgid "Show report"
 msgstr "Pokaż raport"
 
@@ -12831,11 +12822,11 @@ msgid "Report year"
 msgstr "Rok raportu"
 
 msgid ""
-"Spending by category and month. Darker cells mean more spending in that "
+"Spending by category and month. Stronger red means more spending in that "
 "month."
 msgstr ""
-"Wydatki według kategorii i miesiąca. Ciemniejsze komórki oznaczają "
-"większe wydatki w danym miesiącu."
+"Wydatki według kategorii i miesiąca. Mocniejsza czerwień oznacza większe "
+"wydatki w danym miesiącu."
 
 msgid "No spending in this year."
 msgstr "Brak wydatków w tym roku."
@@ -12843,9 +12834,14 @@ msgstr "Brak wydatków w tym roku."
 msgid "Spending by category and month"
 msgstr "Wydatki według kategorii i miesiąca"
 
-#, python-format
-msgid "Window: %(num)d months"
-msgstr "Okno: %(num)d mies."
+msgid "Category trends window"
+msgstr "Okno trendów kategorii"
+
+msgid "3-month average"
+msgstr "Średnia 3-miesięczna"
+
+msgid "12-month average"
+msgstr "Średnia 12-miesięczna"
 
 msgid "Rolling average spending by category."
 msgstr "Średnia krocząca wydatków według kategorii."
@@ -16337,4 +16333,7 @@ msgstr "Usuń obszar roboczy…"
 #~ "Na stronie Transakcje większe wydatki "
 #~ "mają mocniejsze czerwone tło, a większe"
 #~ " przychody mocniejsze zielone."
+
+#~ msgid "Window: %(num)d months"
+#~ msgstr "Okno: %(num)d mies."
 

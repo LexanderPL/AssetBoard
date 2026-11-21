@@ -143,13 +143,15 @@ Property tests: grid totals equal transaction sums; treatment rules respected. I
 - **Year overview:** `domain.reports.year_grid` is F10.3's `category_series` for one calendar
   year, so the grid is one row per eligible category with spending in that year (plus explicitly selected zero rows) and twelve month columns, with row/column/
   grand totals. It follows the category filter and the savings option; transfers, income and
-  withdrawals never count. Heat shading is four CSS classes over the primary-soft token, not
-  inline styles. The report-year selector sits inside the Year overview panel and offers the
-  years with transactions inside the selected range plus an explicitly requested year.
+  withdrawals never count. Heat shading is four CSS classes over the danger shade/tint tokens
+  (the Transactions expense palette), not inline styles. The report-year selector sits inside the
+  Year overview panel and offers the years with transactions inside the selected range plus an
+  explicitly requested year.
 - **Category trends:** `domain.reports.rolling_category_averages` averages the displayed F10.3
   series over a trailing 3- or 12-month window, from exact integer sums, and leaves the first
   `window - 1` points empty (a gap, not zero). The chart reuses the report line module; the
-  table is the accessible version. Yearly granularity shows a prompt to choose monthly.
+  table is the accessible version. The window selector sits inside the Category trends panel and
+  preserves every other filter. Yearly granularity shows a prompt to choose monthly.
 - **Year-over-year:** `domain.reports.year_over_year_table` builds one row per year in the range
   from a monthly totals series, with separate income and expense changes. The first year is
   compared with the year before the range (read but not shown); the current year is compared with
