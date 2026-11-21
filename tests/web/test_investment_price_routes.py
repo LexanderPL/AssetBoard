@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -111,6 +111,17 @@ def _point_id(owner: OwnerApp, instrument: UUID) -> UUID:
         ).one()
 
 
+def _manual_point_on(owner: OwnerApp, instrument: UUID, day: date) -> UUID:
+    with owner.db() as session:
+        return session.scalars(
+            select(PricePoint.id).where(
+                PricePoint.instrument_id == instrument,
+                PricePoint.source == "manual",
+                PricePoint.date == day,
+            )
+        ).one()
+
+
 def _stored_provider_point(
     owner: OwnerApp, instrument: UUID, *, day: date = date(2026, 3, 1), price: str = "5"
 ) -> None:
@@ -133,6 +144,7 @@ def test_the_instrument_page_has_an_empty_prices_panel(owner: OwnerApp) -> None:
     assert "No price has been recorded for this instrument yet." in page
     assert "No stored or transaction prices for this instrument yet." in page
     assert "data-price-form" in page
+    assert "data-price-older" not in page
 
 
 def test_create_a_manual_price_and_show_it_with_a_chart(owner: OwnerApp) -> None:
@@ -220,6 +232,133 @@ def test_transaction_prices_are_shown_as_derived_rows(owner: OwnerApp) -> None:
     assert 'data-price-source="transaction"' in page
     assert "Transaction" in page
     assert "edit_price=" not in page
+
+
+@pytest.mark.parametrize(
+    ("count", "older_count"),
+    [(9, 0), (10, 0), (11, 1), (12, 2)],
+)
+def test_price_history_keeps_the_newest_ten_visible(
+    owner: OwnerApp, count: int, older_count: int
+) -> None:
+    instrument = _instrument(owner, "World ETF")
+    for offset in range(count):
+        day = date(2026, 3, 10) - timedelta(days=offset)
+        assert (
+            _price(
+                owner, instrument, date_value=day.isoformat(), price=str(100 + offset)
+            ).status_code
+            == 303
+        )
+
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    assert page.count("data-price-point=") == count
+    rows = re.findall(r"<tr data-price-point=.*?</tr>", page, re.S)
+    assert "Mar 10, 2026" in rows[0]
+    if count >= 10:
+        assert "Mar 1, 2026" in rows[9]
+
+    if older_count == 0:
+        assert "data-price-older" not in page
+        assert "older price point" not in page
+        return
+
+    recent = re.search(r"<div[^>]*data-price-recent.*?</table>", page, re.S)
+    older = re.search(r"<details[^>]*data-price-older.*?</details>", page, re.S)
+    assert recent is not None and older is not None
+    assert recent.group(0).count("data-price-point=") == 10
+    assert older.group(0).count("data-price-point=") == older_count
+    assert "<table" in older.group(0)
+    opening = re.search(r"<details[^>]*>", older.group(0))
+    assert opening is not None
+    assert " open" not in opening.group(0)
+    summary = re.search(r"<summary[^>]*>(.*?)</summary>", older.group(0), re.S)
+    assert summary is not None
+    expected = f"Show {older_count} older price point" + ("s" if older_count != 1 else "")
+    assert summary.group(1).strip() == expected
+
+
+def test_older_points_keep_sources_and_actions(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    for offset in range(10):
+        day = date(2026, 3, 10) - timedelta(days=offset)
+        assert (
+            _price(
+                owner, instrument, date_value=day.isoformat(), price=str(100 + offset)
+            ).status_code
+            == 303
+        )
+    older_manual_day = date(2026, 2, 22)
+    assert (
+        _price(owner, instrument, date_value=older_manual_day.isoformat(), price="110").status_code
+        == 303
+    )
+    older_manual = _manual_point_on(owner, instrument, older_manual_day)
+    _stored_provider_point(owner, instrument, day=date(2026, 2, 21), price="5")
+    transaction = owner.post(
+        TX,
+        {
+            "instrument_id": str(instrument),
+            "type": "buy",
+            "date": "2026-02-20",
+            "quantity": "1",
+            "unit_price": "42",
+            "fee": "0",
+            "fx_to_base": "1",
+            "note": "",
+        },
+        token_from=TX,
+    )
+    assert transaction.status_code == 303, transaction.text
+
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    recent = re.search(r"<div[^>]*data-price-recent.*?</table>", page, re.S)
+    older = re.search(r"<details[^>]*data-price-older.*?</details>", page, re.S)
+    assert recent is not None and older is not None
+    assert recent.group(0).count("data-price-point=") == 10
+    assert older.group(0).count("data-price-point=") == 3
+
+    manual_row = re.search(r'<tr[^>]*data-price-source="manual".*?</tr>', older.group(0), re.S)
+    provider_row = re.search(r'<tr[^>]*data-price-source="provider".*?</tr>', older.group(0), re.S)
+    transaction_row = re.search(
+        r'<tr[^>]*data-price-source="transaction".*?</tr>', older.group(0), re.S
+    )
+    assert manual_row is not None and provider_row is not None and transaction_row is not None
+    assert "Manual" in manual_row.group(0)
+    assert "Provider" in provider_row.group(0)
+    assert "Transaction" in transaction_row.group(0)
+    assert f"edit_price={older_manual}" in manual_row.group(0)
+    assert f"/prices/{older_manual}/delete" in manual_row.group(0)
+    assert "edit_price=" not in provider_row.group(0)
+    assert "/delete" not in provider_row.group(0)
+    assert "edit_price=" not in transaction_row.group(0)
+    assert "/delete" not in transaction_row.group(0)
+    assert "edit_price=" in recent.group(0)
+
+    summary = re.search(r"<summary[^>]*>(.*?)</summary>", older.group(0), re.S)
+    assert summary is not None
+    assert summary.group(1).strip() == "Show 3 older price points"
+
+
+def test_editing_an_older_point_opens_the_disclosure(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    for offset in range(11):
+        day = date(2026, 3, 10) - timedelta(days=offset)
+        assert (
+            _price(
+                owner, instrument, date_value=day.isoformat(), price=str(100 + offset)
+            ).status_code
+            == 303
+        )
+    oldest = _manual_point_on(owner, instrument, date(2026, 2, 28))
+
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument}?edit_price={oldest}").text
+    older = re.search(r"<details[^>]*data-price-older.*?</details>", page, re.S)
+    assert older is not None
+    opening = re.search(r"<details[^>]*>", older.group(0))
+    assert opening is not None
+    assert " open" in opening.group(0)
+    assert f'name="price_id" value="{oldest}"' in page
 
 
 def test_edit_prefills_the_form_and_saves_the_existing_point(owner: OwnerApp) -> None:

@@ -250,10 +250,16 @@ are excluded from dated history until they get a date.
 ## Prices and FX
 
 Each instrument page has a **Prices** panel: the latest price, a small line chart, a table of
-points and — for editors — a form to add, change or delete **manual prices**. Manual prices are
-the main source for real estate and other illiquid assets. A manual price cannot be dated after
-today, and the form and its actions disappear while the instrument is archived. Saving a price
-on a date that already has a manual point changes that point instead of adding a second one.
+the latest price points and — for editors — a form to add, change or delete **manual prices**.
+Manual prices are the main source for real estate and other illiquid assets. A manual price
+cannot be dated after today, and the form and its actions disappear while the instrument is
+archived. Saving a price on a date that already has a manual point changes that point instead of
+adding a second one.
+
+The table shows the **latest 10 points**, newest first. When the instrument has more history, the
+older points sit behind **Show N older price points**, a native disclosure that works without
+JavaScript. Manual, provider and transaction-derived rows keep their source label, and manual
+rows keep their Edit and Delete actions in both parts.
 
 Prices are in the instrument's quote currency. A **currency** instrument is always priced at 1
 in its own currency, so it has no manual price form; its base-currency value comes entirely from
