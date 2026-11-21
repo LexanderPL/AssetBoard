@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.8](https://github.com/LexanderPL/AssetBoard/compare/v0.8.7...v0.8.8) (2026-11-21)
+
+
+### Documentation
+
+* record the shipped UI improvement plan ([#454](https://github.com/LexanderPL/AssetBoard/issues/454)) ([e15aafe](https://github.com/LexanderPL/AssetBoard/commit/e15aafe8d99ebcd228eeaeff291cc460e1e14cea))
+
 ## [0.8.7](https://github.com/LexanderPL/AssetBoard/compare/v0.8.6...v0.8.7) (2026-11-21)
 
 
