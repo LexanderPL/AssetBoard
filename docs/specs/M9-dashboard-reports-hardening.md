@@ -123,7 +123,8 @@ expenses by category over time to F10.3. The reports left here are added as sect
 - **Year overview:** grid of categories × months (actual), totals per row/column, year selector; heat-shading.
 - **Category trends:** rolling 3/12-month averages on top of F10.3's category series.
 - **Year-over-year:** one row per year in the range, with income, expenses and separate value/percent changes against the previous year.
-- **Planned vs actual accuracy:** how often each category exceeded its plan.
+- **Planning accuracy:** how often each category exceeded its plan, plus an absolute-deviation
+  score (score added 2026-11-21; the over-plan table remains the breakdown).
 - All reports are pure query + domain functions, paginated/streamed where large, respect closed/open months equally, and exclude `transfer` categories.
 - Date-range and category filters are URL-addressable (shareable between workspace members).
 
@@ -153,16 +154,20 @@ Property tests: grid totals equal transaction sums; treatment rules respected. I
   table is the accessible version. The window selector sits inside the Category trends panel and
   preserves every other filter. Yearly granularity shows a prompt to choose monthly.
 - **Year-over-year:** `domain.reports.year_over_year_table` builds one row per year in the range
-  from a monthly totals series, with separate income and expense changes. The first year is
-  compared with the year before the range (read but not shown); the current year is compared with
-  the same months of the previous year. Percent changes are `None` when the previous figure was
-  zero. The table always uses the whole ledger.
-- **Planned vs actual accuracy:** `domain.reports.plan_accuracy` counts planned months and
-  months whose actual was **strictly greater** than the plan per planned regular expense
-  category, with a footer over category-months. The service reads the raw `BudgetLine` rows for
-  the range in one scoped query (`BudgetLineRepository.for_range`) and counts them in Python;
-  transfers, income, savings, categories without plans and other-currency plans are excluded.
-  Open and closed months count alike.
+  from a monthly totals series, with separate income, expense and savings changes. The first year
+  is compared with the full year before the range (read but not shown); the current year shows
+  every recorded month through today. `has_previous` is false when the previous calendar year has
+  no recorded income, expenses or savings; changes are then zero and percentages `None`. Percent
+  changes are also `None` when that previous metric was zero. The table always uses the whole
+  ledger, savings included.
+- **Planning accuracy:** `domain.reports.plan_accuracy` counts planned months and months whose
+  actual was **strictly greater** than the plan per planned regular expense category, with a
+  footer over category-months. It also sums the planned amounts and absolute deviations over the
+  same category-months and exposes `score_tenths = max(0, 1000 − ratio_tenths(deviation, planned))`,
+  rounded once and `None` when the planned total is zero. The service reads the raw `BudgetLine`
+  rows for the range in one scoped query (`BudgetLineRepository.for_range`) and counts them in
+  Python; transfers, income, savings, categories without plans and other-currency plans are
+  excluded. Open and closed months count alike.
 - **One read:** the service materialises the one column-only transaction stream once, then runs
   the additional pure aggregations over it; the budget lines are a second scoped read. The
   existing `ix_transactions_workspace_date` index serves the transaction range and the

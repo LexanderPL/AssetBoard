@@ -66,7 +66,7 @@ Search, filters and the paginated list of all entries.
 ## Reports
 
 The first viewport: filters, and on desktop the start of the income vs expenses chart. The
-savings rate, category, year-over-year, plan-accuracy, net-worth and portfolio-history sections
+savings rate, category, year-over-year, planning-accuracy, net-worth and portfolio-history sections
 continue below these images, so they are not visible here.
 
 > [!NOTE]
