@@ -339,6 +339,14 @@ def test_profile_shows_highlight_large_transactions_checked_by_default(h: Harnes
     assert checkbox is not None and " checked" in checkbox.group(0)
 
 
+def test_profile_explains_the_median_tint_gate(h: Harness) -> None:
+    page = admin(h).get("/account").text
+    help_text = re.search(r'<span id="highlight-help"[^>]*>(.*?)</span>', page, re.DOTALL)
+    assert help_text is not None
+    text = " ".join(help_text.group(1).split())
+    assert "median" in text and "at least three" in text
+
+
 @pytest.mark.parametrize(("value", "stored"), [(None, False), ("1", True)])
 def test_profile_saves_highlight_large_transactions(
     h: Harness, value: str | None, stored: bool

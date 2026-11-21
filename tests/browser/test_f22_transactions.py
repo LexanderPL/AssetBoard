@@ -182,16 +182,17 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("#entry-expense-category")).to_have_value("")
             expect(page.locator("#ledger-status")).to_have_text("Entry added.")
             expect(page.locator("#ledger-expense [data-amount]")).to_have_text(["€12.50"])
-            # The month's largest (here: only) expense gets the strongest tint (amount shading).
-            # The tint fills the whole row, the actions cell included.
-            largest = page.locator("#ledger-expense tr[data-transaction]")
-            expect(largest).to_have_class(re.compile(r"(^|\s)bg-danger-tint(\s|$)"))
-            assert largest.evaluate("row => getComputedStyle(row).backgroundColor") == (
-                "rgb(254, 225, 228)"  # the Month page's above-plan row tint (light theme)
+            # One expense is not enough for a tint: the median gate needs at least three.
+            # The row keeps the card surface and has no shading class or step.
+            only = page.locator("#ledger-expense tr[data-transaction]")
+            expect(only).not_to_have_class(re.compile(r"(^|\s)bg-danger-(shade-\d|tint)(\s|$)"))
+            assert only.get_attribute("data-shade") is None
+            assert only.evaluate("row => getComputedStyle(row).backgroundColor") == (
+                "rgba(0, 0, 0, 0)"  # transparent: the table's surface shows through
             )
-            actions = largest.locator("td").last
+            actions = only.locator("td").last
             assert actions.evaluate("cell => getComputedStyle(cell).backgroundColor") == (
-                "rgba(0, 0, 0, 0)"  # transparent: the row's tint shows through
+                "rgba(0, 0, 0, 0)"
             )
 
             # Enter in a text field saves too.

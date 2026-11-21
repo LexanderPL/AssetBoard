@@ -5888,8 +5888,10 @@ msgid "Highlight large transactions"
 msgstr ""
 
 msgid ""
-"On the Transactions page, larger expenses get a stronger red background "
-"and larger income a stronger green one."
+"On the Transactions page, only clearly large entries are tinted: red for "
+"expenses, green for income. A month needs at least three entries of the "
+"same kind and currency, and only amounts at least twice their median "
+"qualify."
 msgstr ""
 
 msgid "Save"
@@ -15373,5 +15375,12 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Choose which widgets appear on Home and in what order."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "On the Transactions page, larger "
+#~ "expenses get a stronger red background"
+#~ " and larger income a stronger green"
+#~ " one."
 #~ msgstr ""
 
