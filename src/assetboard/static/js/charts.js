@@ -108,7 +108,7 @@
 
   // A line's first and last points sit on the axis ends (boundaryGap: false), so their centred
   // labels overhang the canvas and ECharts clips the last one ("Nov 19, 2"). Align the edge
-  // labels inwards; the extra grid margin below keeps even a long month name inside the box.
+  // labels inwards; the extra grid margin on the right keeps even a long month name inside.
   function lineAxisLabel(ink) {
     return {
       color: ink,

@@ -86,4 +86,6 @@ The **Missing data** widget is a checklist, not a warning that blocks the app:
 - **Imports waiting to be applied** are planned imports whose file has not been applied yet. This
   section is only shown to editors and owners, like the import page itself.
 
-When nothing needs attention the widget says so.
+When nothing needs attention the widget says so. A brand-new workspace instead explains
+that missing-data checks appear once it has a net-worth value, an income source or an
+investment.

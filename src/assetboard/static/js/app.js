@@ -1700,6 +1700,8 @@ function toggleFireYearTable(button) {
   section.querySelectorAll("[data-fire-year-extra]").forEach((row) => {
     if (row instanceof HTMLElement) row.hidden = expanded;
   });
+  const note = section.querySelector("[data-fire-table-note]");
+  if (note instanceof HTMLElement) note.hidden = !expanded;
   button.setAttribute("aria-expanded", expanded ? "false" : "true");
   button.textContent = expanded ? button.dataset.showLabel || "" : button.dataset.hideLabel || "";
 }

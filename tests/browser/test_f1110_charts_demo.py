@@ -205,8 +205,27 @@ def test_chart_labels_fit_and_the_fire_table_collapses(tmp_path: Path) -> None:
         expect(rows.nth(12)).to_be_visible()
         expect(button).to_have_attribute("aria-expanded", "true")
         expect(button).to_have_text("Show fewer years")
+        expect(section.locator("[data-fire-table-note]")).to_be_hidden()
         button.click()
         expect(rows.nth(12)).to_be_hidden()
         expect(button).to_have_attribute("aria-expanded", "false")
+        expect(section.locator("[data-fire-table-note]")).to_be_visible()
+
+        # Without JavaScript every year is visible, and the collapse control is not shown.
+        no_js = browser.new_context(
+            color_scheme="light",
+            viewport={"width": 1440, "height": 900},
+            java_script_enabled=False,
+        )
+        no_js.add_cookies(context.cookies())
+        no_js_page = no_js.new_page()
+        no_js_page.goto(f"{base}/fire", wait_until="networkidle")
+        no_js_section = no_js_page.locator("[data-fire-table-section]")
+        expect(no_js_section.locator("[data-fire-table] tbody tr").nth(12)).to_be_visible()
+        expect(no_js_section.locator("[data-fire-table-more]")).to_be_hidden()
+        expect(no_js_section.locator("[data-fire-show-all]")).to_be_hidden()
+        expect(no_js_section.locator("[data-fire-table-note]")).to_be_hidden()
+        no_js.close()
+
         assert page.evaluate("window.__cspViolations") == []
         browser.close()
