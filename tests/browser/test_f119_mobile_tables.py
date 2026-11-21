@@ -220,6 +220,11 @@ def test_f119_mobile_tables_and_page_identity(tmp_path: Path) -> None:
                 row = page.locator("#entry-expense-row").bounding_box()
                 assert row is not None and 0 <= row["y"] < height, (width, row)
                 expect(page.locator("[data-add-entry='income']")).to_be_visible()
+                if width == 390:
+                    page.locator("[data-add-entry='income']").click()
+                    expect(page.locator("#entry-income-day")).to_be_focused()
+                else:
+                    expect(page.locator("#ledger-expense [data-table-scroll-hint]")).to_be_hidden()
 
             # Wide tables: a named, focusable scroll region with a visible phone hint; the
             # keyboard can scroll it sideways.
@@ -270,6 +275,13 @@ def test_f119_mobile_tables_and_page_identity(tmp_path: Path) -> None:
             assert menu_box is not None and menu_box["x"] >= 0
             assert menu_box["x"] + menu_box["width"] <= 391
 
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.goto(f"{base}/admin/users", wait_until="networkidle")
+            _no_page_overflow(page, "admin users desktop")
+            expect(page.get_by_role("columnheader", name="Account")).to_be_visible()
+            expect(page.locator('[data-user="second@example.com"]')).to_be_visible()
+
+            page.set_viewport_size({"width": 390, "height": 844})
             # Upcoming: skip a row in a week with another row; the redirect keeps that week in
             # view and the notice stays pinned in the viewport with its Undo.
             page.goto(f"{base}/upcoming", wait_until="networkidle")
@@ -312,6 +324,7 @@ def test_f119_mobile_tables_and_page_identity(tmp_path: Path) -> None:
             assert notice_box is not None and notice_box["y"] + notice_box["height"] <= 845
             page.locator("[data-skip-undo] button").click()
             page.wait_for_load_state("networkidle")
+            assert f"at={target['week']}" in page.url
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [error for error in console_errors if "Content Security Policy" in error]

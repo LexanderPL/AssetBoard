@@ -14,7 +14,7 @@
 {% if ledger.can_write %}
 {% for s in ledger.sections %}
 {% if s.categories %}
-<a href="#entry-{{ s.direction }}-row" data-add-entry="{{ s.direction }}" class="{{ 'btn-primary' if s.direction == 'expense' else 'btn' }}">{{ _("Add entry") if s.direction == "expense" else _("Add income") }}</a>
+<a href="#entry-{{ s.direction }}-row" data-add-entry="{{ s.direction }}" class="{{ 'btn-primary' if s.direction == 'expense' else 'btn' }} min-h-11">{{ _("Add entry") if s.direction == "expense" else _("Add income") }}</a>
 {% endif %}
 {% endfor %}
 {% endif %}

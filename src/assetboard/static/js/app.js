@@ -1614,6 +1614,11 @@ function updateTableScrollHints() {
     const region = frame.querySelector("[data-table-scroll]");
     const hint = frame.querySelector("[data-table-scroll-hint]");
     if (!(region instanceof HTMLElement) || !(hint instanceof HTMLElement)) return;
+    if (region.clientWidth <= 1) {
+      // The chart table is sr-only; do not let a resize mark its hint visible.
+      hint.hidden = true;
+      return;
+    }
     hint.hidden = region.scrollWidth <= region.clientWidth + 1;
   });
 }
@@ -1654,5 +1659,14 @@ document.addEventListener("keydown", (event) => {
   } else if (event.key === "End") {
     event.preventDefault();
     region.scrollLeft = region.scrollWidth;
+  }
+});
+
+
+// "Show as table" changes a frame from sr-only to visible; measure it again for the hint.
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  if (event.target.closest("[data-chart-table-toggle]")) {
+    window.requestAnimationFrame(updateTableScrollHints);
   }
 });

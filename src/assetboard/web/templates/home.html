@@ -6,7 +6,7 @@
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Home") }}{% endblock %}
 {% block header_actions %}
-<a href="{{ scoped_url(request, 'dashboard_customise') }}" class="btn" data-customise-link>{{ _("Customise") }}</a>
+<a href="{{ scoped_url(request, 'dashboard_customise') }}" class="btn min-h-11" data-customise-link>{{ _("Customise") }}</a>
 {% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}

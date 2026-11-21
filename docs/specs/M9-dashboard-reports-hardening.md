@@ -103,7 +103,7 @@ ignored; defaults and newly shipped widgets follow the rules above; reordering w
   `services.performance.performance_page` in chart-only mode and
   `web.charts.build_performance_chart`; no valuation maths is duplicated. The Net worth widget
   reuses `services.networth_history` with the saved range.
-- The Customise entry point sits at the bottom of Home below the widgets, not in the page header.
+- The Customise entry point sits in the Home header action row (F11.9), not at the bottom of the page.
 - Missing data composes the existing portfolio price read (stale or absent prices and FX
   rates), `income.missing_work_logs` and planned import batches (the last only for editors and
   owners).

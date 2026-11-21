@@ -427,8 +427,10 @@ async def unskip(request: Request, ctx: CurrentContext, occurrence_id: str) -> R
             _id(occurrence_id),
         )
     except occurrences.OccurrenceError as exc:
-        return _redirect(request, error=exc.code, return_month=return_month)
-    return _redirect(request, notice="skip_undone", return_month=return_month)
+        return _redirect(request, error=exc.code, return_month=return_month, anchor=_anchor(values))
+    return _redirect(
+        request, notice="skip_undone", return_month=return_month, anchor=_anchor(values)
+    )
 
 
 @router.post("/upcoming/{occurrence_id}/delete", name="upcoming_delete")

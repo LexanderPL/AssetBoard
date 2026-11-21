@@ -39,7 +39,7 @@
 <div role="status" class="{% if skipped_id and can_edit %}fixed bottom-5 right-5 z-50 w-[min(28rem,calc(100vw-2.5rem))] shadow-card {% else %}mb-4{% endif %} flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong"{% if skipped_id and can_edit %} data-upcoming-pinned{% endif %} data-upcoming-notice>
   <span>{{ notice }}</span>
   {% if skipped_id and can_edit %}
-  <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=skipped_id) }}" data-skip-undo>{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
+  <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=skipped_id) }}" data-skip-undo>{{ csrf_input() }}<input type="hidden" name="anchor" value="{{ request.query_params.get('at', '') }}"><button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
   {% endif %}
 </div>
 {% endif %}

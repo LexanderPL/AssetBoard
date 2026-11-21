@@ -6,7 +6,8 @@ the same month navigation as the [month page](months.md) (Previous, Next, Today 
 picker); "Month" in the main navigation opens that month's summary (on another page it opens
 the current month). The page is only for entries: the flow bar and planned values are on the month page. The page has two tables,
 **Expenses** and **Income**, with one row per entry, ordered by date and then by the order you
-entered them.
+entered them. The page header has **Add entry** and **Add income** actions that jump to the
+matching entry row (without JavaScript they are ordinary anchors).
 
 Screenshots: [desktop light](assets/screenshots/desktop/light/transactions.jpg) ·
 [desktop dark](assets/screenshots/desktop/dark/transactions.jpg) ·

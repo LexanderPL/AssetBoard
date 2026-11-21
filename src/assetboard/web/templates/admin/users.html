@@ -9,7 +9,7 @@
 {% if notice %}<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>{% endif %}
 <section class="panel p-0" aria-label="{{ _('Users') }}">
-  <table class="sheet-sm w-full text-left text-sm" data-users>
+  <table class="sheet-sm sheet-flush w-full text-left text-sm" data-users>
     <caption class="sr-only">{{ _("Users") }}</caption>
     <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group">
       <tr>
@@ -38,7 +38,7 @@
           {% if user.is_active %}{{ _("Active") }}{% else %}{{ _("Deactivated") }}{% endif %}{% if group_decides_admin and "oidc" in user.methods %} · {% if user.is_instance_admin %}{{ _("Administrator") }}{% else %}{{ _("Not an administrator") }}{% endif %} <span class="text-xs text-muted" data-admin-from-provider>{{ _("(from the identity provider)") }}</span>{% elif user.is_instance_admin %} · {{ _("Administrator") }}{% endif %}{% if user.has_two_factor %} · {{ _("Two-factor authentication enabled") }}{% endif %}{% if user.must_change_password %} · {{ _("Temporary password") }}{% endif %}
         </td>
         <td class="col-span-2 text-right text-muted sm:col-span-1 sm:px-5 sm:py-3 sm:text-left">
-          <span class="text-xs sm:hidden">{{ _("Last sign-in") }}</span>
+          <span class="block text-xs sm:hidden">{{ _("Last sign-in") }}</span>
           {{ user.last_login_at.date().isoformat() if user.last_login_at else _("Never") }}
         </td>
         <td class="col-span-2 text-right sm:px-5 sm:py-3">

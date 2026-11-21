@@ -40,7 +40,7 @@ If you remove every widget, Home shows an empty state with a link back to the pi
 
 ## Customising Home
 
-Choose **Customise** at the bottom of Home, below the widgets:
+Choose **Customise** in the Home header, above the widgets:
 
 - tick the widgets you want;
 - use the **↑** and **↓** buttons to set their order (no drag and drop needed; it works with a
