@@ -68,7 +68,12 @@ def test_upcoming_post_undo_and_filtering(owner):
     inbox = owner.client.get(posted.headers["location"])
     assert "data-post-undo" in inbox.text
     assert "Undo" in inbox.text
-    assert owner.post(f"/upcoming/{occurrence_id}/undo", token_from="/upcoming").status_code == 303
+    undone = owner.post(
+        f"/upcoming/{occurrence_id}/undo",
+        {"anchor": "week-2026-03-02"},
+        token_from="/upcoming",
+    )
+    assert undone.status_code == 303 and "at=week-2026-03-02" in undone.headers["location"]
 
     with owner.db() as session:
         transaction = session.scalars(select(Transaction)).one()
@@ -187,9 +192,15 @@ def test_skipping_from_upcoming_shows_a_notice_and_undo(owner):
     assert "data-upcoming-notice" in page.text and "data-skip-undo" in page.text
     assert f'action="/upcoming/{occurrence_id}/unskip"' in page.text
 
-    undone = owner.post(f"/upcoming/{occurrence_id}/unskip", token_from="/upcoming")
+    undone = owner.post(
+        f"/upcoming/{occurrence_id}/unskip",
+        {"anchor": "week-2026-03-02"},
+        token_from="/upcoming",
+    )
     assert undone.status_code == 303
-    assert undone.headers["location"] == "/upcoming?notice=skip_undone"
+    assert undone.headers["location"] == (
+        "/upcoming?notice=skip_undone&at=week-2026-03-02#week-2026-03-02"
+    )
     page = owner.client.get(undone.headers["location"])
     assert "Skip undone. It is pending again." in page.text
     with owner.db() as session:

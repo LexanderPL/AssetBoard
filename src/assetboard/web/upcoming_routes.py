@@ -193,6 +193,7 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
         "can_edit": has_role(ctx, Role.EDITOR),
         "undo": undo,
         "notice": notice,
+        "notice_code": notice_code,
         "skipped_id": skipped_id,
         "open_form": request.query_params.get("form"),
         "one_time_values": {"direction": "expense", "day": today.isoformat()},
@@ -427,7 +428,8 @@ async def unskip(request: Request, ctx: CurrentContext, occurrence_id: str) -> R
             _id(occurrence_id),
         )
     except occurrences.OccurrenceError as exc:
-        return _redirect(request, error=exc.code, return_month=return_month, anchor=_anchor(values))
+        # An error belongs at the top of the page, where the alert is rendered.
+        return _redirect(request, error=exc.code, return_month=return_month)
     return _redirect(
         request, notice="skip_undone", return_month=return_month, anchor=_anchor(values)
     )
@@ -498,6 +500,7 @@ async def edit_amount(request: Request, ctx: CurrentContext, occurrence_id: str)
 
 @router.post("/upcoming/{occurrence_id}/undo", name="upcoming_undo")
 async def undo(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    values = await _values(request)
     try:
         await run_in_threadpool(
             occurrences.undo_post,
@@ -507,4 +510,4 @@ async def undo(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request)
+    return _redirect(request, anchor=_anchor(values))

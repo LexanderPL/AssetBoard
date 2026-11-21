@@ -325,6 +325,9 @@ def test_f119_mobile_tables_and_page_identity(tmp_path: Path) -> None:
             page.locator("[data-skip-undo] button").click()
             page.wait_for_load_state("networkidle")
             assert f"at={target['week']}" in page.url
+            undone_notice = page.locator("[data-upcoming-notice]")
+            expect(undone_notice).to_be_visible()
+            assert undone_notice.evaluate("el => getComputedStyle(el).position") == "fixed"
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [error for error in console_errors if "Content Security Policy" in error]
