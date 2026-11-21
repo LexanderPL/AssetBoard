@@ -33,6 +33,7 @@ from assetboard.domain.reports import (
     rolling_savings_rates,
     savings_rate,
 )
+from assetboard.domain.shading import large_gates, maxima, shade
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_month, short_month_names
 from assetboard.i18n.numbers import format_money, format_rate_tenths
@@ -767,12 +768,18 @@ HEAT_STEP_CLASSES = (
 )
 
 
-def _heat_class(amount_minor: int, maximum_minor: int) -> str:
-    """A four-step heat class for one cell; zero and negative amounts stay unshaded."""
-    if amount_minor <= 0 or maximum_minor <= 0:
-        return ""
-    step = max(1, min(4, (amount_minor * 4 + maximum_minor - 1) // maximum_minor))
-    return HEAT_STEP_CLASSES[step - 1]
+def _heat_steps(amounts: tuple[Money, ...]) -> tuple[int, ...]:
+    """One category row's shade steps, compared only over its non-zero months.
+
+    This is the Transactions rule (T-1) per category row: ``large_gates`` needs at least three
+    amounts and gates them at twice their exact median, so a row with fewer than three non-zero
+    months stays neutral. Zero or negative months stay neutral and never enter the comparison
+    group; the four steps are then relative to the row's largest non-zero month.
+    """
+    compared = tuple(amount for amount in amounts if amount.amount_minor > 0)
+    top = maxima(compared)
+    gates = large_gates(compared)
+    return tuple(shade(amount, top, gates) if amount.amount_minor > 0 else 0 for amount in amounts)
 
 
 def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOverview:
@@ -789,28 +796,26 @@ def _year_overview(data: ReportsData, locale: str, request: Request) -> YearOver
         )
         for period in series.periods
     )
-    maximum = max(
-        (amount.amount_minor for row in series.rows for amount in row.amounts),
-        default=0,
-    )
-    rows = tuple(
-        YearGridRow(
-            label=_category_name(row, locale),
-            color=row.color or None,
-            cells=tuple(
-                YearGridCell(
-                    text=format_money(amount, locale),
-                    heat_class=_heat_class(amount.amount_minor, maximum),
-                )
-                for amount in row.amounts
-            ),
-            total=format_money(row.total, locale),
+    rows: list[YearGridRow] = []
+    for row in series.rows:
+        steps = _heat_steps(row.amounts)
+        rows.append(
+            YearGridRow(
+                label=_category_name(row, locale),
+                color=row.color or None,
+                cells=tuple(
+                    YearGridCell(
+                        text=format_money(amount, locale),
+                        heat_class=HEAT_STEP_CLASSES[steps[index] - 1] if steps[index] else "",
+                    )
+                    for index, amount in enumerate(row.amounts)
+                ),
+                total=format_money(row.total, locale),
+            )
         )
-        for row in series.rows
-    )
     return YearOverview(
         columns=columns,
-        rows=rows,
+        rows=tuple(rows),
         totals=tuple(format_money(total, locale) for total in series.totals),
         total=format_money(series.total, locale),
         empty=not rows,
@@ -1092,9 +1097,9 @@ def _net_worth_series(
         return None
     labels = [_series_label(point.as_of, step, locale) for point in data.points]
     trend = build_trend_view(data, locale, labels=labels, include_notes=True)
-    # The per-point "items had no value" warning repeats on every row; show each distinct
-    # warning once at section level and keep the chart tooltips for the per-point detail.
-    notes = tuple(dict.fromkeys(note for row in trend.rows for note in row.not_counted))
+    # The section shows figures only: the per-point "not counted" and estimated-value detail
+    # stays in the chart tooltips, and the Net worth Summary page keeps its warning. A chartless
+    # series (for example one whose only items are in another currency) has no section at all.
     links = [href_for(point.as_of) if href_for is not None else "" for point in data.points]
     chart = None
     if trend.chart is not None:
@@ -1115,9 +1120,7 @@ def _net_worth_series(
         if chart is not None
         else ()
     )
-    # An excluded-only (or otherwise unexplained) series has no chart and no warning; showing an
-    # empty panel would be worse than leaving the section out (UX-15).
-    if chart is None and not notes:
+    if chart is None:
         return None
     return ReportSeriesView(
         title=gettext(NET_WORTH_TITLE, locale),
@@ -1132,7 +1135,7 @@ def _net_worth_series(
         ),
         rows=rows,
         chart=chart,
-        notes=notes,
+        notes=(),
     )
 
 

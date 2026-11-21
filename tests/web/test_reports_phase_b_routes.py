@@ -232,6 +232,27 @@ def test_a_no_value_only_net_worth_item_does_not_leave_an_empty_section(
 
 def test_net_worth_report_section_reuses_the_derived_series(reports: OwnerApp) -> None:
     _net_worth(reports)
+    ctx = _context(reports)
+    no_value_category = create_networth_category(
+        reports.app.state.session_factory, ctx, side="asset", name="No value", color="#16a34a"
+    )
+    with reports.db() as session, session.begin():
+        session.add(
+            NetWorthItem(
+                workspace_id=reports.home_id,
+                side="asset",
+                category_id=no_value_category.id,
+                name="No value fund",
+                currency="EUR",
+                notes="",
+                valuation_mode="manual",
+                link_type=None,
+                link_id=None,
+                include_in_net_worth=True,
+                investable=False,
+                estimate_between=True,
+            )
+        )
     html = reports.client.get("/reports?from=2024&to=2026&step=year").text
     section = _section(html, "net-worth")
     assert ">Net worth over time</h2>" in section
@@ -240,20 +261,14 @@ def test_net_worth_report_section_reuses_the_derived_series(reports: OwnerApp) -
     assert data["series"][0]["values"][-1] == 20_000
     assert data["labels"] == ["2024", "2025", "2026"]
     assert len(data["links"]) == 3 and "year=2024" in data["links"][0]
-    # UX-08: the warning is in the tooltips and once at section level, not on every row.
-    assert any(
-        "another currency was not counted" in line
-        for tooltip in data["tooltips"]
-        for line in tooltip
-    )
-    notes = re.search(r"<ul[^>]*data-report-series-notes>(.*?)</ul>", section, re.DOTALL)
-    assert notes is not None
-    assert notes.group(1).count("another currency was not counted") == 1
+    # The per-point detail stays in the tooltips; the section itself has no warning list.
+    tooltip_lines = [line for tooltip in data["tooltips"] for line in tooltip]
+    assert any("another currency was not counted" in line for line in tooltip_lines)
+    assert any("had no value yet and was not counted" in line for line in tooltip_lines)
+    assert "data-report-series-notes" not in section
     assert "data-chart-table-toggle" in section
     assert 'id="reports-net-worth-table"' in section
     assert "data-report-series-period" in section
-    assert "had no value yet" not in section
-    assert "estimated value" not in section
     rows = _rows(section)
     assert len(rows) == 3
     assert all("was not counted" not in row for row in rows)
@@ -300,7 +315,7 @@ def test_portfolio_gain_cells_follow_the_gain_loss_convention(reports: OwnerApp)
     assert "text-success-strong" in rows[-1]
 
 
-def test_a_non_base_only_net_worth_section_explains_itself(reports: OwnerApp) -> None:
+def test_a_non_base_only_net_worth_series_has_no_section(reports: OwnerApp) -> None:
     ctx = _context(reports)
     category = create_networth_category(
         reports.app.state.session_factory, ctx, side="asset", name="Dollars", color="#16a34a"
@@ -318,11 +333,7 @@ def test_a_non_base_only_net_worth_section_explains_itself(reports: OwnerApp) ->
         as_of=date(2024, 12, 31),
     )
     html = reports.client.get("/reports?from=2024&to=2026&step=year").text
-    section = _section(html, "net-worth")
-    assert "data-chart-empty" in section
-    assert "No values to chart in this range." in section
-    assert "another currency was not counted" in section
-    assert not _rows(section)
+    assert 'data-report-series="net-worth"' not in html
 
 
 def test_an_undated_only_portfolio_section_explains_itself(reports: OwnerApp) -> None:

@@ -140,6 +140,21 @@ def _seed(app) -> None:
                     created_by_user_id=None,
                 )
             )
+        for month, minor in ((3, 120_000), (4, 800_000)):
+            session.add(
+                Transaction(
+                    workspace_id=workspace.id,
+                    direction="expense",
+                    date=date(2026, month, 7),
+                    amount_minor=minor,
+                    currency="EUR",
+                    category_id=categories["food"],
+                    description="Groceries",
+                    description_key="groceries",
+                    source="manual",
+                    created_by_user_id=None,
+                )
+            )
 
 
 def _seed_net_worth(app) -> None:
@@ -245,6 +260,10 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             _seed(app)
 
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            filters = page.locator("details[data-filter-disclosure]")
+            expect(filters).not_to_have_attribute("open", "")
+            filters.locator(":scope > summary").click()
+            expect(page.locator("#report-filters")).to_be_visible()
             # The current month row says "so far"; February is a closed past month. The rate
             # section has its own "so far" badge, so scope to the income/expenses section.
             expect(page.locator("[data-report-section] [data-report-so-far]")).to_have_count(1)
@@ -323,7 +342,7 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             picker.locator("summary").click()
             expect(options.first).to_be_visible()
             options.first.check()
-            page.locator("#report-filters button[type=submit]").click()
+            page.locator("#report-filters button.btn-primary").click()
             page.wait_for_url(f"**category={category_value}**")
             expect(page.locator("[data-multi-select-summary]")).to_have_text("1 category selected")
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
@@ -333,6 +352,8 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             # spans the remaining columns and reaches the panel's right edge.
             page.set_viewport_size({"width": 1280, "height": 900})
             page.reload(wait_until="networkidle")
+            page.locator("details[data-filter-disclosure] > summary").click()
+            expect(page.locator("#report-filters")).to_be_visible()
             metrics = page.evaluate(
                 """() => {
                   const rect = (sel) => {
@@ -396,6 +417,8 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             # At 390 px the same form is one column and stays usable.
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            page.locator("details[data-filter-disclosure] > summary").click()
+            expect(page.locator("#report-filters")).to_be_visible()
             phone = page.evaluate(
                 """() => {
                   const rect = (sel) => {
@@ -416,6 +439,10 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
 
             page.set_viewport_size({"width": 1440, "height": 900})
             page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+            desktop_filters = page.locator("details[data-filter-disclosure]")
+            expect(desktop_filters).not_to_have_attribute("open", "")
+            desktop_filters.locator(":scope > summary").click()
+            expect(page.locator("#report-filters")).to_be_visible()
 
             # F9.2: the year grid has twelve heat-shaded month columns and its own year selector.
             grid = page.locator("[data-report-year-overview]")
@@ -448,13 +475,13 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
                   };
                 }"""
             )
-            tinted = next(cell for cell in heat["cells"] if cell["text"] == "€1,200.00")
+            tinted = next(cell for cell in heat["cells"] if cell["text"] == "€8,000.00")
             assert "bg-danger-tint" in tinted["className"].split()
             assert tinted["background"] == heat["tint"]
             assert all(
                 cell["background"] == "rgba(0, 0, 0, 0)"
                 for cell in heat["cells"]
-                if cell["text"] == "€0.00"
+                if cell["text"] in {"€0.00", "€1,200.00"}
             )
             assert all("heat-" not in cell["className"] for cell in heat["cells"])
             year_select = grid.locator("#report-year")
@@ -483,7 +510,7 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-report-yoy-so-far]")).to_have_count(0)
             expect(page.locator("[data-report-yoy-row]")).to_have_count(1)
             expect(page.locator("[data-report-yoy-expense-percent]").last).to_contain_text(
-                "+140.0%"
+                "+1,060.0%"
             )
             expect(page.locator("[data-report-yoy-savings-change]").last).to_have_text("+€1,000.00")
             accuracy = page.locator("[data-report-accuracy-row]")

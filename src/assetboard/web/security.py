@@ -69,6 +69,11 @@ def summary_sort_cookie_name(settings: Settings) -> str:
     return _cookie_name(settings, "summary_sort")
 
 
+def report_filters_cookie_name(settings: Settings) -> str:
+    """The Reports page's last filters chosen in this browser (not sensitive)."""
+    return _cookie_name(settings, "report_filters")
+
+
 # A display preference: kept for a year in this browser.
 PREFERENCE_COOKIE_SECONDS = 365 * 24 * 3600
 
