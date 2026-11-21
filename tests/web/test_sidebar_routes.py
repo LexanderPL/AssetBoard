@@ -101,7 +101,7 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
     assert "Always shown" in home
     # First/last non-Home move buttons are disabled; every row carries its hidden key.
     assert re.search(r'data-sidebar-move="month:up"[^>]*disabled', row(settings, "month"))
-    assert re.search(r'data-sidebar-move="fire:down"[^>]*disabled', row(settings, "fire"))
+    assert re.search(r'data-sidebar-move="reports:down"[^>]*disabled', row(settings, "reports"))
     for key in DEFAULT_ORDER:
         assert f'name="item" value="{key}"' in row(settings, key)
     assert "data-sidebar-save" in settings and "data-sidebar-reset" in settings
@@ -110,7 +110,7 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
     assert "data-sidebar-nojs-note" in settings
     # The glyph-only arrows still carry an accessible name.
     assert 'aria-label="Move Month up"' in row(settings, "month")
-    assert 'aria-label="Move FIRE projection down"' in row(settings, "fire")
+    assert 'aria-label="Move Reports down"' in row(settings, "reports")
 
 
 def test_the_taxes_note_sits_in_the_middle_column(owner: OwnerApp) -> None:
@@ -210,8 +210,8 @@ def test_save_custom_order_and_visibility(owner: OwnerApp) -> None:
 def test_move_up_and_down_by_posting(owner: OwnerApp) -> None:
     moved = post_sidebar(owner, move="income:up")
     assert moved.status_code == 303, moved.text
-    custom = ["home", "month", "transactions", "history", "reports", "upcoming", "income",
-              "recurring", "taxes", "net_worth", "investments", "loans", "fire"]  # fmt: skip
+    custom = ["home", "month", "transactions", "history", "upcoming", "income", "recurring",
+              "taxes", "net_worth", "investments", "loans", "fire", "reports"]  # fmt: skip
     assert [entry["key"] for entry in saved(owner) or []] == custom
     back = post_sidebar(owner, order=custom, move="income:down")
     assert back.status_code == 303
@@ -322,8 +322,8 @@ def test_the_saved_sidebar_follows_the_user_across_workspaces(owner: OwnerApp) -
     assert switched.status_code == 303
     # The preference belongs to the user, not to the workspace they are in.
     assert nav_hooks(owner.client.get("/").text) == [
-        "home", "loans", "month", "transactions", "reports", "upcoming", "recurring",
-        "income", "net-worth", "investments", "fire",
+        "home", "loans", "month", "transactions", "upcoming", "recurring", "income",
+        "net-worth", "investments", "fire", "reports",
     ]  # fmt: skip
     assert panel_keys(owner.client.get("/account").text) == order
     assert saved(owner) == [{"key": key, "visible": key != "history"} for key in order]
@@ -436,13 +436,13 @@ def test_unknown_and_missing_stored_keys_normalise(owner: OwnerApp) -> None:
         "month",
         "transactions",
         "history",
-        "reports",
         "upcoming",
         "recurring",
         "income",
         "net-worth",
         "investments",
         "fire",
+        "reports",
     ]
 
 

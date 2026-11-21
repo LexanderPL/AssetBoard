@@ -21,7 +21,7 @@ the derived net-worth history and portfolio data) and store nothing; there is no
 the M4 archive.
 
 **Shared rules for every report**
-- **Page:** `/reports` ("Reports", pl "Raporty") in the sidebar after History. Every member,
+- **Page:** `/reports` ("Reports", pl "Raporty") last in the default sidebar order. Every member,
   viewers included, can open it (it shows what they can already read); the services check the
   role like every other read.
 - **Filters** (a plain GET form, so a view is a bookmarkable URL; works without JavaScript):
@@ -114,7 +114,7 @@ conventions). Golden test against services.summary.month_summary; property tests
 ```
 
 **As built (F10.1):**
-- `/reports` is in the sidebar after History; every member, viewers included, may open it. The
+- `/reports` is last in the default sidebar order; every member, viewers included, may open it. The
   filters are one plain GET form; unknown parameters are ignored.
 - Defaults follow the data: the last three years that have transactions (the current year when
   there are none), monthly for a range up to 3 years and yearly beyond. The year selectors offer
@@ -366,5 +366,5 @@ and assumptions are in M9 F9.2; the user guide is [Reports](../reports.md).
    tables have no CSV download. Ledger CSV stays on [History](../transactions.md).
 4. **Withdrawals from savings.** Proposed: not shown in Phase A (they are not earnings). Should
    F10.1 show them as their own series?
-5. **Sidebar placement.** Proposed: after History. Or among the later modules (Net worth,
+5. **Sidebar placement.** Last in the default sidebar order. Or among the later modules (Net worth,
    Investments)?

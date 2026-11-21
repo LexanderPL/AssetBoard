@@ -93,7 +93,7 @@ def test_hidden_items_keep_their_position(db: WorkspaceDb) -> None:
         visible=[key for key in DEFAULT_ORDER if key != "loans"],
     )
     entries = stored(db, user_id) or []
-    assert entries[11] == {"key": "loans", "visible": False}
+    assert entries[10] == {"key": "loans", "visible": False}
 
 
 def test_missing_keys_are_appended_visible(db: WorkspaceDb) -> None:
@@ -113,12 +113,12 @@ def test_move_is_applied_after_normalisation(db: WorkspaceDb) -> None:
         move="income:up",
     )
     assert [item.key for item in result] == [
-        "home", "month", "transactions", "history", "reports", "upcoming", "income",
-        "recurring", "taxes", "net_worth", "investments", "loans", "fire",
+        "home", "month", "transactions", "history", "upcoming", "income", "recurring",
+        "taxes", "net_worth", "investments", "loans", "fire", "reports",
     ]  # fmt: skip
     assert [entry["key"] for entry in stored(db, user_id) or []][:8] == [
-        "home", "month", "transactions", "history", "reports", "upcoming", "income",
-        "recurring",
+        "home", "month", "transactions", "history", "upcoming", "income", "recurring",
+        "taxes",
     ]  # fmt: skip
 
 

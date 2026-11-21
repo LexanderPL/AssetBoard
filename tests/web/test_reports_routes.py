@@ -219,13 +219,14 @@ def test_the_year_dropdowns_only_offer_years_with_transactions(reports: OwnerApp
     assert _row_labels(html) == ["2019", "2020", "2021", "2022", "2023", "2024"]
 
 
-def test_the_sidebar_entry_follows_history(reports: OwnerApp) -> None:
+def test_the_sidebar_entry_is_last(reports: OwnerApp) -> None:
     nav = _sidebar(_page(reports))
     assert re.search(
         r'<a class="nav-link" href="/reports"[^>]*data-reports-link[^>]*aria-current="page"', nav
     )
     assert nav.index("data-history-link") < nav.index("data-reports-link")
-    assert nav.index("data-reports-link") < nav.index("data-upcoming-link")
+    assert nav.index("data-upcoming-link") < nav.index("data-reports-link")
+    assert nav.index("data-fire-link") < nav.index("data-reports-link")
     assert "▦" not in nav
     assert re.search(r'data-reports-link.*?<svg class="h-5 w-5 shrink-0"', nav, re.DOTALL)
 
