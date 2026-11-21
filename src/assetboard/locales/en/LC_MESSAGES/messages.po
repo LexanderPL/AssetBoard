@@ -5234,8 +5234,17 @@ msgstr ""
 msgid "Not available: no expenses in the previous year."
 msgstr ""
 
+msgid "Not available: no savings in the previous year."
+msgstr ""
+
 #, python-format
-msgid "The current year is compared through %(month)s in both years."
+msgid "No data for %(year)s."
+msgstr ""
+
+msgid "The current year is still in progress; no projection is added."
+msgstr ""
+
+msgid "Not available: no planned amount."
 msgstr ""
 
 msgid "All categories"
@@ -5940,10 +5949,8 @@ msgid "Highlight large transactions"
 msgstr ""
 
 msgid ""
-"On the Transactions page, only clearly large entries are tinted: red for "
-"expenses, green for income. A month needs at least three entries of the "
-"same kind and currency, and only amounts at least twice their median "
-"qualify."
+"On the Transactions page, larger expenses get a stronger red background "
+"and larger income a stronger green one."
 msgstr ""
 
 msgid "Save"
@@ -9069,10 +9076,6 @@ msgstr ""
 msgid "Unknown"
 msgstr ""
 
-#, python-format
-msgid "Delete the manual price of %(date)s?"
-msgstr ""
-
 msgid "Prices"
 msgstr ""
 
@@ -9142,13 +9145,7 @@ msgid "Price history of %(name)s"
 msgstr ""
 
 #, python-format
-msgid "Show %(num)d older price point"
-msgid_plural "Show %(num)d older price points"
-msgstr[0] ""
-msgstr[1] ""
-
-#, python-format
-msgid "Older price history of %(name)s"
+msgid "Delete the manual price of %(date)s?"
 msgstr ""
 
 msgid "No stored or transaction prices for this instrument yet."
@@ -11663,6 +11660,15 @@ msgid ""
 "the category charts."
 msgstr ""
 
+msgid "Category trends window"
+msgstr ""
+
+msgid "3-month average"
+msgstr ""
+
+msgid "12-month average"
+msgstr ""
+
 msgid "Show report"
 msgstr ""
 
@@ -11685,7 +11691,7 @@ msgstr ""
 msgid "Year-over-year"
 msgstr ""
 
-msgid "Planned vs actual accuracy"
+msgid "Planning accuracy"
 msgstr ""
 
 msgid "No earned, spent or saved amounts in this range."
@@ -11706,7 +11712,7 @@ msgid "Report year"
 msgstr ""
 
 msgid ""
-"Spending by category and month. Stronger red means more spending in that "
+"Spending by category and month. Darker cells mean more spending in that "
 "month."
 msgstr ""
 
@@ -11716,13 +11722,8 @@ msgstr ""
 msgid "Spending by category and month"
 msgstr ""
 
-msgid "Category trends window"
-msgstr ""
-
-msgid "3-month average"
-msgstr ""
-
-msgid "12-month average"
+#, fuzzy, python-format
+msgid "Window: %(num)d months"
 msgstr ""
 
 msgid "Rolling average spending by category."
@@ -11743,13 +11744,22 @@ msgid ""
 "selected month."
 msgstr ""
 
-msgid "Income and expenses per year, compared with the previous year."
+msgid "Income, expenses and savings per year, compared with the previous year."
 msgstr ""
 
-msgid "No income or expenses in this range."
+msgid ""
+"Expenses are regular spending; savings and investments are shown "
+"separately. Investment purchases recorded in Investments are not "
+"included."
+msgstr ""
+
+msgid "No income, expenses or savings in this range."
 msgstr ""
 
 msgid "Year-over-year comparison"
+msgstr ""
+
+msgid "Savings & investments"
 msgstr ""
 
 msgid "Income change"
@@ -11758,10 +11768,19 @@ msgstr ""
 msgid "Expenses change"
 msgstr ""
 
-msgid "How often actual spending exceeded the plan, by category."
+msgid "Savings change"
+msgstr ""
+
+msgid "No comparison"
+msgstr ""
+
+msgid "How closely actual spending matched the plan, by category."
 msgstr ""
 
 msgid "No planned regular expenses in this range."
+msgstr ""
+
+msgid "Accuracy score"
 msgstr ""
 
 msgid "How often actual spending exceeded the plan"
@@ -11778,8 +11797,11 @@ msgid "Over %%"
 msgstr ""
 
 msgid ""
-"A month counts as over when actual spending is greater than the plan. "
-"Only planned regular expense categories are included."
+"The score compares actual spending with the plan across planned regular "
+"expense categories. A score of 100 means every planned month matched "
+"exactly. Only planned regular expenses count; income and savings are "
+"excluded. A month counts as over when actual spending is greater than the"
+" plan."
 msgstr ""
 
 msgid "No transactions in this range"
@@ -15456,20 +15478,26 @@ msgstr ""
 #~ msgid "Choose which widgets appear on Home and in what order."
 #~ msgstr ""
 
-#~ msgid ""
-#~ "On the Transactions page, larger "
-#~ "expenses get a stronger red background"
-#~ " and larger income a stronger green"
-#~ " one."
+#~ msgid "The current year is compared through %(month)s in both years."
+#~ msgstr ""
+
+#~ msgid "Planned vs actual accuracy"
+#~ msgstr ""
+
+#~ msgid "Income and expenses per year, compared with the previous year."
+#~ msgstr ""
+
+#~ msgid "No income or expenses in this range."
+#~ msgstr ""
+
+#~ msgid "How often actual spending exceeded the plan, by category."
 #~ msgstr ""
 
 #~ msgid ""
-#~ "Spending by category and month. Darker"
-#~ " cells mean more spending in that "
-#~ "month."
-#~ msgstr ""
-
-#~ msgid "Window: %(num)d months"
+#~ "A month counts as over when actual"
+#~ " spending is greater than the plan."
+#~ " Only planned regular expense categories"
+#~ " are included."
 #~ msgstr ""
 
 #~ msgid ""

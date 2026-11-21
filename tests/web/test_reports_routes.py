@@ -956,7 +956,7 @@ def test_the_category_trends_window_is_its_own_form(reports: OwnerApp) -> None:
     assert '<input type="hidden" name="year" value="2026">' in plain_section.group(0)
 
 
-def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
+def test_year_over_year_has_a_row_per_year_with_income_expense_and_savings_changes(
     reports: OwnerApp,
 ) -> None:
     food = _category(reports, "YOY Food")
@@ -968,16 +968,21 @@ def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
 
     html = _page(reports, "from=2025&to=2026&step=month&year=2026")
     assert "data-report-year-over-year" in html
-    assert "data-report-yoy-partial" in html
+    assert "data-report-yoy-partial" not in html
+    assert "data-report-yoy-so-far" not in html
+    assert "data-report-yoy-in-progress" in html
+    assert "The current year is still in progress; no projection is added." in html
+    assert "Investment purchases recorded in Investments are not included." in html
     rows = re.findall(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
     assert len(rows) == 2
     current = next(row for row in rows if "data-report-yoy-year>2026<" in row)
     cells = _cells(current)
-    assert cells[:2] == ["€0.00", "€170.00"]
-    assert cells[2] == "€0.00"
-    assert "no income in the previous year" in cells[3]
-    assert cells[4] == "+€20.00"
-    assert cells[5] == "+13.3%"
+    assert cells[:3] == ["€0.00", "€170.00", "€0.00"]
+    assert "no income in the previous year" in cells[4]
+    assert cells[5] == "+€20.00"
+    assert cells[6] == "+13.3%"
+    assert cells[7] == "€0.00"
+    assert "no savings in the previous year" in cells[8]
     assert "#year-overview" in current
     assert "text-danger" in re.search(
         r'<td class="([^"]*)" data-report-yoy-expense-change>', current
@@ -985,12 +990,15 @@ def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
 
     previous = next(row for row in rows if "data-report-yoy-year>2025<" in row)
     previous_cells = _cells(previous)
-    assert previous_cells[:2] == ["€0.00", "€150.00"]
-    assert previous_cells[4] == "+€150.00"
+    assert previous_cells[:3] == ["€0.00", "€150.00", "€0.00"]
+    assert previous_cells[3:] == ["—No comparison"] * 6
+    assert "No data for 2024." in previous
+    assert "data-report-yoy-no-previous" in previous
 
     total = re.search(r"<tr [^>]*data-report-yoy-total.*?</tr>", html, re.DOTALL)
     assert total is not None
-    assert _cells(total.group(0))[:2] == ["€0.00", "€320.00"]
+    assert _cells(total.group(0))[:3] == ["€0.00", "€320.00", "€0.00"]
+    assert 'colspan="6"' in total.group(0)
 
     filtered = _page(
         reports,
@@ -1002,6 +1010,35 @@ def test_year_over_year_has_a_row_per_year_with_income_and_expense_changes(
         if "data-report-yoy-year>2026<" in row
     )
     assert _cells(filtered_row) == cells
+
+
+def test_year_over_year_first_range_year_keeps_changes_when_a_prior_year_exists(
+    reports: OwnerApp,
+) -> None:
+    food = _category(reports, "First Range Food")
+    _tx(reports, food, date(2025, 1, 10), 10_000)
+    _tx(reports, food, date(2026, 1, 10), 20_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month&year=2026")
+    row = re.search(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
+    assert row is not None
+    cells = _cells(row.group(0))
+    assert cells[:3] == ["€0.00", "€200.00", "€0.00"]
+    assert cells[5] == "+€100.00"
+    assert cells[6] == "+100.0%"
+    assert "No data for 2025." not in row.group(0)
+    assert "data-report-yoy-no-previous" not in row.group(0)
+
+
+def test_year_over_year_savings_only_year_is_not_empty(reports: OwnerApp) -> None:
+    savings = _category(reports, "YOY Savings", "expense", "savings")
+    _tx(reports, savings, date(2026, 1, 10), 5_000)
+
+    html = _page(reports, "from=2026&to=2026&step=month&year=2026")
+    assert "No income, expenses or savings in this range." not in html
+    row = re.search(r"<tr data-report-yoy-row>.*?</tr>", html, re.DOTALL)
+    assert row is not None
+    assert _cells(row.group(0))[:3] == ["€0.00", "€0.00", "€50.00"]
 
 
 def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None:
@@ -1024,7 +1061,7 @@ def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None
 
     html = _page(reports, "from=2026&to=2026&step=month")
     assert "data-report-accuracy" in html
-    assert ">Planned vs actual accuracy</h2>" in html
+    assert ">Planning accuracy</h2>" in html
     assert "data-report-accuracy-row" in html
     assert _cells(_accuracy_row(html, "Accuracy Food")) == ["3", "1", "33.3%"]
     assert _cells(_accuracy_row(html, "Accuracy Rent")) == ["1", "0", "0.0%"]
@@ -1033,6 +1070,17 @@ def test_plan_accuracy_counts_planned_and_over_months(reports: OwnerApp) -> None
     assert "All categories" in total.group(0)
     assert _cells(total.group(0)) == ["4", "1", "25.0%"]
     assert "A month counts as over when actual spending is greater than the plan." in html
+    assert "Only planned regular expenses count; income and savings are excluded." in html
+    score = re.search(
+        r"<p class=\"text-3xl[^\"]*\" data-report-accuracy-score>(.*?)</p>", html, re.DOTALL
+    )
+    assert score is not None
+    assert "84.6%" in score.group(1)
+    bar = re.search(r"<svg[^>]*data-report-accuracy-bar>", html)
+    assert bar is not None
+    assert 'aria-valuenow="84"' in bar.group(0)
+    assert 'aria-valuetext="84.6%"' in bar.group(0)
+    assert 'width="84.6"' in html
     assert "Accuracy Savings" not in html and "Accuracy Salary" not in html
     with_savings = _page(reports, "from=2026&to=2026&step=month&savings=1")
     accuracy_section = re.search(
@@ -1053,7 +1101,7 @@ def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
     assert "Przegląd roczny" in html
     assert "Trendy kategorii" in html
     assert "Rok do roku" in html
-    assert "Dokładność planu i rzeczywistości" in html
+    assert "Dokładność planowania" in html
     assert "Okno trendów kategorii" in html
     assert "Średnia 3-miesięczna" in html
     assert (
@@ -1062,6 +1110,7 @@ def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
     )
     assert "Zmiana dochodów" in html
     assert "Zmiana wydatków" in html
+    assert "Zmiana oszczędności" in html
     assert "Przekroczenie %" in html
 
 
@@ -1070,3 +1119,5 @@ def test_plan_accuracy_is_empty_without_plans(reports: OwnerApp) -> None:
     _tx(reports, food, date(2026, 1, 10), 10_000)
     html = _page(reports, "from=2026&to=2026&step=month")
     assert "No planned regular expenses in this range." in html
+    assert "data-report-accuracy-score" not in html
+    assert "data-report-accuracy-bar" not in html

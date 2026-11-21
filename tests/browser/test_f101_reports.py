@@ -476,18 +476,37 @@ def test_the_reports_chart_and_table_in_a_browser(tmp_path: Path) -> None:
             )
             assert trend_option["series"] == ["Browser Food"]
 
-            # Year-over-year has one row per year and compares the current partial year
-            # with the same months of the previous one.
-            expect(page.locator("[data-report-yoy-partial]")).to_be_visible()
+            # Year-over-year has one row per year, compares full calendar years and shows
+            # savings separately from expenses.
+            expect(page.locator("[data-report-yoy-in-progress]")).to_be_visible()
+            expect(page.locator("[data-report-yoy-partial]")).to_have_count(0)
+            expect(page.locator("[data-report-yoy-so-far]")).to_have_count(0)
             expect(page.locator("[data-report-yoy-row]")).to_have_count(1)
             expect(page.locator("[data-report-yoy-expense-percent]").last).to_contain_text(
                 "+140.0%"
             )
-            expect(page.locator("[data-report-yoy-so-far]")).to_be_visible()
+            expect(page.locator("[data-report-yoy-savings-change]").last).to_have_text("+€1,000.00")
             accuracy = page.locator("[data-report-accuracy-row]")
             expect(accuracy).to_have_count(1)
             expect(accuracy.locator("[data-report-accuracy-planned]")).to_have_text("2")
             expect(accuracy.locator("[data-report-accuracy-over]")).to_have_text("2")
+            expect(page.locator("[data-report-accuracy-score]")).to_contain_text("40.0%")
+            expect(page.locator("[data-report-accuracy-bar]")).to_have_attribute(
+                "aria-valuenow", "40"
+            )
+            expect(page.locator("[data-report-accuracy-bar]")).to_have_attribute(
+                "aria-valuetext", "40.0%"
+            )
+            expect(page.locator("[data-report-accuracy-fill]")).to_have_attribute("width", "40.0")
+
+            # A range without plans keeps the accuracy empty state and no score or bar.
+            page.goto(f"{base}/reports?from=2025&to=2025&step=month", wait_until="networkidle")
+            expect(page.locator("[data-report-accuracy]")).to_contain_text(
+                "No planned regular expenses in this range."
+            )
+            expect(page.locator("[data-report-accuracy-score]")).to_have_count(0)
+            expect(page.locator("[data-report-accuracy-bar]")).to_have_count(0)
+            page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
 
             # Net worth/portfolio data tables are collapsed by default once the chart is drawn.
             _seed_net_worth(app)

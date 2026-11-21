@@ -5663,9 +5663,18 @@ msgstr "Niedostępne: brak dochodów w poprzednim roku."
 msgid "Not available: no expenses in the previous year."
 msgstr "Niedostępne: brak wydatków w poprzednim roku."
 
+msgid "Not available: no savings in the previous year."
+msgstr "Niedostępne: brak oszczędności w poprzednim roku."
+
 #, python-format
-msgid "The current year is compared through %(month)s in both years."
-msgstr "Bieżący rok jest porównywany do %(month)s w obu latach."
+msgid "No data for %(year)s."
+msgstr "Brak danych za %(year)s."
+
+msgid "The current year is still in progress; no projection is added."
+msgstr "Bieżący rok wciąż trwa; nie dodajemy prognozy."
+
+msgid "Not available: no planned amount."
+msgstr "Niedostępne: brak zaplanowanej kwoty."
 
 msgid "All categories"
 msgstr "Wszystkie kategorie"
@@ -6452,16 +6461,11 @@ msgid "Highlight large transactions"
 msgstr "Wyróżniaj duże transakcje"
 
 msgid ""
-"On the Transactions page, only clearly large entries are tinted: red for "
-"expenses, green for income. A month needs at least three entries of the "
-"same kind and currency, and only amounts at least twice their median "
-"qualify."
+"On the Transactions page, larger expenses get a stronger red background "
+"and larger income a stronger green one."
 msgstr ""
-"Na stronie Transakcje wyróżniane są tylko naprawdę duże transakcje: "
-"wydatki na czerwono, przychody na zielono. W miesiącu muszą być co "
-"najmniej trzy transakcje tego samego rodzaju i w tej samej walucie, a "
-"kwalifikują się tylko kwoty co najmniej dwukrotnie większe od ich "
-"mediany."
+"Na stronie Transakcje większe wydatki mają mocniejsze czerwone tło, a "
+"większe przychody mocniejsze zielone."
 
 msgid "Save"
 msgstr "Zapisz"
@@ -9990,10 +9994,6 @@ msgstr "Transakcja"
 msgid "Unknown"
 msgstr "Nieznane"
 
-#, python-format
-msgid "Delete the manual price of %(date)s?"
-msgstr "Usunąć cenę ręczną z dnia %(date)s?"
-
 msgid "Prices"
 msgstr "Ceny"
 
@@ -10065,15 +10065,8 @@ msgid "Price history of %(name)s"
 msgstr "Historia cen: %(name)s"
 
 #, python-format
-msgid "Show %(num)d older price point"
-msgid_plural "Show %(num)d older price points"
-msgstr[0] "Pokaż %(num)d starszy punkt cenowy"
-msgstr[1] "Pokaż %(num)d starsze punkty cenowe"
-msgstr[2] "Pokaż %(num)d starszych punktów cenowych"
-
-#, python-format
-msgid "Older price history of %(name)s"
-msgstr "Starsza historia cen: %(name)s"
+msgid "Delete the manual price of %(date)s?"
+msgstr "Usunąć cenę ręczną z dnia %(date)s?"
 
 msgid "No stored or transaction prices for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
@@ -12855,6 +12848,15 @@ msgstr ""
 "Pozostaw puste, aby pokazać wszystkie kategorie w przeglądzie rocznym i 8"
 " największych na wykresach kategorii."
 
+msgid "Category trends window"
+msgstr "Okno trendów kategorii"
+
+msgid "3-month average"
+msgstr "Średnia 3-miesięczna"
+
+msgid "12-month average"
+msgstr "Średnia 12-miesięczna"
+
 msgid "Show report"
 msgstr "Pokaż raport"
 
@@ -12877,8 +12879,8 @@ msgstr "Trendy kategorii"
 msgid "Year-over-year"
 msgstr "Rok do roku"
 
-msgid "Planned vs actual accuracy"
-msgstr "Dokładność planu i rzeczywistości"
+msgid "Planning accuracy"
+msgstr "Dokładność planowania"
 
 msgid "No earned, spent or saved amounts in this range."
 msgstr "W tym zakresie nie ma kwot zarobionych, wydanych ani zaoszczędzonych."
@@ -12900,11 +12902,11 @@ msgid "Report year"
 msgstr "Rok raportu"
 
 msgid ""
-"Spending by category and month. Stronger red means more spending in that "
+"Spending by category and month. Darker cells mean more spending in that "
 "month."
 msgstr ""
-"Wydatki według kategorii i miesiąca. Mocniejsza czerwień oznacza większe "
-"wydatki w danym miesiącu."
+"Wydatki według kategorii i miesiąca. Ciemniejsze komórki oznaczają "
+"większe wydatki w danym miesiącu."
 
 msgid "No spending in this year."
 msgstr "Brak wydatków w tym roku."
@@ -12912,14 +12914,9 @@ msgstr "Brak wydatków w tym roku."
 msgid "Spending by category and month"
 msgstr "Wydatki według kategorii i miesiąca"
 
-msgid "Category trends window"
-msgstr "Okno trendów kategorii"
-
-msgid "3-month average"
-msgstr "Średnia 3-miesięczna"
-
-msgid "12-month average"
-msgstr "Średnia 12-miesięczna"
+#, python-format
+msgid "Window: %(num)d months"
+msgstr "Okno: %(num)d mies."
 
 msgid "Rolling average spending by category."
 msgstr "Średnia krocząca wydatków według kategorii."
@@ -12939,14 +12936,25 @@ msgid ""
 "selected month."
 msgstr "Średnia krocząca obejmuje poprzednie %(num)d mies., w tym wybrany miesiąc."
 
-msgid "Income and expenses per year, compared with the previous year."
-msgstr "Dochody i wydatki w każdym roku w porównaniu z rokiem poprzednim."
+msgid "Income, expenses and savings per year, compared with the previous year."
+msgstr "Dochody, wydatki i oszczędności rocznie w porównaniu z poprzednim rokiem."
 
-msgid "No income or expenses in this range."
-msgstr "W tym zakresie nie ma dochodów ani wydatków."
+msgid ""
+"Expenses are regular spending; savings and investments are shown "
+"separately. Investment purchases recorded in Investments are not "
+"included."
+msgstr ""
+"Wydatki to regularne wydatki; oszczędności i inwestycje pokazujemy "
+"osobno. Zakupów zarejestrowanych w Inwestycjach nie uwzględniamy."
+
+msgid "No income, expenses or savings in this range."
+msgstr "Brak dochodów, wydatków i oszczędności w tym zakresie."
 
 msgid "Year-over-year comparison"
 msgstr "Porównanie rok do roku"
+
+msgid "Savings & investments"
+msgstr "Oszczędności i inwestycje"
 
 msgid "Income change"
 msgstr "Zmiana dochodów"
@@ -12954,11 +12962,20 @@ msgstr "Zmiana dochodów"
 msgid "Expenses change"
 msgstr "Zmiana wydatków"
 
-msgid "How often actual spending exceeded the plan, by category."
-msgstr "Jak często rzeczywiste wydatki przekroczyły plan, według kategorii."
+msgid "Savings change"
+msgstr "Zmiana oszczędności"
+
+msgid "No comparison"
+msgstr "Brak porównania"
+
+msgid "How closely actual spending matched the plan, by category."
+msgstr "Jak blisko planu były rzeczywiste wydatki, według kategorii."
 
 msgid "No planned regular expenses in this range."
 msgstr "W tym zakresie nie ma zaplanowanych regularnych wydatków."
+
+msgid "Accuracy score"
+msgstr "Wynik dokładności"
 
 msgid "How often actual spending exceeded the plan"
 msgstr "Jak często rzeczywiste wydatki przekroczyły plan"
@@ -12974,11 +12991,17 @@ msgid "Over %%"
 msgstr "Przekroczenie %%"
 
 msgid ""
-"A month counts as over when actual spending is greater than the plan. "
-"Only planned regular expense categories are included."
+"The score compares actual spending with the plan across planned regular "
+"expense categories. A score of 100 means every planned month matched "
+"exactly. Only planned regular expenses count; income and savings are "
+"excluded. A month counts as over when actual spending is greater than the"
+" plan."
 msgstr ""
-"Miesiąc liczy się jako przekroczenie, gdy rzeczywiste wydatki są większe "
-"niż plan. Uwzględniane są tylko zaplanowane regularne kategorie wydatków."
+"Wynik porównuje rzeczywiste wydatki z planem dla zaplanowanych regularnych "
+"wydatków. Wynik 100 oznacza, że każdy zaplanowany miesiąc zgadzał się "
+"dokładnie. Liczą się tylko zaplanowane regularne wydatki; dochody i "
+"oszczędności są wyłączone. Miesiąc jest przekroczony, gdy rzeczywiste "
+"wydatki są większe niż plan."
 
 msgid "No transactions in this range"
 msgstr "Brak transakcji w tym zakresie"
@@ -16425,18 +16448,22 @@ msgstr "Usuń obszar roboczy…"
 #~ " stronie głównej i w jakiej "
 #~ "kolejności."
 
-#~ msgid ""
-#~ "On the Transactions page, larger "
-#~ "expenses get a stronger red background"
-#~ " and larger income a stronger green"
-#~ " one."
-#~ msgstr ""
-#~ "Na stronie Transakcje większe wydatki "
-#~ "mają mocniejsze czerwone tło, a większe"
-#~ " przychody mocniejsze zielone."
+#~ msgid "The current year is compared through %(month)s in both years."
+#~ msgstr "Bieżący rok jest porównywany do %(month)s w obu latach."
 
-#~ msgid "Window: %(num)d months"
-#~ msgstr "Okno: %(num)d mies."
+#~ msgid "No income or expenses in this range."
+#~ msgstr "W tym zakresie nie ma dochodów ani wydatków."
+
+#~ msgid ""
+#~ "A month counts as over when actual"
+#~ " spending is greater than the plan."
+#~ " Only planned regular expense categories"
+#~ " are included."
+#~ msgstr ""
+#~ "Miesiąc liczy się jako przekroczenie, "
+#~ "gdy rzeczywiste wydatki są większe niż"
+#~ " plan. Uwzględniane są tylko zaplanowane"
+#~ " regularne kategorie wydatków."
 
 #~ msgid "Invite someone"
 #~ msgstr "Zaproś kogoś"
