@@ -54,6 +54,8 @@ belongs to the tab currently shown.
   - focused confirmations: `max-w-2xl`;
   - report pages: `max-w-6xl` (the same as dashboards and lists);
   - import pages: `max-w-4xl`.
+- Profile, Account security and Instance settings use `max-w-3xl space-y-6`; their panels fill
+  that width instead of carrying their own narrower caps.
 - Detail pages (income edit, tax edit, instrument, work calendar, recurring edit) start with one
   consistent back control. Prefer a `.btn` “Back to …” in the content header, not a one-off
   rounded link on some pages and an underlined text link on others.
@@ -110,6 +112,15 @@ Rules:
 - Destructive confirmation uses the danger tone: mark the `<form>` or HTMX trigger with
   `data-confirm-tone="danger"` and the global dialog swaps its accept button from `.btn-primary`
   to `.btn-danger`. Reversible archive, pause and skip actions keep the primary tone.
+
+### Icons
+
+- Sidebar destinations use Heroicons v2.2.0 outline inline SVGs (MIT), rendered at 20 × 20
+  (`h-5 w-5`) with `stroke-width="1.5"`, `stroke="currentColor"`, `shrink-0` and
+  `aria-hidden="true"`. The link text is the accessible name; icons never replace it.
+- The path data lives in `web/rendering.py` (`SIDEBAR_ICONS`) and is rendered by the
+  `sidebar_icon` macro. It is copied at development time, never fetched at runtime. The version,
+  source, licence and licence-file hash are recorded in `static/vendor/README.md`.
 
 ### Forms
 

@@ -46,7 +46,7 @@ def _begin(owner: OwnerApp) -> str:
     response = owner.post("/account/totp/start", {"confirm_password": owner.web.admin_password})
     assert response.status_code == 303, response.text
     page = owner.client.get("/account/totp")
-    assert "<svg" in page.text
+    assert 'aria-label="Authenticator enrollment QR code"' in page.text
     match = re.search(r"<code[^>]*data-totp-secret>([A-Z2-7]+)</code>", page.text)
     assert match
     return match.group(1)
@@ -143,7 +143,11 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     page = owner.client.get("/account/totp")
     assert page.headers["cache-control"] == "no-store"
     assert all(code not in page.text for code in codes)
-    assert secret not in page.text and "<svg" not in page.text
+    # The sidebar icons are SVGs on every page; the enrollment QR block is what must be gone.
+    assert (
+        secret not in page.text and 'aria-label="Authenticator enrollment QR code"' not in page.text
+    )
+    assert "data-totp-secret" not in page.text
     security = owner.client.get("/account/password").text
     assert "data-two-factor-enabled" in security
     assert owner.post("/account/totp/verify", {"code": "123456"}).status_code == 400
@@ -629,6 +633,8 @@ def test_totp_messages_are_translated_and_secrets_are_not_logged(
     page = owner.client.get("/account/totp")
     assert "Uwierzytelnianie dwuskładnikowe" in page.text
     assert "Skonfiguruj uwierzytelnianie dwuskładnikowe" in page.text
+    # _begin checks the English QR label; enrollment itself does not need the Polish catalog.
+    owner.client.headers["accept-language"] = "en"
     with caplog.at_level("INFO"):
         secret, codes = _enable(owner)
     assert secret not in caplog.text

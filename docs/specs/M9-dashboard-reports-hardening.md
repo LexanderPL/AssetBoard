@@ -687,7 +687,7 @@ enable (today Taxes) are still hidden by that feature gate.
   in `run_immediate`; malformed or unknown move values are ignored. A normal JavaScript save
   posts the row order in the `item` fields and has no `move` value.
 - **Rendering.** `base.html` renders one loop over request-aware links built from
-  `WorkspaceNav.sidebar`; desktop and mobile share it. The existing hooks, glyphs, order,
+  `WorkspaceNav.sidebar`; desktop and mobile share it. The existing hooks, icons, order,
   `aria-current` rules, Upcoming overdue badge and `ngettext` text are preserved. Home always
   appears; without a workspace Context only Home appears; Taxes appears only when
   `WorkspaceNav.current.taxes_enabled`. All URL logic stays in `web/rendering.py` (no duplicate
@@ -732,6 +732,12 @@ submit buttons and apply the move on the server, as the `data-sidebar-nojs-note`
 test keeps `SIDEBAR_LABELS`, `SIDEBAR_GLYPHS` and the link rules in step with `CANONICAL_KEYS`,
 and an unhandled canonical key raises instead of silently disappearing. No follow-ups beyond
 the existing feature gate for Taxes.
+
+**As built (2026-11-21, WP5).** The Unicode glyphs were replaced with Heroicons v2.2.0 outline
+inline SVGs rendered at 20 × 20: `SIDEBAR_ICONS` in `web/rendering.py`, the `sidebar_icon` macro
+in `templates/macros/sidebar_icons.html`, and `vendor/HEROICONS-LICENSE.txt` plus the vendor
+README record. Labels, keys, order, hooks and `aria-current` are unchanged. The 13-key coverage
+test now checks `SIDEBAR_ICONS`.
 
 ---
 

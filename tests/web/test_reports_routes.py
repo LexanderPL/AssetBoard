@@ -225,7 +225,8 @@ def test_the_sidebar_entry_follows_history(reports: OwnerApp) -> None:
     )
     assert nav.index("data-history-link") < nav.index("data-reports-link")
     assert nav.index("data-reports-link") < nav.index("data-upcoming-link")
-    assert "▦" in nav
+    assert "▦" not in nav
+    assert re.search(r'data-reports-link.*?<svg class="h-5 w-5 shrink-0"', nav, re.DOTALL)
 
 
 def test_monthly_and_yearly_steps_and_month_links(reports: OwnerApp) -> None:

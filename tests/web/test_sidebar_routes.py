@@ -17,7 +17,7 @@ from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.domain.navigation import CANONICAL_KEYS, DEFAULT_SIDEBAR, SidebarItem
 from assetboard.services.context import Role, WorkspaceNav, WorkspaceRef
 from assetboard.web.rendering import (
-    SIDEBAR_GLYPHS,
+    SIDEBAR_ICONS,
     SIDEBAR_LABELS,
     sidebar_labels,
     sidebar_links,
@@ -111,6 +111,21 @@ def test_the_profile_lists_every_destination_with_home_always_shown(owner: Owner
     # The glyph-only arrows still carry an accessible name.
     assert 'aria-label="Move Month up"' in row(settings, "month")
     assert 'aria-label="Move FIRE projection down"' in row(settings, "fire")
+
+
+def test_the_taxes_note_sits_in_the_middle_column(owner: OwnerApp) -> None:
+    settings = panel(owner.client.get("/account").text)
+    taxes = row(settings, "taxes")
+    assert 'class="flex items-start gap-3 py-3"' in taxes
+    assert "flex-wrap" not in taxes
+    assert "w-full" not in taxes
+    assert '<div class="min-w-0 flex-1">' in taxes
+    middle = re.search(r'<div class="min-w-0 flex-1">(.*?)</div>', taxes, re.DOTALL)
+    assert middle is not None and "data-sidebar-taxes-note" in middle.group(1)
+    assert '<p class="mt-0.5 break-words text-xs text-muted"' in taxes
+    assert '<div class="flex shrink-0 items-center gap-2">' in taxes
+    # The arrows share one non-wrapping group, so the note can never push them to a new line.
+    assert taxes.count("data-sidebar-move=") == 2
 
 
 def test_the_sidebar_actions_share_one_row_and_reset_submits_its_own_route(
@@ -347,15 +362,35 @@ def _nav(owner: OwnerApp, *, sidebar: tuple[SidebarItem, ...] = DEFAULT_SIDEBAR)
     )
 
 
-def test_every_canonical_key_has_a_label_glyph_and_link_rule(owner: OwnerApp) -> None:
+def test_every_canonical_key_has_a_label_icon_and_link_rule(owner: OwnerApp) -> None:
     assert set(SIDEBAR_LABELS) == set(CANONICAL_KEYS)
-    assert set(SIDEBAR_GLYPHS) == set(CANONICAL_KEYS)
+    assert set(SIDEBAR_ICONS) == set(CANONICAL_KEYS)
+    assert all(SIDEBAR_ICONS[key] for key in CANONICAL_KEYS)
+    assert len({SIDEBAR_ICONS[key] for key in CANONICAL_KEYS}) == len(CANONICAL_KEYS)
     assert set(sidebar_labels("en")) == set(CANONICAL_KEYS)
     # With Taxes enabled every canonical key must reach the sidebar builder, so a destination
     # added to CANONICAL_KEYS without an href/current rule fails here instead of disappearing.
     assert [link.key for link in sidebar_links(_request_for(owner), _nav(owner))] == list(
         CANONICAL_KEYS
     )
+
+
+def test_the_sidebar_icons_are_decorative_inline_svgs(owner: OwnerApp) -> None:
+    page = owner.client.get("/").text
+    match = re.search(r'<nav [^>]*aria-label="Main navigation".*?</nav>', page, re.DOTALL)
+    assert match is not None
+    nav = match.group(0)
+    links = re.findall(r'<a class="nav-link".*?</a>', nav, re.DOTALL)
+    assert len(links) == 12  # every default destination except Taxes
+    for link in links:
+        assert link.count("<svg") == 1
+        assert (
+            '<svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" '
+            'stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
+        ) in link
+        assert '<path stroke-linecap="round" stroke-linejoin="round" d="' in link
+    for glyph in ("⌂", "◷", "≡", "⌕", "▦", "◔", "↻", "¤", "%", "◇", "↗", "▤", "✦"):
+        assert f'<span aria-hidden="true">{glyph}</span>' not in nav
 
 
 def test_a_canonical_key_without_a_link_rule_fails_loudly(owner: OwnerApp) -> None:

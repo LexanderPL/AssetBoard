@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from assetboard.domain.money import Money
-from assetboard.web.rendering import templates_for
+from assetboard.web.rendering import SIDEBAR_ICONS, templates_for
 
 
 def test_form_field_renders_validation_errors_safely() -> None:
@@ -86,6 +86,42 @@ def test_each_vendored_javascript_has_a_documented_license() -> None:
         license_file_name = columns[4].strip("`")
         assert license_file_name.endswith("-LICENSE.txt")
         assert (vendor_directory / license_file_name).is_file()
+
+
+def test_every_sidebar_icon_is_an_hidden_outline_svg() -> None:
+    templates = templates_for("en")
+    rendered = templates.env.from_string(
+        '{% from "macros/sidebar_icons.html" import sidebar_icon %}'
+        "{% for paths in icons %}{{ sidebar_icon(paths) }}{% endfor %}"
+    ).render(icons=list(SIDEBAR_ICONS.values()))
+
+    assert len(SIDEBAR_ICONS) == 13
+    assert rendered.count("<svg") == 13
+    assert rendered.count('class="h-5 w-5 shrink-0"') == 13
+    assert rendered.count('viewBox="0 0 24 24"') == 13
+    assert rendered.count('fill="none"') == 13
+    assert rendered.count('stroke="currentColor"') == 13
+    assert rendered.count('stroke-width="1.5"') == 13
+    assert rendered.count('aria-hidden="true"') == 13
+    assert rendered.count("<path") == sum(len(paths) for paths in SIDEBAR_ICONS.values())
+    assert "#" not in rendered
+
+
+def test_heroicons_paths_have_their_licence_and_vendor_entry() -> None:
+    repository = Path(__file__).parents[2]
+    vendor_directory = repository / "src/assetboard/static/vendor"
+    manifest = (vendor_directory / "README.md").read_text(encoding="utf-8")
+
+    assert "Heroicons" in manifest
+    assert "2.2.0" in manifest
+    assert "MIT" in manifest
+    assert "https://github.com/tailwindlabs/heroicons" in manifest
+    assert "0435d4ca364a608cc75e2f8683d374e55abbae26" in manifest
+    licence = (vendor_directory / "HEROICONS-LICENSE.txt").read_text(encoding="utf-8")
+    assert "MIT License" in licence
+    assert "Copyright (c) Tailwind Labs, Inc." in licence
+    digest = hashlib.sha256((vendor_directory / "HEROICONS-LICENSE.txt").read_bytes()).hexdigest()
+    assert digest in manifest
 
 
 def test_built_css_uses_class_based_dark_mode() -> None:

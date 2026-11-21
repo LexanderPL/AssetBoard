@@ -225,6 +225,43 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         browser.close()
 
 
+def test_the_taxes_note_keeps_the_arrows_on_the_label_line(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    with live_server(app) as base, sync_playwright() as playwright:
+        _setup(app)
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        _sign_in(page, base)
+        page.goto(f"{base}/account", wait_until="networkidle")
+
+        for width in (1280, 390):
+            page.set_viewport_size({"width": width, "height": 900 if width == 1280 else 844})
+            page.goto(f"{base}/account", wait_until="networkidle")
+            taxes = page.locator('[data-sidebar-item="taxes"]')
+            transactions = page.locator('[data-sidebar-item="transactions"]')
+            label = taxes.locator('label[for="sidebar-visible-taxes"]').bounding_box()
+            note = taxes.locator("[data-sidebar-taxes-note]").bounding_box()
+            up = taxes.locator('[data-sidebar-move="taxes:up"]').bounding_box()
+            down = taxes.locator('[data-sidebar-move="taxes:down"]').bounding_box()
+            row = taxes.bounding_box()
+            other_up = transactions.locator('[data-sidebar-move="transactions:up"]').bounding_box()
+            other_row = transactions.bounding_box()
+            assert label and note and up and down and row and other_up and other_row
+            # Both arrows share the label's line instead of wrapping below the note.
+            assert abs(up["y"] - down["y"]) <= 1, (width, up, down)
+            assert up["y"] <= label["y"] + 2, (width, up, label)
+            assert up["y"] < note["y"], (width, up, note)
+            # The note wraps inside the middle column, never under the arrows.
+            assert note["x"] >= label["x"] - 1
+            assert note["x"] + note["width"] <= up["x"] + 1
+            if width == 390:
+                assert note["height"] > label["height"]
+            # The arrows sit at the same offset from the row top as on a row without a note.
+            assert abs((up["y"] - row["y"]) - (other_up["y"] - other_row["y"])) <= 1
+            assert page.evaluate(NO_OVERFLOW)
+        browser.close()
+
+
 def test_keyboard_moves_at_the_boundaries_keep_focus(tmp_path: Path) -> None:
     app = _app(tmp_path)
     with live_server(app) as base, sync_playwright() as playwright:

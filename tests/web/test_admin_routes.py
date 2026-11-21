@@ -738,3 +738,20 @@ def test_promote_and_demote_say_when_the_provider_decides(
         local_row = listing.split('data-user="local@example.com"')[1].split("</tr>")[0]
         assert ("(from the identity provider)" in ola_row) == (group is not None)
         assert "(from the identity provider)" not in local_row  # no OIDC identity
+
+
+# Instance settings layout
+
+
+def test_instance_settings_panels_share_one_width(h: Harness) -> None:
+    page = admin(h).get("/admin/settings").text
+    assert page.count('<div class="max-w-3xl space-y-6">') == 1
+    assert "max-w-xl" not in page
+    assert 'class="panel mt-6' not in page
+    assert (
+        '<section class="panel p-6 sm:p-7" aria-labelledby="instance-settings-heading" '
+        "data-instance-settings>"
+    ) in page
+    assert (
+        '<section class="panel p-6 sm:p-7" aria-labelledby="backups-heading" data-backup-panel>'
+    ) in page
