@@ -310,10 +310,12 @@ year/month selection, the base-currency rule and the empty workspace.
 - **Filters:** the shared `filter_panel` macro gained `open=true`; Reports passes `false` unless
   the view has validation errors. The last resolved filters (from, to, step, currency,
   categories, savings, year, trend) are kept in a one-year `HttpOnly`, `SameSite=Lax` browser
-  cookie. Any explicit report parameter wins and refreshes it; a bare `/reports` reads it; an
-  invalid or oversized cookie falls back to the current defaults. `clear=1` deletes it and
-  redirects to the clean URL. A **Clear filters** button submits that action inside the GET form.
-  URLs stay bookmarkable and no-JS.
+  cookie. A valid explicit report parameter wins and refreshes it; an invalid explicit request
+  shows its errors and keeps the previous settings. A bare `/reports` reads it; a cookie whose
+  values no longer validate is cleared and falls back to the current defaults, while a
+  malformed or oversized cookie is ignored. `clear=1` deletes it and redirects to the clean
+  URL. A **Clear filters** button submits that action inside the GET form. URLs stay
+  bookmarkable and no-JS.
 - **Year overview heat:** each category row now follows the Transactions T-1 gate. The comparison
   group is the category's non-zero months: at least three are needed, a month must be at least
   twice the row median, and the four steps then use the existing max-relative scale against the

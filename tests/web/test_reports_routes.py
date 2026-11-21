@@ -709,6 +709,14 @@ def _report_cookie(reports: OwnerApp) -> str:
     return report_filters_cookie_name(reports.app.state.settings)
 
 
+def _filter_summary(html: str) -> str:
+    panel = re.search(r"<details[^>]*data-filter-disclosure.*?</form>", html, re.DOTALL)
+    assert panel is not None
+    summary = re.search(r"<summary.*?</summary>", panel.group(0), re.DOTALL)
+    assert summary is not None
+    return summary.group(0)
+
+
 def test_the_filter_cookie_remembers_every_resolved_field(reports: OwnerApp) -> None:
     food = _category(reports, "Cookie Food")
     _tx(reports, food, date(2024, 3, 5), 1_000)
@@ -762,14 +770,18 @@ def test_a_remembered_default_year_does_not_inflate_the_filter_count(
 ) -> None:
     food = _category(reports, "Badge Food")
     _tx(reports, food, date(2026, 3, 5), 1_000)
-    reports.client.get("/reports?from=2026&to=2026&step=year")
+    explicit = reports.client.get("/reports?from=2026&to=2026&step=year")
+    assert "1 filter" in _filter_summary(explicit.text)  # only the granularity differs
+    assert "2 filters" not in _filter_summary(explicit.text)
 
-    panel = re.search(r"<details[^>]*data-filter-disclosure.*?</form>", _page(reports), re.DOTALL)
-    assert panel is not None
-    summary = re.search(r"<summary.*?</summary>", panel.group(0), re.DOTALL)
-    assert summary is not None
-    assert "1 filter" in summary.group(0)  # only the granularity differs from the defaults
-    assert "2 filters" not in summary.group(0)
+    remembered = _filter_summary(_page(reports))
+    assert "1 filter" in remembered  # the remembered default year is not counted
+    assert "2 filters" not in remembered
+
+    different = reports.client.get("/reports?from=2026&to=2026&step=month&year=2025")
+    summary = _filter_summary(different.text)
+    assert "1 filter" in summary  # a genuinely different year still counts
+    assert "2 filters" not in summary
 
 
 def test_an_invalid_explicit_url_does_not_refresh_the_cookie(reports: OwnerApp) -> None:
