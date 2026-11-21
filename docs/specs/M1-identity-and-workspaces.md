@@ -22,7 +22,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 **Story:** On first start I create the admin account and my workspace; afterwards I log in with email + password.
 
 **Acceptance**
-- With zero users, every route redirects to `/setup` (create admin: email, display name, password; workspace: name, base currency, country, timezone, locale). `/setup` returns 404 once a user exists.
+- With zero users, every route redirects to `/setup` (create admin: email, display name, password; workspace: name, country, base currency, timezone, locale; since W-1 the country comes first, a blank currency is derived from it and a blank time zone is UTC). `/setup` returns 404 once a user exists.
 - Passwords: argon2id; minimum length 8 (10 until 0.2.0), no composition rules; check against a small bundled common-password list.
 - Sessions are **server-side** (`UserSession`), cookie holds an opaque random id (stored hashed), `HttpOnly`, `SameSite=Lax`, `Secure` when `BASE_URL` is https; idle timeout 14 days, absolute 60 days (configurable); "log out other devices".
 - Login/logout, change password (invalidates other sessions), CSRF on all forms.
@@ -106,10 +106,17 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     changed on `/admin/settings` (instance administrators), confirmed like every F1.5 admin
     action, and audited as the instance-level `instance.settings_updated`
     (`allow_workspace_creation`).
-  - The form reuses first-run setup's workspace fields (name, base currency, country, time
+  - The form reuses first-run setup's workspace fields (name, country, base currency, time
     zone, language); a blank name becomes the display name. The workspace gets the suggested
     categories in the request's language (M2 F2.1), `workspace.created` is recorded in its own
     log only, and the session switches to it; the response redirects to `/`.
+  - **Workspace country defaults (W-1, 2026-11-21).** First-run setup and Create workspace ask
+    country before base currency. On a fresh form the time zone is seeded from the browser's
+    IANA zone; selecting a country fills the base currency from Babel's first supported current
+    tender currency. A time zone the user chose is never overwritten, and there is no
+    country-to-time-zone table. The server keeps a no-JavaScript submission valid: a submitted
+    currency always wins, a blank currency with a country is derived, and a blank time zone
+    becomes UTC. Workspace settings keeps its own field order and does not auto-fill.
   - The "No workspace" page offers "Create workspace", and every workspace page offers "New
     workspace" in the account menu's workspace group, both only when allowed. The
     service re-reads the account and the setting inside its write transaction.

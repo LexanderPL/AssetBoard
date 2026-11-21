@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -49,6 +50,61 @@ def test_setup_form_has_token_field_and_option_lists(web: WebHarness) -> None:
     english = client.get("/setup", headers={"accept-language": "en"})
     assert ">Workspace language</label>" in english.text
     assert "Used for the suggested categories and formatting." in english.text
+
+
+def test_workspace_fields_put_the_country_before_the_currency(web: WebHarness) -> None:
+    with TestClient(web.app()) as client:
+        page = client.get("/setup", headers={"accept-language": "en"})
+    assert page.status_code == 200
+    html = page.text
+    assert (
+        html.index('id="workspace_name"')
+        < html.index('id="country_code"')
+        < html.index('id="base_currency"')
+        < html.index('id="timezone"')
+        < html.index('id="workspace_locale"')
+    )
+    # Each country option carries the base currency the browser module should select.
+    assert 'data-currency="PLN"' in html and 'data-currency="USD"' in html
+    assert "Picked from your country and browser; change it if needed." in html
+    # The fresh form seeds the time zone; the script is external and CSP-safe.
+    assert "data-workspace-fields" in html and 'data-seed-timezone="1"' in html
+    assert "js/workspace-fields.js" in html
+    assert re.search(r"<script(?![^>]*\ssrc=)", html) is None
+
+
+def test_a_rejected_setup_form_does_not_seed_the_time_zone_again(web: WebHarness) -> None:
+    app = web.app()
+    with TestClient(app) as client:
+        response = client.post("/setup", data=_form(client, web, None))  # wrong token
+    assert response.status_code == 400
+    assert "data-workspace-fields" in response.text
+    assert "data-seed-timezone" not in response.text
+
+
+def test_without_javascript_a_blank_currency_uses_the_country_currency(web: WebHarness) -> None:
+    app = web.app()
+    with TestClient(app) as client:
+        response = client.post(
+            "/setup",
+            data=_form(
+                client,
+                web,
+                app.state.setup_token,
+                base_currency="",
+                country_code="PL",
+                timezone="UTC",
+            ),
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+    with app.state.session_factory() as session:
+        workspace = session.scalars(select(Workspace)).one()
+    assert (workspace.base_currency, workspace.country_code, workspace.timezone) == (
+        "PLN",
+        "PL",
+        "UTC",
+    )
 
 
 def test_setup_creates_admin_signs_in_and_rotates_the_csrf_cookie(web: WebHarness) -> None:

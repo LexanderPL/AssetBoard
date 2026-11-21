@@ -184,10 +184,12 @@ if your account has none.
 Any signed-in account can create a workspace and becomes its owner, unless an instance
 administrator has turned this off. "Create workspace" appears on the "No workspace" page, and
 "New workspace" in the account menu (top right) and on the workspace settings page. The form asks
-for the same details as first-run setup: a name (your display name unless you change it),
-base currency, country, time zone and language. The new workspace starts with the suggested
-categories in your language ([categories](categories.md#suggested-categories)), and you switch
-to it straight away. Its log records "Workspace created".
+for the same details as first-run setup: a name (your display name unless you change it), country,
+base currency, time zone and language. The country fills the base currency with that country's
+currency, and your browser's time zone is suggested; change either before you create the
+workspace. The new workspace starts with the suggested categories in your language
+([categories](categories.md#suggested-categories)), and you switch to it straight away. Its log
+records "Workspace created".
 
 **Instance settings** (instance administrators, "Instance settings" in the account menu or on
 the Users page): "Who can create workspaces" is "Every signed-in user" (the default) or "Only

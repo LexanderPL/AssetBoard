@@ -1149,6 +1149,7 @@ def _new_workspace_page(
     *,
     errors: dict[str, str] | None = None,
     status_code: int = 200,
+    seed_timezone: bool = False,
 ) -> Response:
     return render_template(
         request,
@@ -1157,6 +1158,7 @@ def _new_workspace_page(
             "values": values,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "options": workspace_form_options(request.state.locale),
+            "seed_timezone": seed_timezone,
         },
         status_code=status_code,
     )
@@ -1177,7 +1179,7 @@ async def new_workspace_form(request: Request) -> Response:
         "timezone": "UTC",
         "workspace_locale": request.state.locale,
     }
-    return _new_workspace_page(request, values)
+    return _new_workspace_page(request, values, seed_timezone=True)
 
 
 @router.post("/workspaces/new")

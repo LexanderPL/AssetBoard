@@ -8,6 +8,7 @@ from typing import cast
 from zoneinfo import available_timezones
 
 from babel import Locale
+from babel.numbers import get_territory_currencies
 
 from assetboard.domain.money import CURRENCY_MINOR_UNITS, minor_unit_for
 from assetboard.i18n.locale import SUPPORTED_LOCALES, normalize_locale
@@ -47,6 +48,33 @@ def country_names(display_locale: str) -> dict[str, str]:
         code: name
         for code, name in sorted(territories.items(), key=lambda item: item[1])
         if len(code) == 2 and code.isalpha() and code not in _NON_COUNTRY_TERRITORIES
+    }
+
+
+def country_default_currency(country_code: str | None) -> str | None:
+    """The first current tender currency Babel lists for the territory, if the app supports it.
+
+    Babel also lists currencies the app does not know (for example ``ZWG``); those are skipped so
+    the value can always be selected in the base-currency field.
+    """
+    code = (country_code or "").strip().upper()
+    if not code:
+        return None
+    currencies = get_territory_currencies(code, tender=True)
+    return next((currency for currency in currencies if currency in CURRENCY_MINOR_UNITS), None)
+
+
+@lru_cache(maxsize=1)
+def country_currency_map() -> dict[str, str]:
+    """``{country_code: default_base_currency}`` for every country the forms offer.
+
+    Built from ``country_names("en")`` so the map and the country list cannot drift. Territories
+    without a supported current tender currency are left out (the field keeps its value).
+    """
+    return {
+        code: currency
+        for code in country_names("en")
+        if (currency := country_default_currency(code)) is not None
     }
 
 

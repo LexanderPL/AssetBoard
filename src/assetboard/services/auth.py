@@ -63,7 +63,11 @@ from assetboard.domain.identity import (
 from assetboard.services import categories, investments, invitations, networth
 from assetboard.services.context import DemoRestricted
 from assetboard.services.hash_gate import HashGate, HashGateBusy
-from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
+from assetboard.services.workspace_options import (
+    WorkspaceOptions,
+    country_default_currency,
+    validate_workspace_options,
+)
 
 ActorType = Literal["user", "cli", "system"]
 # ``account``: sign-in attempts per normalized email (whether or not an account has it).
@@ -1709,9 +1713,11 @@ def _workspace_options(
 ) -> WorkspaceOptions:
     try:
         return validate_workspace_options(
-            base_currency=base_currency or settings.default_currency,
+            base_currency=(base_currency or "").strip()
+            or country_default_currency(country_code)
+            or settings.default_currency,
             country_code=country_code,
-            timezone=timezone or "UTC",
+            timezone=(timezone or "").strip() or "UTC",
             locale=workspace_locale or settings.default_locale,
         )
     except ValueError as exc:

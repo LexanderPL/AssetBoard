@@ -4,7 +4,7 @@ Owners open "Workspace settings" from the workspace menu. The page has:
 
 - **Workspace name**: 1 to 120 characters.
 - **Base currency**: the currency every amount in the workspace is entered and stored in.
-- **Country**: optional.
+- **Country**: optional; it suggests the base currency when a workspace is created.
 - **Time zone**: decides when a day and a month begin for the workspace (for example, which
   month "Today" opens; see [Months](months.md)).
 - **Formatting default**: the language used for numbers and dates where no personal preference

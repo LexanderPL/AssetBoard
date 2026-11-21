@@ -1,10 +1,23 @@
 {# The workspace part of first-run setup and of "Create workspace" (pre-release A). The
-   options come from web.workspace_forms.workspace_form_options. #}
+   options come from web.workspace_forms.workspace_form_options. The country select is written
+   here rather than with the shared macro so each option can carry the currency it suggests
+   (W-1); the browser module reads it. #}
 {% from "macros/components.html" import field, select with context %}
 {% macro workspace_fields(values, errors, options, focus=None) -%}
 <div class="sm:col-span-2">{{ field("workspace_name", _("Workspace name"), value=values.workspace_name, error=errors.get("workspace_name"), maxlength=120, help=_("Defaults to your display name."), autofocus=focus == "workspace_name") }}</div>
+{% set country_error = errors.get("country_code") %}
+<div class="space-y-1.5">
+  <label for="country_code" class="block text-sm font-medium text-ink">{{ _("Country") }}</label>
+  <select id="country_code" name="country_code" data-country-select{% if focus == "country_code" %} data-autofocus{% endif %}{% if country_error %} aria-invalid="true" aria-describedby="country_code-error"{% endif %} class="form-select w-full">
+    <option value="">{{ _("Not set") }}</option>
+    {% for code, name in options.country_options %}
+    <option value="{{ code }}"{% if options.country_currencies.get(code) %} data-currency="{{ options.country_currencies[code] }}"{% endif %}{% if code == (values.country_code or "") %} selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+  {% if country_error %}<p id="country_code-error" class="text-sm text-danger">{{ country_error }}</p>{% endif %}
+</div>
 {{ select("base_currency", _("Base currency"), options.currency_options, selected=values.base_currency, error=errors.get("base_currency"), autofocus=focus == "base_currency") }}
-{{ select("country_code", _("Country"), options.country_options, selected=values.country_code, error=errors.get("country_code"), blank=_("Not set"), autofocus=focus == "country_code") }}
 {{ select("timezone", _("Time zone"), options.timezone_options, selected=values.timezone, error=errors.get("timezone"), autofocus=focus == "timezone") }}
+<p class="text-xs text-muted sm:col-span-2" data-workspace-defaults-help>{{ _("Picked from your country and browser; change it if needed.") }}</p>
 {{ select("workspace_locale", _("Workspace language"), options.locales, selected=values.workspace_locale, error=errors.get("workspace_locale"), autofocus=focus == "workspace_locale", help=_("Used for the suggested categories and formatting. The interface follows your profile or browser language; you can change both later.")) }}
 {%- endmacro %}

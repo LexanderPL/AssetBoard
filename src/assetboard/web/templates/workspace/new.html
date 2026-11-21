@@ -10,7 +10,7 @@
   {% if demo_session %}
   <p class="mt-4 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
   {% else %}
-  <form method="post" action="{{ scoped_url(request, 'workspace_new') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
+  <form method="post" action="{{ scoped_url(request, 'workspace_new') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate data-workspace-fields{% if seed_timezone %} data-seed-timezone="1"{% endif %}>
     {{ csrf_input() }}
     {{ workspace_fields(values, errors, options) }}
     <div class="sm:col-span-2">{{ primary_button(_("Create workspace")) }}</div>
@@ -18,3 +18,4 @@
   {% endif %}
 </section>
 {% endblock %}
+{% block scripts %}<script defer src="{{ static_url(request, 'js/workspace-fields.js') }}" referrerpolicy="no-referrer"></script>{% endblock %}
