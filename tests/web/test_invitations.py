@@ -84,10 +84,11 @@ def test_the_invite_form_is_a_header_dialog(owner: OwnerApp) -> None:
     header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
     assert re.search(
         r'<a href="[^"]+\?form=invite#invite-dialog" data-dialog-open="invite-dialog"'
-        r"[^>]*data-invite-open>Invite someone</a>",
+        r"[^>]*data-invite-open>Invite</a>",
         header,
     )
     assert 'id="invite-dialog"' in page
+    assert ">Invite to this workspace</h2>" in page
     assert " open" not in _dialog_opening(page)
     opened = owner.client.get("/workspace/members?form=invite").text
     assert " open" in _dialog_opening(opened)

@@ -719,6 +719,9 @@ msgstr "Dezaktywowano konto"
 msgid "Two-factor authentication reset by an administrator"
 msgstr "Administrator zresetował uwierzytelnianie dwuskładnikowe"
 
+msgid "Account deleted"
+msgstr "Konto usunięte"
+
 msgid "Workspace settings changed"
 msgstr "Zmieniono ustawienia obszaru roboczego"
 
@@ -982,6 +985,9 @@ msgstr "Zakres"
 
 msgid "Sessions ended"
 msgstr "Zakończone sesje"
+
+msgid "Workspace memberships removed"
+msgstr "Usunięte członkostwa w obszarach roboczych"
 
 msgid "Other sessions ended"
 msgstr "Zakończone inne sesje"
@@ -1435,6 +1441,9 @@ msgstr "nadanie uprawnień administratora"
 
 msgid "removing the administrator role"
 msgstr "odebranie uprawnień administratora"
+
+msgid "deleting an account"
+msgstr "usuwanie konta"
 
 msgid "creating an account"
 msgstr "utworzenie konta"
@@ -2704,6 +2713,9 @@ msgstr "Odbierz uprawnienia administratora instancji"
 msgid "Reset two-factor authentication"
 msgstr "Zresetuj uwierzytelnianie dwuskładnikowe"
 
+msgid "Delete account"
+msgstr "Usuń konto"
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr "%(user)s znów może się logować."
@@ -2736,6 +2748,16 @@ msgstr ""
 "przed dostępem do obszarów roboczych wymagających uwierzytelniania "
 "dwuskładnikowego."
 
+#, python-format
+msgid ""
+"Permanently delete %(user)s. Their workspace memberships, sessions, "
+"linked sign-in methods and personal settings are removed. Audit log "
+"entries are kept."
+msgstr ""
+"Trwale usuń konto %(user)s. Jego członkostwa w obszarach roboczych, "
+"sesje, powiązane metody logowania i ustawienia osobiste zostaną usunięte."
+" Wpisy dziennika zdarzeń zostaną zachowane."
+
 msgid "Done."
 msgstr "Gotowe."
 
@@ -2743,11 +2765,11 @@ msgid "Nothing to change: the account is already in that state."
 msgstr "Nie ma nic do zmiany: konto jest już w tym stanie."
 
 msgid ""
-"You cannot deactivate your own account or remove your own administrator "
-"role."
+"You cannot deactivate or delete your own account, or remove your own "
+"administrator role."
 msgstr ""
-"Nie możesz dezaktywować własnego konta ani odebrać sobie uprawnień "
-"administratora."
+"Nie możesz dezaktywować ani usunąć własnego konta, ani odebrać sobie "
+"uprawnień administratora."
 
 msgid ""
 "Use your own account security page to manage your two-factor "
@@ -2758,6 +2780,21 @@ msgstr ""
 
 msgid "This is the last active administrator, so this would leave none."
 msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
+
+msgid "Only a deactivated account can be deleted. Deactivate it first."
+msgstr "Usunąć można tylko dezaktywowane konto. Najpierw je dezaktywuj."
+
+msgid "The account was deleted."
+msgstr "Konto zostało usunięte."
+
+msgid ""
+"This action cannot be undone. The account, its memberships, sessions, "
+"linked sign-in methods and personal settings are removed. Audit log "
+"entries are kept."
+msgstr ""
+"Tej operacji nie można cofnąć. Konto, jego członkostwa, sesje, powiązane "
+"metody logowania i ustawienia osobiste zostaną usunięte. Wpisy dziennika "
+"zdarzeń zostaną zachowane."
 
 msgid ""
 "The identity provider decides this at each sign-in; to change it, change "
@@ -2816,6 +2853,30 @@ msgstr "Podaj prawidłowy adres e-mail."
 msgid "An account with this email address already exists."
 msgstr "Konto z tym adresem e-mail już istnieje."
 
+#, python-format
+msgid ""
+"This account is the only owner of %(num)d workspace. Make another member "
+"an owner there first."
+msgid_plural ""
+"This account is the only owner of %(num)d workspaces. Make another member"
+" an owner there first."
+msgstr[0] ""
+"To konto jest jedynym właścicielem %(num)d obszaru roboczego. Najpierw "
+"uczyń inną osobę jego właścicielem."
+msgstr[1] ""
+"To konto jest jedynym właścicielem %(num)d obszarów roboczych. Najpierw "
+"uczyń inną osobę ich właścicielem."
+msgstr[2] ""
+"To konto jest jedynym właścicielem %(num)d obszarów roboczych. Najpierw "
+"uczyń inną osobę ich właścicielem."
+
+msgid ""
+"Open another workspace from the workspace switcher first, then manage its"
+" members."
+msgstr ""
+"Najpierw otwórz inny obszar roboczy z przełącznika obszarów roboczych, a "
+"następnie zarządzaj jego członkami."
+
 msgid "Command line"
 msgstr "Wiersz poleceń"
 
@@ -2824,6 +2885,9 @@ msgstr "System"
 
 msgid "Former member"
 msgstr "Były członek"
+
+msgid "Deleted user"
+msgstr "Usunięty użytkownik"
 
 msgid "yes"
 msgstr "tak"
@@ -6266,6 +6330,9 @@ msgstr "Obszary robocze"
 
 msgid "New workspace"
 msgstr "Nowy obszar roboczy"
+
+msgid "Workspace members"
+msgstr "Członkowie obszaru roboczego"
 
 msgid "Audit log: workspace"
 msgstr "Dziennik zdarzeń: obszar roboczy"
@@ -14072,8 +14139,8 @@ msgstr ""
 msgid "Confirm rollback"
 msgstr "Potwierdź cofnięcie"
 
-msgid "Invite someone"
-msgstr "Zaproś kogoś"
+msgid "Invite"
+msgstr "Zaproś"
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
@@ -14095,6 +14162,9 @@ msgstr ""
 
 msgid "Invitation link"
 msgstr "Link z zaproszeniem"
+
+msgid "Invite to this workspace"
+msgstr "Zaproś do tego obszaru roboczego"
 
 msgid "Valid for"
 msgstr "Ważny przez"
@@ -14246,6 +14316,23 @@ msgid ""
 msgstr ""
 "Podatki pozostają włączone, dopóki te źródła przychodu mają zaznaczone "
 "podatki. Najpierw je odznacz:"
+
+#, python-format
+msgid "%(num)d member"
+msgid_plural "%(num)d members"
+msgstr[0] "%(num)d członek"
+msgstr[1] "%(num)d członków"
+msgstr[2] "%(num)d członków"
+
+#, python-format
+msgid "%(num)d pending invitation"
+msgid_plural "%(num)d pending invitations"
+msgstr[0] "%(num)d oczekujące zaproszenie"
+msgstr[1] "%(num)d oczekujące zaproszenia"
+msgstr[2] "%(num)d oczekujących zaproszeń"
+
+msgid "Manage members"
+msgstr "Zarządzaj członkami"
 
 msgid ""
 "Permanently removes this workspace and all its data, for every member. "
@@ -16350,4 +16437,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Window: %(num)d months"
 #~ msgstr "Okno: %(num)d mies."
+
+#~ msgid "Invite someone"
+#~ msgstr "Zaproś kogoś"
 

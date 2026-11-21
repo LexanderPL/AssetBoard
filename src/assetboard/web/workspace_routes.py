@@ -73,6 +73,7 @@ from assetboard.services.workspaces import (
     CreatedInvitation,
     InvalidInvitation,
     InvalidWorkspaceSettings,
+    MembersSummary,
     TooManyInvitations,
     WorkspaceChanged,
     WorkspaceCreationDisabled,
@@ -86,6 +87,7 @@ from assetboard.services.workspaces import (
     deletion_preview,
     list_invitations,
     list_members,
+    members_summary,
     remove_member,
     revoke_invitation,
     update_settings,
@@ -770,6 +772,7 @@ async def switch(request: Request, workspace_id: FormStr = "") -> Response:
 def _settings_page(
     request: Request,
     values: WorkspaceSettings,
+    members: MembersSummary,
     *,
     errors: dict[str, str] | None = None,
     notice: str | None = None,
@@ -782,6 +785,7 @@ def _settings_page(
         "workspace/settings.html",
         context={
             "values": values,
+            "members_summary": members,
             "taxes_in_use": taxes_in_use,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
@@ -798,9 +802,17 @@ def _settings_page(
 
 @router.get("/workspace/settings", name="workspace_settings")
 async def settings_form(request: Request, ctx: CurrentContext, saved: str = "") -> Response:
-    values = await run_in_threadpool(workspace_settings, request.app.state.session_factory, ctx)
+    state = request.app.state
+
+    def load() -> tuple[WorkspaceSettings, MembersSummary]:
+        return (
+            workspace_settings(state.session_factory, ctx),
+            members_summary(state.session_factory, ctx),
+        )
+
+    values, members = await run_in_threadpool(load)
     notice = _t(request, _("Workspace settings saved.")) if saved else None
-    return _settings_page(request, values, notice=notice)
+    return _settings_page(request, values, members, notice=notice)
 
 
 @router.post("/workspace/settings")
@@ -856,8 +868,9 @@ async def settings_submit(
             )
         )
     except InvalidWorkspaceSettings as exc:
-        current = await run_in_threadpool(
-            workspace_settings, request.app.state.session_factory, ctx
+        factory = request.app.state.session_factory
+        current, members = await run_in_threadpool(
+            lambda: (workspace_settings(factory, ctx), members_summary(factory, ctx))
         )
         if current.base_currency_locked:
             # The locked field shows the stored currency, whatever was submitted.
@@ -867,6 +880,7 @@ async def settings_submit(
         return _settings_page(
             request,
             submitted,
+            members,
             errors={exc.field: SETTINGS_ERRORS[exc.code]},
             status_code=400,
             upcoming_days_text=days_text,
@@ -889,8 +903,11 @@ async def menu_submit(
             taxes_enabled == "1",
         )
     except taxes.TaxesInUse as exc:
-        values = await run_in_threadpool(workspace_settings, request.app.state.session_factory, ctx)
-        return _settings_page(request, values, taxes_in_use=exc.sources, status_code=400)
+        factory = request.app.state.session_factory
+        values, members = await run_in_threadpool(
+            lambda: (workspace_settings(factory, ctx), members_summary(factory, ctx))
+        )
+        return _settings_page(request, values, members, taxes_in_use=exc.sources, status_code=400)
     return RedirectResponse(
         request.url_for("workspace_settings").path + "?saved=1", status_code=303
     )

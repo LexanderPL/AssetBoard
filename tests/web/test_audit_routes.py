@@ -397,6 +397,27 @@ def test_a_member_who_no_longer_resolves_reads_former_member(h: Harness) -> None
     assert "Former member" in row and gone not in row
 
 
+def test_a_deleted_account_reads_deleted_user_in_the_instance_log(h: Harness) -> None:
+    add_user(h, "gone@example.com")
+    target = h.user("gone@example.com").id
+    event(
+        h,
+        "admin.user_deleted",
+        data={"memberships_removed": 2, "email": "leak@example.net"},
+        actor=admin_id(h),
+        entity=str(target),
+    )
+    with h.app.state.session_factory.begin() as session:
+        user = session.get(User, target)
+        assert user is not None
+        session.delete(user)
+    (row,) = planted(admin(h).get("/audit?scope=instance&group=accounts").text)
+    assert "Account deleted" in row
+    assert "Workspace memberships removed: 2" in row
+    assert "Deleted user" in row
+    assert "leak@example.net" not in row and "gone@example.com" not in row
+
+
 def test_times_show_seconds(h: Harness) -> None:
     event(h, "admin.user_activated", ts=BASE + timedelta(seconds=7))
     (row,) = planted(admin(h).get("/audit?scope=instance&group=accounts").text)

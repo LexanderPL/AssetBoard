@@ -35,12 +35,15 @@ from assetboard.domain.identity import (
     normalize_display_name,
     normalize_email,
 )
-from assetboard.i18n import gettext
+from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day, format_time
 from assetboard.services.admin_users import (
     ADMIN_ACTIONS,
+    ActionStatus,
     AdminAction,
+    BlockingWorkspace,
     NotInstanceAdmin,
+    OwnershipBlocked,
     UserRow,
     apply_admin_action,
     generate_temporary_password,
@@ -66,7 +69,7 @@ from assetboard.services.instance_settings import (
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import Refusal, confirm_only, confirm_view, refusal, run_confirmed
 from assetboard.web.errors import BUSY_RETRY_AFTER
-from assetboard.web.rendering import render_template
+from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import client_host, require_csrf, web_session
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
@@ -85,6 +88,7 @@ ACTION_TITLES: dict[str, str] = {
     "promote": _("Make instance administrator"),
     "demote": _("Remove instance administrator"),
     "reset_totp": _("Reset two-factor authentication"),
+    "delete": _("Delete account"),
 }
 ACTION_EXPLANATIONS: dict[str, str] = {
     "activate": _("%(user)s can sign in again."),
@@ -98,22 +102,36 @@ ACTION_EXPLANATIONS: dict[str, str] = {
         "Remove %(user)s's authenticator and recovery codes, end every session, and require "
         "them to enroll again before accessing workspaces that require two-factor authentication."
     ),
+    "delete": _(
+        "Permanently delete %(user)s. Their workspace memberships, sessions, linked sign-in "
+        "methods and personal settings are removed. Audit log entries are kept."
+    ),
 }
 ACTION_RESULTS: dict[str, str] = {
     "done": _("Done."),
     "unchanged": _("Nothing to change: the account is already in that state."),
-    "self": _("You cannot deactivate your own account or remove your own administrator role."),
+    "self": _(
+        "You cannot deactivate or delete your own account, or remove your own administrator role."
+    ),
     "self_totp_reset": _(
         "Use your own account security page to manage your two-factor authentication."
     ),
     "last_admin": _("This is the last active administrator, so this would leave none."),
+    "active_user": _("Only a deactivated account can be deleted. Deactivate it first."),
 }
+DELETE_DONE = _("The account was deleted.")
+DELETE_WARNING = _(
+    "This action cannot be undone. The account, its memberships, sessions, linked sign-in "
+    "methods and personal settings are removed. Audit log entries are kept."
+)
+
 # With OIDC_ADMIN_GROUP set, the provider's group decides the role again at each OIDC sign-in
 # (``oidc_accounts._sync_admin``), so promote and demote never claim a durable result.
 GROUP_DECIDES = _(
     "The identity provider decides this at each sign-in; to change it, change the group there."
 )
 ROLE_ACTIONS = frozenset({"promote", "demote"})
+SECOND_FACTOR_ACTIONS = frozenset({"reset_totp", "delete"})
 SETTINGS_RESULTS: dict[str, str] = {
     "done": _("Instance settings saved."),
     "unchanged": _("Nothing to change: the settings already had these values."),
@@ -153,6 +171,34 @@ def _t(request: Request, message: str, **values: str) -> str:
         gettext(message, request.state.locale) % values
         if values
         else gettext(message, request.state.locale)
+    )
+
+
+def _delete_blocked_message(request: Request, count: int) -> str:
+    return ngettext(
+        "This account is the only owner of %(num)d workspace. Make another member an owner "
+        "there first.",
+        "This account is the only owner of %(num)d workspaces. Make another member an owner "
+        "there first.",
+        count,
+        request.state.locale,
+    ) % {"num": count}
+
+
+def _blocking_workspace_rows(
+    request: Request, workspaces: tuple[BlockingWorkspace, ...]
+) -> tuple[dict[str, str | None], ...]:
+    """Names plus a settings link only for the workspace already selected in this session."""
+    nav = getattr(request.state, "workspace_nav", None)
+    current_id = nav.current.id if nav is not None else None
+    return tuple(
+        {
+            "name": workspace.name,
+            "href": scoped_url(request, "workspace_settings")
+            if workspace.id == current_id
+            else None,
+        }
+        for workspace in workspaces
     )
 
 
@@ -242,6 +288,7 @@ async def _confirm_page(
     *,
     error: str | None = None,
     status_code: int = 200,
+    blocking_workspaces: tuple[BlockingWorkspace, ...] = (),
 ) -> Response:
     response = render_template(
         request,
@@ -251,6 +298,18 @@ async def _confirm_page(
             "title": _t(request, ACTION_TITLES[action]),
             "explanation": _t(request, ACTION_EXPLANATIONS[action], user=target.email),
             "group_notice": _t(request, GROUP_DECIDES) if _group_decides(request, action) else None,
+            "danger": action == "delete",
+            "delete_warning": _t(request, DELETE_WARNING) if action == "delete" else None,
+            "blocking_workspaces": _blocking_workspace_rows(request, blocking_workspaces),
+            "blocking_hint": _t(
+                request,
+                _(
+                    "Open another workspace from the workspace switcher first, "
+                    "then manage its members."
+                ),
+            )
+            if blocking_workspaces
+            else None,
             "target": target,
             "confirm": await confirm_view(request, current),
             "error": error,
@@ -282,7 +341,9 @@ async def action_submit(
     target = await _target(request, current, user_id)
     state = _state(request)
 
-    def apply(session: Session, actor: User, _method: ConfirmMethod) -> str:
+    def apply(
+        session: Session, actor: User, _method: ConfirmMethod
+    ) -> ActionStatus | OwnershipBlocked:
         return apply_admin_action(
             session,
             actor,
@@ -298,7 +359,7 @@ async def action_submit(
         current,
         purpose=f"admin_{chosen}",
         password=confirm_password,
-        second_factor=second_factor if chosen == "reset_totp" else None,
+        second_factor=second_factor if chosen in SECOND_FACTOR_ACTIONS else None,
         action=apply,
     )
     if outcome.status != "confirmed" or outcome.value is None:
@@ -309,10 +370,25 @@ async def action_submit(
         return _with_retry_after(page, refused)
     if outcome.value == "not_found":
         raise HTTPException(status_code=404)
-    message = _t(request, ACTION_RESULTS[outcome.value])
+    if isinstance(outcome.value, OwnershipBlocked):
+        return await _confirm_page(
+            request,
+            current,
+            chosen,
+            target,
+            error=_delete_blocked_message(request, len(outcome.value.workspaces)),
+            status_code=409,
+            blocking_workspaces=outcome.value.workspaces,
+        )
+    message = _t(
+        request,
+        DELETE_DONE
+        if chosen == "delete" and outcome.value == "done"
+        else ACTION_RESULTS[outcome.value],
+    )
     if outcome.value == "done" and _group_decides(request, chosen):
         message = f"{message} {_t(request, GROUP_DECIDES)}"
-    if outcome.value in {"self", "self_totp_reset", "last_admin"}:
+    if outcome.value in {"self", "self_totp_reset", "last_admin", "active_user"}:
         return await _confirm_page(request, current, chosen, target, error=message, status_code=409)
     return await _users_page(request, current, notice=message)
 

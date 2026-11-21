@@ -181,8 +181,8 @@ affected. It needs the scheduler (`ASSETBOARD_SCHEDULER_ENABLED`, on by default)
 
 ### Invitations
 
-Workspace owners add people from **Members** with an invitation link. AssetBoard does not email
-invitations: copy the link (it is shown only once) and share it privately. The link works once
+Workspace owners add people from **Workspace members** with an invitation link. AssetBoard does
+not email invitations: copy the link (it is shown only once) and share it privately. The link works once
 and expires after 1, 7 or 30 days. Whoever opens it can sign in, or create an account even when
 open registration is off; an account created this way joins only that workspace.
 Every invitation is locked to an email address: only an account with that address can accept

@@ -162,6 +162,14 @@ if your account has none.
   once (password, identity provider and proxy sessions alike). **Activate** undoes it.
   Deactivating the only owner of a workspace leaves that workspace without an active owner
   until the account is activated again.
+- **Delete account** (only for a deactivated account): permanently removes the account, its
+  workspace memberships, sessions, linked sign-in methods, two-factor authentication, reset
+  links, notification channels and dashboard preferences. Audit log entries are kept; the
+  account then shows as "Deleted user" in the instance log. An account that is the only owner
+  of a workspace cannot be deleted until another member there is made an owner; the confirmation
+  page lists the blocking workspaces. You cannot delete your own account or the demo account.
+  When the acting administrator has two-factor authentication enabled, deleting also asks for a
+  current authenticator or recovery code. This cannot be undone.
 - **Make administrator / Remove administrator**: instance administrators manage every account.
   With `ASSETBOARD_OIDC_ADMIN_GROUP` set, the provider's group decides again at each OIDC
   sign-in of that person ([docs/auth/oidc.md](auth/oidc.md#administrators-from-a-group)), so a
@@ -218,11 +226,13 @@ forgets the last result. See [ADR-0023](adr/0023-opt-in-update-check.md).
 The account menu is the button with your name at the top right of every page. It groups, with
 separators: your workspaces (the current one is marked; pick another to switch to it) and "New
 workspace" when allowed; the current workspace's pages (Categories; for owners Workspace
-settings, Members and "Audit log: workspace"; for owners and editors "Export and import");
-for instance administrators Users, Instance settings and "Audit log: instance"; and Profile,
+settings, Workspace members and "Audit log: workspace"; for owners and editors "Export and
+import"); for instance administrators Users, Instance settings and "Audit log: instance"; and
+Profile,
 Account security and Sign out. A press outside it or Escape closes it. The current
-workspace's name is shown above each page title. The bottom of the sidebar shows the running
-version and the dark-mode switch.
+workspace's name is shown above each page title. Workspace settings also has a **Workspace
+members** panel for owners, with the member count, pending invitations and a **Manage members**
+link. The bottom of the sidebar shows the running version and the dark-mode switch.
 
 ## Audit log
 
@@ -238,7 +248,8 @@ instance administrator.
 - **Instance** ("Audit log: instance", for instance administrators): sign-ins and sign-outs,
   failed and refused sign-ins, linked and removed sign-in methods, password changes and account
   administration. Each row also shows the account it is about, the acting account's email and
-  the network (an IPv4 /24 or IPv6 /48 prefix, never the full address). It never shows any
+  the network (an IPv4 /24 or IPv6 /48 prefix, never the full address). An account that was
+  deleted shows as "Deleted user"; its earlier events stay in the log. It never shows any
   workspace's events: those are only in that workspace's log.
 
 Filters: the kind of event and a date range in UTC (both days included). In the instance log,

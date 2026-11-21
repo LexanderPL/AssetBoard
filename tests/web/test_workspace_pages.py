@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
-from assetboard.db.models.identity import Membership, UserSession, Workspace
+from assetboard.db.models.identity import Invitation, Membership, UserSession, Workspace
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from assetboard.services.auth import session_id_hash
 from assetboard.services.workspaces import WorkspaceError
@@ -94,8 +94,11 @@ def test_home_shows_owner_links_only_to_owners(owner: OwnerApp) -> None:
     page = owner.client.get("/").text
     assert "data-owner-link" in page
     assert "data-recurring-link" in page
+    assert ">Workspace members</a>" in page
     owner.set_admin_role("viewer")
-    assert "data-owner-link" not in owner.client.get("/").text
+    viewer_page = owner.client.get("/").text
+    assert "data-owner-link" not in viewer_page
+    assert "Workspace members" not in viewer_page
 
 
 def test_account_pages_show_the_workspace_parts(owner: OwnerApp) -> None:
@@ -137,6 +140,45 @@ def test_settings_cards_share_one_column(owner: OwnerApp) -> None:
     assert "panel max-w-2xl" not in page
     assert '<button type="submit" class="btn-primary">Save settings</button>' in page
     assert "w-full rounded-xl bg-primary" not in page
+
+
+def test_workspace_members_naming_and_settings_panel(owner: OwnerApp) -> None:
+    home = owner.client.get("/").text
+    assert ">Workspace members</a>" in home
+    members = owner.client.get("/workspace/members")
+    assert members.status_code == 200
+    assert "<title>Workspace members · " in members.text
+    assert ">Workspace members</h1>" in members.text
+    assert ">People in this workspace</h2>" in members.text
+    assert ">Invite</a>" in members.text
+    assert ">Invite to this workspace</h2>" in members.text
+
+    settings = owner.client.get("/workspace/settings").text
+    assert "data-settings-members" in settings
+    assert "1 member" in settings
+    assert "pending invitation" not in settings
+    assert "data-manage-members" in settings
+    assert 'href="/workspace/members"' in settings
+
+
+def test_settings_panel_counts_members_and_pending_invitations(owner: OwnerApp) -> None:
+    bea = owner.add_user("bea")
+    owner.join(bea, owner.home_id, "editor")
+    now = owner.app.state.clock.now()
+    with owner.db() as session, session.begin():
+        session.add(
+            Invitation(
+                workspace_id=owner.home_id,
+                token_hash="a" * 64,
+                role="viewer",
+                email="pending@example.com",
+                expires_at=now + timedelta(days=1),
+                created_by_user_id=owner.admin_id,
+            )
+        )
+    settings = owner.client.get("/workspace/settings").text
+    assert "2 members" in settings
+    assert "1 pending invitation" in settings
 
 
 def test_owner_updates_workspace_settings(owner: OwnerApp) -> None:
@@ -432,10 +474,12 @@ def test_workspace_pages_render_in_english_and_polish(owner: OwnerApp, locale: s
     members = owner.client.get("/workspace/members", headers=headers).text
     if locale == "pl":
         assert "Ustawienia obszaru roboczego" in settings
-        assert "Członkowie" in members
+        assert "Członkowie obszaru roboczego" in members
+        assert "Zarządzaj członkami" in settings
     else:
         assert "Workspace settings" in settings
-        assert "Members" in members
+        assert "Workspace members" in members
+        assert "Manage members" in settings
 
 
 def test_unexpected_member_errors_use_the_generic_message(

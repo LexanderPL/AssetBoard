@@ -23,6 +23,10 @@ Owners open "Workspace settings" from the workspace menu. The page has:
   asset item per active asset class with a value. Turning it off leaves existing links working
   and shows the manual linking button on the Net Worth page while a class still needs a link.
 
+The **Workspace members** panel shows the number of members and the pending invitations, and
+its **Manage members** link opens the dedicated member list, role controls, removal and
+invitation dialog. It is visible to owners only, like the rest of this page.
+
 Changes are recorded in the workspace audit log under "Workspace settings" (which fields
 changed, not their values).
 

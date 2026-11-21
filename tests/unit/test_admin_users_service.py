@@ -3,21 +3,31 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import event, select, update
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import AuditEvent, ExternalIdentity, SetupState, User
+from assetboard.db.models.identity import (
+    AuditEvent,
+    EmailToken,
+    ExternalIdentity,
+    Membership,
+    SetupState,
+    User,
+    UserSession,
+)
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 from assetboard.domain.totp import recovery_hash
 from assetboard.services import admin_users
 from assetboard.services.admin_users import (
     AUDIT_DATA_KEYS,
     NotInstanceAdmin,
+    OwnershipBlocked,
     apply_admin_action,
     generate_temporary_password,
     get_user,
@@ -47,8 +57,8 @@ def add_user(db: WorkspaceDb, email: str, *, admin: bool = False, active: bool =
         return user.id
 
 
-def run(db: WorkspaceDb, actor_id: UUID, target_id: UUID, action: Any) -> str:
-    def apply(session: Any) -> str:
+def run(db: WorkspaceDb, actor_id: UUID, target_id: UUID, action: Any) -> Any:
+    def apply(session: Any) -> Any:
         actor = session.get(User, actor_id)
         return apply_admin_action(
             session, actor, target_id, action, clock=db.clock, host=None, user_agent=None
@@ -118,7 +128,7 @@ def test_the_last_active_administrator_is_kept(db: WorkspaceDb) -> None:
 def test_a_non_administrator_cannot_act(db: WorkspaceDb) -> None:
     actor = add_user(db, "user@example.com")
     target = add_user(db, "other@example.com")
-    for action in ("activate", "deactivate", "promote", "demote", "reset_totp"):
+    for action in ("activate", "deactivate", "promote", "demote", "reset_totp", "delete"):
         with pytest.raises(NotInstanceAdmin):
             run(db, actor, target, action)
 
@@ -131,6 +141,7 @@ def test_audit_data_keys_are_named_for_every_action() -> None:
         "admin.admin_granted": (),
         "admin.admin_revoked": (),
         "admin.totp_reset": ("sessions_revoked",),
+        "admin.user_deleted": ("memberships_removed",),
     }
 
 
@@ -200,6 +211,132 @@ def test_the_last_administrator_guard_on_its_own(db: WorkspaceDb, action: Any) -
         assert admin_users._protection(session, actor, target, action) == "last_admin"
         assert admin_users._protection(session, target, target, action) == "self"
         assert admin_users._protection(session, actor, target, "promote") is None
+
+
+def deactivate(db: WorkspaceDb, user_id: UUID) -> None:
+    with db.factory.begin() as session:
+        user = session.get(User, user_id)
+        assert user is not None
+        user.is_active = False
+
+
+def join(db: WorkspaceDb, user_id: UUID, workspace_id: UUID, role: str) -> UUID:
+    with db.factory.begin() as session:
+        membership = Membership(workspace_id=workspace_id, user_id=user_id, role=role)
+        session.add(membership)
+        session.flush()
+        return membership.id
+
+
+def memberships_for(db: WorkspaceDb, user_id: UUID) -> list[Membership]:
+    with db.factory() as session:
+        return list(session.scalars(select(Membership).where(Membership.user_id == user_id)))
+
+
+def test_delete_removes_all_memberships_the_account_and_keeps_the_audit_row(
+    db: WorkspaceDb,
+) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    target = add_user(db, "target@example.com")
+    other = db.add_workspace("Other")
+    join(db, target, db.workspace_id, "viewer")
+    join(db, target, other, "editor")
+    now = db.clock.now()
+    with db.factory.begin() as session:
+        session.add(ExternalIdentity(user_id=target, provider="https://idp.test", subject="s"))
+        session.add(
+            UserSession(
+                id_hash="a" * 64,
+                user_id=target,
+                created_at=now,
+                last_seen_at=now,
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        session.add(
+            EmailToken(
+                id=uuid4(),
+                purpose="reset",
+                token_hash="b" * 64,
+                email="target@example.com",
+                user_id=target,
+                created_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+    deactivate(db, target)
+
+    assert run(db, actor, target, "delete") == "done"
+
+    with db.factory() as session:
+        assert session.get(User, target) is None
+        assert list(session.scalars(select(ExternalIdentity))) == []
+        assert list(session.scalars(select(UserSession))) == []
+        assert list(session.scalars(select(EmailToken))) == []
+        audit = session.scalar(select(AuditEvent).where(AuditEvent.action == "admin.user_deleted"))
+        assert audit is not None
+        assert audit.entity_id == str(target)
+        assert audit.actor_user_id == actor
+        assert audit.data == {"memberships_removed": 2}
+    assert memberships_for(db, target) == []
+
+
+def test_delete_refuses_the_only_owner_of_a_workspace_and_lists_it(db: WorkspaceDb) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    target = add_user(db, "target@example.com")
+    family = db.add_workspace("Family")
+    join(db, target, db.workspace_id, "viewer")
+    join(db, target, family, "owner")
+    deactivate(db, target)
+
+    result = run(db, actor, target, "delete")
+
+    assert isinstance(result, OwnershipBlocked)
+    assert [(workspace.id, workspace.name) for workspace in result.workspaces] == [
+        (family, "Family")
+    ]
+    with db.factory() as session:
+        assert session.get(User, target) is not None
+        assert (
+            session.scalar(select(AuditEvent).where(AuditEvent.action == "admin.user_deleted"))
+            is None
+        )
+    assert len(memberships_for(db, target)) == 2
+
+
+def test_delete_allows_a_shared_owner_and_keeps_the_workspace(db: WorkspaceDb) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    target = add_user(db, "target@example.com")
+    other_owner = add_user(db, "other@example.com")
+    family = db.add_workspace("Family")
+    join(db, target, family, "owner")
+    join(db, other_owner, family, "owner")
+    join(db, target, db.workspace_id, "viewer")
+    deactivate(db, target)
+
+    assert run(db, actor, target, "delete") == "done"
+
+    with db.factory() as session:
+        assert session.get(User, target) is None
+        assert session.get(User, other_owner) is not None
+        rows = list(session.scalars(select(Membership).where(Membership.workspace_id == family)))
+        assert [(row.user_id, row.role) for row in rows] == [(other_owner, "owner")]
+
+
+def test_delete_refuses_active_self_and_demo_accounts(db: WorkspaceDb) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    active = add_user(db, "active@example.com")
+    assert run(db, actor, active, "delete") == "active_user"
+    assert run(db, actor, actor, "delete") == "self"
+    demo = add_user(db, "demo@example.invalid", active=False)
+    with db.factory.begin() as session:
+        user = session.get(User, demo)
+        assert user is not None
+        user.is_demo = True
+    assert run(db, actor, demo, "delete") == "not_found"
+    with db.factory() as session:
+        assert session.get(User, active) is not None
+        assert session.get(User, demo) is not None
 
 
 def link(db: WorkspaceDb, user_id: UUID, provider: str, subject: str) -> None:

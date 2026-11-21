@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Iterator
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import ORMExecuteState, Session
 from sqlalchemy.sql import ClauseElement
 
-from assetboard.db.models.identity import AuditEvent
+from assetboard.db.models.identity import AuditEvent, Invitation
 from assetboard.db.models.ledger import Category, Transaction
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import YearMonth
@@ -32,6 +32,7 @@ from assetboard.services.transactions import (
 from assetboard.services.workspaces import (
     InvalidWorkspaceSettings,
     LastOwnerError,
+    MembersSummary,
     SelfRemovalError,
     change_role,
     create_invitation,
@@ -39,6 +40,7 @@ from assetboard.services.workspaces import (
     deletion_preview,
     list_invitations,
     list_members,
+    members_summary,
     remove_member,
     revoke_invitation,
     update_settings,
@@ -84,6 +86,7 @@ def _events(db: WorkspaceDb) -> list[tuple[str, dict[str, Any]]]:
 ServiceCall = Callable[[WorkspaceDb, Context], object]
 SERVICE_CALLS: dict[str, ServiceCall] = {
     "workspace_settings": lambda db, ctx: workspace_settings(db.factory, ctx),
+    "members_summary": lambda db, ctx: members_summary(db.factory, ctx),
     "update_settings": lambda db, ctx: update_settings(db.factory, ctx, **SETTINGS),
     "list_members": lambda db, ctx: list_members(db.factory, ctx),
     "change_role": lambda db, ctx: change_role(
@@ -154,7 +157,13 @@ def test_service_writes_recheck_the_role_in_the_transaction(
     else:
         remove_member(team.factory, ed, membership_id=team.memberships["olga"])
     roles_before, events_before = team.roles(), _events(team)
-    if name in {"workspace_settings", "list_members", "list_invitations", "deletion_preview"}:
+    if name in {
+        "workspace_settings",
+        "members_summary",
+        "list_members",
+        "list_invitations",
+        "deletion_preview",
+    }:
         SERVICE_CALLS[name](team, olga)  # reads use the request's Context
         return
     with pytest.raises(PermissionDenied):
@@ -593,3 +602,55 @@ def test_list_members_returns_this_workspace_only(team: WorkspaceDb) -> None:
         ("Ed", "editor"),
         ("Vic", "viewer"),
     }
+
+
+def test_members_summary_counts_members_and_only_pending_valid_invitations(
+    team: WorkspaceDb,
+) -> None:
+    owner = team.ctx("olga", "owner")
+    now = team.clock.now()
+    assert members_summary(team.factory, owner) == MembersSummary(
+        member_count=3, pending_invitation_count=0
+    )
+    with team.factory.begin() as session:
+        session.add_all(
+            [
+                Invitation(
+                    workspace_id=team.workspace_id,
+                    token_hash="a" * 64,
+                    role="viewer",
+                    email="pending@example.com",
+                    expires_at=now + timedelta(days=1),
+                    created_by_user_id=team.users["olga"],
+                ),
+                Invitation(
+                    workspace_id=team.workspace_id,
+                    token_hash="b" * 64,
+                    role="viewer",
+                    email="expired@example.com",
+                    expires_at=now - timedelta(days=1),
+                    created_by_user_id=team.users["olga"],
+                ),
+                Invitation(
+                    workspace_id=team.workspace_id,
+                    token_hash="c" * 64,
+                    role="viewer",
+                    email="used@example.com",
+                    expires_at=now + timedelta(days=1),
+                    used_at=now,
+                    created_by_user_id=team.users["olga"],
+                ),
+                Invitation(
+                    workspace_id=team.workspace_id,
+                    token_hash="d" * 64,
+                    role="viewer",
+                    email="revoked@example.com",
+                    expires_at=now + timedelta(days=1),
+                    revoked_at=now,
+                    created_by_user_id=team.users["olga"],
+                ),
+            ]
+        )
+    assert members_summary(team.factory, owner) == MembersSummary(
+        member_count=3, pending_invitation_count=1
+    )

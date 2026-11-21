@@ -14,7 +14,7 @@ from assetboard.domain.categories import Kind, Treatment
 from assetboard.domain.instruments import InstrumentType, ValuationSource
 from assetboard.domain.networth import Side
 from assetboard.i18n import gettext
-from assetboard.services.admin_users import NotInstanceAdmin
+from assetboard.services.admin_users import AUDIT_DATA_KEYS, NotInstanceAdmin
 from assetboard.services.audit_view import (
     ACTION_LABELS,
     DATA_KEYS,
@@ -92,6 +92,15 @@ def test_the_services_check_the_scope_themselves(db: WorkspaceDb) -> None:
         workspace_page(db.factory, db.ctx("kim", "viewer"), AuditQuery(scope="workspace"))
     with pytest.raises(NotInstanceAdmin):
         instance_page(db.factory, actor_id=db.users["kim"], query=AuditQuery(scope="instance"))
+
+
+def test_every_admin_action_has_a_label_and_allowlisted_keys() -> None:
+    for action, keys in AUDIT_DATA_KEYS.items():
+        assert action in ACTION_LABELS
+        assert set(keys) <= set(KEY_LABELS)
+        texts = [ACTION_LABELS[action], *(KEY_LABELS[key] for key in keys)]
+        for text in texts:
+            assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
 
 
 @pytest.mark.parametrize(

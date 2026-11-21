@@ -8,7 +8,9 @@ import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,9 +20,11 @@ from sqlalchemy.exc import OperationalError
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import (
     AuditEvent,
+    EmailToken,
     ExternalIdentity,
     Membership,
     User,
+    UserSession,
     Workspace,
 )
 from assetboard.services.external_identity import PROXY_PROVIDER
@@ -74,6 +78,12 @@ def add_member(h: Harness, email: str, role: str) -> Any:
     return member_id
 
 
+def deactivate(h: Harness, email: str) -> None:
+    with h.app.state.session_factory.begin() as session:
+        user = session.scalars(select(User).where(User.email == email)).one()
+        user.is_active = False
+
+
 def act(
     h: Harness, client: TestClient, target: Any, action: str, password: str | None = None
 ) -> Any:
@@ -106,9 +116,18 @@ def test_admin_pages_need_an_instance_administrator(h: Harness, role: str) -> No
     h.web.sign_in(client, email="member@example.com", password=LOCAL_PASSWORD)
     token = h.token(client, "/account")
     assert "data-admin-link" not in client.get("/account").text
-    for path in ("/admin/users", "/admin/users/new", f"/admin/users/{target}/demote"):
+    for path in (
+        "/admin/users",
+        "/admin/users/new",
+        f"/admin/users/{target}/demote",
+        f"/admin/users/{target}/delete",
+    ):
         assert client.get(path).status_code == 403, path
-    for path in ("/admin/users/new", f"/admin/users/{target}/demote"):
+    for path in (
+        "/admin/users/new",
+        f"/admin/users/{target}/demote",
+        f"/admin/users/{target}/delete",
+    ):
         response = client.post(path, data={"csrf_token": token, "confirm_password": LOCAL_PASSWORD})
         assert response.status_code == 403, path
     assert h.user(h.web.admin_email).is_instance_admin
@@ -176,7 +195,8 @@ def test_a_throttled_admin_confirmation_says_how_long_to_wait(h: Harness) -> Non
 
 
 @pytest.mark.parametrize(
-    "action", ["create", "activate", "deactivate", "promote", "demote", "reset_totp"]
+    "action",
+    ["create", "activate", "deactivate", "promote", "demote", "reset_totp", "delete"],
 )
 @pytest.mark.parametrize("password", ["", "wrong password"])
 def test_every_admin_mutation_needs_confirmation(h: Harness, action: str, password: str) -> None:
@@ -281,6 +301,153 @@ def test_deactivation_stops_an_in_flight_profile_link(h: Harness) -> None:
     done = browser.get("/auth/oidc/callback", params=params, follow_redirects=False)
     assert done.headers["location"] == "/account?link=failed"
     assert h.identities() == []
+
+
+# Deleting a deactivated account
+
+
+def test_delete_is_offered_only_for_deactivated_users(h: Harness) -> None:
+    add_user(h, OLA)
+    client = admin(h)
+    active_row = client.get("/admin/users").text.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
+    assert "data-delete-user" not in active_row
+    deactivate(h, OLA)
+    inactive_row = client.get("/admin/users").text.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
+    assert "data-delete-user" in inactive_row
+    confirm = client.get(f"/admin/users/{user_id(h, OLA)}/delete")
+    assert confirm.status_code == 200
+    assert 'data-admin-confirm="delete"' in confirm.text
+    assert "data-danger-confirm" in confirm.text
+    assert "data-delete-warning" in confirm.text
+    assert "btn-danger" in confirm.text
+    assert 'name="second_factor"' in confirm.text
+
+
+def test_delete_removes_identities_sessions_tokens_and_keeps_the_audit_row(h: Harness) -> None:
+    add_user(h, OLA)
+    add_identity(h, OLA, ISSUER, "user-123")
+    h.web.sign_in(h.client(), email=OLA, password=LOCAL_PASSWORD)
+    target = user_id(h, OLA)
+    now = h.app.state.clock.now()
+    with h.app.state.session_factory.begin() as session:
+        session.add(
+            EmailToken(
+                id=uuid4(),
+                purpose="reset",
+                token_hash="f" * 64,
+                email=OLA,
+                user_id=target,
+                created_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+    deactivate(h, OLA)
+
+    response = act(h, admin(h), target, "delete")
+
+    assert response.status_code == 200 and "The account was deleted." in response.text
+    with h.db() as session:
+        assert session.get(User, target) is None
+        assert list(session.scalars(select(ExternalIdentity))) == []
+        assert list(session.scalars(select(UserSession).where(UserSession.user_id == target))) == []
+        assert list(session.scalars(select(EmailToken).where(EmailToken.user_id == target))) == []
+    assert h.audits("admin.user_deleted") == [{"memberships_removed": 0}]
+    assert h.identities() == []
+    assert [email for email, _method in h.sessions()] == [h.web.admin_email]
+    audit = admin(h).get(f"/audit?scope=instance&group=accounts&account={target}").text
+    assert "Account deleted" in audit
+    assert "Workspace memberships removed: 0" in audit
+    assert "Deleted user" in audit
+
+
+def test_delete_refuses_an_active_user(h: Harness) -> None:
+    add_user(h, OLA)
+    target = user_id(h, OLA)
+    response = act(h, admin(h), target, "delete")
+    assert response.status_code == 409
+    assert "Only a deactivated account can be deleted." in response.text
+    assert h.user(OLA).is_active
+
+
+def test_delete_refuses_yourself_and_the_demo_account(h: Harness) -> None:
+    client = admin(h)
+    response = act(h, client, user_id(h, h.web.admin_email), "delete")
+    assert response.status_code == 409 and "your own account" in response.text
+    assert h.user(h.web.admin_email).is_active
+    demo = add_user(h, "demo@example.invalid")
+    with h.app.state.session_factory.begin() as session:
+        user = session.get(User, demo)
+        assert user is not None
+        user.is_demo = True
+    assert act(h, client, demo, "delete").status_code == 404
+
+
+def test_delete_refuses_the_only_owner_and_lists_the_workspace(h: Harness) -> None:
+    target = add_user(h, OLA)
+    with h.app.state.session_factory.begin() as session:
+        workspace = Workspace(name="Family", base_currency="EUR", locale="en", timezone="UTC")
+        session.add(workspace)
+        session.flush()
+        family = workspace.id
+        session.add(Membership(workspace_id=workspace.id, user_id=target, role="owner"))
+    deactivate(h, OLA)
+
+    client = admin(h)
+    response = act(h, client, target, "delete")
+
+    assert response.status_code == 409
+    assert "only owner of 1 workspace" in response.text
+    assert "Family" in response.text
+    assert "workspace switcher" in response.text
+    assert "data-blocking-workspace>Family</span>" in response.text
+    assert response.text.count("data-blocking-workspace>") == 1
+    with h.db() as session:
+        assert session.get(User, target) is not None
+        assert session.scalars(select(Membership).where(Membership.workspace_id == family)).all()
+    assert h.audits("admin.user_deleted") == []
+
+    # The link is offered only for the workspace selected in this session.
+    with h.db() as session, session.begin():
+        session.add(
+            Membership(workspace_id=family, user_id=h.user(h.web.admin_email).id, role="viewer")
+        )
+    switched = client.post(
+        "/workspace/switch",
+        data={"csrf_token": h.token(client, "/"), "workspace_id": str(family)},
+        follow_redirects=False,
+    )
+    assert switched.status_code == 303
+    response = act(h, client, target, "delete")
+    assert response.status_code == 409
+    assert (
+        '<a class="font-semibold text-primary-ink underline" href="/workspace/settings" '
+        "data-blocking-workspace>Family</a>"
+    ) in response.text
+
+
+def test_delete_removes_a_shared_membership_and_keeps_the_workspace(h: Harness) -> None:
+    target = add_member(h, OLA, "viewer")
+    deactivate(h, OLA)
+    response = act(h, admin(h), target, "delete")
+    assert response.status_code == 200
+    with h.db() as session:
+        assert session.get(User, target) is None
+        assert session.scalars(select(Workspace).where(Workspace.name == "Home")).one()
+        assert list(session.scalars(select(Membership).where(Membership.user_id == target))) == []
+    assert h.audits("admin.user_deleted") == [{"memberships_removed": 1}]
+
+
+def test_delete_needs_csrf(h: Harness) -> None:
+    target = add_user(h, OLA)
+    deactivate(h, OLA)
+    response = admin(h).post(
+        f"/admin/users/{target}/delete",
+        data={"confirm_password": h.web.admin_password},
+    )
+    assert response.status_code == 403
+    with h.db() as session:
+        assert session.get(User, target) is not None
+    assert h.audits("admin.user_deleted") == []
 
 
 # Activate, promote, demote; self and last-administrator protection

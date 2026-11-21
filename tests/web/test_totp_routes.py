@@ -706,6 +706,45 @@ def test_instance_admin_can_reset_another_users_factor(owner: OwnerApp) -> None:
         assert event.data == {"sessions_revoked": 1}
 
 
+def test_deleting_an_account_requires_the_administrators_second_factor(
+    owner: OwnerApp,
+) -> None:
+    admin_secret, _admin_recovery_codes = _enable(owner)
+    target = owner.add_user("delete-me")
+    with owner.app.state.session_factory.begin() as session:
+        user = session.get(User, target)
+        assert user is not None
+        user.is_active = False
+    page = owner.client.get(f"/admin/users/{target}/delete")
+    assert page.status_code == 200 and 'name="second_factor"' in page.text
+    missing = owner.client.post(
+        f"/admin/users/{target}/delete",
+        data={
+            "csrf_token": owner.web.csrf(page.text),
+            "confirm_password": owner.web.admin_password,
+        },
+        follow_redirects=False,
+    )
+    assert missing.status_code == 401
+    with owner.db() as session:
+        assert session.get(User, target) is not None
+
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    page = owner.client.get(f"/admin/users/{target}/delete")
+    response = owner.client.post(
+        f"/admin/users/{target}/delete",
+        data={
+            "csrf_token": owner.web.csrf(page.text),
+            "confirm_password": owner.web.admin_password,
+            "second_factor": TOTP(admin_secret).at(owner.app.state.clock.now()),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 200 and "The account was deleted." in response.text
+    with owner.db() as session:
+        assert session.get(User, target) is None
+
+
 def _current(owner: OwnerApp):
     app = owner.app.state
     with app.session_factory() as session:

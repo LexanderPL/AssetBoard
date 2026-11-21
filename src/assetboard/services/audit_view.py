@@ -346,6 +346,7 @@ ACTION_LABELS: dict[str, str] = {
     "admin.admin_granted": _("Administrator role granted"),
     "admin.admin_revoked": _("Administrator role removed"),
     "admin.totp_reset": _("Two-factor authentication reset by an administrator"),
+    "admin.user_deleted": _("Account deleted"),
     "workspace.settings_updated": _("Workspace settings changed"),
     "workspace.created": _("Workspace created"),
     "workspace.delete": _("Workspace deleted"),
@@ -439,6 +440,7 @@ KEY_LABELS: dict[str, str] = {
     "scope": _("Scope"),
     "revoked_count": _("Sessions ended"),
     "sessions_revoked": _("Sessions ended"),
+    "memberships_removed": _("Workspace memberships removed"),
     "other_sessions_revoked": _("Other sessions ended"),
     "status": _("Status"),
     "version": _("Dataset version"),
@@ -615,6 +617,7 @@ PURPOSE_LABELS: dict[str, str] = {
     "admin_deactivate": _("deactivating an account"),
     "admin_promote": _("granting the administrator role"),
     "admin_demote": _("removing the administrator role"),
+    "admin_delete": _("deleting an account"),
     "admin_create_user": _("creating an account"),
     "admin_settings": _("changing instance settings"),
     "backup_create": _("creating a backup"),
@@ -931,7 +934,8 @@ class AuditRow:
     actor_kind: str  # "user", "cli", "system"
     target_name: str | None  # the affected account (workspace scope: a member)
     target_email: str | None  # instance scope only
-    target_missing: bool  # an affected user that no longer resolves ("Former member")
+    target_missing: bool  # an affected user that no longer resolves
+    instance: bool  # instance scope: a missing target reads "Deleted user"
     ip_prefix: str | None  # instance scope only
     details: tuple[tuple[str, str | int | bool], ...]  # (key, value), allowlisted
 
@@ -1028,6 +1032,7 @@ def _page(session: Session, query: AuditQuery, events: list[AuditEvent], limit: 
                 target_name=target.display_name if target else None,
                 target_email=target.email if target and instance else None,
                 target_missing=target_id is not None and target is None,
+                instance=instance,
                 ip_prefix=event.ip_prefix if instance else None,
                 details=_details(event),
             )
