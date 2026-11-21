@@ -14,7 +14,7 @@ from dataclasses import replace
 from functools import partial
 from tempfile import SpooledTemporaryFile
 from typing import Annotated, Any, Literal, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -187,6 +187,10 @@ ROLE_LABELS = {
     Role.EDITOR: _("Editor"),
     Role.VIEWER: _("Viewer"),
 }
+MEMBER_NOTICES = {
+    "role_changed": _("Member role changed."),
+    "removed": _("Member removed."),
+}
 
 
 def _t(request: Request, message: str) -> str:
@@ -210,6 +214,8 @@ def _import_notice(request: Request) -> str | None:
         ) % {"num": count}
     if notice == "no_months_closed":
         return _t(request, NO_IMPORTED_MONTHS_TO_CLOSE)
+    if notice == "rolled_back":
+        return _t(request, _("Import rolled back."))
     return None
 
 
@@ -695,7 +701,9 @@ async def workspace_data_import_rollback(
     except (ImportError, ImportUnavailable) as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
-    return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
+    return RedirectResponse(
+        request.url_for("workspace_data").path + "?notice=rolled_back", status_code=303
+    )
 
 
 @router.post("/workspace/data/export", name="workspace_data_export")
@@ -921,6 +929,7 @@ def _members_page(
     ctx: CurrentContext,
     *,
     error: str | None = None,
+    notice: str | None = None,
     created: CreatedInvitation | None = None,
     invite_values: dict[str, str] | None = None,
     invite_errors: dict[str, str] | None = None,
@@ -940,6 +949,7 @@ def _members_page(
             "roles": [(role.value, _t(request, ROLE_LABELS[role])) for role in Role],
             "role_labels": {role.value: _t(request, label) for role, label in ROLE_LABELS.items()},
             "error": _t(request, error) if error else None,
+            "notice": _t(request, MEMBER_NOTICES[notice]) if notice in MEMBER_NOTICES else None,
             "created": created,
             # Shown once, in this response only: the token is not stored.
             "created_link": f"{base_url}/invite/{created.token}" if created else None,
@@ -960,12 +970,15 @@ def _members_page(
 
 
 @router.get("/workspace/members", name="workspace_members")
-async def members_page(request: Request, ctx: CurrentContext) -> Response:
-    return await run_in_threadpool(_members_page, request, ctx)
+async def members_page(request: Request, ctx: CurrentContext, notice: str = "") -> Response:
+    return await run_in_threadpool(lambda: _members_page(request, ctx, notice=notice or None))
 
 
-def _members_redirect(request: Request) -> Response:
-    return RedirectResponse(request.url_for("workspace_members").path, status_code=303)
+def _members_redirect(request: Request, notice: str | None = None) -> Response:
+    path = request.url_for("workspace_members").path
+    if notice is not None:
+        path += "?" + urlencode({"notice": notice})
+    return RedirectResponse(path, status_code=303)
 
 
 async def _member_error(request: Request, ctx: CurrentContext, exc: WorkspaceError) -> Response:
@@ -994,7 +1007,7 @@ async def member_role(
         )
     except WorkspaceError as exc:
         return await _member_error(request, ctx, exc)
-    return _members_redirect(request)
+    return _members_redirect(request, "role_changed")
 
 
 @router.post("/workspace/members/{membership_id}/remove", name="workspace_member_remove")
@@ -1006,7 +1019,7 @@ async def member_remove(request: Request, ctx: CurrentContext, membership_id: st
         )
     except WorkspaceError as exc:
         return await _member_error(request, ctx, exc)
-    return _members_redirect(request)
+    return _members_redirect(request, "removed")
 
 
 # Invitations

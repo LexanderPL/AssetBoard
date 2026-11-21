@@ -44,7 +44,9 @@ def _form(category_id: str) -> dict[str, str]:
 def test_income_source_and_work_log_forms(owner):
     created = owner.post("/income", _form(_income_category(owner)), token_from="/income")
     assert created.status_code == 303
-    assert "error" not in created.headers["location"]
+    assert created.headers["location"] == "/income?notice=created"
+    created_page = owner.client.get(created.headers["location"]).text
+    assert "data-toast" in created_page and "Income source created." in created_page
     with owner.db() as session:
         source = session.scalars(select(IncomeSource)).one()
         assert source.rate_minor == 123_000
@@ -234,3 +236,17 @@ def test_a_received_month_locks_its_work_log_and_links_the_transaction(owner):
         token_from="/income",
     )
     assert "error" not in changed.headers["location"]
+
+
+def test_archiving_an_income_source_shows_a_toast(owner):
+    assert (
+        owner.post("/income", _form(_income_category(owner)), token_from="/income").status_code
+        == 303
+    )
+    with owner.db() as session:
+        source = session.scalars(select(IncomeSource)).one()
+    archived = owner.post(f"/income/{source.id}/archive", token_from="/income")
+    assert archived.status_code == 303
+    assert archived.headers["location"] == "/income?notice=archived"
+    page = owner.client.get(archived.headers["location"]).text
+    assert "data-toast" in page and "Income source archived." in page

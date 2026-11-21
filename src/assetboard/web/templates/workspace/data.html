@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Export and import") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Export and import") }}{% endblock %}
+{# Import, restore and rollback results are reports that must stay on the page. #}
+{% block toast %}{% endblock %}
 {% block content %}
 <div class="max-w-4xl space-y-6" data-page-width="4xl">
 {% if notice %}

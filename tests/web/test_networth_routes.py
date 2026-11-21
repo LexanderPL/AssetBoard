@@ -354,9 +354,7 @@ def test_archive_and_restore_item_keep_the_history(owner: OwnerApp) -> None:
     assert 'data-item="' + str(item) + '"' in restored.text
 
 
-def test_htmx_write_shows_a_toast_and_a_full_page_keeps_its_inline_notice(
-    owner: OwnerApp,
-) -> None:
+def test_htmx_and_full_page_writes_show_a_toast(owner: OwnerApp) -> None:
     item = _create_item(owner)
     archived = _htmx(owner, f"/net-worth/items/{item}/archive", {"side": "asset"})
     assert archived.status_code == 200
@@ -365,9 +363,9 @@ def test_htmx_write_shows_a_toast_and_a_full_page_keeps_its_inline_notice(
     assert "data-toast-strict" not in archived.text
 
     page = owner.client.get("/net-worth?side=asset&notice=item_archived").text
-    assert "data-notice" in page and "Item archived." in page
+    assert "data-notice" not in page and "Item archived." in page
     assert 'hx-swap-oob="beforeend:#toast-container"' not in page
-    assert "data-toast" not in page
+    assert "data-toast" in page
 
 
 def test_category_crud_reorder_archive_restore_and_delete(owner: OwnerApp) -> None:

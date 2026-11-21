@@ -2557,6 +2557,9 @@ msgstr ""
 msgid "Browser language"
 msgstr ""
 
+msgid "Profile saved."
+msgstr ""
+
 msgid "The sign-in method was removed from your account."
 msgstr ""
 
@@ -3734,6 +3737,18 @@ msgid "The end month cannot be before the start month."
 msgstr ""
 
 msgid "The income source could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Income source created."
+msgstr ""
+
+msgid "Income source saved."
+msgstr ""
+
+msgid "Income source archived."
+msgstr ""
+
+msgid "The transaction now matches the logged days."
 msgstr ""
 
 #, python-format
@@ -5433,10 +5448,19 @@ msgid ""
 " holiday data."
 msgstr ""
 
+msgid "Recurring item created."
+msgstr ""
+
+msgid "Recurring item saved."
+msgstr ""
+
 msgid "Recurring item paused."
 msgstr ""
 
 msgid "Recurring item resumed."
+msgstr ""
+
+msgid "Recurring item archived."
 msgstr ""
 
 msgid "Recurring item deleted."
@@ -5777,11 +5801,20 @@ msgstr ""
 msgid "Risk targets"
 msgstr ""
 
+msgid "Member role changed."
+msgstr ""
+
+msgid "Member removed."
+msgstr ""
+
 #, fuzzy, python-format
 msgid "Closed %(num)d imported month."
 msgid_plural "Closed %(num)d imported months."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Import rolled back."
+msgstr ""
 
 msgid "Workspace settings saved."
 msgstr ""
@@ -8039,9 +8072,6 @@ msgid "Open the transaction"
 msgstr ""
 
 msgid "Edit anyway"
-msgstr ""
-
-msgid "The transaction now matches the logged days."
 msgstr ""
 
 #, python-format

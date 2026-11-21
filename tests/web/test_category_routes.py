@@ -164,6 +164,9 @@ def test_inline_edit_fragment_save_and_cancel(owner: OwnerApp) -> None:
     assert _names(saved.text, "expense") == ["Groceries"]
     assert 'data-treatment="savings"' in saved.text
     assert 'fill="#0ea5e9"' in saved.text
+    assert 'hx-swap-oob="beforeend:#toast-container"' in saved.text
+    assert "data-toast" in saved.text and "Category saved." in saved.text
+    assert "data-notice" not in saved.text
 
 
 def test_inline_edit_without_javascript_uses_the_page(owner: OwnerApp) -> None:
@@ -175,6 +178,9 @@ def test_inline_edit_without_javascript_uses_the_page(owner: OwnerApp) -> None:
     form = {"name": "Groceries", "kind": "expense", "treatment": "regular", "color": "#16a34a"}
     response = owner.post(f"/categories/{food}", form, token_from="/categories")
     assert response.headers["location"] == "/categories?notice=saved"
+    page = owner.client.get(response.headers["location"]).text
+    assert "data-toast" in page and "Category saved." in page
+    assert "data-notice" not in page
 
 
 def test_an_edit_error_keeps_the_row_in_edit_mode(owner: OwnerApp) -> None:
@@ -227,6 +233,7 @@ def test_archive_restore_and_delete(owner: OwnerApp) -> None:
     food = _create(owner, "Food")
     archived = _htmx(owner, f"/categories/{food}/archive")
     assert "Category archived." in archived.text
+    assert "data-toast" in archived.text
     assert _names(archived.text, "expense") == []
     assert "data-archived" in archived.text and "data-restore" in archived.text
     restored = _htmx(owner, f"/categories/{food}/restore")

@@ -1,14 +1,11 @@
 {# Portfolio overview and allocation (F6.6). ``view`` is web.portfolio_routes.PortfolioView. #}
 {% from "investments/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, toast with context %}
 {% from "investments/_macros.html" import swatch %}
 {% from "macros/charts.html" import donut with context %}
 <div id="portfolio-body" class="space-y-6">
   {{ tabs("portfolio") }}
-
-  {% if notice %}
-  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
-  {% endif %}
+  {% if toast_notice %}{{ toast(toast_notice, none, none) }}{% endif %}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-heading" data-portfolio-totals>
     <div class="flex flex-wrap items-baseline justify-between gap-2">

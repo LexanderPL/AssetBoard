@@ -18,7 +18,6 @@
 </ol>
 <section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading">
   <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
-  {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
   {% if error and not error_is_field %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
   <form id="loan-wizard" method="post" action="{{ scoped_url(request, 'loan_new_step') }}" class="grid gap-6" data-loan-wizard="{{ step }}">
     {{ csrf_input() }}

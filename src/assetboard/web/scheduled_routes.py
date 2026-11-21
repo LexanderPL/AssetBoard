@@ -155,8 +155,11 @@ ACTION_ERRORS = {
     ),
 }
 ACTION_NOTICES = {
+    "created": _("Recurring item created."),
+    "saved": _("Recurring item saved."),
     "pause": _("Recurring item paused."),
     "resume": _("Recurring item resumed."),
+    "archive": _("Recurring item archived."),
     "delete": _("Recurring item deleted."),
 }
 GENERIC_ERROR = _("The recurring item could not be saved. Check the form and try again.")
@@ -447,7 +450,9 @@ async def _save(request: Request, ctx: Context, item_id: str | None) -> Response
             field = "amount" if data.name.strip() else "name"
         errors = {field: FIELD_ERRORS[field]} if field else {"form": GENERIC_ERROR}
         return await _form(request, ctx, values, item_id=item_id, errors=errors)
-    return RedirectResponse(request.url_for("scheduled_items").path, status_code=303)
+    notice = "saved" if item_id else "created"
+    target = request.url_for("scheduled_items").path + "?" + urlencode({"notice": notice})
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/recurring", name="scheduled_create")

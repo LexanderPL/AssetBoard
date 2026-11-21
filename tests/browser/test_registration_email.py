@@ -100,7 +100,7 @@ def test_registration_and_password_reset_by_email(tmp_path: Path) -> None:
             admin_page.get_by_label("Open registration").select_option("on")
             admin_page.get_by_label("Your password").fill(PASSWORD)
             admin_page.get_by_role("button", name="Save settings").click()
-            expect(admin_page.locator("[data-admin-notice]")).to_have_text(
+            expect(admin_page.locator("#toast-container [data-toast]")).to_contain_text(
                 "Instance settings saved."
             )
             assert admin_page.evaluate("window.__cspViolations") == []

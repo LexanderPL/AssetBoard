@@ -180,6 +180,7 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
         filters["direction"] = direction
     if category_id:
         filters["category"] = str(category_id)
+    notice_inline = notice_code in {"skipped", "skip_undone"} or bool(skipped_id)
     return {
         "weeks": weeks,
         "today": today,
@@ -193,6 +194,7 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
         "can_edit": has_role(ctx, Role.EDITOR),
         "undo": undo,
         "notice": notice,
+        "notice_inline": notice_inline,
         "notice_code": notice_code,
         "skipped_id": skipped_id,
         "open_form": request.query_params.get("form"),

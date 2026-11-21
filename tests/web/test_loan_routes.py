@@ -336,6 +336,7 @@ def test_loan_detail_renders_a_notice_and_ignores_unknown_codes(owner):
     notice = owner.client.get(f"/loans/{loan_id}?notice=loan_created")
     assert notice.status_code == 200
     assert "Loan saved." in notice.text
+    assert 'id="toast-container"' in notice.text and "data-toast" in notice.text
     unknown = owner.client.get(f"/loans/{loan_id}?notice=unknown")
     assert unknown.status_code == 200
 

@@ -835,7 +835,8 @@ def test_save_persists_returns_to_the_view_and_clears_needs_review(owner) -> Non
         assert row.income_minor == 5_500_000
         assert row.needs_review is False
     page = owner.client.get("/fire?notice=saved")
-    assert "data-action-notice" in page.text
+    assert "data-action-notice" not in page.text
+    assert 'id="toast-container"' in page.text and "data-toast" in page.text
     assert "FIRE plan saved." in page.text
     assert "data-fire-needs-review" not in page.text
 

@@ -94,7 +94,8 @@ belongs to the tab currently shown.
   In a filter grid, align fields to the top (`items-start`), not the bottom: helper text and
   validation errors must not lift a neighbouring control. Use `min-w-0` wrappers and `w-full`
   controls so long translated labels and options cannot widen the grid.
-- Notices sit `mb-4` below the page header or above the panel they refer to.
+- Persistent inline notices sit `mb-4` below the page header or above the panel they refer to.
+  Successful writes use the bottom-right toast instead.
 
 ## 4. Components
 
@@ -169,17 +170,29 @@ Rules:
 
 ### Feedback and empty states
 
-- Every write produces one of:
-  - an inline change plus a toast or status line;
-  - a dialog that closes and a toast;
-  - a navigation that lands on the changed row, with the row in view.
+- **Successful writes always show a toast** in the bottom-right `#toast-container`. This covers
+  save, create, update, delete, archive, restore, pause, resume and post actions. The toast
+  auto-dismisses after five seconds; undo toasts keep their ten-second countdown.
+- Use the shared macros: `toast_item` for one toast, `toast` for the HTMX out-of-band wrapper.
+  Full-page redirects render the server toast from `base.html`'s `{% block toast %}`; HTMX
+  fragments append to `#toast-container` out of band. Do not add a page-top success banner.
+- **Keep persistent inline panels** for:
+  - validation errors, refusals and warnings, next to the field or section;
+  - results that must be read, copied, downloaded or followed through a link: invitation links,
+    import/restore/rollback reports, recovery codes, auth notices, backup status and results,
+    archive secrets, and multi-line results;
+  - no-JS undo affordances such as the Transactions page's delete banner or the Upcoming skip
+    panel.
+- A transport or server error in an HTMX request may use the global error toast because there is
+  no field or section to attach it to; field validation never does.
 - Never rely on a flash message that is above the scroll position, and never rely on a row that
   appeared above the viewport. Measured examples are in the audit.
 - Preserve scroll and open `<details>`. Reuse `data-keep-visible` for row swaps. Restore focus to
   the control that started the action, or to the next logical field.
-- Use the `toast` macro for undoable actions; use a normal status block for persistent results.
 - Notice and status blocks on signed-in pages are square (`border … px-4 py-3`), not rounded
   cards. The auth frame is the only place that keeps its rounded notice style.
+- Without JavaScript a server-rendered toast stays visible; HTMX toasts and the JS dismiss/timer
+  need JavaScript.
 - Empty states use `empty_state(title, message, action_label, action_url, icon=…)`. Use it for
   page-level “nothing here yet” panels; the optional icon is a short character, not an image.
   When an existing `data-*` test hook must stay, wrap the macro in a plain element with that
@@ -228,7 +241,7 @@ Rules:
 | Delete | row/overflow | toast with Undo; row disappears | 10 s |
 | Archive | row/overflow | toast with Restore or link to archived section | restore |
 | Skip a planned occurrence | row | toast “Skipped” with Undo | undo |
-| Settings save | form bottom | status at the top of the form + focus stays | not needed |
+| Settings save | form bottom | toast + focus stays | not needed |
 | Import/export | dedicated page/dialog | progress/result panel, never silent | rollback where supported |
 
 ## 6. Accessibility
@@ -258,7 +271,8 @@ Rules:
 - [ ] One `h1`; page title matches the destination.
 - [ ] Primary action in the left-aligned page action row under the title, or under the tab strip.
 - [ ] No create/edit form below a long list unless it is a deliberate wizard.
-- [ ] Every action has visible feedback in the current viewport.
+- [ ] Every successful write shows a bottom-right toast; inline panels are used only for errors,
+      warnings, reports, copy/download results and no-JS undo.
 - [ ] Scroll, focus and open disclosures survive HTMX swaps.
 - [ ] Forms use the shared field/button components; no one-off button class strings.
 - [ ] Optional fields are hidden until needed; no field that is irrelevant to the chosen mode.

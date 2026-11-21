@@ -449,6 +449,7 @@ def _render(
     factory = request.app.state.session_factory
     locale = request.state.locale
     page = portfolio_page(factory, ctx, scope=scope)
+    notice_message = gettext(PORTFOLIO_NOTICES[notice], locale) if notice else None
     context = {
         "view": build_view(
             request,
@@ -464,7 +465,8 @@ def _render(
                 else None
             ),
         ),
-        "notice": gettext(PORTFOLIO_NOTICES[notice], locale) if notice else None,
+        "notice": notice_message,
+        "toast_notice": notice_message if is_htmx_fragment_request(request) else None,
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": provider_enabled(factory, ctx, "coingecko"),
         "can_edit": has_role(ctx, Role.EDITOR),

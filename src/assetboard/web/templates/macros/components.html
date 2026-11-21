@@ -105,16 +105,6 @@
 </details>
 {%- endmacro %}
 
-{% macro flashes(messages=[]) -%}
-{% if messages %}
-<div class="space-y-2" role="status" aria-live="polite">
-  {% for message in messages %}
-  <div class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong">{{ message }}</div>
-  {% endfor %}
-</div>
-{% endif %}
-{%- endmacro %}
-
 {% macro confirm_dialog(id, title, message, confirm_label, cancel_label) -%}
 <dialog id="{{ id }}" aria-labelledby="{{ id }}-title" class="popup w-[min(92vw,28rem)]" data-backdrop-static>
   <div class="space-y-5 p-6">
@@ -144,20 +134,25 @@
 </div>
 {%- endmacro %}
 
-{# An undo toast is strict: it does not pause on hover or focus, since the server's undo window
-   does not either, and it counts down the seconds left. The undo response replaces it. #}
-{% macro toast(message, undo_url, undo_label, undo_seconds=10) -%}
-<div hx-swap-oob="beforeend:#toast-container">
-  <div id="toast-{{ uuid4().hex }}" data-toast role="status" aria-live="polite"{% if undo_url %} data-toast-strict data-toast-seconds="{{ undo_seconds }}"{% endif %}
-       class="toast flex items-center justify-between gap-4 bg-inverse px-4 py-3 text-sm text-on-inverse">
-    <span>{{ message }}</span>
-    <div class="flex items-center gap-3">
-      {% if undo_url %}<span class="tabular-nums text-on-inverse" aria-hidden="true" data-toast-countdown>{{ undo_seconds }}</span>
-      <button type="button" data-toast-undo class="font-semibold text-inverse-link" hx-post="{{ undo_url }}" hx-target="closest [data-toast]" hx-swap="outerHTML">{{ undo_label }}</button>{% endif %}
-      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-on-inverse">×</button>
-    </div>
+{# One toast. It carries no placement attribute: base.html renders a server-side toast into
+   #toast-container, while toast() below inserts one out of band after an HTMX write. An undo
+   toast is strict: it does not pause on hover or focus, since the server's undo window does not
+   either, and it counts down the seconds left. The undo response replaces it. #}
+{% macro toast_item(message, undo_url=None, undo_label=None, undo_seconds=10) -%}
+<div id="toast-{{ uuid4().hex }}" data-toast role="status" aria-live="polite"{% if undo_url %} data-toast-strict data-toast-seconds="{{ undo_seconds }}"{% endif %}
+     class="toast flex items-center justify-between gap-4 bg-inverse px-4 py-3 text-sm text-on-inverse">
+  <span>{{ message }}</span>
+  <div class="flex items-center gap-3">
+    {% if undo_url %}<span class="tabular-nums text-on-inverse" aria-hidden="true" data-toast-countdown>{{ undo_seconds }}</span>
+    <button type="button" data-toast-undo class="font-semibold text-inverse-link" hx-post="{{ undo_url }}" hx-target="closest [data-toast]" hx-swap="outerHTML">{{ undo_label }}</button>{% endif %}
+    <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-on-inverse">×</button>
   </div>
 </div>
+{%- endmacro %}
+
+{# The HTMX API: append one toast to the shared container without replacing the current target. #}
+{% macro toast(message, undo_url=None, undo_label=None, undo_seconds=10) -%}
+<div hx-swap-oob="beforeend:#toast-container">{{ toast_item(message, undo_url, undo_label, undo_seconds) }}</div>
 {%- endmacro %}
 
 {% macro empty_state(title, message, action_label=None, action_url=None, icon="+", action_data=None) -%}

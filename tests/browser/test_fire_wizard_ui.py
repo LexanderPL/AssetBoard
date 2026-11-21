@@ -346,7 +346,7 @@ def test_setup_wizard_and_reset_in_a_browser(tmp_path: Path) -> None:
                 page.locator("[data-fire-reset-submit]").click()
             assert "/fire?notice=reset" in page.url
             expect(page.locator("[data-fire-wizard]")).to_have_attribute("data-fire-wizard", "1")
-            expect(page.locator("[data-action-notice]")).to_be_visible()
+            expect(page.locator("#toast-container [data-toast]")).to_be_visible()
             _no_page_overflow(page)
 
             assert page.evaluate("window.__cspViolations") == []

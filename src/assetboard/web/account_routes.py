@@ -137,7 +137,7 @@ async def _profile_page(
     errors: dict[str, str] | None = None,
     notice: str | None = None,
     error: str | None = None,
-    sidebar_notice: str | None = None,
+    identity_notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
     current = _require_session(request)
@@ -192,10 +192,11 @@ async def _profile_page(
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
             "error": error,
+            # OIDC/proxy link results stay inline next to the account's sign-in methods.
+            "identity_notice": identity_notice,
             # The fresh WebSession already carries the user row's stored preference: no second
             # query. Malformed stored data normalises to the default instead of failing.
             "sidebar_items": normalize_sidebar(current.sidebar_items),
-            "sidebar_notice": sidebar_notice,
         },
         status_code=status_code,
     )
@@ -205,21 +206,28 @@ def _issuer_host(issuer: str | None) -> str:
     return (urlsplit(issuer).hostname or issuer or "") if issuer else ""
 
 
+PROFILE_SAVED = _("Profile saved.")
+
+
 @router.get("/account", name="account")
-async def profile(request: Request, link: str = "", sidebar: str = "") -> Response:
+async def profile(request: Request, link: str = "", sidebar: str = "", saved: str = "") -> Response:
     _require_session(request)
     sidebar_message = SIDEBAR_MESSAGES.get(sidebar)
-    sidebar_notice = _t(request, sidebar_message) if sidebar_message is not None else None
+    notice = (
+        _t(request, sidebar_message)
+        if sidebar_message is not None
+        else (_t(request, PROFILE_SAVED) if saved else None)
+    )
     outcome = LINK_MESSAGES.get(link)
     if outcome is None:
-        return await _profile_page(request, sidebar_notice=sidebar_notice)
+        return await _profile_page(request, notice=notice)
     ok, message = outcome
     text = _t(request, message)
     return await _profile_page(
         request,
-        notice=text if ok else None,
+        notice=notice,
         error=None if ok else text,
-        sidebar_notice=sidebar_notice,
+        identity_notice=text if ok else None,
     )
 
 
@@ -253,7 +261,7 @@ async def profile_submit(
             request, errors={problem: PROFILE_ERRORS[problem]}, status_code=400
         )
     # Shown with the new language: the next request reads the saved locale.
-    return Response(status_code=303, headers={"Location": "/account"})
+    return Response(status_code=303, headers={"Location": "/account?saved=1"})
 
 
 # The personal sidebar (F9.12)
@@ -398,7 +406,7 @@ async def link_proxy(request: Request, confirm_password: FormStr = "") -> Respon
         )
     if outcome.value in {"linked", "already_linked"}:
         key = "linked" if outcome.value == "linked" else "already_linked"
-        return await _profile_page(request, notice=_t(request, LINK_MESSAGES[key][1]))
+        return await _profile_page(request, identity_notice=_t(request, LINK_MESSAGES[key][1]))
     # Linked to someone else, or anything else: the generic failure (no oracle).
     return await _profile_page(
         request, error=_t(request, LINK_MESSAGES["failed"][1]), status_code=409
@@ -440,5 +448,6 @@ async def unlink(request: Request, identity_id: str, confirm_password: FormStr =
     if outcome.value == "last_method":
         return await _profile_page(request, error=_t(request, UNLINK_LAST), status_code=409)
     return await _profile_page(
-        request, notice=_t(request, _("The sign-in method was removed from your account."))
+        request,
+        identity_notice=_t(request, _("The sign-in method was removed from your account.")),
     )

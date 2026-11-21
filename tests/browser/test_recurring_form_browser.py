@@ -170,7 +170,10 @@ def test_guided_recurring_form_in_a_browser(tmp_path: Path) -> None:
             expect(sentence).to_contain_text("Monthly on the 10th")
             _shoot(page, shots, "form")
             page.get_by_role("button", name="Save recurring item").click()
-            page.wait_for_url(f"{base}/recurring")
+            page.wait_for_url(f"{base}/recurring?notice=created")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Recurring item created."
+            )
 
             expenses = page.locator('[data-recurring-section="expense"]')
             expect(expenses.get_by_role("heading", name="Expenses")).to_be_visible()

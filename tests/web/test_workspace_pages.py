@@ -200,6 +200,7 @@ def test_owner_updates_workspace_settings(owner: OwnerApp) -> None:
         "/workspace/settings?saved=1",
     )
     saved = owner.client.get(response.headers["location"]).text
+    assert 'id="toast-container"' in saved and "data-toast" in saved
     assert "Workspace settings saved." in saved
     assert "data-current-workspace>Family<" in saved
     with owner.db() as session:
@@ -412,12 +413,20 @@ def test_owner_changes_a_role_and_removes_a_member(owner: OwnerApp) -> None:
     response = owner.post(
         f"/workspace/members/{membership}/role", {"role": "editor"}, token_from="/workspace/members"
     )
-    assert (response.status_code, response.headers["location"]) == (303, "/workspace/members")
+    assert (response.status_code, response.headers["location"]) == (
+        303,
+        "/workspace/members?notice=role_changed",
+    )
+    changed = owner.client.get(response.headers["location"]).text
+    assert "data-toast" in changed and "Member role changed." in changed
     assert owner.roles()["bea"] == "editor"
     response = owner.post(
         f"/workspace/members/{membership}/remove", token_from="/workspace/members"
     )
     assert response.status_code == 303
+    assert response.headers["location"] == "/workspace/members?notice=removed"
+    removed = owner.client.get(response.headers["location"]).text
+    assert "data-toast" in removed and "Member removed." in removed
     assert "bea" not in owner.roles()
 
 

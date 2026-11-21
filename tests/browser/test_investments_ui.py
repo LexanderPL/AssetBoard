@@ -104,8 +104,8 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(warning).to_be_hidden()
             create_form.get_by_role("button", name="Save instrument").click()
 
-            notice = page.locator("[data-notice]")
-            expect(notice).to_have_text("Instrument added.")
+            notice = page.locator("#toast-container [data-toast]")
+            expect(notice).to_contain_text("Instrument added.")
             expect(notice).to_be_in_viewport()
             expect(page.locator("[data-instrument-name='World ETF']")).to_be_visible()
             expect(dialog).to_be_hidden()  # closed again

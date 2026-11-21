@@ -227,7 +227,9 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("#confirm-heading")).to_have_text("Move 2 entries to Eating out?")
             expect(page.locator("[data-months]")).to_have_text("March 2025, April 2025")
             page.get_by_role("button", name="Change category").click()
-            expect(page.locator("[data-notice]")).to_have_text("Category changed for 2 entries.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Category changed for 2 entries."
+            )
             expect(page.locator("[data-results] [data-category-name]")).to_have_text(
                 ["Eating out", "Eating out"]
             )

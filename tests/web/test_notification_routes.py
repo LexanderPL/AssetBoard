@@ -90,7 +90,9 @@ def test_create_mask_test_send_edit_and_delete(owner):
     tested = owner.post(f"/notifications/{identifier}/test")
     assert tested.headers["location"].endswith("notice=test_sent")
     assert [message.url for message in notifier.sent] == [URL]
-    assert "Test message sent" in owner.client.get(tested.headers["location"]).text
+    tested_page = owner.client.get(tested.headers["location"]).text
+    assert "Test message sent" in tested_page
+    assert 'id="toast-container"' in tested_page and "data-toast" in tested_page
 
     notifier.fail_with = "timeout"
     failed = owner.post(f"/notifications/{identifier}/test")

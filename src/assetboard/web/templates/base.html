@@ -30,7 +30,7 @@
 </head>
 <body class="min-h-full">
   <a href="#main-content" class="skip-link" data-skip-link>{{ _("Skip to content") }}</a>
-  {% from "macros/components.html" import confirm_dialog, flashes %}
+  {% from "macros/components.html" import confirm_dialog, toast_item %}
   {% from "macros/sidebar_icons.html" import sidebar_icon %}
   <div class="min-h-screen">
     {# Desktop: the sidebar is fixed to the viewport (top to bottom, so its height never depends on
@@ -160,12 +160,15 @@
           </div>
           {% endif %}
         </div>
-        {{ flashes() }}
         {% block content %}{% endblock %}
       </div>
     </main>
   </div>
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 w-[min(24rem,calc(100vw-2.5rem))] space-y-2"></div>
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 w-[min(24rem,calc(100vw-2.5rem))] space-y-2">
+    {% block toast %}
+    {% if notice and not notice_inline %}{{ toast_item(notice) }}{% endif %}
+    {% endblock %}
+  </div>
   {{ confirm_dialog("confirm-dialog", _("Are you sure?"), _("This action cannot be undone."), _("Continue"), _("Cancel")) }}
 </body>
 </html>

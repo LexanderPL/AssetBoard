@@ -125,7 +125,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.locator('input[type="checkbox"][name="enabled"]').check()
             page.get_by_role("button", name="Save setting").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-action-notice]")).to_contain_text(
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
                 "Automatic payment recording saved."
             )
             category_select = page.locator('[data-scheduled-generation] select[name="category_id"]')
@@ -148,7 +148,9 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             dialog.get_by_role("button", name="Save rate change").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-rate-change]")).to_have_count(2)
-            expect(page.locator("[data-action-notice]")).to_contain_text("Rate change saved.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Rate change saved."
+            )
             _no_page_overflow(page)
 
             # The overview is read-only insight: no configuration forms or dialogs.
@@ -221,7 +223,9 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.get_by_role("button", name="Compare and save named scenarios").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-saved-scenario]")).to_have_count(1)
-            expect(page.locator("[data-action-notice]")).to_contain_text("Saved scenarios updated")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Saved scenarios updated"
+            )
             expect(page.locator("[data-saved-delta]")).to_be_visible()
             expect(page.locator("[data-saved-interest-delta]")).to_be_visible()
             expect(page.locator("[data-saved-months-delta]")).to_be_visible()
@@ -258,7 +262,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             payment_dialog.locator('input[name="total"]').fill("100")
             payment_dialog.get_by_role("button", name="Save payment").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-action-notice]")).to_contain_text("Payment saved.")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text("Payment saved.")
             expect(page.locator("[data-payment]")).to_have_count(1)
             expect(page.locator("[data-payment-variance]")).to_be_visible()
             expect(page.locator("[data-payment-variance-label]")).to_have_text(
@@ -295,7 +299,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             checkpoint_dialog.locator('input[name="remaining_principal"]').fill("290,000")
             checkpoint_dialog.get_by_role("button", name="Save checkpoint").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-action-notice]")).to_contain_text(
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
                 "Balance checkpoint saved."
             )
 

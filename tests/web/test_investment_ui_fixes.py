@@ -108,7 +108,7 @@ def test_a_successful_add_shows_only_the_notice(owner: OwnerApp) -> None:
     assert response.status_code == 200
     body = response.text
     assert body.lstrip().startswith('<div id="investments-body"')
-    assert "Instrument added." in body and "data-notice" in body
+    assert "Instrument added." in body and "data-toast" in body
     assert "data-error" not in body and "data-field-error" not in body
     # The client-side warning starts hidden; the script shows it only once a weight is typed.
     assert re.search(r'class="hidden [^"]*" data-allocation-warning', body)
@@ -120,7 +120,7 @@ def test_a_successful_add_shows_only_the_notice(owner: OwnerApp) -> None:
     assert opening is not None and " open" not in opening.group(0)
     assert 'hx-swap="outerHTML"' in body
     assert "show:#investments-body:top" not in body
-    assert body.index("data-notice") < body.index('id="instrument-dialog"')
+    assert body.index("data-toast") < body.index('id="instrument-dialog"')
 
 
 def test_the_add_form_sits_behind_a_button_and_reopens_on_errors(owner: OwnerApp) -> None:

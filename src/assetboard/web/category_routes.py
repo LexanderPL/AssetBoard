@@ -129,10 +129,13 @@ def _body_context(
     edit_values: dict[str, str] | None = None,
     edit_errors: dict[str, str] | None = None,
 ) -> dict[str, object]:
+    message = _t(request, NOTICES[notice]) if notice in NOTICES else None
     return {
         "categories": categories,
         "can_edit": has_role(ctx, Role.EDITOR),
-        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice": message,
+        # A fragment cannot use base.html's toast block, so it gets the OOB one instead.
+        "toast_notice": message if is_htmx_fragment_request(request) else None,
         "error": _t(request, error) if error else None,
         "create_values": create_values or _values(),
         "create_errors": {f: _t(request, m) for f, m in (create_errors or {}).items()},

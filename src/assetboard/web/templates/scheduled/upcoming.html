@@ -35,7 +35,7 @@
   <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<input type="hidden" name="anchor" value="{{ request.query_params.get('at', '') }}"><button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
 </div>
 {% endif %}
-{% if notice %}
+{% if notice and notice_inline %}
 {% set pinned_notice = (skipped_id and can_edit) or notice_code == "skip_undone" %}
 <div role="status" class="{% if pinned_notice %}fixed bottom-5 right-5 z-50 w-[min(28rem,calc(100vw-2.5rem))] shadow-card {% else %}mb-4{% endif %} flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong"{% if pinned_notice %} data-upcoming-pinned{% endif %} data-upcoming-notice>
   <span>{{ notice }}</span>

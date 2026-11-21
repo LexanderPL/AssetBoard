@@ -138,7 +138,7 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
             "reports",
         ]
         assert _nav(page).index("income") > _nav(page).index("recurring")
-        assert page.locator("[data-sidebar-notice]").count() == 0
+        assert page.locator("#toast-container [data-toast]").count() == 0
         assert page.evaluate("document.activeElement?.dataset?.sidebarMove") == "income:up"
         # The local move has not written the preference.
         assert _stored_sidebar(app) is None
@@ -165,7 +165,9 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
             "reports",
         ]
         page.wait_for_url(f"{base}/account?sidebar=saved#sidebar-settings")
-        expect(settings.locator('[role="status"]')).to_contain_text("Your sidebar is saved.")
+        expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+            "Your sidebar is saved."
+        )
         assert _nav(page).index("income") < _nav(page).index("recurring")
         assert [entry["key"] for entry in _stored_sidebar(app) or []] == fields["item"]
         assert page.evaluate(NO_OVERFLOW)
@@ -237,7 +239,7 @@ def test_the_sidebar_customiser_at_desktop_and_phone_widths(tmp_path: Path) -> N
         page.goto(f"{base}/account", wait_until="networkidle")
         page.locator("[data-sidebar-reset]").click()
         page.wait_for_url(f"{base}/account?sidebar=reset#sidebar-settings")
-        expect(settings.locator('[role="status"]')).to_contain_text(
+        expect(page.locator("#toast-container [data-toast]")).to_contain_text(
             "Your sidebar is back to the default order."
         )
         page.goto(f"{base}/", wait_until="networkidle")
@@ -342,7 +344,7 @@ def test_keyboard_moves_at_the_boundaries_keep_focus(tmp_path: Path) -> None:
         assert _form_keys(page).index("transactions") == 1
         expect(page.locator('[data-sidebar-move="transactions:up"]')).to_be_disabled()
         assert page.evaluate("document.activeElement?.dataset?.sidebarMove") == "transactions:down"
-        assert page.locator("[data-sidebar-notice]").count() == 0
+        assert page.locator("#toast-container [data-toast]").count() == 0
         assert _stored_sidebar(app) is None
 
         # Down into the last slot: Down becomes disabled; focus moves to the other arrow.
@@ -353,7 +355,7 @@ def test_keyboard_moves_at_the_boundaries_keep_focus(tmp_path: Path) -> None:
         assert _form_keys(page)[-1] == "reports"
         expect(page.locator('[data-sidebar-move="reports:down"]')).to_be_disabled()
         assert page.evaluate("document.activeElement?.dataset?.sidebarMove") == "reports:up"
-        assert page.locator("[data-sidebar-notice]").count() == 0
+        assert page.locator("#toast-container [data-toast]").count() == 0
         assert _stored_sidebar(app) is None
         browser.close()
 

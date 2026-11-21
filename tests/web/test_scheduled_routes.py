@@ -176,7 +176,11 @@ def test_list_navigation_delete_confirmation_and_action_feedback(owner):
         from sqlalchemy import select
 
         item_id = session.scalars(select(ScheduledItem.id)).one()
-    assert owner.post(f"/recurring/{item_id}/archive").status_code == 303
+    archived = owner.post(f"/recurring/{item_id}/archive")
+    assert archived.status_code == 303
+    assert archived.headers["location"] == "/recurring?notice=archive"
+    archived_page = owner.client.get(archived.headers["location"]).text
+    assert "data-toast" in archived_page and "Recurring item archived." in archived_page
     again = owner.post(f"/recurring/{item_id}/pause")
     assert again.headers["location"] == "/recurring?error=archived_item"
     shown = owner.client.get(again.headers["location"]).text
@@ -184,23 +188,31 @@ def test_list_navigation_delete_confirmation_and_action_feedback(owner):
 
 
 def test_actions_redirect_with_a_success_notice(owner):
-    assert owner.post("/recurring", form(owner)).status_code == 303
+    created = owner.post("/recurring", form(owner))
+    assert created.headers["location"] == "/recurring?notice=created"
+    created_page = owner.client.get(created.headers["location"]).text
+    assert 'id="toast-container"' in created_page and "data-toast" in created_page
+    assert "Recurring item created." in created_page
     with owner.db() as session:
         from sqlalchemy import select
 
         item_id = session.scalars(select(ScheduledItem.id)).one()
+    saved = owner.post(f"/recurring/{item_id}/edit", form(owner))
+    assert saved.headers["location"] == "/recurring?notice=saved"
+    saved_page = owner.client.get(saved.headers["location"]).text
+    assert "data-toast" in saved_page and "Recurring item saved." in saved_page
     paused = owner.post(f"/recurring/{item_id}/pause")
     assert paused.headers["location"] == "/recurring?notice=pause"
     paused_page = owner.client.get(paused.headers["location"]).text
-    assert "data-action-notice" in paused_page and "Recurring item paused." in paused_page
+    assert "data-toast" in paused_page and "Recurring item paused." in paused_page
     resumed = owner.post(f"/recurring/{item_id}/resume")
     assert resumed.headers["location"] == "/recurring?notice=resume"
     resumed_page = owner.client.get(resumed.headers["location"]).text
-    assert "data-action-notice" in resumed_page and "Recurring item resumed." in resumed_page
+    assert "data-toast" in resumed_page and "Recurring item resumed." in resumed_page
     deleted = owner.post(f"/recurring/{item_id}/delete")
     assert deleted.headers["location"] == "/recurring?notice=delete"
     deleted_page = owner.client.get(deleted.headers["location"]).text
-    assert "data-action-notice" in deleted_page and "Recurring item deleted." in deleted_page
+    assert "data-toast" in deleted_page and "Recurring item deleted." in deleted_page
     assert "Car insurance" not in deleted_page
     owner.client.headers["Accept-Language"] = "pl"
     translated = owner.client.get("/recurring?notice=pause").text

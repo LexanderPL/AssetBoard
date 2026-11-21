@@ -45,7 +45,8 @@ def test_back_up_now_creates_a_downloadable_copy(owner: OwnerApp) -> None:
     assert response.status_code == 303
     assert response.headers["location"].endswith("?backup=created")
     page = owner.client.get(response.headers["location"])
-    assert "Backup created." in page.text
+    assert "data-backup-notice" in page.text and "Backup created." in page.text
+    assert "data-toast" not in page.text
     settings = owner.app.state.settings
     files = list((settings.data_dir / "backups").glob("assetboard-manual-*.db"))
     assert len(files) == 1
@@ -153,6 +154,7 @@ def test_retention_settings_are_saved_and_audited(owner: OwnerApp) -> None:
     )
     assert response.status_code == 200
     assert "Instance settings saved." in response.text
+    assert 'id="toast-container"' in response.text and "data-toast" in response.text
     with owner.db() as session:
         row = session.get(InstanceSettings, 1)
         assert row is not None

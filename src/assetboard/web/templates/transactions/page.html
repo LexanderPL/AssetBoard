@@ -21,7 +21,7 @@
 {% endblock %}
 {% block content %}
 <div class="space-y-6" data-month="{{ view.month }}" data-transactions-page>
-  {% if notice %}
+  {% if notice and notice_inline %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
   {% endif %}
   {% if error %}

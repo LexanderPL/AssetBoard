@@ -176,6 +176,7 @@ def month_header(
         "month_names": month_names(locale),
         "closed_on": closed_on,
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice_inline": notice in {"outside_filter", "outside_filter_planned"},
         "notice_href": None,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
         "missing_work_logs": [

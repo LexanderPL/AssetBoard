@@ -12,7 +12,6 @@
 {% block content %}
 <div class="space-y-6" data-home data-month="{{ home.month }}">
   <p class="text-sm font-medium text-primary-ink" data-home-month>{{ home.month_heading }}</p>
-  {% if notice %}<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-home-notice>{{ notice }}</p>{% endif %}
   {% if home.widgets %}
   <div class="grid gap-6 lg:grid-cols-2" data-home-widgets>
     {% for w in home.widgets %}

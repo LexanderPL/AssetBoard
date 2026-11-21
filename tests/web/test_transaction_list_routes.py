@@ -372,7 +372,8 @@ def test_recategorize_ticked_rows_with_confirmation(ledger: OwnerApp, rows: dict
     assert _category_of(ledger, rows["aug"]) == groceries
     assert _category_of(ledger, rows["sep"]) == groceries
     assert _category_of(ledger, rows["oct"]) == rows["food"]
-    assert "Category changed for 2 entries." in _page(ledger, "?direction=expense&changed=2")
+    page = _page(ledger, "?direction=expense&changed=2")
+    assert "Category changed for 2 entries." in page and "data-toast" in page
     with ledger.db() as session:
         (event,) = session.scalars(
             select(AuditEvent).where(AuditEvent.action == "transaction.recategorized")

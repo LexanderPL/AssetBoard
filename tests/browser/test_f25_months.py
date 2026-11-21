@@ -118,7 +118,7 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             # No "Month closed." notice: the banner and the badge say so.
             expect(page.locator("[data-closed-banner]")).to_contain_text("This month is closed.")
             assert page.url == f"{base}/m/2025-03"
-            expect(page.locator("[data-notice]")).to_have_count(0)
+            expect(page.locator("#toast-container [data-toast]")).to_have_count(0)
             expect(page.locator("[data-closed-banner]")).to_contain_text("by Browser Admin.")
             expect(page.locator("[data-closed-badge]")).to_be_visible()
 
@@ -128,7 +128,7 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Continue").click()
             expect(page.locator("[data-month-close]")).to_be_visible()
             expect(page.locator("[data-closed-banner]")).to_have_count(0)
-            expect(page.locator("[data-notice]")).to_have_count(0)
+            expect(page.locator("#toast-container [data-toast]")).to_have_count(0)
 
             # Sidebar (v0.2.1 bug): on a long desktop page the sidebar footer stays on screen
             # after scrolling to the bottom, and account pages show the full workspace nav. The

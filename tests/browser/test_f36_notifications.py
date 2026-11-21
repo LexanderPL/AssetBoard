@@ -98,12 +98,14 @@ def test_notification_channels_in_a_browser(tmp_path: Path) -> None:
             form.get_by_label("Items due soon").uncheck()
             expect(form.get_by_label("Remind days before the due date")).to_be_hidden()
             form.get_by_role("button", name="Add channel").click()
-            expect(page.locator("[data-notice]")).to_be_visible()
+            expect(page.locator("#toast-container [data-toast]")).to_be_visible()
             expect(page.locator("[data-masked-url]")).to_have_text("ntfys://••••••")
             assert "browser-secret-topic" not in page.content()
 
             page.locator("[data-send-test]").click()
-            expect(page.locator("[data-notice]")).to_contain_text("Test message sent")
+            expect(page.locator("#toast-container [data-toast]")).to_contain_text(
+                "Test message sent"
+            )
             assert [message.url for message in notifier.sent] == [URL]
 
             channel = page.locator("[data-channel]")

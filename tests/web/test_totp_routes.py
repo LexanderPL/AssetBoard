@@ -693,7 +693,7 @@ def test_instance_admin_can_reset_another_users_factor(owner: OwnerApp) -> None:
         },
         follow_redirects=False,
     )
-    assert response.status_code == 200 and "data-admin-notice" in response.text
+    assert response.status_code == 200 and "data-toast" in response.text
     assert target_client.get("/account", follow_redirects=False).status_code == 303
     with owner.db() as session:
         assert session.get(TotpFactor, target_id) is None
