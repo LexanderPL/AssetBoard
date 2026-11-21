@@ -1,6 +1,6 @@
 {% from "categories/_macros.html" import category_row, htmx_form, options with context %}
 {% from "macros/components.html" import csrf_input with context %}
-<div id="categories-body" class="space-y-6">
+<div id="categories-body" class="max-w-4xl space-y-6" data-page-width="4xl">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}

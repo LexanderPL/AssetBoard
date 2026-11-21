@@ -6,8 +6,9 @@
 {% if can_create %}<a class="btn-primary" href="{{ scoped_url(request, 'admin_user_new') }}" data-admin-create>{{ _("Create an account") }}</a>{% endif %}
 {% endblock %}
 {% block content %}
-{% if notice %}<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
-{% if error %}<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>{% endif %}
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
+{% if notice %}<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>{% endif %}
 <section class="panel p-0" aria-label="{{ _('Users') }}">
   <table class="sheet-sm sheet-flush w-full text-left text-sm" data-users>
     <caption class="sr-only">{{ _("Users") }}</caption>
@@ -59,4 +60,5 @@
     </tbody>
   </table>
 </section>
+</div>
 {% endblock %}

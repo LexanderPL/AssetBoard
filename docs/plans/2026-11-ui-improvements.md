@@ -7,6 +7,10 @@ implemented; a feature is not done until its item is checked and its acceptance 
 Legend: `[ ]` not started · `[~]` in progress · `[x]` done · **Decision** = blocked on an owner
 answer.
 
+> **Superseded 2026-11-21:** pages reached from the user menu now use one `max-w-4xl` frame. This
+> supersedes the P-1/P-2 `max-w-3xl` choice and the P-2 note that the Users table stays at
+> `max-w-6xl`; see `docs/ui-guidelines.md`. The shipped 0.8.7 record below is unchanged.
+
 ## Work packages
 
 Small, reviewable PRs; keep unrelated items out of the same PR.

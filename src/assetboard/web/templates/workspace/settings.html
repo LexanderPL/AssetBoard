@@ -3,7 +3,7 @@
 {% block title %}{{ _("Workspace settings") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Workspace settings") }}{% endblock %}
 {% block content %}
-<div class="max-w-3xl space-y-6">
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
 {% if demo_session %}<p class="text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>{% endif %}
 <section class="panel p-6 sm:p-7" aria-labelledby="workspace-settings-heading">
   <h2 id="workspace-settings-heading" class="text-base font-semibold">{{ _("General") }}</h2>

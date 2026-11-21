@@ -218,7 +218,7 @@ def test_profile_shows_the_planning_fields_with_defaults(h: Harness) -> None:
 
 def test_profile_cards_share_one_column(h: Harness) -> None:
     page = admin(h).get("/account").text
-    assert '<div class="max-w-3xl space-y-6">' in page
+    assert '<div class="max-w-4xl space-y-6" data-page-width="4xl">' in page
     assert "lg:col-span-2" not in page
     assert "lg:grid-cols-2" not in page
     assert '<button type="submit" class="btn-primary">Save</button>' in page
@@ -230,7 +230,7 @@ def test_profile_and_account_security_share_the_settings_width(h: Harness) -> No
     profile = client.get("/account").text
     security = client.get("/account/password").text
     for page in (profile, security):
-        assert page.count('<div class="max-w-3xl space-y-6">') == 1
+        assert page.count('<div class="max-w-4xl space-y-6" data-page-width="4xl">') == 1
     assert '<div class="grid gap-6 lg:grid-cols-2">' in security
     assert "lg:col-span-2" in security
 

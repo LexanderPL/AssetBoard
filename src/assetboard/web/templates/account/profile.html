@@ -3,13 +3,13 @@
 {% block title %}{{ _("Profile") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Profile") }}{% endblock %}
 {% block content %}
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
 {% if notice %}
-<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-profile-notice>{{ notice }}</p>
+<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-profile-notice>{{ notice }}</p>
 {% endif %}
 {% if error %}
-<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-profile-error>{{ error }}</p>
+<p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-profile-error>{{ error }}</p>
 {% endif %}
-<div class="max-w-3xl space-y-6">
   <section class="panel p-6 sm:p-7" aria-labelledby="profile-heading">
     <h2 id="profile-heading" class="text-base font-semibold">{{ _("Your details") }}</h2>
     {% if demo_session %}
