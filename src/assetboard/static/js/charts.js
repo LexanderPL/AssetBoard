@@ -446,8 +446,12 @@
 
   function setChartTableHidden(table, hidden) {
     table.classList.toggle("sr-only", hidden);
-    // Inert also removes the period links from the tab order; the toggle is the access point.
-    if (table instanceof HTMLElement) table.inert = hidden;
+    // A report table with a "Show as table" toggle is inert while hidden, so its period links
+    // do not become invisible tab stops; the toggle is the access point. Donut tables have no
+    // toggle and stay in the accessibility tree as the chart's only accessible data.
+    const chart = table.closest("[data-chart]");
+    const hasToggle = chart?.querySelector("[data-chart-table-toggle]");
+    if (table instanceof HTMLElement && hasToggle) table.inert = hidden;
     const region = table.querySelector("[data-table-scroll]");
     if (region instanceof HTMLElement) region.tabIndex = hidden ? -1 : 0;
   }

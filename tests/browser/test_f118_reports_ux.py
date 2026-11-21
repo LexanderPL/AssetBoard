@@ -293,6 +293,26 @@ def test_invalid_filters_stay_open_with_their_error_on_a_phone(tmp_path: Path) -
         browser.close()
 
 
+def test_a_donut_table_stays_in_the_accessibility_tree(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    port = _serve(app)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(color_scheme="light", viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        base = f"http://127.0.0.1:{port}"
+        _sign_in(page, base, app)
+        _seed(app)
+        page.goto(f"{base}/m/2026-01", wait_until="networkidle")
+        donut = page.locator('[data-chart="donut"]').first
+        expect(donut).to_have_attribute("data-chart-ready", "true")
+        table = donut.locator("[data-chart-table]")
+        assert "sr-only" in (table.get_attribute("class") or "").split()
+        assert table.evaluate("el => el.inert") is False
+        context.close()
+        browser.close()
+
+
 def test_the_series_table_is_visible_without_javascript(tmp_path: Path) -> None:
     app = _app(tmp_path)
     port = _serve(app)

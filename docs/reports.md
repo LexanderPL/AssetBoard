@@ -203,8 +203,9 @@ in the report range. It reuses the same derived history as the Net worth Summary
 values, linked items and prices are calculated on read, and the last point of each period is
 shown. There is no interpolation between periods.
 
-The section appears when the workspace has recorded net-worth history. A series whose only
-items are in another currency keeps the section with the existing “not counted” warning. If the
+The section appears when the workspace has counted net-worth history, or a non-base series
+with a warning. A series whose only items are in another currency keeps the section with the
+existing “not counted” warning. If the
 report currency is not the workspace base currency, a page note says net worth and portfolio are
 base-currency only. The chart and table carry the same figures; the data table is collapsed
 behind **Show as table** with JavaScript and stays visible without JavaScript. Period rows link
