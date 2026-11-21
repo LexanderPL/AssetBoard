@@ -23,7 +23,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.domain.months import YearMonth
-from assetboard.domain.shading import maxima, shade
+from assetboard.domain.shading import large_gates, maxima, shade
 from assetboard.domain.transactions import MAX_DESCRIPTION_LENGTH, TransactionDirection
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
@@ -232,7 +232,9 @@ def build_ledger(
 
     Row tints (the user's "Highlight large transactions" setting) compare each amount with the
     largest one of its table and currency in the whole month, also when a filter is applied, so
-    a row keeps its tint whichever view shows it. Every render reads the month afresh.
+    a row keeps its tint whichever view shows it. Before any tint, the month needs at least
+    three entries of that direction and currency and the entry must reach twice their median
+    amount. Every render reads the month afresh.
     """
     locale = request.state.locale
     transactions = list_month(factory, ctx, view.month)
@@ -277,10 +279,15 @@ def build_ledger(
                 format_amount_input(occurrence.expected, locale),
             )
 
-        top = maxima(t.amount for t in whole) if highlight else {}
+        amounts = tuple(t.amount for t in whole)
+        top = maxima(amounts) if highlight else {}
+        gates = large_gates(amounts) if highlight else {}
         rows = tuple(
             RowView(
-                t, format_day(t.date, locale), format_money(t.amount, locale), shade(t.amount, top)
+                t,
+                format_day(t.date, locale),
+                format_money(t.amount, locale),
+                shade(t.amount, top, gates),
             )
             for t in stored
         )

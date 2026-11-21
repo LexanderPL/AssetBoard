@@ -31,7 +31,7 @@
       <label class="flex items-start gap-2 text-sm">
         <input type="checkbox" name="highlight_large_amounts" value="1"{% if values.highlight_large_amounts %} checked{% endif %} aria-describedby="highlight-help" data-highlight-setting class="mt-0.5 h-4 w-4 rounded border-line accent-primary">
         <span>{{ _("Highlight large transactions") }}
-          <span id="highlight-help" class="block text-xs text-muted">{{ _("On the Transactions page, larger expenses get a stronger red background and larger income a stronger green one.") }}</span>
+          <span id="highlight-help" class="block text-xs text-muted">{{ _("On the Transactions page, only clearly large entries are tinted: red for expenses, green for income. A month needs at least three entries of the same kind and currency, and only amounts at least twice their median qualify.") }}</span>
         </span>
       </label>
       <button type="submit" class="btn-primary">{{ _("Save") }}</button>

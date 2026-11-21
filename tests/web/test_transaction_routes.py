@@ -1043,22 +1043,61 @@ def _shading_month(app: OwnerApp) -> tuple[UUID, UUID]:
     food, rent = _category(app, "Food"), _category(app, "Rent")
     salary = _category(app, "Salary", "income")
     for category, amount, description in (
-        (rent, "1000", "Rent"),
-        (food, "900", "Big shop"),
-        (food, "500", "Half"),
-        (food, "249.99", "Small"),
+        (rent, "4000", "Rent"),
+        (food, "2500", "Big shop"),
+        (food, "1000", "Half"),
+        (food, "800", "Small"),
+        (food, "500", "Coffee"),
     ):
         _add(app, _form(category, amount=amount, description=description))
-    for amount, description in (("3000", "Pay"), ("800", "Bonus")):
+    for amount, description in (
+        ("10000", "Pay"),
+        ("2500", "Bonus"),
+        ("100", "Interest"),
+        ("100", "Gift"),
+        ("100", "Refund"),
+    ):
         _add(app, _form(salary, amount=amount, description=description, direction="income"))
     return food, rent
 
 
-def test_larger_rows_are_tinted_by_their_share_of_the_months_largest(ledger: OwnerApp) -> None:
+@pytest.mark.parametrize(
+    ("amounts", "expected"),
+    [
+        (("100",), {"Row 1": 0}),
+        (("100", "120"), {"Row 1": 0, "Row 2": 0}),
+        (("100", "105", "110"), {"Row 1": 0, "Row 2": 0, "Row 3": 0}),
+        (("100", "100", "1000"), {"Row 1": 0, "Row 2": 0, "Row 3": 4}),
+    ],
+)
+def test_the_median_gate_controls_the_ledger(
+    ledger: OwnerApp, amounts: tuple[str, ...], expected: dict[str, int]
+) -> None:
+    food = _category(ledger, "Food")
+    for number, amount in enumerate(amounts, 1):
+        _add(ledger, _form(food, amount=amount, description=f"Row {number}"))
+    assert _shades(_page(ledger), "expense") == expected
+
+
+def test_only_entries_at_twice_the_month_median_are_tinted(ledger: OwnerApp) -> None:
     _shading_month(ledger)
     page = _page(ledger)
-    assert _shades(page, "expense") == {"Rent": 4, "Big shop": 4, "Half": 2, "Small": 0}
-    assert _shades(page, "income") == {"Pay": 4, "Bonus": 1}
+    # Expenses: median 1000, gate 2000; Big shop (62.5% of the largest) and Rent stand out.
+    assert _shades(page, "expense") == {
+        "Rent": 4,
+        "Big shop": 2,
+        "Half": 0,
+        "Small": 0,
+        "Coffee": 0,
+    }
+    # Income: median 100, gate 200; Bonus is exactly 25% of the largest, Pay is the maximum.
+    assert _shades(page, "income") == {
+        "Pay": 4,
+        "Bonus": 1,
+        "Interest": 0,
+        "Gift": 0,
+        "Refund": 0,
+    }
     expense, income = _section(page, "expense"), _section(page, "income")
     # Step 4 is the Month page's above-plan tint; the tint is on the row, actions cell included.
     assert 'class="bg-danger-tint" data-shade="4"' in expense and "bg-success" not in expense
@@ -1077,10 +1116,16 @@ def test_turning_the_setting_off_removes_every_tint(ledger: OwnerApp) -> None:
     assert "data-shade" in _page(ledger)
 
 
-def test_a_filtered_view_compares_with_the_whole_months_largest(ledger: OwnerApp) -> None:
+def test_a_filtered_view_compares_with_the_whole_months_group(ledger: OwnerApp) -> None:
     food, _rent = _shading_month(ledger)
     page = _page(ledger, f"{PAGE}?category={food}")
-    assert _shades(page, "expense") == {"Big shop": 4, "Half": 2, "Small": 0}
+    # Rent is hidden, but the gate and the maximum still come from the whole month.
+    assert _shades(page, "expense") == {
+        "Big shop": 2,
+        "Half": 0,
+        "Small": 0,
+        "Coffee": 0,
+    }
 
 
 def test_htmx_writes_recompute_the_tints(ledger: OwnerApp) -> None:
@@ -1088,13 +1133,25 @@ def test_htmx_writes_recompute_the_tints(ledger: OwnerApp) -> None:
     rent_id = _id(ledger, "Rent")
     data = {"day": "7", "amount": "5000", "description": "Rent", "category_id": str(rent)}
     edited = _htmx(ledger, f"{MONTH}/transactions/{rent_id}", data)
-    assert _shades(edited.text, "expense") == {"Rent": 4, "Big shop": 0, "Half": 0, "Small": 0}
+    assert _shades(edited.text, "expense") == {
+        "Rent": 4,
+        "Big shop": 2,
+        "Half": 0,
+        "Small": 0,
+        "Coffee": 0,
+    }
     deleted = _htmx(ledger, f"{MONTH}/transactions/{rent_id}/delete")
-    assert _shades(deleted.text, "expense") == {"Big shop": 4, "Half": 2, "Small": 1}
+    assert _shades(deleted.text, "expense") == {
+        "Big shop": 4,
+        "Half": 0,
+        "Small": 0,
+        "Coffee": 0,
+    }
     undone = _htmx(ledger, f"{MONTH}/transactions/{rent_id}/undo")
     assert _shades(undone.text, "expense")["Rent"] == 4
-    added = _htmx(ledger, f"{MONTH}/transactions", _form(food, amount="20000", description="Car"))
+    added = _htmx(ledger, f"{MONTH}/transactions", _form(food, amount="8000", description="Car"))
     assert _shades(added.text, "expense")["Car"] == 4
-    assert _shades(added.text, "expense")["Rent"] == 1
+    assert _shades(added.text, "expense")["Rent"] == 2
+    assert _shades(added.text, "expense")["Big shop"] == 0
     row = _htmx_get(ledger, f"{MONTH}/transactions/{rent_id}/row")
-    assert 'class="bg-danger-shade-1" data-shade="1"' in row.text
+    assert 'class="bg-danger-shade-2" data-shade="2"' in row.text
