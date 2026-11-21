@@ -78,7 +78,9 @@ def test_missing_empty_and_oversized_values_mean_defaults() -> None:
 
 
 def test_too_many_fields_fall_back_instead_of_raising() -> None:
-    raw = "&".join(f"category={uuid4()}" for _ in range(300))
+    raw = "&".join(f"category={index}" for index in range(300))
+    # Small enough to pass the length guard, so parse_qsl's max_num_fields is what rejects it.
+    assert len(raw) < MAX_REPORT_FILTER_COOKIE_LENGTH
     source = parse_report_filter_cookie(raw)
     assert source.category_ids == ()
 

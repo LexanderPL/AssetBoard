@@ -709,6 +709,14 @@ def _report_cookie(reports: OwnerApp) -> str:
     return report_filters_cookie_name(reports.app.state.settings)
 
 
+def _filter_summary(html: str) -> str:
+    panel = re.search(r"<details[^>]*data-filter-disclosure.*?</form>", html, re.DOTALL)
+    assert panel is not None
+    summary = re.search(r"<summary.*?</summary>", panel.group(0), re.DOTALL)
+    assert summary is not None
+    return summary.group(0)
+
+
 def test_the_filter_cookie_remembers_every_resolved_field(reports: OwnerApp) -> None:
     food = _category(reports, "Cookie Food")
     _tx(reports, food, date(2024, 3, 5), 1_000)
@@ -757,6 +765,25 @@ def test_an_explicit_report_url_overrides_and_refreshes_the_cookie(reports: Owne
     assert '<option value="month" selected>Monthly</option>' in _page(reports)
 
 
+def test_a_remembered_default_year_does_not_inflate_the_filter_count(
+    reports: OwnerApp,
+) -> None:
+    food = _category(reports, "Badge Food")
+    _tx(reports, food, date(2026, 3, 5), 1_000)
+    explicit = reports.client.get("/reports?from=2026&to=2026&step=year")
+    assert "1 filter" in _filter_summary(explicit.text)  # only the granularity differs
+    assert "2 filters" not in _filter_summary(explicit.text)
+
+    remembered = _filter_summary(_page(reports))
+    assert "1 filter" in remembered  # the remembered default year is not counted
+    assert "2 filters" not in remembered
+
+    different = reports.client.get("/reports?from=2026&to=2026&step=month&year=2025")
+    summary = _filter_summary(different.text)
+    assert "1 filter" in summary  # a genuinely different year still counts
+    assert "2 filters" not in summary
+
+
 def test_an_invalid_explicit_url_does_not_refresh_the_cookie(reports: OwnerApp) -> None:
     food = _category(reports, "Invalid Cookie Food")
     for year in (2024, 2025, 2026):
@@ -795,18 +822,47 @@ def test_clear_filters_deletes_the_cookie_and_redirects_clean(reports: OwnerApp)
     assert '<option value="month" selected>Monthly</option>' in html
 
 
+def test_an_explicit_view_too_large_for_the_cookie_clears_it(reports: OwnerApp) -> None:
+    categories = [_category(reports, f"Overflow {index}") for index in range(85)]
+    _tx(reports, categories[0], date(2026, 3, 5), 1_000)
+    query = "from=2026&to=2026&step=month&" + "&".join(
+        f"category={category_id}" for category_id in categories
+    )
+    response = reports.client.get(f"/reports?{query}")
+    assert response.status_code == 200
+    name = _report_cookie(reports)
+    cleared = next(
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.startswith(f"{name}=")
+    )
+    assert "Max-Age=0" in cleared
+    assert name not in reports.client.cookies
+
+
 def test_an_invalid_cookie_falls_back_to_the_current_defaults(reports: OwnerApp) -> None:
     food = _category(reports, "Fallback Food")
     for year in (2024, 2025, 2026):
         _tx(reports, food, date(year, 3, 5), 1_000)
     name = _report_cookie(reports)
-    reports.client.cookies.set(name, "from=2026&to=2025&step=year")
+    reports.client.cookies.set(
+        name, "from=2026&to=2025&step=year", domain="testserver.local", path="/"
+    )
 
-    html = _page(reports)
+    response = reports.client.get("/reports")
+    html = response.text
     assert "data-report-invalid" not in html
     assert '<details class="panel" data-filter-disclosure>' in html
     assert "data-report-range>2024 – 2026<" in html
     assert '<option value="month" selected>Monthly</option>' in html
+    # The stale cookie is forgotten, so the next bare request does not resolve it twice.
+    cleared = next(
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.startswith(f"{name}=")
+    )
+    assert "Max-Age=0" in cleared
+    assert name not in reports.client.cookies
 
     reports.client.cookies.set(name, "x=" + "a" * 5_000)
     oversized = _page(reports)

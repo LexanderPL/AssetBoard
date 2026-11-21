@@ -212,7 +212,9 @@ def _resolve_filters(
     in_range = [year for year in data_years if start_year <= year <= end_year]
     default_year = max(in_range) if in_range else min(end_year, current_year)
     parsed_year = _parse_year(raw_year) if raw_year.strip() else None
-    year_is_default = parsed_year is None
+    # A remembered year that equals the default is not a user change: the badge counts it only
+    # when the resolved year actually differs, like the step and trend values.
+    year_is_default = parsed_year is None or parsed_year == default_year
     year = parsed_year if parsed_year is not None else default_year
     trend_months = int(raw_trend) if raw_trend in ("3", "12") else TREND_MONTHS_DEFAULT
     return ReportFilters(
@@ -377,9 +379,10 @@ def net_worth_report(
     if not dates:
         return None
     data = networth_history(factory, ctx, "all", dates=dates)
-    # A workspace whose only items are non-base still has recorded history worth explaining;
-    # keep the section so its warning is visible (UX-15). No-value-only items have no recorded
-    # history and stay absent.
+    # Chartless series have no section (UX-15): the per-item "not counted" and estimated-value
+    # notes stay in the chart tooltips, and the Net worth Summary page keeps its warning. A
+    # workspace whose recorded values are all outside the base currency therefore gets no
+    # section here.
     if not data.points or not data.has_recorded_values:
         return None
     return data

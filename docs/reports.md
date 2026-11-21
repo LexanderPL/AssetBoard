@@ -22,9 +22,11 @@ JavaScript. Unknown query parameters are ignored. The filter panel is closed by 
 automatically when a field has an error, so the message is never hidden.
 
 The page remembers the last settings in a one-year browser cookie (`HttpOnly`, `SameSite=Lax`,
-no amounts). A request with any report query parameter wins: it opens exactly that view and
-refreshes the remembered settings. A bare `/reports` opens the remembered settings, or the current
-defaults when there is no valid cookie. A malformed or invalid cookie is ignored. The cookie is
+no amounts). A valid request with any report query parameter wins: it opens exactly that view
+and refreshes the remembered settings. An invalid explicit request shows its field errors and
+leaves the remembered settings unchanged. A bare `/reports` opens the remembered settings, or the
+current defaults when there is no valid cookie. A malformed cookie is ignored, and a cookie whose
+values no longer validate is cleared when the page falls back to the defaults. The cookie is
 scoped to the browser, not the account or workspace; category ids from another workspace are
 ignored when the page resolves them. **Clear filters** deletes the remembered settings and
 redirects to the clean `/reports` URL, so the defaults and bookmark link stay exact.

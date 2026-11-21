@@ -27,10 +27,11 @@ the M4 archive.
 - **Filters** (a plain GET form, so a view is a bookmarkable URL; works without JavaScript):
   - **Remembered settings.** The last resolved filters (years, granularity, currency, categories,
     savings, report year and trend window) are kept in a one-year browser cookie (`HttpOnly`,
-    `SameSite=Lax`; no amounts). Any explicit report query parameter wins and refreshes it; a
-    bare `/reports` reads it; an invalid cookie falls back to the current defaults. `clear=1`
-    deletes it and redirects to the clean page. The filter panel is closed by default and opens
-    automatically when a field has a validation error.
+    `SameSite=Lax`; no amounts). A valid explicit report query parameter wins and refreshes it;
+    an invalid explicit request shows its errors and keeps the previous settings. A bare
+    `/reports` reads it; a cookie whose values no longer validate falls back to the current
+    defaults and is cleared. `clear=1` deletes it and redirects to the clean page. The filter
+    panel is closed by default and opens automatically when a field has a validation error.
   - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the last three years that have
     transactions (the current year when there are none); at most 30 years; `from > to`,
     malformed or out-of-range values are marked on the form and show no charts. The dropdowns
@@ -309,10 +310,12 @@ year/month selection, the base-currency rule and the empty workspace.
 - **Filters:** the shared `filter_panel` macro gained `open=true`; Reports passes `false` unless
   the view has validation errors. The last resolved filters (from, to, step, currency,
   categories, savings, year, trend) are kept in a one-year `HttpOnly`, `SameSite=Lax` browser
-  cookie. Any explicit report parameter wins and refreshes it; a bare `/reports` reads it; an
-  invalid or oversized cookie falls back to the current defaults. `clear=1` deletes it and
-  redirects to the clean URL. A **Clear filters** button submits that action inside the GET form.
-  URLs stay bookmarkable and no-JS.
+  cookie. A valid explicit report parameter wins and refreshes it; an invalid explicit request
+  shows its errors and keeps the previous settings. A bare `/reports` reads it; a cookie whose
+  values no longer validate is cleared and falls back to the current defaults, while a
+  malformed or oversized cookie is ignored. `clear=1` deletes it and redirects to the clean
+  URL. A **Clear filters** button submits that action inside the GET form. URLs stay
+  bookmarkable and no-JS.
 - **Year overview heat:** each category row now follows the Transactions T-1 gate. The comparison
   group is the category's non-zero months: at least three are needed, a month must be at least
   twice the row median, and the four steps then use the existing max-relative scale against the
