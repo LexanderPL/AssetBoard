@@ -745,7 +745,7 @@ def test_promote_and_demote_say_when_the_provider_decides(
 
 def test_instance_settings_panels_share_one_width(h: Harness) -> None:
     page = admin(h).get("/admin/settings").text
-    assert page.count('<div class="max-w-3xl space-y-6">') == 1
+    assert page.count('<div class="max-w-4xl space-y-6" data-page-width="4xl">') == 1
     assert "max-w-xl" not in page
     assert 'class="panel mt-6' not in page
     assert (

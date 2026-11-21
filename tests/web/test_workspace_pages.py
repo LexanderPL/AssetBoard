@@ -136,7 +136,7 @@ def test_pages_without_a_context_render_without_workspace_parts(owner: OwnerApp,
 
 def test_settings_cards_share_one_column(owner: OwnerApp) -> None:
     page = owner.client.get("/workspace/settings").text
-    assert page.count('<div class="max-w-3xl space-y-6">') == 1
+    assert page.count('<div class="max-w-4xl space-y-6" data-page-width="4xl">') == 1
     assert "panel max-w-2xl" not in page
     assert '<button type="submit" class="btn-primary">Save settings</button>' in page
     assert "w-full rounded-xl bg-primary" not in page
