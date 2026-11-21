@@ -13202,6 +13202,12 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
+msgid "Salary and variable income:"
+msgstr "Wynagrodzenie i dochody zmienne:"
+
+msgid "Income tax rules:"
+msgstr "Reguły podatku dochodowego:"
+
 msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 "Powtarzające się rachunki i przychody. Każda pozycja sama planuje kolejne"
