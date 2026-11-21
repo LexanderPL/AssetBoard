@@ -2,13 +2,14 @@
 {% block title %}{{ _("Export and import") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Export and import") }}{% endblock %}
 {% block content %}
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
 {% if notice %}
-<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-import-notice>{{ notice }}</p>
+<p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-import-notice>{{ notice }}</p>
 {% endif %}
 {% if export_error %}
-<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ export_error }}</p>
+<p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ export_error }}</p>
 {% endif %}
-<section class="panel max-w-2xl p-6">
+<section class="panel p-6">
   <h2 class="text-lg font-semibold">{{ _("Download workspace archive") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Save this workspace’s ledger, including categories, planned values, transactions, and month status.") }}</p>
   <p class="mt-2 text-sm text-muted">{% if is_owner %}{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels and provider API keys are included only in the optional encrypted secrets member.") }}{% else %}{{ _("Recurring items, income sources, work logs, calendars, and tax rules are included. Notification channels and provider API keys are not included in this download.") }}{% endif %}</p>
@@ -33,12 +34,12 @@
   </form>
 </section>
 {% if demo_session %}
-<section class="panel mt-6 max-w-2xl p-6">
+<section class="panel p-6">
   <h2 class="text-lg font-semibold">{{ _("Import ledger data") }}</h2>
   <p class="mt-2 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
 </section>
 {% else %}
-<section class="panel mt-6 max-w-2xl p-6">
+<section class="panel p-6">
   <h2 class="text-lg font-semibold">{{ _("Import ledger data") }}</h2>
   <form method="post" enctype="multipart/form-data" action="{{ scoped_url(request, 'workspace_data_import') }}" class="mt-4 space-y-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -85,7 +86,7 @@
   </p>
 </section>
 {% if import_batches %}
-<section class="mt-8 max-w-4xl">
+<section>
   <h2 class="text-lg font-semibold">{{ _("Recent imports") }}</h2>
   <div class="mt-3 divide-y divide-line">
     {% for batch in import_batches %}
@@ -127,7 +128,7 @@
 </section>
 {% endif %}
 {% if selected_batch %}
-<section class="mt-8 max-w-4xl" aria-live="polite">
+<section aria-live="polite">
   <h2 class="text-lg font-semibold">{{ _("Import report") }}</h2>
   {% if selected_batch.report %}
   {% if selected_batch.source in available_import_sources %}
@@ -405,4 +406,5 @@
 </section>
 {% endif %}
 {% endif %}
+</div>
 {% endblock %}

@@ -3,7 +3,7 @@
 {% block title %}{{ _("Instance settings") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Instance settings") }}{% endblock %}
 {% block content %}
-<div class="max-w-3xl space-y-6">
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
 <section class="panel p-6 sm:p-7" aria-labelledby="instance-settings-heading" data-instance-settings>
   <h2 id="instance-settings-heading" class="text-base font-semibold">{{ _("Workspaces") }}</h2>
   {% if notice %}<p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}

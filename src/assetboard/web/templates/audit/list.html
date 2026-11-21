@@ -3,8 +3,9 @@
 {% block title %}{{ _("Audit log") }} · {{ app_name }}{% endblock %}
 {% block heading %}{% if scope == "instance" %}{{ _("Audit log: instance") }}{% else %}{{ _("Audit log: workspace") }}{% endif %}{% endblock %}
 {% block content %}
+<div class="max-w-4xl space-y-6" data-page-width="4xl">
 {% set filter_count = (1 if filters.get("group") else 0) + (1 if filters.get("from") else 0) + (1 if filters.get("to") else 0) + (1 if filters.get("account") else 0) %}
-{% call filter_panel(filter_count, "panel mb-6") %}
+{% call filter_panel(filter_count, "panel") %}
 <form method="get" action="{{ scoped_url(request, 'audit') }}" class="flex flex-wrap items-end gap-4" data-audit-filters>
   <input type="hidden" name="scope" value="{{ scope }}">
   <div class="space-y-1.5">
@@ -59,8 +60,9 @@
   <p class="p-6 text-sm text-muted" data-audit-empty>{{ _("No events match.") }}</p>
   {% endif %}
 </section>
-<nav class="mt-6 flex gap-4 text-sm" aria-label="{{ _('Pages') }}">
+<nav class="flex gap-4 text-sm" aria-label="{{ _('Pages') }}">
   {% if paged %}<a class="text-primary-ink" href="{{ first_url }}" data-audit-first>{{ _("Newest") }}</a>{% endif %}
   {% if next_url %}<a class="text-primary-ink" href="{{ next_url }}" data-audit-next>{{ _("Older") }}</a>{% endif %}
 </nav>
+</div>
 {% endblock %}
