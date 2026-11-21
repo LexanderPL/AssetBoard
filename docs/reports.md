@@ -40,9 +40,11 @@ ledger. An unknown or malformed `year` is ignored and the default is used.
 
 The **Report year** selector sits inside the **Year overview** panel and chooses the grid's year.
 It does not change the range of the other sections, and its options are the data years inside the
-selected range (plus an explicitly requested year). The **Net worth over time** and
-**Portfolio value over time** sections follow **From year**, **To year** and **Granularity**,
-ignore the category/savings filters, and are shown only in the workspace base currency.
+selected range (plus an explicitly requested year). The **Category trends window** selector sits
+inside the **Category trends** panel; changing it reloads the page with every other filter
+preserved. The **Net worth over time** and **Portfolio value over time** sections follow **From
+year**, **To year** and **Granularity**, ignore the category/savings filters, and are shown only in
+the workspace base currency.
 
 A range is at most 30 years. A malformed year, `from` after `to`, or a longer range is marked on
 the field and no chart is drawn. The range always ends with the current month in the workspace's
@@ -143,9 +145,9 @@ and open months count alike; entries dated after today are not charted.
 The grid follows the category rules above: regular expenses only, plus expense categories with
 the `savings` treatment when **Include saved / invested** is on. Income, withdrawals and transfers
 never appear. Without a category filter every such category is shown; with a filter exactly the
-chosen categories appear (including a zero row). A category's swatch uses its colour. Darker
-cells mean more spending in that month; the shading uses the theme's colour tokens, so it follows
-the light and dark themes.
+chosen categories appear (including a zero row). A category's swatch uses its colour. Stronger red
+means more spending in that month: the shading uses the same red scale as a large expense on
+Transactions and follows the light and dark themes. Zero months stay unshaded.
 
 The month column headings link to that month's page. The **Report year** selector in this panel
 changes only the grid; changing it reloads the page with the other filters preserved.
@@ -153,10 +155,11 @@ changes only the grid; changing it reloads the page with the other filters prese
 ## Category trends
 
 The category-trends table shows a rolling average for each category shown in the category chart:
-the **3-month** or **12-month** average chosen in **Category trends window**. A point is the exact
-sum of the category's spending over that window divided by the window length, rounded once to
-the currency's minor unit. The average is only shown when the window is full; earlier periods
-show “—” (and a screen-reader reason) and are gaps in the chart, never zeros.
+the **3-month** or **12-month** average chosen with the **Category trends window** selector in
+this panel. A point is the exact sum of the category's spending over that window divided by the
+window length, rounded once to the currency's minor unit. The average is only shown when the
+window is full; earlier periods show “—” (and a screen-reader reason) and are gaps in the chart,
+never zeros.
 
 The section uses the same categories as the expenses-by-category chart: the selected categories,
 or the eight largest plus **Other (combined)** when none are selected. It is monthly only; with

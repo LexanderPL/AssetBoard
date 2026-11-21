@@ -78,6 +78,9 @@ belongs to the tab currently shown.
 - Page stack: `space-y-6`. Panel padding: `p-4 sm:p-6`. Large settings panels may use
   `p-6 sm:p-7`. Do not mix `p-4`, `p-5`, `p-6` and `p-7` arbitrarily.
 - Field stack: `space-y-1.5` (or `gap-4` in a grid). Help text belongs directly below its field.
+  In a filter grid, align fields to the top (`items-start`), not the bottom: helper text and
+  validation errors must not lift a neighbouring control. Use `min-w-0` wrappers and `w-full`
+  controls so long translated labels and options cannot widen the grid.
 - Notices sit `mb-4` below the page header or above the panel they refer to.
 
 ## 4. Components
