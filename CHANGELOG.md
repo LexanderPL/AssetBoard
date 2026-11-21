@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.8.7](https://github.com/LexanderPL/AssetBoard/compare/v0.8.6...v0.8.7) (2026-11-21)
+
+
+### Features
+
+* **admin:** delete deactivated users and clarify workspace members ([#451](https://github.com/LexanderPL/AssetBoard/issues/451)) ([bb5d4ec](https://github.com/LexanderPL/AssetBoard/commit/bb5d4ec5a656692207bb7e6cd14db966f471940a))
+* **investments:** show the latest 10 price points and disclose older ones ([#447](https://github.com/LexanderPL/AssetBoard/issues/447)) ([ac9e3d5](https://github.com/LexanderPL/AssetBoard/commit/ac9e3d5ce04003831276455c94fe9ded1a7fad9e))
+* **reports:** full-year year-over-year and planning accuracy ([#453](https://github.com/LexanderPL/AssetBoard/issues/453)) ([5448f78](https://github.com/LexanderPL/AssetBoard/commit/5448f78f7559df47bc9c3682ccaf1a168f7cd1d1))
+* **reports:** polish report filters, heat scale and trend window (WP1) ([#450](https://github.com/LexanderPL/AssetBoard/issues/450)) ([37bdf6b](https://github.com/LexanderPL/AssetBoard/commit/37bdf6b6b0b2342b19befe0a25e67b340f4162bb))
+* **transactions:** tint only genuinely large entries (T-1) ([#449](https://github.com/LexanderPL/AssetBoard/issues/449)) ([6c144f1](https://github.com/LexanderPL/AssetBoard/commit/6c144f1755879f1b3e3370fe7e601aa9e7bf8983))
+* **ui:** unify settings widths and use Heroicons sidebar icons ([#452](https://github.com/LexanderPL/AssetBoard/issues/452)) ([55a8405](https://github.com/LexanderPL/AssetBoard/commit/55a84050394cfa5051f9eaf0a79dd2492d7854cc))
+* **workspace:** country-first currency and time zone defaults ([#448](https://github.com/LexanderPL/AssetBoard/issues/448)) ([9c4e752](https://github.com/LexanderPL/AssetBoard/commit/9c4e752d0f45d31b1a8d003b54db7da6b213b2e0))
+
+
+### Bug Fixes
+
+* **reports:** make the page readable on a phone and honest when empty ([#442](https://github.com/LexanderPL/AssetBoard/issues/442)) ([db434f1](https://github.com/LexanderPL/AssetBoard/commit/db434f17a0c52533ec745ba4caf1f12001ace903))
+* **ui:** fix chart labels, demo consistency and long tables ([#439](https://github.com/LexanderPL/AssetBoard/issues/439)) ([0bc7554](https://github.com/LexanderPL/AssetBoard/commit/0bc7554132a323d81116701e772ed477788099bf))
+* **ui:** make the core pages work on a phone ([#440](https://github.com/LexanderPL/AssetBoard/issues/440)) ([f91e50e](https://github.com/LexanderPL/AssetBoard/commit/f91e50e185589fd4f29881605f4ec722518389e2))
+
+
+### Documentation
+
+* plan the UI improvements ([#438](https://github.com/LexanderPL/AssetBoard/issues/438)) ([6b97147](https://github.com/LexanderPL/AssetBoard/commit/6b971473e816751da632a2b0702bb6653caf7516))
+
 ## [0.8.6](https://github.com/LexanderPL/AssetBoard/compare/v0.8.5...v0.8.6) (2026-11-20)
 
 
