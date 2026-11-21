@@ -503,8 +503,21 @@ def reports_data(
                 year_options=_report_year_options(data_years, filters),
                 year_grid=_empty_category_series(base_currency),
                 category_trends=CategoryTrends((), filters.trend_months, ()),
-                yoy=YearOverYearTable((), Money(0, base_currency), Money(0, base_currency)),
-                plan_accuracy=PlanAccuracy((), 0, 0, None),
+                yoy=YearOverYearTable(
+                    rows=(),
+                    earned=Money(0, base_currency),
+                    spent=Money(0, base_currency),
+                    saved=Money(0, base_currency),
+                ),
+                plan_accuracy=PlanAccuracy(
+                    rows=(),
+                    months_planned=0,
+                    months_over=0,
+                    over_tenths=None,
+                    planned=Money(0, base_currency),
+                    deviation=Money(0, base_currency),
+                    score_tenths=None,
+                ),
                 available_currencies=(base_currency,),
                 base_currency=base_currency,
                 show_currency_selector=False,
@@ -640,6 +653,9 @@ def reports_data(
                 for line in BudgetLineRepository(session, ctx).for_range(plan_start, plan_end)
                 if line.currency == selected_currency
             )
+        # The year before the range is read in full so the first row has a real comparison, and
+        # the current year holds every recorded month through today (future rows never reach
+        # here). ``year_over_year_table`` compares full calendar years; it does not clip months.
         yoy_monthly = ledger_series(
             yoy_entries,
             categories,

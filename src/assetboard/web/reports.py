@@ -85,7 +85,10 @@ ARCHIVED = _("archived")
 CATEGORY_TRENDS_NOT_ENOUGH = _("Not available: fewer than %(num)d months of data.")
 YEAR_OVER_YEAR_NO_INCOME = _("Not available: no income in the previous year.")
 YEAR_OVER_YEAR_NO_EXPENSES = _("Not available: no expenses in the previous year.")
-YEAR_OVER_YEAR_PARTIAL = _("The current year is compared through %(month)s in both years.")
+YEAR_OVER_YEAR_NO_SAVINGS = _("Not available: no savings in the previous year.")
+YEAR_OVER_YEAR_NO_DATA = _("No data for %(year)s.")
+YEAR_OVER_YEAR_IN_PROGRESS = _("The current year is still in progress; no projection is added.")
+NOT_AVAILABLE_SCORE = _("Not available: no planned amount.")
 CATEGORY_SUMMARY_ALL = _("All categories")
 CATEGORY_SUMMARY_ONE = _("1 category selected")
 CATEGORY_SUMMARY_MANY = _("%(num)d categories selected")
@@ -244,15 +247,21 @@ class YearOverYearRowView:
     href: str
     earned: str
     spent: str
-    earned_change: str
+    saved: str
+    earned_change: str | None
     earned_change_minor: int
     earned_percent: str | None
     earned_percent_note: str | None
-    spent_change: str
+    spent_change: str | None
     spent_change_minor: int
     spent_percent: str | None
     spent_percent_note: str | None
-    partial: bool = False
+    saved_change: str | None
+    saved_change_minor: int
+    saved_percent: str | None
+    saved_percent_note: str | None
+    has_previous: bool
+    no_previous_note: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +269,8 @@ class YearOverYearView:
     rows: tuple[YearOverYearRowView, ...]
     earned: str
     spent: str
-    partial_note: str | None
+    saved: str
+    in_progress_note: str | None
     empty: bool
 
 
@@ -279,6 +289,9 @@ class PlanAccuracyView:
     months_planned: int
     months_over: int
     percent: str
+    score: str | None
+    score_tenths: int | None
+    score_note: str | None
     empty: bool
 
 
@@ -913,44 +926,68 @@ def _trend_chart(data: ReportsData, locale: str, request: Request) -> dict[str, 
 def _year_over_year_view(data: ReportsData, locale: str, request: Request) -> YearOverYearView:
     rows: list[YearOverYearRowView] = []
     for row in data.yoy.rows:
-        earned_percent = _signed_rate(row.earned_change_tenths, locale)
-        spent_percent = _signed_rate(row.spent_change_tenths, locale)
+        if row.has_previous:
+            earned_change = _signed_money(row.earned_change, locale)
+            spent_change = _signed_money(row.spent_change, locale)
+            saved_change = _signed_money(row.saved_change, locale)
+            earned_percent = _signed_rate(row.earned_change_tenths, locale)
+            spent_percent = _signed_rate(row.spent_change_tenths, locale)
+            saved_percent = _signed_rate(row.saved_change_tenths, locale)
+            earned_percent_note = (
+                None if earned_percent is not None else gettext(YEAR_OVER_YEAR_NO_INCOME, locale)
+            )
+            spent_percent_note = (
+                None if spent_percent is not None else gettext(YEAR_OVER_YEAR_NO_EXPENSES, locale)
+            )
+            saved_percent_note = (
+                None if saved_percent is not None else gettext(YEAR_OVER_YEAR_NO_SAVINGS, locale)
+            )
+            no_previous_note = None
+        else:
+            earned_change = None
+            spent_change = None
+            saved_change = None
+            earned_percent = None
+            spent_percent = None
+            saved_percent = None
+            earned_percent_note = None
+            spent_percent_note = None
+            saved_percent_note = None
+            no_previous_note = gettext(YEAR_OVER_YEAR_NO_DATA, locale) % {"year": row.year - 1}
         rows.append(
             YearOverYearRowView(
                 year=row.year,
                 href=_report_year_url(request, data.filters, row.year),
                 earned=format_money(row.earned, locale),
                 spent=format_money(row.spent, locale),
-                earned_change=_signed_money(row.earned_change, locale),
+                saved=format_money(row.saved, locale),
+                earned_change=earned_change,
                 earned_change_minor=row.earned_change.amount_minor,
                 earned_percent=earned_percent,
-                earned_percent_note=(
-                    None
-                    if earned_percent is not None
-                    else gettext(YEAR_OVER_YEAR_NO_INCOME, locale)
-                ),
-                spent_change=_signed_money(row.spent_change, locale),
+                earned_percent_note=earned_percent_note,
+                spent_change=spent_change,
                 spent_change_minor=row.spent_change.amount_minor,
                 spent_percent=spent_percent,
-                spent_percent_note=(
-                    None
-                    if spent_percent is not None
-                    else gettext(YEAR_OVER_YEAR_NO_EXPENSES, locale)
-                ),
-                partial=row.partial,
+                spent_percent_note=spent_percent_note,
+                saved_change=saved_change,
+                saved_change_minor=row.saved_change.amount_minor,
+                saved_percent=saved_percent,
+                saved_percent_note=saved_percent_note,
+                has_previous=row.has_previous,
+                no_previous_note=no_previous_note,
             )
         )
-    partial_note = (
-        gettext(YEAR_OVER_YEAR_PARTIAL, locale)
-        % {"month": format_month(YearMonth(data.today.year, data.today.month), locale)}
-        if any(row.partial for row in data.yoy.rows)
+    in_progress_note = (
+        gettext(YEAR_OVER_YEAR_IN_PROGRESS, locale)
+        if any(row.year == data.today.year for row in data.yoy.rows)
         else None
     )
     return YearOverYearView(
         rows=tuple(rows),
         earned=format_money(data.yoy.earned, locale),
         spent=format_money(data.yoy.spent, locale),
-        partial_note=partial_note,
+        saved=format_money(data.yoy.saved, locale),
+        in_progress_note=in_progress_note,
         empty=data.yoy.empty,
     )
 
@@ -978,6 +1015,11 @@ def _plan_accuracy_view(data: ReportsData, locale: str) -> PlanAccuracyView:
         )
         for row in accuracy.rows
     )
+    score = (
+        format_rate_tenths(accuracy.score_tenths, locale)
+        if accuracy.score_tenths is not None
+        else None
+    )
     return PlanAccuracyView(
         rows=rows,
         months_planned=accuracy.months_planned,
@@ -986,6 +1028,13 @@ def _plan_accuracy_view(data: ReportsData, locale: str) -> PlanAccuracyView:
             format_rate_tenths(accuracy.over_tenths, locale)
             if accuracy.over_tenths is not None
             else "—"
+        ),
+        score=score,
+        score_tenths=accuracy.score_tenths,
+        score_note=(
+            gettext(NOT_AVAILABLE_SCORE, locale)
+            if not accuracy.empty and accuracy.score_tenths is None
+            else None
         ),
         empty=accuracy.empty,
     )

@@ -5234,8 +5234,17 @@ msgstr ""
 msgid "Not available: no expenses in the previous year."
 msgstr ""
 
+msgid "Not available: no savings in the previous year."
+msgstr ""
+
 #, python-format
-msgid "The current year is compared through %(month)s in both years."
+msgid "No data for %(year)s."
+msgstr ""
+
+msgid "The current year is still in progress; no projection is added."
+msgstr ""
+
+msgid "Not available: no planned amount."
 msgstr ""
 
 msgid "All categories"
@@ -11685,7 +11694,7 @@ msgstr ""
 msgid "Year-over-year"
 msgstr ""
 
-msgid "Planned vs actual accuracy"
+msgid "Planning accuracy"
 msgstr ""
 
 msgid "No earned, spent or saved amounts in this range."
@@ -11743,13 +11752,22 @@ msgid ""
 "selected month."
 msgstr ""
 
-msgid "Income and expenses per year, compared with the previous year."
+msgid "Income, expenses and savings per year, compared with the previous year."
 msgstr ""
 
-msgid "No income or expenses in this range."
+msgid ""
+"Expenses are regular spending; savings and investments are shown "
+"separately. Investment purchases recorded in Investments are not "
+"included."
+msgstr ""
+
+msgid "No income, expenses or savings in this range."
 msgstr ""
 
 msgid "Year-over-year comparison"
+msgstr ""
+
+msgid "Savings & investments"
 msgstr ""
 
 msgid "Income change"
@@ -11758,10 +11776,19 @@ msgstr ""
 msgid "Expenses change"
 msgstr ""
 
-msgid "How often actual spending exceeded the plan, by category."
+msgid "Savings change"
+msgstr ""
+
+msgid "No comparison"
+msgstr ""
+
+msgid "How closely actual spending matched the plan, by category."
 msgstr ""
 
 msgid "No planned regular expenses in this range."
+msgstr ""
+
+msgid "Accuracy score"
 msgstr ""
 
 msgid "How often actual spending exceeded the plan"
@@ -11778,8 +11805,11 @@ msgid "Over %%"
 msgstr ""
 
 msgid ""
-"A month counts as over when actual spending is greater than the plan. "
-"Only planned regular expense categories are included."
+"The score compares actual spending with the plan across planned regular "
+"expense categories. A score of 100 means every planned month matched "
+"exactly. Only planned regular expenses count; income and savings are "
+"excluded. A month counts as over when actual spending is greater than the"
+" plan."
 msgstr ""
 
 msgid "No transactions in this range"
@@ -15456,6 +15486,37 @@ msgstr ""
 #~ msgid "Choose which widgets appear on Home and in what order."
 #~ msgstr ""
 
+#~ msgid "The current year is compared through %(month)s in both years."
+#~ msgstr ""
+
+#~ msgid "Planned vs actual accuracy"
+#~ msgstr ""
+
+#~ msgid "Income and expenses per year, compared with the previous year."
+#~ msgstr ""
+
+#~ msgid "No income or expenses in this range."
+#~ msgstr ""
+
+#~ msgid "How often actual spending exceeded the plan, by category."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A month counts as over when actual"
+#~ " spending is greater than the plan."
+#~ " Only planned regular expense categories"
+#~ " are included."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You cannot deactivate your own account"
+#~ " or remove your own administrator "
+#~ "role."
+#~ msgstr ""
+
+#~ msgid "Invite someone"
+#~ msgstr ""
+
 #~ msgid ""
 #~ "On the Transactions page, larger "
 #~ "expenses get a stronger red background"
@@ -15470,14 +15531,5 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Window: %(num)d months"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "You cannot deactivate your own account"
-#~ " or remove your own administrator "
-#~ "role."
-#~ msgstr ""
-
-#~ msgid "Invite someone"
 #~ msgstr ""
 

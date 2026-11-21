@@ -149,7 +149,7 @@
       <a href="#reports-year-overview-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Year overview") }}</a>
       <a href="#reports-trends-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Category trends") }}</a>
       <a href="#reports-yoy-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Year-over-year") }}</a>
-      <a href="#reports-accuracy-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Planned vs actual accuracy") }}</a>
+      <a href="#reports-accuracy-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Planning accuracy") }}</a>
       {% endif %}
       {% if view.net_worth %}<a href="#reports-net-worth-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Net worth over time") }}</a>{% endif %}
       {% if view.portfolio %}<a href="#reports-portfolio-heading" class="text-primary-ink underline-offset-2 hover:underline">{{ _("Portfolio value over time") }}</a>{% endif %}
@@ -470,10 +470,11 @@
       <h2 id="reports-yoy-heading" class="text-base font-semibold">{{ _("Year-over-year") }}</h2>
       <p class="text-sm tabular-nums text-muted" data-report-yoy-range>{{ view.range_years }}</p>
     </div>
-    <p class="mt-1 text-sm text-muted">{{ _("Income and expenses per year, compared with the previous year.") }}</p>
-    {% if view.year_over_year.partial_note %}<p class="mt-2 text-sm text-muted" data-report-yoy-partial>{{ view.year_over_year.partial_note }}</p>{% endif %}
+    <p class="mt-1 text-sm text-muted">{{ _("Income, expenses and savings per year, compared with the previous year.") }}</p>
+    {% if view.year_over_year.in_progress_note %}<p class="mt-2 text-sm text-muted" data-report-yoy-in-progress>{{ view.year_over_year.in_progress_note }}</p>{% endif %}
+    <p class="mt-2 text-xs text-muted" data-report-yoy-scope>{{ _("Expenses are regular spending; savings and investments are shown separately. Investment purchases recorded in Investments are not included.") }}</p>
     {% if view.year_over_year.empty %}
-    <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No income or expenses in this range.") }}</p>
+    <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No income, expenses or savings in this range.") }}</p>
     {% else %}
     {% call table_scroll(_("Year-over-year comparison"), class_name="mt-4") %}
       <table class="sheet w-full text-sm">
@@ -483,10 +484,14 @@
             <th scope="col" rowspan="2" class="py-1.5 pr-2 font-medium">{{ _("Year") }}</th>
             <th scope="col" rowspan="2" class="py-1.5 pr-2 text-right font-medium">{{ _("Income") }}</th>
             <th scope="col" rowspan="2" class="py-1.5 pr-2 text-right font-medium">{{ _("Expenses") }}</th>
+            <th scope="col" rowspan="2" class="py-1.5 pr-2 text-right font-medium">{{ _("Savings & investments") }}</th>
             <th scope="colgroup" colspan="2" class="py-1.5 pr-2 text-center font-medium">{{ _("Income change") }}</th>
-            <th scope="colgroup" colspan="2" class="py-1.5 text-center font-medium">{{ _("Expenses change") }}</th>
+            <th scope="colgroup" colspan="2" class="py-1.5 pr-2 text-center font-medium">{{ _("Expenses change") }}</th>
+            <th scope="colgroup" colspan="2" class="py-1.5 text-center font-medium">{{ _("Savings change") }}</th>
           </tr>
           <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Value") }}</th>
+            <th scope="col" class="py-1.5 pr-2 text-right font-medium">%</th>
             <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Value") }}</th>
             <th scope="col" class="py-1.5 pr-2 text-right font-medium">%</th>
             <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Value") }}</th>
@@ -497,17 +502,29 @@
           {% for row in view.year_over_year.rows %}
           <tr data-report-yoy-row>
             <th scope="row" class="whitespace-nowrap py-1.5 pr-2 text-left font-normal">
-              <a href="{{ row.href }}" class="text-primary-ink underline" data-report-yoy-year>{{ row.year }}</a>{% if row.partial %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-yoy-so-far>{{ _("so far") }}</span>{% endif %}
+              <a href="{{ row.href }}" class="text-primary-ink underline" data-report-yoy-year>{{ row.year }}</a>
+              {% if not row.has_previous %}<span class="mt-1 block text-xs font-normal text-muted" data-report-yoy-no-previous>{{ row.no_previous_note }}</span>{% endif %}
             </th>
             <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.earned }}</td>
             <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.spent }}</td>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.earned_change_minor > 0 %}text-success-strong{% elif row.earned_change_minor < 0 %}text-danger{% endif %}" data-report-yoy-income-change>{{ row.earned_change }}</td>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-report-yoy-income-percent>
-              {% if row.earned_percent is not none %}{{ row.earned_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ row.earned_percent_note }}</span>{% endif %}
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums">{{ row.saved }}</td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.has_previous and row.earned_change_minor > 0 %}text-success-strong{% elif row.has_previous and row.earned_change_minor < 0 %}text-danger{% endif %}" data-report-yoy-income-change>
+              {% if row.earned_change is not none %}{{ row.earned_change }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ _("No comparison") }}</span>{% endif %}
             </td>
-            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.spent_change_minor > 0 %}text-danger{% elif row.spent_change_minor < 0 %}text-success-strong{% endif %}" data-report-yoy-expense-change>{{ row.spent_change }}</td>
-            <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-yoy-expense-percent>
-              {% if row.spent_percent is not none %}{{ row.spent_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ row.spent_percent_note }}</span>{% endif %}
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-report-yoy-income-percent>
+              {% if row.earned_percent is not none %}{{ row.earned_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{% if row.has_previous %}{{ row.earned_percent_note }}{% else %}{{ _("No comparison") }}{% endif %}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.has_previous and row.spent_change_minor > 0 %}text-danger{% elif row.has_previous and row.spent_change_minor < 0 %}text-success-strong{% endif %}" data-report-yoy-expense-change>
+              {% if row.spent_change is not none %}{{ row.spent_change }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ _("No comparison") }}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-report-yoy-expense-percent>
+              {% if row.spent_percent is not none %}{{ row.spent_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{% if row.has_previous %}{{ row.spent_percent_note }}{% else %}{{ _("No comparison") }}{% endif %}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {% if row.has_previous and row.saved_change_minor > 0 %}text-success-strong{% elif row.has_previous and row.saved_change_minor < 0 %}text-danger{% endif %}" data-report-yoy-savings-change>
+              {% if row.saved_change is not none %}{{ row.saved_change }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ _("No comparison") }}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-1.5 text-right tabular-nums" data-report-yoy-savings-percent>
+              {% if row.saved_percent is not none %}{{ row.saved_percent }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{% if row.has_previous %}{{ row.saved_percent_note }}{% else %}{{ _("No comparison") }}{% endif %}</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -517,7 +534,8 @@
             <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
             <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.year_over_year.earned }}</td>
             <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.year_over_year.spent }}</td>
-            <td colspan="4" class="py-2"></td>
+            <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ view.year_over_year.saved }}</td>
+            <td colspan="6" class="py-2"></td>
           </tr>
         </tfoot>
       </table>
@@ -527,13 +545,28 @@
 
   <section class="panel scroll-mt-24 p-4 sm:p-6" aria-labelledby="reports-accuracy-heading" data-report-accuracy>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="reports-accuracy-heading" class="text-base font-semibold">{{ _("Planned vs actual accuracy") }}</h2>
+      <h2 id="reports-accuracy-heading" class="text-base font-semibold">{{ _("Planning accuracy") }}</h2>
       <p class="text-sm tabular-nums text-muted">{{ view.range_years }}</p>
     </div>
-    <p class="mt-1 text-sm text-muted">{{ _("How often actual spending exceeded the plan, by category.") }}</p>
+    <p class="mt-1 text-sm text-muted">{{ _("How closely actual spending matched the plan, by category.") }}</p>
     {% if view.plan_accuracy.empty %}
     <p class="mt-4 text-sm text-muted" data-chart-empty>{{ _("No planned regular expenses in this range.") }}</p>
     {% else %}
+    <div class="mt-4 flex flex-wrap items-center gap-4" data-report-accuracy-score-block>
+      <div class="min-w-0">
+        <p class="text-xs text-muted">{{ _("Accuracy score") }}</p>
+        <p class="text-3xl font-semibold tabular-nums" data-report-accuracy-score>
+          {% if view.plan_accuracy.score is not none %}{{ view.plan_accuracy.score }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ view.plan_accuracy.score_note }}</span>{% endif %}
+        </p>
+      </div>
+      {% if view.plan_accuracy.score_tenths is not none %}
+      <svg class="h-2 w-full max-w-md overflow-hidden rounded-full" viewBox="0 0 100 8" preserveAspectRatio="none" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ view.plan_accuracy.score_tenths // 10 }}" aria-valuetext="{{ view.plan_accuracy.score }}" aria-label="{{ _('Planning accuracy') }}" data-report-accuracy-bar>
+        <rect x="0" y="0" width="100" height="8" class="fill-subtle"></rect>
+        <rect x="0" y="0" width="{{ view.plan_accuracy.score_tenths / 10 }}" height="8" class="fill-primary" data-report-accuracy-fill></rect>
+      </svg>
+      {% endif %}
+    </div>
+    {% if view.plan_accuracy.score_note %}<p class="mt-2 text-sm text-muted" data-report-accuracy-score-note>{{ view.plan_accuracy.score_note }}</p>{% endif %}
     {% call table_scroll(_("How often actual spending exceeded the plan"), class_name="mt-4") %}
       <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ _("How often actual spending exceeded the plan") }}</caption>
@@ -568,7 +601,7 @@
       </table>
     {% endcall %}
     {% endif %}
-    <p class="mt-2 text-xs text-muted">{{ _("A month counts as over when actual spending is greater than the plan. Only planned regular expense categories are included.") }}</p>
+    <p class="mt-2 text-xs text-muted">{{ _("The score compares actual spending with the plan across planned regular expense categories. A score of 100 means every planned month matched exactly. Only planned regular expenses count; income and savings are excluded. A month counts as over when actual spending is greater than the plan.") }}</p>
   </section>
   {% elif view.valid %}
   {% if view.notes %}

@@ -28,11 +28,13 @@ their history keeps counting and the caller supplies their current name and colo
 **F9.2 sections.** ``year_grid`` is the same category series for one calendar year, month by
 month. ``rolling_category_averages`` averages each category's monthly amount over a trailing
 window (3 or 12 months) and leaves the first ``months - 1`` points empty, like F10.2's rolling
-rate. ``year_over_year_table`` compares every year in the range with the year before, with
-separate income and expense changes; the percent change is ``None`` when the previous year's
+rate. ``year_over_year_table`` compares every year in the range with the full year before, with
+separate income, expense and savings changes; ``has_previous`` says whether there is a
+comparison at all, and a percent change is ``None`` when the previous year's corresponding
 figure was zero. ``plan_accuracy`` counts, per planned regular expense category, the months with
-a plan and the months whose actual was **greater** than the plan; a month with equal amounts is
-not over.
+a plan and the months whose actual was **greater** than the plan (a month with equal amounts is
+not over), and scores how closely the actual amounts followed the plan: the summed absolute
+deviation against the summed plan, rounded once and floored at zero.
 """
 
 from __future__ import annotations
@@ -225,46 +227,47 @@ class CategoryTrends:
 
 @dataclass(frozen=True, slots=True)
 class YearOverYearRow:
-    """One calendar year's income and expenses, with the change against the year before.
+    """One calendar year's income, expenses and savings, with the change against the year before.
 
-    ``earned_change = earned - previous_earned`` and ``spent_change = spent - previous_spent``;
-    a positive expense change means more was spent. The percent changes are in tenths of a
-    percent, rounded once, and are ``None`` when the previous year's figure was zero.
+    ``earned_change = earned - previous_earned`` and so on; a positive expense change means more
+    was spent, while a positive savings change means more was saved. The percent changes are in
+    tenths of a percent, rounded once, and are ``None`` when the previous year's corresponding
+    figure was zero. ``has_previous`` is false when the previous calendar year has no recorded
+    income, expenses or savings at all; the changes are then zero rather than the whole current
+    amount, and every percentage is ``None``.
     """
 
     year: int
     earned: Money
     spent: Money
+    saved: Money
     earned_change: Money
     earned_change_tenths: int | None
     spent_change: Money
     spent_change_tenths: int | None
-    partial: bool = False
+    saved_change: Money
+    saved_change_tenths: int | None
+    has_previous: bool
 
 
 @dataclass(frozen=True, slots=True)
 class YearOverYearTable:
-    """One row per year in the report range, plus the exact income/expense totals."""
+    """One row per year in the report range, plus the exact income/expense/savings totals."""
 
     rows: tuple[YearOverYearRow, ...]
     earned: Money
     spent: Money
+    saved: Money
 
     @property
     def empty(self) -> bool:
         if not self.rows:
             return True
-        previous_earned = sum(
-            row.earned.amount_minor - row.earned_change.amount_minor for row in self.rows
-        )
-        previous_spent = sum(
-            row.spent.amount_minor - row.spent_change.amount_minor for row in self.rows
-        )
         return (
             self.earned.amount_minor == 0
             and self.spent.amount_minor == 0
-            and previous_earned == 0
-            and previous_spent == 0
+            and self.saved.amount_minor == 0
+            and not any(row.has_previous for row in self.rows)
         )
 
 
@@ -296,12 +299,22 @@ class AccuracyRow:
 
 @dataclass(frozen=True, slots=True)
 class PlanAccuracy:
-    """Plan accuracy per category plus the exact totals across category-months."""
+    """Plan accuracy per category plus the exact totals across category-months.
+
+    ``planned`` and ``deviation`` are the summed plan and the summed absolute deviation
+    ``|actual - planned|`` over the counted category-months. ``score_tenths`` is
+    ``max(0, 1000 - deviation / planned * 1000)``, rounded once (half away from zero) and
+    expressed in tenths of a percent; it is ``None`` when the planned total is zero and no
+    score is defined.
+    """
 
     rows: tuple[AccuracyRow, ...]
     months_planned: int
     months_over: int
     over_tenths: int | None
+    planned: Money
+    deviation: Money
+    score_tenths: int | None
 
     @property
     def empty(self) -> bool:
@@ -775,12 +788,15 @@ def year_over_year_table(
     today: date,
     currency: str,
 ) -> YearOverYearTable:
-    """One row per calendar year in the range, compared with the year before.
+    """One row per calendar year in the range, compared with the full year before.
 
     ``periods`` is a monthly ``PeriodTotals`` series. The service includes the year before
     ``start_year`` so the first row can still show its change; missing months count as zero.
-    The current year is compared with the same months of the previous year, never with that
-    year's full total. Future years are omitted, like the rest of the reports.
+    Months are never clipped: a previous year is compared with its full total, and the current
+    year shows every period supplied (the service never supplies future-dated rows). A row has
+    no comparison when the previous year has no recorded income, expenses or savings; its
+    changes are then zero and its percentages are ``None``. Future years are omitted, like the
+    rest of the reports.
     """
     by_year: dict[int, list[PeriodTotals]] = {}
     for period in periods:
@@ -788,45 +804,54 @@ def year_over_year_table(
             raise ValueError("year-over-year needs a monthly period series")
         by_year.setdefault(period.period.year, []).append(period)
 
-    def totals(year: int, *, through_month: int | None = None) -> tuple[int, int]:
-        earned = spent = 0
+    def totals(year: int) -> tuple[int, int, int]:
+        earned = spent = saved = 0
         for period in by_year.get(year, ()):
-            assert isinstance(period.period, YearMonth)
-            if through_month is not None and period.period.month > through_month:
-                continue
             earned += period.earned.amount_minor
             spent += period.spent.amount_minor
-        return earned, spent
+            saved += period.saved.amount_minor
+        return earned, spent, saved
 
     rows: list[YearOverYearRow] = []
-    total_earned = total_spent = 0
+    total_earned = total_spent = total_saved = 0
     last_year = min(end_year, today.year)
     for year in range(start_year, last_year + 1):
-        partial = year == today.year
-        current_earned, current_spent = totals(year, through_month=today.month if partial else None)
-        previous_earned, previous_spent = totals(
-            year - 1, through_month=today.month if partial else None
-        )
-        earned_change = current_earned - previous_earned
-        spent_change = current_spent - previous_spent
+        current_earned, current_spent, current_saved = totals(year)
+        previous_earned, previous_spent, previous_saved = totals(year - 1)
+        has_previous = previous_earned != 0 or previous_spent != 0 or previous_saved != 0
+        if has_previous:
+            earned_change = current_earned - previous_earned
+            spent_change = current_spent - previous_spent
+            saved_change = current_saved - previous_saved
+            earned_tenths = ratio_tenths(earned_change, previous_earned)
+            spent_tenths = ratio_tenths(spent_change, previous_spent)
+            saved_tenths = ratio_tenths(saved_change, previous_saved)
+        else:
+            earned_change = spent_change = saved_change = 0
+            earned_tenths = spent_tenths = saved_tenths = None
         rows.append(
             YearOverYearRow(
                 year=year,
                 earned=Money(current_earned, currency),
                 spent=Money(current_spent, currency),
+                saved=Money(current_saved, currency),
                 earned_change=Money(earned_change, currency),
-                earned_change_tenths=ratio_tenths(earned_change, previous_earned),
+                earned_change_tenths=earned_tenths,
                 spent_change=Money(spent_change, currency),
-                spent_change_tenths=ratio_tenths(spent_change, previous_spent),
-                partial=partial,
+                spent_change_tenths=spent_tenths,
+                saved_change=Money(saved_change, currency),
+                saved_change_tenths=saved_tenths,
+                has_previous=has_previous,
             )
         )
         total_earned += current_earned
         total_spent += current_spent
+        total_saved += current_saved
     return YearOverYearTable(
         rows=tuple(rows),
         earned=Money(total_earned, currency),
         spent=Money(total_spent, currency),
+        saved=Money(total_saved, currency),
     )
 
 
@@ -835,7 +860,7 @@ def plan_accuracy(
     plans: Iterable[PlannedMonth],
     categories: Mapping[UUID, ReportCategory],
 ) -> PlanAccuracy:
-    """How often actual spending exceeded the plan, per planned regular expense category.
+    """How often actual spending exceeded the plan, and how closely it followed it.
 
     ``series`` is the monthly category series for the range; only regular expense categories
     are considered (transfers, income, withdrawals and savings never count, whichever option
@@ -843,6 +868,12 @@ def plan_accuracy(
     amount is **greater** than the plan; equal amounts are not over. Lines outside the series'
     periods or in another currency than the series are ignored; a category with a plan but no
     spending still counts with an actual of zero. A category without any plan has no row.
+
+    The score sums the absolute deviation ``|actual - planned|`` and the planned amounts over
+    the same category-months, then applies
+    ``max(0, 1000 - ratio_tenths(deviation, planned))``: 1000 (100.0%) means every month
+    matched its plan exactly, and being far under plan is penalised like being far over. The
+    score is ``None`` when the planned total is zero.
     """
     positions = {period: index for index, period in enumerate(series.periods)}
     planned_by_category: dict[UUID, dict[YearMonth, int]] = {}
@@ -859,6 +890,8 @@ def plan_accuracy(
         months = planned_by_category.setdefault(category.id, {})
         months[line.month] = months.get(line.month, 0) + line.planned.amount_minor
     rows: list[AccuracyRow] = []
+    planned_total = 0
+    deviation_total = 0
     for category_id, months in planned_by_category.items():
         actuals = next(
             (row.amounts for row in series.rows if row.category_id == category_id),
@@ -870,6 +903,8 @@ def plan_accuracy(
             actual_minor = actuals[position].amount_minor if actuals is not None else 0
             if actual_minor > planned_minor:
                 over += 1
+            planned_total += planned_minor
+            deviation_total += abs(actual_minor - planned_minor)
         months_planned = len(months)
         category = categories[category_id]
         rows.append(
@@ -892,13 +927,17 @@ def plan_accuracy(
             str(row.category_id),
         )
     )
-    total_planned = sum(row.months_planned for row in rows)
+    total_months = sum(row.months_planned for row in rows)
     total_over = sum(row.months_over for row in rows)
+    deviation_tenths = ratio_tenths(deviation_total, planned_total)
     return PlanAccuracy(
         rows=tuple(rows),
-        months_planned=total_planned,
+        months_planned=total_months,
         months_over=total_over,
-        over_tenths=ratio_tenths(total_over, total_planned),
+        over_tenths=ratio_tenths(total_over, total_months),
+        planned=Money(planned_total, series.total.currency),
+        deviation=Money(deviation_total, series.total.currency),
+        score_tenths=(max(0, 1000 - deviation_tenths) if deviation_tenths is not None else None),
     )
 
 

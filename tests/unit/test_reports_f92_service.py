@@ -281,20 +281,23 @@ def test_year_over_year_table_has_a_row_per_data_year(team: WorkspaceDb) -> None
     first, current = table.rows
     assert first.earned == Money(0, "EUR")
     assert first.spent == Money(180_000, "EUR")
+    assert first.has_previous is False
     assert current.earned == Money(3_000_000, "EUR")
     assert current.spent == Money(1_005_500, "EUR")
+    assert current.saved == Money(500_000, "EUR")
     assert current.earned_change == Money(3_000_000, "EUR")
     assert current.spent_change == Money(825_500, "EUR")
+    assert current.saved_change == Money(500_000, "EUR")
     assert current.earned_change_tenths is None
     assert current.spent_change_tenths == 4_586  # +458.6 %
-    assert current.partial
+    assert current.saved_change_tenths is None
+    assert current.has_previous is True
     assert table.earned == Money(3_000_000, "EUR")
     assert table.spent == Money(1_185_500, "EUR")
+    assert table.saved == Money(500_000, "EUR")
 
 
-def test_the_current_year_yoy_compares_the_same_months_in_both_years(
-    team: WorkspaceDb,
-) -> None:
+def test_the_current_year_yoy_compares_full_calendar_years(team: WorkspaceDb) -> None:
     food = _category(team, "YTD Food")
     for month in range(1, 13):
         _entry(team, YearMonth(2025, month), food, "100.00")
@@ -303,19 +306,63 @@ def test_the_current_year_yoy_compares_the_same_months_in_both_years(
 
     table = _data(team, from_year="2026", to_year="2026").yoy
     row = table.rows[0]
-    assert row.partial is True
+    assert row.has_previous is True
     assert (row.earned, row.spent) == (Money(0, "EUR"), Money(100_000, "EUR"))
-    # No income in either year; the expense comparison uses Jan-Oct 2025, not the full year.
-    assert row.spent_change == Money(0, "EUR")
-    assert row.spent_change_tenths == 0
+    # The current year has ten recorded months; 2025 is compared in full, not Jan-Oct.
+    assert row.spent_change == Money(-20_000, "EUR")
+    assert row.spent_change_tenths == -167  # -16.7 %
 
 
 def test_yoy_percent_is_none_without_previous_data(team: WorkspaceDb) -> None:
     _seed_year(team)
     table = _data(team, from_year="2026", to_year="2026").yoy
     row = table.rows[0]
+    assert row.has_previous is False
+    assert row.earned_change == Money(0, "EUR")
+    assert row.spent_change == Money(0, "EUR")
+    assert row.saved_change == Money(0, "EUR")
     assert row.earned_change_tenths is None
     assert row.spent_change_tenths is None
+    assert row.saved_change_tenths is None
+
+
+def test_year_over_year_first_range_year_keeps_changes_when_a_prior_year_exists(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "Prior Year Food")
+    _entry(team, YearMonth(2025, 1), food, "100.00")
+    _entry(team, YearMonth(2026, 1), food, "200.00")
+
+    row = _data(team, from_year="2026", to_year="2026").yoy.rows[0]
+    assert row.has_previous is True
+    assert row.spent_change == Money(10_000, "EUR")
+    assert row.spent_change_tenths == 1_000
+
+
+def test_year_over_year_savings_are_separate_from_expenses(team: WorkspaceDb) -> None:
+    salary = _category(team, "YoY Salary", "income")
+    food = _category(team, "YoY Food")
+    savings = _category(team, "YoY Savings", "expense", "savings")
+    _entry(team, YearMonth(2025, 1), salary, "3000.00", direction="income")
+    _entry(team, YearMonth(2025, 1), food, "1000.00")
+    _entry(team, YearMonth(2025, 1), savings, "250.00")
+    _entry(team, YearMonth(2026, 1), salary, "3000.00", direction="income")
+    _entry(team, YearMonth(2026, 1), food, "1000.00")
+    _entry(team, YearMonth(2026, 1), savings, "500.00")
+
+    data = _data(team, from_year="2025", to_year="2026")
+    row = data.yoy.rows[1]
+    assert (row.earned, row.spent, row.saved) == (
+        Money(300_000, "EUR"),
+        Money(100_000, "EUR"),
+        Money(50_000, "EUR"),
+    )
+    assert row.saved_change == Money(25_000, "EUR")
+    assert row.saved_change_tenths == 1_000
+    assert data.yoy.saved == Money(75_000, "EUR")
+
+    with_savings = _data(team, from_year="2025", to_year="2026", savings="1").yoy
+    assert with_savings == data.yoy
 
 
 def test_plan_accuracy_counts_planned_months_and_strictly_over_months(
@@ -358,9 +405,13 @@ def test_plan_accuracy_counts_planned_months_and_strictly_over_months(
     assert (accuracy.rows[1].months_planned, accuracy.rows[1].months_over) == (1, 0)
     assert (accuracy.months_planned, accuracy.months_over) == (4, 1)
     assert accuracy.over_tenths == 250
+    assert accuracy.planned == Money(65_000, "EUR")
+    assert accuracy.deviation == Money(10_000, "EUR")
+    assert accuracy.score_tenths == 846
 
     with_savings = _data(team, year="2026", savings="1")
     assert [row.category_id for row in with_savings.plan_accuracy.rows] == [food, rent]
+    assert with_savings.plan_accuracy.score_tenths == 846
 
 
 def test_plan_accuracy_includes_a_plan_without_any_spending(team: WorkspaceDb) -> None:
@@ -370,6 +421,9 @@ def test_plan_accuracy_includes_a_plan_without_any_spending(team: WorkspaceDb) -
     assert len(accuracy.rows) == 1
     assert (accuracy.rows[0].months_planned, accuracy.rows[0].months_over) == (1, 0)
     assert accuracy.rows[0].over_tenths == 0
+    assert accuracy.planned == Money(10_000, "EUR")
+    assert accuracy.deviation == Money(10_000, "EUR")
+    assert accuracy.score_tenths == 0
 
 
 def test_plan_accuracy_is_empty_without_plans(team: WorkspaceDb) -> None:
@@ -377,6 +431,7 @@ def test_plan_accuracy_is_empty_without_plans(team: WorkspaceDb) -> None:
     data = _data(team, year="2026")
     assert data.plan_accuracy.empty
     assert data.plan_accuracy.over_tenths is None
+    assert data.plan_accuracy.score_tenths is None
 
 
 def test_one_transaction_read_covers_section_years_outside_the_range(team: WorkspaceDb) -> None:

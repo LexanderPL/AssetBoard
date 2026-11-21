@@ -39,8 +39,9 @@ the M4 archive.
   - Unknown parameters are ignored.
 - **Months and dates:** a transaction belongs to the calendar month of its `date` (already a
   workspace-calendar date). The range ends at the current month (from the Clock, workspace time
-  zone); the current month and year are marked "so far". Future-dated entries are not charted;
-  a note says how many there are.
+  zone); the current period in the period tables and the current month in the year overview are
+  marked "so far". The year-over-year table has no badge; its current-year row is noted as still
+  in progress. Future-dated entries are not charted; a note says how many there are.
 - **Treatment rules** are those of 00-overview §3.3 and F2.4, reused, not re-implemented:
   `earned` = income/regular, `spent` = expense/regular, `saved` = expense/savings; transfers are
   in nothing; withdrawals from savings (income/savings) are not earnings. Soft-deleted rows never
@@ -293,17 +294,32 @@ year/month selection, the base-currency rule and the empty workspace.
 
 F9.2 (M9) originally listed "income vs expenses vs saved per month and per year; savings-rate
 trend". Those move here (F10.1, F10.2). F9.2's remaining reports (year overview grid, rolling
-category averages, year-over-year, planned-vs-actual accuracy) are added as further sections of
+category averages, year-over-year, planning accuracy) are added as further sections of
 this `/reports` page when M9 is built, using the same filters and aggregation rules.
 
 **As built (F9.2):** the page now also has the year overview (a category × month grid for a
 selected `year`, with heat shading and month links), category trends (3- or 12-month rolling
 averages over the displayed F10.3 series, `trend=3|12`), year-over-year (one row per year in the
-range, income and expenses, separate value and percent changes against the previous year) and
-planned-vs-actual accuracy (planned regular expense categories, months planned/over/strictly
-greater, from the raw budget lines in one scoped read). The year selectors offer only years with
-transactions; the report-table CSV was removed. Section details and assumptions are in M9 F9.2;
-the user guide is [Reports](../reports.md).
+range, income, expenses and savings, separate value and percent changes against the previous
+year) and planning accuracy (an absolute-deviation score plus planned regular expense categories,
+months planned/over/strictly greater, from the raw budget lines in one scoped read). The year
+selectors offer only years with transactions; the report-table CSV was removed. Section details
+and assumptions are in M9 F9.2; the user guide is [Reports](../reports.md).
+
+**As built (2026-11-21, UI improvements R-4/R-5).**
+- **Year-over-year:** full calendar years; the domain no longer clips the current year or the
+  previous year to the current month. The service still reads the year before the range and the
+  current year through today. `YearOverYearRow` carries `saved`, `saved_change`,
+  `saved_change_tenths` and `has_previous`; changes and percentages are zero/`None` when the
+  previous calendar year has no recorded income, expenses or savings. The table adds
+  **Savings & investments** and a savings change group, includes savings in its footer, and
+  always uses the whole ledger (the `savings=1` filter does not change it). Investment-module
+  purchases are out of scope.
+- **Planning accuracy:** `PlanAccuracy` carries the summed `planned`, summed absolute
+  `deviation` and `score_tenths = max(0, 1000 − ratio_tenths(deviation, planned))`, rounded once
+  and `None` when the planned total is zero. The section shows the score and an SVG progress bar
+  above the unchanged months planned/over breakdown. Only planned regular expenses count; income
+  and savings are excluded.
 
 ## Open questions (for the owner)
 

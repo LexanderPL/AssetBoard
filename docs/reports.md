@@ -2,9 +2,9 @@
 
 Reports (`/reports`) show how much came in and went out over a range of years, month by month or
 year by year, where the spending went by category, how categories trend, how a year compares
-with the one before, how often actual spending beat its plan, and how net worth and the portfolio
-moved over the same range. Every member of a workspace, viewers included, can open the page: it
-only reads what they can already see in the ledger.
+with the one before, how closely actual spending followed the plan, and how net worth and the
+portfolio moved over the same range. Every member of a workspace, viewers included, can open the
+page: it only reads what they can already see in the ledger.
 
 Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
 [desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
@@ -36,7 +36,8 @@ dropdown.
 
 The **Categories** and **Include saved / invested** filters apply to the expenses-by-category
 section, the year overview and category trends. The year-over-year table always uses the whole
-ledger. An unknown or malformed `year` is ignored and the default is used.
+ledger, including savings, so **Include saved / invested** does not change it. An unknown or
+malformed `year` is ignored and the default is used.
 
 The **Report year** selector sits inside the **Year overview** panel and chooses the grid's year.
 It does not change the range of the other sections, and its options are the data years inside the
@@ -69,8 +70,9 @@ The report uses the same treatment rules as the month summary:
 - `net = earned - spent - saved`, exactly as on the Month page.
 
 Soft-deleted entries never count. Closed and open months count alike. Entries dated after today
-are not charted; the page notes how many there are. The current month and year are marked
-“so far”.
+are not charted; the page notes how many there are. The current period is marked “so far” in the
+period tables and the year overview. The year-over-year table has no “so far” badge: it notes
+that the current year is still in progress.
 
 ## Chart and table
 
@@ -169,24 +171,48 @@ figures; the table is the accessible version and works without JavaScript.
 ## Year-over-year
 
 The year-over-year table has one row per year in the report range, up to the current year.
-Each row shows the year's
-**income** and **expenses**, then the change against the previous year for both: the absolute
-value and the percentage. Income growth is shown as good and an income drop as bad; an expense
+Each row shows the year's **income**, **expenses** and **savings & investments**, then the change
+against the previous year for each: the absolute value and the percentage. Income growth and
+more savings are shown as good; an income drop or less savings is shown as bad. An expense
 increase is shown as bad and a decrease as good. The signs and percentages carry the meaning, so
 colour is not the only cue.
 
+Rows cover full calendar years. The current year shows every month recorded so far; it is not
+clipped to the current month and no projection is added, so its figures are lower while some
+income and expenses are still to come. The previous year is compared in full, even when the
+current year is still in progress.
+
 The percent change is `(current - previous) / previous`, rounded once to one decimal place. When
-the previous year had no income or no expenses, that percentage is undefined: the table shows “—”
-and screen readers hear why. The first year in the range is compared with the year before it even
-when that year is outside the selected range. When the current year is included, both years are
-compared through the current month ("so far") rather than a partial year against a full one. The
-table uses the whole ledger: income, expenses and transfers follow the same treatment rules as
-the rest of the page; the category filter does not narrow it.
+the previous year had no income, no expenses or no savings, that percentage is undefined: the
+table shows “—” and screen readers hear why. The first year in the range is compared with the
+year before it when that year is outside the selected range. When the previous calendar year has
+no recorded income, expenses or savings at all, the row has no comparison: every change value and
+percentage shows “—” and a note says “No data for YYYY.”, rather than presenting the whole year as
+a change. Later rows keep their changes.
 
-## Planned vs actual accuracy
+**Expenses** here are regular spending only; savings and investments are separate, so
+`income ≈ expenses + savings` remains visible. Investment purchases recorded in the
+**Investments** module are not included. The table uses the whole ledger: income, expenses,
+savings and transfers follow the same treatment rules as the rest of the page; the category and
+savings filters do not narrow it. The footer repeats the range totals for income, expenses and
+savings. A wider table scrolls horizontally inside its panel on a phone.
 
-The plan-accuracy table answers how often each expense category's actual spending exceeded its
-plan over the report range. For every **planned regular expense category** it shows:
+## Planning accuracy
+
+The planning-accuracy section answers two questions: how close actual spending was to the plan,
+and how often it went over. The headline score is an absolute-deviation measure:
+
+`score = max(0, 100 − Σ|actual − planned| / Σplanned × 100)`
+
+The sums cover every planned category-month in the range: a regular expense category with a
+budget line, including months where nothing was spent. The result is rounded once to one decimal
+place, half away from zero. `100.0%` means every planned month matched its plan exactly. `0.0%`
+means the total absolute deviation was at least the total plan. Being far under plan is penalised
+as a planning miss, just like being far over. A progress bar shows the same score. When there are
+no plans, or the planned total is zero, no score is shown.
+
+The table below the score is the breakdown. For every **planned regular expense category** it
+shows:
 
 - **Months planned** — calendar months in the range with a budget line for that category.
 - **Months over** — planned months whose actual spending was **greater** than the plan. Equal
@@ -197,7 +223,7 @@ Only regular expense categories with at least one planned month appear; transfer
 withdrawals, savings and categories without plans are left out. The table has a footer with the
 same counts across all category-months. Open and closed months count alike, and plans for future
 months are outside the report range. Amounts are compared in the selected currency; plans in
-another currency are left out, never converted.
+another currency are left out, never converted. The category filter does not narrow this section.
 
 ## Net worth over time
 
