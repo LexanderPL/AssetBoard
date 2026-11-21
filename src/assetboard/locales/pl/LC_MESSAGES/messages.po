@@ -13206,7 +13206,7 @@ msgid "Salary and variable income:"
 msgstr "Wynagrodzenie i dochody zmienne:"
 
 msgid "Income tax rules:"
-msgstr "Zasady podatku od dochodów:"
+msgstr "Reguły podatku dochodowego:"
 
 msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
