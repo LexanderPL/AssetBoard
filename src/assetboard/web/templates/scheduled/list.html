@@ -8,10 +8,6 @@
 {% block content %}
 {% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
-<div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted" data-related-schedules>
-  <span>{{ _("Salary and variable income:") }} <a href="{{ scoped_url(request, 'income_sources') }}" class="font-medium text-primary-ink underline">{{ _("Income") }}</a></span>
-  {% if taxes_enabled %}<span>{{ _("Income tax rules:") }} <a href="{{ scoped_url(request, 'tax_rules') }}" class="font-medium text-primary-ink underline">{{ _("Taxes") }}</a></span>{% endif %}
-</div>
 {% if has_items %}
 <p class="mb-6 max-w-2xl text-sm text-muted">{{ _("Bills and income that repeat. Each one plans its next dates for you.") }}</p>
 {% for direction, rows in sections %}
