@@ -60,6 +60,7 @@ SO_FAR = _("so far")
 TOTAL = _("Total")
 TABLE_CAPTION = _("Income, expenses and savings by period")
 RANGE_END_NOTE = _("The range ends with the current month.")
+BASE_CURRENCY_NOTE = _("Net worth and portfolio are shown in the workspace base currency only.")
 EARNED = _("Earned")
 SPENT = _("Spent")
 SAVED = _("Saved")
@@ -1006,6 +1007,8 @@ def _notes(data: ReportsData, locale: str) -> tuple[str, ...]:
         )
     if data.filters.end_year > data.today.year:
         notes.append(gettext(RANGE_END_NOTE, locale))
+    if data.filters.currency != data.base_currency:
+        notes.append(gettext(BASE_CURRENCY_NOTE, locale))
     return tuple(notes)
 
 
@@ -1055,6 +1058,10 @@ def _net_worth_series(
         if chart is not None
         else ()
     )
+    # An excluded-only (or otherwise unexplained) series has no chart and no warning; showing an
+    # empty panel would be worse than leaving the section out (UX-15).
+    if chart is None and not notes:
+        return None
     return ReportSeriesView(
         title=gettext(NET_WORTH_TITLE, locale),
         description=gettext(NET_WORTH_DESCRIPTION, locale),

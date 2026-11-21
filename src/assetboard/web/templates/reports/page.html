@@ -53,7 +53,7 @@
               {% if row.href %}<a href="{{ row.href }}" class="text-primary-ink underline" data-report-series-period>{{ row.label }}</a>{% else %}<span data-report-series-period>{{ row.label }}</span>{% endif %}{% if row.so_far %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-report-series-so-far>{{ _("so far") }}</span>{% endif %}
               {% for note in row.notes %}<span class="mt-1 block text-xs font-normal text-warning-strong">{{ note }}</span>{% endfor %}
             </th>
-            {% for cell in row.cells %}{% set tone = row.tones[loop.index0] if loop.index0 < row.tones|length else "" %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums{% if tone == 'positive' %} text-success-strong{% elif tone == 'negative' %} text-danger{% endif %}">{{ cell }}</td>{% endfor %}
+            {% for cell in row.cells %}{% set tone = row.tones[loop.index0] if loop.index0 < row.tones|length else "" %}{% set tone_class = "text-success-strong" if tone == "positive" else ("text-danger" if tone == "negative" else "") %}<td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums {{ tone_class }}">{{ cell }}</td>{% endfor %}
           </tr>
           {% endfor %}
         </tbody>

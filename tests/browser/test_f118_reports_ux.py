@@ -274,6 +274,25 @@ def test_the_phone_filters_nav_and_series_toggle(tmp_path: Path) -> None:
         browser.close()
 
 
+def test_invalid_filters_stay_open_with_their_error_on_a_phone(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    port = _serve(app)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(color_scheme="light", viewport={"width": 390, "height": 844})
+        page = context.new_page()
+        base = f"http://127.0.0.1:{port}"
+        _sign_in(page, base, app)
+        _seed(app)
+        page.goto(f"{base}/reports?from=2026&to=2025", wait_until="networkidle")
+        panel = page.locator("details[data-filter-disclosure]")
+        expect(panel).to_have_attribute("open", "")
+        expect(page.locator("[data-report-invalid]")).to_be_visible()
+        expect(panel.locator(":scope > summary")).to_contain_text("1 filter")
+        context.close()
+        browser.close()
+
+
 def test_the_series_table_is_visible_without_javascript(tmp_path: Path) -> None:
     app = _app(tmp_path)
     port = _serve(app)

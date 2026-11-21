@@ -105,6 +105,21 @@ def test_wide_tables_are_labelled_scroll_regions_with_a_hint(owner: OwnerApp) ->
     assert transactions.count("data-table-scroll-hint") >= 2
     assert "Scroll sideways to see every column." in transactions
 
+    food = _category(owner, "Scroll Food")
+    assert (
+        owner.post(
+            f"/m/{MONTH}/transactions",
+            {
+                "direction": "expense",
+                "day": "7",
+                "amount": "10",
+                "description": "Scroll",
+                "category_id": str(food),
+            },
+            token_from=f"/m/{MONTH}",
+        ).status_code
+        == 303
+    )
     reports = _page(owner, "/reports")
     assert (
         'role="region" aria-label="Income, expenses and savings by period"'

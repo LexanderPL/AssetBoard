@@ -446,6 +446,8 @@
 
   function setChartTableHidden(table, hidden) {
     table.classList.toggle("sr-only", hidden);
+    // Inert also removes the period links from the tab order; the toggle is the access point.
+    if (table instanceof HTMLElement) table.inert = hidden;
     const region = table.querySelector("[data-table-scroll]");
     if (region instanceof HTMLElement) region.tabIndex = hidden ? -1 : 0;
   }

@@ -637,6 +637,18 @@ def test_the_filters_are_a_phone_disclosure_with_an_active_count(reports: OwnerA
     assert 'class="btn-primary"' in panel.group(0)
 
 
+def test_a_non_base_currency_filter_explains_the_hidden_module_sections(
+    reports: OwnerApp,
+) -> None:
+    food = _category(reports, "Golden Food")
+    _tx(reports, food, date(2026, 3, 5), 1_000)
+    _tx(reports, food, date(2026, 3, 6), 2_000, currency="USD")
+    html = _page(reports, "from=2026&to=2026&step=month&currency=USD")
+    assert "Net worth and portfolio are shown in the workspace base currency only." in html
+    assert 'data-report-series="net-worth"' not in html
+    assert 'data-report-series="portfolio"' not in html
+
+
 def test_the_section_nav_links_each_visible_section(reports: OwnerApp) -> None:
     _tx(reports, _category(reports, "Golden Food"), date(2026, 3, 5), 1_000)
     html = _page(reports)

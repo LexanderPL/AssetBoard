@@ -5116,6 +5116,9 @@ msgstr ""
 msgid "The range ends with the current month."
 msgstr ""
 
+msgid "Net worth and portfolio are shown in the workspace base currency only."
+msgstr ""
+
 msgid "Earned"
 msgstr ""
 

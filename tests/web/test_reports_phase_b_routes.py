@@ -13,6 +13,7 @@ import pytest
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.investments import InvestmentTransaction
+from assetboard.db.models.networth import NetWorthItem
 from assetboard.db.repositories import PricePointRepository
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.investment_transactions import create_transaction
@@ -176,6 +177,57 @@ def _chart_data(section: str, key: str) -> dict[str, Any]:
 def test_phase_b_sections_are_absent_without_data(reports: OwnerApp) -> None:
     html = reports.client.get("/reports").text
     assert "data-report-series" not in html
+
+
+def test_an_excluded_only_net_worth_item_does_not_leave_an_empty_section(
+    reports: OwnerApp,
+) -> None:
+    ctx = _context(reports)
+    category = create_networth_category(
+        reports.app.state.session_factory, ctx, side="asset", name="Excluded", color="#16a34a"
+    )
+    create_item(
+        reports.app.state.session_factory,
+        ctx,
+        locale="en",
+        side="asset",
+        category_id=category.id,
+        name="Excluded fund",
+        value="100",
+        currency="EUR",
+        include_in_net_worth=False,
+        as_of=date(2024, 12, 31),
+    )
+    html = reports.client.get("/reports?from=2024&to=2026&step=year").text
+    assert 'data-report-series="net-worth"' not in html
+
+
+def test_a_no_value_only_net_worth_item_does_not_leave_an_empty_section(
+    reports: OwnerApp,
+) -> None:
+    ctx = _context(reports)
+    category = create_networth_category(
+        reports.app.state.session_factory, ctx, side="asset", name="No value", color="#16a34a"
+    )
+    with reports.db() as session, session.begin():
+        session.add(
+            NetWorthItem(
+                workspace_id=reports.home_id,
+                side="asset",
+                category_id=category.id,
+                name="No value fund",
+                currency="EUR",
+                notes="",
+                valuation_mode="manual",
+                link_type=None,
+                link_id=None,
+                include_in_net_worth=True,
+                investable=False,
+                estimate_between=True,
+            )
+        )
+    html = reports.client.get("/reports?from=2024&to=2026&step=year").text
+    assert 'data-report-series="net-worth"' not in html
 
 
 def test_net_worth_report_section_reuses_the_derived_series(reports: OwnerApp) -> None:

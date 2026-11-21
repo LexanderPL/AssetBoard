@@ -5526,6 +5526,11 @@ msgstr "Dochody, wydatki i oszczędności według okresu"
 msgid "The range ends with the current month."
 msgstr "Zakres kończy się na bieżącym miesiącu."
 
+msgid "Net worth and portfolio are shown in the workspace base currency only."
+msgstr ""
+"Wartość netto i portfel są pokazywane tylko w walucie bazowej obszaru "
+"roboczego."
+
 msgid "Earned"
 msgstr "Zarobione"
 

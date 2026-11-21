@@ -125,6 +125,7 @@ class ReportsData:
     yoy: YearOverYearTable
     plan_accuracy: PlanAccuracy
     available_currencies: tuple[str, ...]
+    base_currency: str
     show_currency_selector: bool
     future_count: int
     other_currency_count: int
@@ -253,6 +254,21 @@ def _category_blocks(include_savings: bool) -> set[str]:
     return {"expense", "saved"} if include_savings else {"expense"}
 
 
+def _active_filter_count(filters: ReportFilters, base_currency: str) -> int:
+    """The number of filters that differ from the page defaults (for the phone badge)."""
+    return sum(
+        (
+            not filters.range_is_default,
+            filters.step != _default_step(filters.start_year, filters.end_year),
+            bool(filters.category_ids),
+            filters.savings,
+            filters.currency != base_currency,
+            not filters.year_is_default,
+            filters.trend_months != TREND_MONTHS_DEFAULT,
+        )
+    )
+
+
 def _range_year_options(data_years: tuple[int, ...], filters: ReportFilters) -> tuple[int, ...]:
     """Years the from/to selectors offer: data years plus the selected endpoints."""
     years = set(data_years)
@@ -361,8 +377,9 @@ def net_worth_report(
     if not dates:
         return None
     data = networth_history(factory, ctx, "all", dates=dates)
-    # A workspace whose only items are non-base (or have no value yet) still has recorded
-    # history worth explaining; keep the section so its warning is visible (UX-15).
+    # A workspace whose only items are non-base still has recorded history worth explaining;
+    # keep the section so its warning is visible (UX-15). No-value-only items have no recorded
+    # history and stay absent.
     if not data.points or not data.has_recorded_values:
         return None
     return data
@@ -489,11 +506,15 @@ def reports_data(
                 yoy=YearOverYearTable((), Money(0, base_currency), Money(0, base_currency)),
                 plan_accuracy=PlanAccuracy((), 0, 0, None),
                 available_currencies=(base_currency,),
+                base_currency=base_currency,
                 show_currency_selector=False,
                 future_count=0,
                 other_currency_count=0,
                 has_data=False,
-                active_filter_count=0,
+                active_filter_count=_active_filter_count(
+                    replace(filters, currency=base_currency, savings=include_savings),
+                    base_currency,
+                ),
                 today=today,
                 series_start=None,
                 series_end=None,
@@ -665,21 +686,12 @@ def reports_data(
         ),
         plan_accuracy=plan_accuracy(accuracy_series, plans, categories),
         available_currencies=available,
+        base_currency=base_currency,
         show_currency_selector=len(available) > 1,
         future_count=stats.future,
         other_currency_count=stats.other_currency,
         has_data=stats.counted > 0 and bool(series),
-        active_filter_count=sum(
-            (
-                not filters.range_is_default,
-                filters.step != _default_step(filters.start_year, filters.end_year),
-                bool(filters.category_ids),
-                filters.savings,
-                filters.currency != base_currency,
-                not filters.year_is_default,
-                filters.trend_months != TREND_MONTHS_DEFAULT,
-            )
-        ),
+        active_filter_count=_active_filter_count(filters, base_currency),
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
