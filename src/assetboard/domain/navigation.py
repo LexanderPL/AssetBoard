@@ -22,7 +22,6 @@ CANONICAL_KEYS: tuple[str, ...] = (
     "month",
     "transactions",
     "history",
-    "reports",
     "upcoming",
     "recurring",
     "income",
@@ -31,6 +30,7 @@ CANONICAL_KEYS: tuple[str, ...] = (
     "investments",
     "loans",
     "fire",
+    "reports",
 )
 HOME_KEY = "home"
 DIRECTIONS = frozenset({"up", "down"})
