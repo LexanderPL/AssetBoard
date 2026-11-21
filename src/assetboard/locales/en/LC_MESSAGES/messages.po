@@ -9017,6 +9017,10 @@ msgstr ""
 msgid "Unknown"
 msgstr ""
 
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr ""
+
 msgid "Prices"
 msgstr ""
 
@@ -9086,7 +9090,13 @@ msgid "Price history of %(name)s"
 msgstr ""
 
 #, python-format
-msgid "Delete the manual price of %(date)s?"
+msgid "Show %(num)d older price point"
+msgid_plural "Show %(num)d older price points"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Older price history of %(name)s"
 msgstr ""
 
 msgid "No stored or transaction prices for this instrument yet."

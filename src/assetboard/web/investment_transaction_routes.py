@@ -89,6 +89,10 @@ FormStr = Annotated[str, Form()]
 LIST_PATH = "/investments/transactions"
 EMPTY = TransactionList(rows=(), page=1, pages=1, total=0, has_previous=False, has_next=False)
 
+# The price panel keeps the newest points visible; older ones sit behind a disclosure.
+# ``PricePanel.points`` is newest first (see services.prices.instrument_prices).
+PRICE_HISTORY_LATEST_COUNT = 10
+
 
 def _(message: str) -> str:
     """Marks a message for extraction; it is translated when rendered."""
@@ -668,10 +672,14 @@ def _history_page(
                 "date": point.date.isoformat(),
                 "price": format_quantity_input(point.price, locale),
             }
+    recent_price_points = prices.points[:PRICE_HISTORY_LATEST_COUNT]
+    older_price_points = prices.points[PRICE_HISTORY_LATEST_COUNT:]
     context: dict[str, Any] = {
         "history": history,
         "instrument": history.instrument,
         "prices": prices,
+        "recent_price_points": recent_price_points,
+        "older_price_points": older_price_points,
         "bond": bond,
         "bond_values": bond_values or bond_default_values,
         "bond_schedule": bond_schedule or bond_default_schedule,

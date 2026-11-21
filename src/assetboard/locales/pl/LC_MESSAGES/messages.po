@@ -9923,6 +9923,10 @@ msgstr "Transakcja"
 msgid "Unknown"
 msgstr "Nieznane"
 
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr "Usunąć cenę ręczną z dnia %(date)s?"
+
 msgid "Prices"
 msgstr "Ceny"
 
@@ -9994,8 +9998,15 @@ msgid "Price history of %(name)s"
 msgstr "Historia cen: %(name)s"
 
 #, python-format
-msgid "Delete the manual price of %(date)s?"
-msgstr "Usunąć cenę ręczną z dnia %(date)s?"
+msgid "Show %(num)d older price point"
+msgid_plural "Show %(num)d older price points"
+msgstr[0] "Pokaż %(num)d starszy punkt cenowy"
+msgstr[1] "Pokaż %(num)d starsze punkty cenowe"
+msgstr[2] "Pokaż %(num)d starszych punktów cenowych"
+
+#, python-format
+msgid "Older price history of %(name)s"
+msgstr "Starsza historia cen: %(name)s"
 
 msgid "No stored or transaction prices for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
