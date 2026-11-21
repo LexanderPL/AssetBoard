@@ -1,6 +1,6 @@
 # UI improvements plan — 2026-11-21
 
-Status: **draft for discussion**. Baseline: `main` at `5ce53ac` (0.8.6), 2026-11-21. This file
+Status: **shipped in 0.8.7 (2026-11-21)**. Baseline: `main` at `5ce53ac` (0.8.6). This file
 is the durable checklist for the owner's UI improvement list. Update it as items are
 implemented; a feature is not done until its item is checked and its acceptance tests pass.
 
@@ -21,9 +21,25 @@ Small, reviewable PRs; keep unrelated items out of the same PR.
 | WP6 | P-3, P-4 | `workspace-members-admin` |
 | WP7 | W-1 | `workspace-country-defaults` |
 
+## Shipped in 0.8.7
+
+All items below shipped in **0.8.7** on 2026-11-21:
+
+| Items | PR |
+| --- | --- |
+| R-1, R-2, R-6 | #450 |
+| R-4, R-5 | #453 |
+| T-1 | #449 |
+| I-1 | #447 |
+| P-1, P-2, P-5 | #452 |
+| P-3, P-4 | #451 |
+| W-1 | #448 |
+
+R-3 was dropped by the owner; the Category trends table and its toggle stay unchanged.
+
 ## Reports
 
-### [ ] R-1 — Report filters fill the panel and keep controls aligned
+### [x] R-1 — Report filters fill the panel and keep controls aligned
 
 **Current.** The filter form is `grid gap-4 sm:grid-cols-4 sm:items-end` in
 `src/assetboard/web/templates/reports/page.html` (current main line 67). `items-end` aligns the
@@ -51,7 +67,7 @@ checkbox carry helper text; the Category trends window select does not, so they 
 **Files.** `src/assetboard/web/templates/reports/page.html`,
 `tests/web/test_reports_routes.py`, `tests/browser/test_f101_reports.py`.
 
-### [ ] R-2 — Year overview heat uses the transactions red scale
+### [x] R-2 — Year overview heat uses the transactions red scale
 
 **Current.** Cells use `.heat-1`…`.heat-4` (`src/assetboard/static/css/input.css:410-428`),
 which are shades of the primary blue. The legend says “Darker cells mean more spending in that
@@ -78,7 +94,7 @@ report tests.
 
 **Decision 2026-11-21:** keep the current table and “Show as table” toggle unchanged. No work.
 
-### [ ] R-4 — Year-over-year: honest first row, full years, savings column
+### [x] R-4 — Year-over-year: honest first row, full years, savings column
 
 **Current (after #421).**
 - One row per year in the report range: Year, Income, Expenses, Income change (value and %),
@@ -132,7 +148,7 @@ second data source).
 `src/assetboard/web/reports.py` (`YearOverYearRowView`, `YearOverYearView`),
 `reports/page.html`, `docs/reports.md`, `docs/specs/M10-reports.md`, report tests.
 
-### [ ] R-5 — Planned vs actual becomes a planning score
+### [x] R-5 — Planned vs actual becomes a planning score
 
 **Current.** The section counts, per planned regular-expense category, how often actual spending
 was strictly greater than the plan. It shows months planned, months over, and an over %.
@@ -159,7 +175,7 @@ plan, which is still a planning miss. Keep the existing over-plan table as the b
 **Files.** `src/assetboard/domain/reports.py` (`PlanAccuracy`), `src/assetboard/web/reports.py`,
 `reports/page.html`, `docs/reports.md`, `docs/specs/M10-reports.md`, report tests.
 
-### [ ] R-6 — Move “Category trends window” into the Category trends panel
+### [x] R-6 — Move “Category trends window” into the Category trends panel
 
 **Current.** `trend` is a field in the shared filter form
 (`reports/page.html:112-118`). The section only prints the resulting window.
@@ -182,7 +198,7 @@ plan, which is still a planning miss. Keep the existing over-plan table as the b
 
 ## Transactions
 
-### [ ] T-1 — Only genuinely large entries stand out
+### [x] T-1 — Only genuinely large entries stand out
 
 **Current.** Every amount is stored positive; `direction` decides red (expense) or green
 (income). The tint is relative to the largest amount of the same direction and currency in the
@@ -219,7 +235,7 @@ transactions stand out” and needs no per-currency configuration.
 
 ## Investments
 
-### [ ] I-1 — Price history shows the latest 10 points, older points expand
+### [x] I-1 — Price history shows the latest 10 points, older points expand
 
 **Current.** `_prices_panel.html:94-130` renders every point in `prices.points` (104+ weekly
 points in the demo, plus transaction-derived points). No limit or disclosure.
@@ -242,7 +258,7 @@ points in the demo, plus transaction-derived points). No limit or disclosure.
 
 ## Profile, admin and navigation
 
-### [ ] P-1 — Sidebar order rows align; Profile and Account security share a width
+### [x] P-1 — Sidebar order rows align; Profile and Account security share a width
 
 **Current.** The Taxes row in `account/profile.html:58-71` inserts a `w-full` helper note
 before the arrow group, so the arrows wrap onto a second line. Other rows keep them on the same
@@ -273,7 +289,7 @@ settings/form standard in the UI guidelines.
 `docs/ui-guidelines.md` if needed, `tests/web/test_profile_routes.py`,
 `tests/browser/test_sidebar_customization.py`.
 
-### [ ] P-2 — Instance settings panels share one standard width
+### [x] P-2 — Instance settings panels share one standard width
 
 **Current.** `admin/settings.html` mixes `max-w-xl` (main and demo panels) with `max-w-3xl`
 (backups panel), left-aligned, so the right edges do not line up.
@@ -293,7 +309,7 @@ settings/form standard in the UI guidelines.
 **Files.** `src/assetboard/web/templates/admin/settings.html`,
 `tests/web/test_admin_routes.py` (or a settings-specific test).
 
-### [ ] P-3 — Delete deactivated users
+### [x] P-3 — Delete deactivated users
 
 **Current.** Admin actions are activate/deactivate/promote/demote/reset 2FA. There is no delete
 path. A user row can be hard-deleted in principle: sessions, identities, tokens, 2FA,
@@ -335,7 +351,7 @@ zone), then the account. The refusal message must list the blocking workspaces a
 `src/assetboard/web/templates/admin/users.html`, confirm template if it needs a delete tone,
 `docs/accounts.md`, `docs/specs/M1-identity-and-workspaces.md`, admin tests.
 
-### [ ] P-4 — “Workspace members” naming and discoverability
+### [x] P-4 — “Workspace members” naming and discoverability
 
 **Current.** The user-menu item, page title and heading say “Members”. The section heading says
 “People in this workspace”. The header button says “Invite someone”. The page is separate from
@@ -362,7 +378,7 @@ the dedicated page; no settings/members route merge.
 `services/workspaces.py` or the settings route for counts, locales, `docs/accounts.md`,
 M1 spec, tests.
 
-### [ ] P-5 — Nicer, larger sidebar icons
+### [x] P-5 — Nicer, larger sidebar icons
 
 **Current.** Icons are Unicode glyphs in `SIDEBAR_GLYPHS` (`web/rendering.py:51-65`), rendered in
 an unclassed `<span>` in `base.html:58`. They render at text size and vary by platform
@@ -397,7 +413,7 @@ glyphs.
 
 ## Workspace setup
 
-### [ ] W-1 — Country before currency; auto-set currency and seed the timezone
+### [x] W-1 — Country before currency; auto-set currency and seed the timezone
 
 **Current.** The shared `workspace_fields` macro
 (`workspace/_fields.html`) orders: name → base currency → country → time zone → language.
