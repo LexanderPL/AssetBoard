@@ -120,10 +120,12 @@ assetboard demo-seed --workspace <workspace-id> [--date YYYY-MM-DD]
 - four months of ledger activity (`M-3`…`M0`), planned values for every month and `M-3` closed;
 - recurring items of every kind (once, weekly, monthly, yearly) with posted, pending, skipped
   and overdue occurrences;
-- an hourly income source with a filled work calendar for `M-3`…`M0` and an attached tax rule;
-- net worth items (current account, savings, emergency fund, car, apartment, mortgage, credit
-  card) with monthly valuations (one deliberate gap), so the derived history chart has a year of
-  points; no stored snapshots are created;
+- an hourly income source with a filled work calendar for `M-3`…`M0` and an attached tax rule
+  (the Taxes switch is on, so the rule and its payments are reachable);
+- net worth items (current account, savings, emergency fund, car, apartment, a mortgage and a
+  car loan linked to their Loans entries, and a manual credit card); the manual items have
+  monthly valuations (one deliberate gap) and the linked loans derive from their schedules, so
+  the derived history chart has a year of points; no stored snapshots are created;
 - a portfolio: a global ETF, an 80/20 fund, a USD stock (sells, quarterly dividends, linked
   income, a 2-for-1 split and a base-settled buy), gold, crypto, a bond-model instrument with
   terms and a currency cash holding, plus 24 months of weekly manual prices and FX rates;

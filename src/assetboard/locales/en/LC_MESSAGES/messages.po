@@ -2838,6 +2838,9 @@ msgstr ""
 msgid "No income yet this month"
 msgstr ""
 
+msgid "Other (combined)"
+msgstr ""
+
 msgid "Unallocated"
 msgstr ""
 
@@ -5166,9 +5169,6 @@ msgstr ""
 msgid "Saved and invested amounts get their own category series."
 msgstr ""
 
-msgid "Other (combined)"
-msgstr ""
-
 msgid "archived"
 msgstr ""
 
@@ -6643,6 +6643,11 @@ msgstr ""
 msgid "Nothing needs attention."
 msgstr ""
 
+msgid ""
+"Add a net-worth value, an income source or an investment to see missing-"
+"data checks."
+msgstr ""
+
 msgid "Prices and FX"
 msgstr ""
 
@@ -7430,6 +7435,16 @@ msgstr ""
 
 #, python-format
 msgid "Loan paid off: %(names)s"
+msgstr ""
+
+msgid "Show all years"
+msgstr ""
+
+msgid "Show fewer years"
+msgstr ""
+
+#, python-format
+msgid "Showing the first %(shown)s of %(total)s years."
 msgstr ""
 
 msgid "Choose your FIRE plan"

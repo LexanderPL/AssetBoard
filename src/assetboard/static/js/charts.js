@@ -106,6 +106,21 @@
     return lines.join("\n");
   }
 
+  // A line's first and last points sit on the axis ends (boundaryGap: false), so their centred
+  // labels overhang the canvas and ECharts clips the last one ("Nov 19, 2"). Align the edge
+  // labels inwards; the extra grid margin on the right keeps even a long month name inside.
+  function lineAxisLabel(ink) {
+    return {
+      color: ink,
+      alignMinLabel: "left",
+      alignMaxLabel: "right",
+      // Keep the newest point's label even when ECharts hides overlapping categories on a
+      // phone: the last value is the one the visitor came for.
+      showMinLabel: true,
+      showMaxLabel: true,
+    };
+  }
+
 
   function performanceOptions(data) {
     const ink = token("ink");
@@ -123,7 +138,7 @@
         textStyle: { color: ink },
         data: [data.legend.value, data.legend.invested],
       },
-      grid: { left: 8, right: 16, top: 42, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 24, top: 42, bottom: 8, containLabel: true },
       tooltip: {
         trigger: "axis",
         renderMode: "richText",
@@ -140,7 +155,7 @@
         type: "category",
         data: data.labels,
         boundaryGap: false,
-        axisLabel: { color: ink },
+        axisLabel: lineAxisLabel(ink),
         axisLine: { lineStyle: { color: line } },
       },
       yAxis: {
@@ -308,7 +323,7 @@
         textStyle: { color: ink },
         data: data.series.map((series) => series.name),
       },
-      grid: { left: 8, right: 16, top: 42, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 24, top: 42, bottom: 8, containLabel: true },
       tooltip: {
         trigger: "axis",
         renderMode: "richText",
@@ -321,7 +336,7 @@
         type: "category",
         data: data.labels,
         boundaryGap: false,
-        axisLabel: { color: ink },
+        axisLabel: lineAxisLabel(ink),
         axisLine: { lineStyle: { color: line } },
       },
       yAxis: {

@@ -33,6 +33,7 @@ from assetboard.db.repositories import (
 from assetboard.domain.archive import parse_archive
 from assetboard.domain.demo import DEMO_EXCLUDED_MODELS, DemoPlan
 from assetboard.domain.months import YearMonth
+from assetboard.services import loans, networth
 from assetboard.services.archive import export_workspace
 from assetboard.services.context import Context
 from assetboard.services.demo import (
@@ -334,6 +335,63 @@ def test_fire_plan_values_load_through_the_service(built: BuiltWorkspace) -> Non
 
 def test_the_builder_writes_no_legacy_networth_snapshots(built: BuiltWorkspace) -> None:
     assert _count(built.db, NetWorthSnapshot) == 0
+
+
+def test_the_demo_workspace_enables_taxes_when_the_plan_has_tax_data(
+    built: BuiltWorkspace,
+) -> None:
+    with built.db.factory() as session:
+        workspace = session.get(Workspace, built.db.workspace_id)
+        assert workspace is not None
+        assert workspace.taxes_enabled is True
+    # The plan really has the seeded tax rule the switch makes reachable.
+    assert built.plan.tax_rule.percent_bp > 0
+
+
+def test_demo_net_worth_liabilities_reconcile_with_the_linked_loans(
+    built: BuiltWorkspace,
+) -> None:
+    """COR-08: the linked mortgage and car loan equal the Loans page balance.
+
+    The credit card stays a manual liability, so net worth can exceed the Loans total by
+    exactly that manual amount; no mortgage/car balance may be represented twice.
+    """
+    page = networth.list_networth(built.db.factory, built.ctx)
+    items = tuple(item for group in page.liability.groups for item in group.items)
+    linked = {
+        item.link_id: item
+        for item in items
+        if item.valuation_mode == "linked" and item.link_type == "loan_balance"
+    }
+    assert len(linked) == 2
+    assert all(item.current is not None and not item.unavailable for item in linked.values())
+
+    loan_page = loans.list_loans(built.db.factory, built.ctx)
+    linked_ids = set(linked)
+    assert {row.loan.id for row in loan_page.active} >= linked_ids
+    loan_total = sum(
+        row.figures.remaining_principal.amount_minor
+        for row in loan_page.active
+        if row.loan.id in linked_ids and row.figures.remaining_principal is not None
+    )
+    linked_total = sum(
+        item.current.amount_minor for item in linked.values() if item.current is not None
+    )
+    manual_total = sum(
+        item.current.amount_minor
+        for item in items
+        if item.valuation_mode == "manual" and item.current is not None and not item.archived
+    )
+    assert linked_total == loan_total
+    assert linked_total + manual_total == sum(
+        item.current.amount_minor
+        for item in items
+        if item.current is not None and not item.archived
+    )
+    if built.ctx.workspace.base_currency == "EUR":
+        # The audit's numbers, so a data change that stops reconciling is visible here.
+        assert linked_total == 29_207_445
+        assert manual_total == 87_000
 
 
 def test_the_data_page_has_one_completed_real_csv_import(built: BuiltWorkspace) -> None:

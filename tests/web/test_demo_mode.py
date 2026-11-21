@@ -53,6 +53,31 @@ def _demo_counts(factory) -> tuple[int, int, int]:
         return int(users), int(workspaces), int(batches)
 
 
+def test_the_demo_workspace_shows_the_seeded_taxes(web: WebHarness) -> None:
+    """COR-09: tax data is seeded, so the Tax page and the income tax link must be reachable."""
+    app = _demo_app(web)
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        token = web.csrf(client.get("/login").text)
+        assert (
+            client.post(
+                "/login/demo", data={"csrf_token": token}, follow_redirects=False
+            ).status_code
+            == 303
+        )
+        with app.state.session_factory() as session:
+            workspace = session.scalars(select(Workspace).where(Workspace.is_demo.is_(True))).one()
+            assert workspace.taxes_enabled is True
+        taxes = client.get("/taxes")
+        assert taxes.status_code == 200
+        assert "data-tax-rule" in taxes.text
+        assert "Income tax" in taxes.text
+        assert "data-taxes-link" in taxes.text
+        income = client.get("/income")
+        assert income.status_code == 200
+        assert "data-income-taxes-link" in income.text
+
+
 def test_startup_creates_the_demo_once_and_login_lands_on_home(web: WebHarness) -> None:
     app = _demo_app(web)
     with TestClient(app) as client:

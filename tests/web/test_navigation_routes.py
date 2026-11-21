@@ -12,7 +12,9 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
+from assetboard.db.models.identity import User
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory, NetWorthItem
 from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.domain.dashboard import WIDGET_KEYS
 from tests.conftest import OwnerApp
@@ -91,6 +93,39 @@ def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     assert "data-chart-json" not in expenses  # no chart without slices
     assert "Nothing is overdue or due in the next 30 days." in _fragment(nav, "upcoming")
     assert 'data-home-link aria-current="page"' in html
+    # UX-14: a brand-new workspace has nothing to check, so the widget must say so honestly.
+    missing = _fragment(nav, "missing-data")
+    assert "data-empty-setup" in missing
+    assert "Add a net-worth value, an income source or an investment" in missing
+    assert "Nothing needs attention" not in missing
+
+
+def test_missing_data_says_nothing_needs_attention_once_data_exists(nav: OwnerApp) -> None:
+    with nav.db() as session, session.begin():
+        category = session.scalars(
+            select(NetWorthCategory).where(
+                NetWorthCategory.workspace_id == nav.home_id,
+                NetWorthCategory.side == "asset",
+                NetWorthCategory.name_key == "other",
+            )
+        ).one()
+        session.add(
+            NetWorthItem(
+                workspace_id=nav.home_id,
+                side="asset",
+                category_id=category.id,
+                name="Savings",
+                currency="EUR",
+                notes="",
+                valuation_mode="manual",
+                include_in_net_worth=True,
+                investable=False,
+                estimate_between=False,
+            )
+        )
+    missing = _fragment(nav, "missing-data")
+    assert "Nothing needs attention." in missing
+    assert "data-empty-setup" not in missing
 
 
 def test_home_charts_match_the_summary_and_have_tables(nav: OwnerApp) -> None:
@@ -122,6 +157,35 @@ def test_home_charts_match_the_summary_and_have_tables(nav: OwnerApp) -> None:
         "€75.00", "75.0%", "€25.00", "25.0%",
     ]  # fmt: skip
     assert "js/charts.js" in html and "vendor/echarts.min.js" in html
+
+
+def test_a_real_other_category_is_distinct_from_the_grouped_other_slice(
+    nav: OwnerApp,
+) -> None:
+    """COR-11: two slices must never share the name "Other"; the legend and table must differ."""
+    other = _category(nav, "Other", color="#ff0000")
+    _add(nav, other, "100")
+    for index in range(8):
+        small = _category(nav, f"Small {index}")
+        _add(nav, small, "10")
+    expenses = _fragment(nav, "month-expenses")
+    chart = _chart(expenses, "expense")
+    names = [s["name"] for s in chart["slices"]]
+    assert names.count("Other") == 1
+    assert names.count("Other (combined)") == 1
+    assert "<span>Other</span>" in expenses
+    assert "<span>Other (combined)</span>" in expenses
+    assert re.search(r"Other</th>", expenses)
+    assert re.search(r"Other \(combined\)</th>", expenses)
+
+    # The Polish catalog names the grouped tail in Polish while a user-created category
+    # keeps the name it was created with.
+    with nav.db() as session, session.begin():
+        user = session.scalars(select(User).where(User.id == nav.admin_id)).one()
+        user.locale = "pl"
+    polish = _fragment(nav, "month-expenses")
+    assert "<span>Other</span>" in polish
+    assert "<span>Inne (połączone)</span>" in polish
 
 
 def test_home_upcoming_items_for_editors_and_viewers(nav: OwnerApp) -> None:

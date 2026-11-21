@@ -92,7 +92,7 @@ The plan page shows the saved plan without any inputs or preview controls:
   a collapsed **Archived adjustments** section) and the **Loans** panel with each active loan's
   annual payment, payoff year, included/ignored state and effect on the plan. Open it with a
   click, Enter or Space; no JavaScript is needed;
-- the year-by-year schedule and the net-worth and expenses-versus-gain charts;
+- the year-by-year schedule (the first 12 years, with **Show all years** for the rest; without JavaScript every year is shown) and the net-worth and expenses-versus-gain charts;
 - the **Sensitivity** grid, which always uses the saved plan and never unsaved changes;
 - the disclaimer, which is the last block on the page.
 
