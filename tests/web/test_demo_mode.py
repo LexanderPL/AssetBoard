@@ -360,6 +360,7 @@ def test_demo_workspace_pages_hide_member_and_settings_controls(
         assert settings.status_code == 200
         assert "data-taxes-switch" not in settings.text
         assert "data-delete-workspace-link" not in settings.text
+        assert "data-settings-members" not in settings.text
         assert 'name="name"' not in settings.text
         assert "Not available in the demo workspace." in settings.text
 

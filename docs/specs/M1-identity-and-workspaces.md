@@ -62,7 +62,10 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - `ScopedRepository[T]` base: every query adds `workspace_id = ctx.workspace.id`; inserts set it; there is no public method that bypasses scoping.
 - `require_role("editor")`-style guard used in services; roles `owner > editor > viewer`.
 - **Tenant isolation test:** a parametrized test discovers every mapped class with `workspace_id` and, using two workspaces, verifies that user B can never read, update or delete user A's rows through the repository API. Adding a new workspace-owned model without a repository fails this test (by design).
-- Workspace settings page (owner): name, base currency, timezone, country, default locale. Members page (owner): list, change role, remove (cannot remove the last owner).
+- Workspace settings page (owner): name, base currency, timezone, country, default locale, and
+  a **Workspace members** panel with the member count, pending invitations and a **Manage
+  members** link. Workspace members page (owner): list, change role, remove (cannot remove the
+  last owner), invitations and the **Invite** dialog.
 - Invitations: owner creates an invite link (role, expiry, email lock); invitee registers or logs in and accepts; token stored hashed, single use. (Changed in pre-release A: the email lock was optional except for owner invitations; it is now required for every role.)
 
 **Delivery and decisions (2026-10-12)**
@@ -265,12 +268,22 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   Accept-Language; a saved language wins over it. Sensitive actions (link, unlink, sign out
   everywhere) are confirmed with the password, or without one by a sign-in from the last
   10 minutes (ADR-0012 amendment).
-- Instance admin page: users list, activate/deactivate, promote/demote instance admin, create user with temporary password.
+- Instance admin page: users list, activate/deactivate, promote/demote instance admin, create
+  user with temporary password, and delete a deactivated account.
   Every action is confirmed by the acting administrator (password, or a fresh external
-  sign-in). The temporary password is generated and shown once; the account must change it
+  sign-in), with an authenticator or recovery code when the administrator has two-factor
+  authentication enabled and the action is delete or reset 2FA. The temporary password is
+  generated and shown once; the account must change it
   before anything else and starts without a workspace (it sees the "no workspace" page until
   it is invited, or creates its own workspace, pre-release A). Account creation is not
   offered under `OIDC_ONLY`.
+  Deleting is a hard delete of an inactive account: its memberships, sessions, identities,
+  tokens, 2FA rows, notification channels and dashboard preferences are removed, while audit
+  rows are kept and target the deleted id. Active accounts, the acting account itself and the
+  demo account are refused. An account that is the only owner of any workspace is refused
+  until another member there is an owner; the confirmation lists every blocking workspace and
+  links the one currently selected. The audit event is `admin.user_deleted` with
+  `memberships_removed`.
   Instance settings page (pre-release A): who can create workspaces (see the F1.2 decisions).
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
 - The top-right user menu is a `<details data-popover>`; it closes on a press outside, Escape,
@@ -279,8 +292,10 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   Two scopes: the owner sees the current workspace's events; an instance administrator sees
   instance-level events (`workspace_id IS NULL`) only, never another workspace's. Keyset
   pages; data rendered only through per-action key allowlists; IP prefixes and the affected
-  account only in the instance scope.
-- Deactivated users cannot log in and their sessions are revoked.
+  account only in the instance scope. A deleted account reads "Deleted user" in the instance
+  log; workspace member events keep "Former member".
+- Deactivated users cannot log in and their sessions are revoked. A deactivated account can be
+  permanently deleted by an instance administrator, subject to the owner policy above.
 
 **Email, verified registration and password reset (owner, pre-release B, 2026-10-19)**, see
 [ADR-0017](../adr/0017-email-and-account-recovery.md):

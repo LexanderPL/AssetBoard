@@ -2,9 +2,9 @@
 
 Every mutation runs inside the acting administrator's confirmation (``web.confirm.
 run_confirmed``), in that same ``BEGIN IMMEDIATE`` transaction, and checks there that the actor
-is still an active instance administrator. Self-protection (no deactivating or demoting
-yourself) and last-administrator protection are decided in that transaction too, so two
-administrators acting on each other at the same moment cannot remove every administrator.
+is still an active instance administrator. Self-protection (no deactivating, deleting or
+demoting yourself) and last-administrator protection are decided in that transaction too, so
+two administrators acting on each other at the same moment cannot remove every administrator.
 
 Audit actions (instance-level, ``workspace_id`` NULL, ``entity_id`` = the target user) and the
 only ``data`` keys each one carries:
@@ -15,6 +15,7 @@ only ``data`` keys each one carries:
 * ``admin.admin_granted``: none
 * ``admin.admin_revoked``: none
 * ``admin.totp_reset``: ``sessions_revoked`` (how many sessions ended)
+* ``admin.user_deleted``: ``memberships_removed`` (how many memberships were removed)
 """
 
 from __future__ import annotations
@@ -29,8 +30,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
-from assetboard.db.models.identity import ExternalIdentity, User
+from assetboard.db.models.identity import ExternalIdentity, Membership, User, Workspace
 from assetboard.db.models.totp import TotpFactor
+from assetboard.db.repositories.membership import MembershipRepository
 from assetboard.db.repositories.totp import TotpRepository
 from assetboard.services.auth import (
     PasswordPolicyError,
@@ -49,17 +51,27 @@ AUDIT_DATA_KEYS: dict[str, tuple[str, ...]] = {
     "admin.admin_granted": (),
     "admin.admin_revoked": (),
     "admin.totp_reset": ("sessions_revoked",),
+    "admin.user_deleted": ("memberships_removed",),
 }
 
-AdminAction = Literal["activate", "deactivate", "promote", "demote", "reset_totp"]
+AdminAction = Literal["activate", "deactivate", "promote", "demote", "reset_totp", "delete"]
 ADMIN_ACTIONS: tuple[AdminAction, ...] = (
     "activate",
     "deactivate",
     "promote",
     "demote",
     "reset_totp",
+    "delete",
 )
-ActionStatus = Literal["done", "unchanged", "self", "self_totp_reset", "last_admin", "not_found"]
+ActionStatus = Literal[
+    "done",
+    "unchanged",
+    "self",
+    "self_totp_reset",
+    "last_admin",
+    "active_user",
+    "not_found",
+]
 TEMPORARY_PASSWORD_BYTES = 12  # token_urlsafe(12): 16 characters, 96 bits
 TEMPORARY_PASSWORD_ATTEMPTS = 20
 
@@ -93,6 +105,31 @@ class UserRow:
     created_at: datetime
     methods: tuple[Literal["password", "oidc", "proxy"], ...]
     has_two_factor: bool
+
+
+@dataclass(frozen=True, slots=True)
+class BlockingWorkspace:
+    """A workspace the target is the only owner of, so deleting them would strand it."""
+
+    id: UUID
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class OwnershipBlocked:
+    """Deletion refused: these workspaces would have no owner left."""
+
+    workspaces: tuple[BlockingWorkspace, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkspaceId:
+    id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkspaceScope:
+    workspace: _WorkspaceId
 
 
 def _two_factor_users(session: Session, user_ids: list[UUID] | None = None) -> set[UUID]:
@@ -195,7 +232,7 @@ def _protection(
     last-administrator rule cannot trigger through ``apply_admin_action``; it stays as a second
     line of defence (and is tested on its own).
     """
-    if target.id == actor.id and action in {"deactivate", "demote"}:
+    if target.id == actor.id and action in {"deactivate", "demote", "delete"}:
         return "self"
     removes_admin = target.is_instance_admin and target.is_active
     if (
@@ -207,6 +244,31 @@ def _protection(
     return None
 
 
+def _memberships_to_remove(
+    session: Session, target: User
+) -> tuple[tuple[BlockingWorkspace, ...], list[tuple[MembershipRepository, Membership]]]:
+    """The target's memberships, split into sole-owner blockers and removable rows.
+
+    Every lookup goes through a repository scoped to the workspace being examined, so the
+    instance-level action never reads or writes a membership outside an explicit workspace
+    scope. A target who is the only owner of any workspace blocks the whole deletion; nothing
+    is removed in that case.
+    """
+    blocking: list[BlockingWorkspace] = []
+    removable: list[tuple[MembershipRepository, Membership]] = []
+    workspaces = session.scalars(select(Workspace).order_by(Workspace.name, Workspace.id)).all()
+    for workspace in workspaces:
+        repository = MembershipRepository(session, _WorkspaceScope(_WorkspaceId(workspace.id)))
+        membership = repository.for_user(target.id)
+        if membership is None:
+            continue
+        if membership.role == "owner" and repository.count_owners() <= 1:
+            blocking.append(BlockingWorkspace(workspace.id, workspace.name))
+        else:
+            removable.append((repository, membership))
+    return tuple(blocking), removable
+
+
 def apply_admin_action(
     session: Session,
     actor: User,
@@ -216,7 +278,7 @@ def apply_admin_action(
     clock: Clock,
     host: str | None,
     user_agent: str | None,
-) -> ActionStatus:
+) -> ActionStatus | OwnershipBlocked:
     """One administrator action, inside the confirming transaction (``actor`` confirmed)."""
     if not actor.is_active or not actor.is_instance_admin:
         raise NotInstanceAdmin
@@ -229,7 +291,22 @@ def apply_admin_action(
     if refusal is not None:
         return refusal
     data: dict[str, str | int | bool] = {}
-    if action == "reset_totp":
+    if action == "delete":
+        if target.is_active:
+            return "active_user"
+        blocking, removable = _memberships_to_remove(session, target)
+        if blocking:
+            return OwnershipBlocked(blocking)
+        for repository, membership in removable:
+            repository.delete(membership)
+        data["memberships_removed"] = len(removable)
+        # Sessions, identities, tokens, two-factor rows, dashboard preferences and notification
+        # channels cascade from the user row. Audit events keep their ids and lose the actor
+        # reference where the deleted account was the actor.
+        session.delete(target)
+        session.flush()
+        audit = "admin.user_deleted"
+    elif action == "reset_totp":
         if target.id == actor.id:
             return "self_totp_reset"
         repository = TotpRepository(session, target.id)

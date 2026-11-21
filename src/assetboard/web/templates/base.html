@@ -131,7 +131,7 @@
                   <a href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Categories") }}</a>
                   {% if workspace_nav.role == "owner" %}
                   <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Workspace settings") }}</a>
-                  <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_members') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Members") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_members') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Workspace members") }}</a>
                   <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="{{ menu_item }}" data-details-close>{{ _("Audit log: workspace") }}</a>
                   {% endif %}
                   {% if workspace_nav.role in ("owner", "editor") %}

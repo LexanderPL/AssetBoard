@@ -91,6 +91,18 @@
   {% endif %}
 </section>
 {% if not demo_session %}
+<section class="panel p-6 sm:p-7" aria-labelledby="workspace-members-heading" data-settings-members>
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h2 id="workspace-members-heading" class="text-base font-semibold">{{ _("Workspace members") }}</h2>
+      <p class="mt-1 text-sm text-muted" data-members-summary>
+        {{ ngettext("%(num)d member", "%(num)d members", members_summary.member_count) }}
+        {% if members_summary.pending_invitation_count %} · {{ ngettext("%(num)d pending invitation", "%(num)d pending invitations", members_summary.pending_invitation_count) }}{% endif %}
+      </p>
+    </div>
+    <a href="{{ scoped_url(request, 'workspace_members') }}" class="btn" data-manage-members>{{ _("Manage members") }}</a>
+  </div>
+</section>
 <section class="panel border-danger-line p-6 sm:p-7" aria-labelledby="danger-zone-heading" data-danger-zone>
   <h2 id="danger-zone-heading" class="text-base font-semibold text-danger-strong">{{ _("Delete workspace") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Permanently removes this workspace and all its data, for every member. You confirm on the next page by typing the workspace name.") }}</p>

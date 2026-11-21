@@ -61,6 +61,7 @@ def _(message: str) -> str:
 
 ACTOR_KINDS = {"cli": _("Command line"), "system": _("System")}
 FORMER_MEMBER = _("Former member")
+DELETED_USER = _("Deleted user")
 
 
 def _t(request: Request, message: str) -> str:
@@ -86,7 +87,7 @@ def _row(request: Request, row: AuditRow) -> dict[str, Any]:
         actor = _t(request, kind) if kind else None
     target = row.target_name
     if target is None and row.target_missing:
-        target = _t(request, FORMER_MEMBER)
+        target = _t(request, DELETED_USER if row.instance else FORMER_MEMBER)
     return {
         "when": row.ts.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "label": _t(request, row.label),

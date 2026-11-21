@@ -174,6 +174,14 @@ class PendingInvitation:
 
 
 @dataclass(frozen=True, slots=True)
+class MembersSummary:
+    """The counts the owner's Workspace settings summary panel shows."""
+
+    member_count: int
+    pending_invitation_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class WorkspaceSettings:
     name: str
     base_currency: str
@@ -232,6 +240,22 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             upcoming_days=workspace.upcoming_days,
             investment_cost_basis=workspace.investment_cost_basis,
             auto_link_portfolio=workspace.auto_link_portfolio,
+        )
+
+
+def members_summary(factory: sessionmaker[Session], ctx: Context) -> MembersSummary:
+    """Member and pending-invitation counts for the Workspace settings panel.
+
+    "Pending" is the same set the Members page lists and invitation creation counts against
+    ``MAX_PENDING_INVITATIONS``: not used, not revoked and not expired.
+    """
+    require_role(ctx, Role.OWNER)
+    with factory() as session:
+        return MembersSummary(
+            member_count=len(MembershipRepository(session, ctx).members()),
+            pending_invitation_count=InvitationRepository(session, ctx).count_pending(
+                ctx.clock.now()
+            ),
         )
 
 

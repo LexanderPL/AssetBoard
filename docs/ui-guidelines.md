@@ -39,11 +39,12 @@ belongs to the tab currently shown.
 
 - **One `h1` per page.** It names the destination, not the period: `Home`, `Month`,
   `Transactions`, `History`, `Upcoming payments`, `Recurring items`, `Income`, `Taxes`,
-  `Net worth`, `Investments`, `Categories`, `Notifications`, `Workspace settings`.
+  `Net worth`, `Investments`, `Categories`, `Notifications`, `Workspace settings`,
+  `Workspace members`.
   Put the period in a subtitle or in the page title block (`Transactions: November 2026` is the
   exception because both destination and month matter).
 - The base template has a `header_actions` block, rendered as a left-aligned row directly under
-  the `h1`. Use it for the page's primary action (`Add income`, `New tax`, `Invite someone`).
+  the `h1`. Use it for the page's primary action (`Add income`, `New tax`, `Invite`).
   Pages with tabs put the action below the tab strip instead, in a `data-page-actions` row, so
   it clearly belongs to the active tab. Do not put primary actions at the top right beside the
   user menu.

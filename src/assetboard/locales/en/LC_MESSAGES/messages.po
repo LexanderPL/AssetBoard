@@ -700,6 +700,9 @@ msgstr ""
 msgid "Two-factor authentication reset by an administrator"
 msgstr ""
 
+msgid "Account deleted"
+msgstr ""
+
 msgid "Workspace settings changed"
 msgstr ""
 
@@ -963,6 +966,9 @@ msgid "Scope"
 msgstr ""
 
 msgid "Sessions ended"
+msgstr ""
+
+msgid "Workspace memberships removed"
 msgstr ""
 
 msgid "Other sessions ended"
@@ -1416,6 +1422,9 @@ msgid "granting the administrator role"
 msgstr ""
 
 msgid "removing the administrator role"
+msgstr ""
+
+msgid "deleting an account"
 msgstr ""
 
 msgid "creating an account"
@@ -2566,6 +2575,9 @@ msgstr ""
 msgid "Reset two-factor authentication"
 msgstr ""
 
+msgid "Delete account"
+msgstr ""
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr ""
@@ -2591,6 +2603,13 @@ msgid ""
 " two-factor authentication."
 msgstr ""
 
+#, python-format
+msgid ""
+"Permanently delete %(user)s. Their workspace memberships, sessions, "
+"linked sign-in methods and personal settings are removed. Audit log "
+"entries are kept."
+msgstr ""
+
 msgid "Done."
 msgstr ""
 
@@ -2598,8 +2617,8 @@ msgid "Nothing to change: the account is already in that state."
 msgstr ""
 
 msgid ""
-"You cannot deactivate your own account or remove your own administrator "
-"role."
+"You cannot deactivate or delete your own account, or remove your own "
+"administrator role."
 msgstr ""
 
 msgid ""
@@ -2608,6 +2627,18 @@ msgid ""
 msgstr ""
 
 msgid "This is the last active administrator, so this would leave none."
+msgstr ""
+
+msgid "Only a deactivated account can be deleted. Deactivate it first."
+msgstr ""
+
+msgid "The account was deleted."
+msgstr ""
+
+msgid ""
+"This action cannot be undone. The account, its memberships, sessions, "
+"linked sign-in methods and personal settings are removed. Audit log "
+"entries are kept."
 msgstr ""
 
 msgid ""
@@ -2659,6 +2690,21 @@ msgstr ""
 msgid "An account with this email address already exists."
 msgstr ""
 
+#, python-format
+msgid ""
+"This account is the only owner of %(num)d workspace. Make another member "
+"an owner there first."
+msgid_plural ""
+"This account is the only owner of %(num)d workspaces. Make another member"
+" an owner there first."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"Open another workspace from the workspace switcher first, then manage its"
+" members."
+msgstr ""
+
 msgid "Command line"
 msgstr ""
 
@@ -2666,6 +2712,9 @@ msgid "System"
 msgstr ""
 
 msgid "Former member"
+msgstr ""
+
+msgid "Deleted user"
 msgstr ""
 
 msgid "yes"
@@ -5772,6 +5821,9 @@ msgid "Workspaces"
 msgstr ""
 
 msgid "New workspace"
+msgstr ""
+
+msgid "Workspace members"
 msgstr ""
 
 msgid "Audit log: workspace"
@@ -12797,7 +12849,7 @@ msgstr ""
 msgid "Confirm rollback"
 msgstr ""
 
-msgid "Invite someone"
+msgid "Invite"
 msgstr ""
 
 msgid "People in this workspace"
@@ -12817,6 +12869,9 @@ msgid "Invitation link created. Copy it now: it is shown only once."
 msgstr ""
 
 msgid "Invitation link"
+msgstr ""
+
+msgid "Invite to this workspace"
 msgstr ""
 
 msgid "Valid for"
@@ -12939,6 +12994,21 @@ msgstr ""
 msgid ""
 "Taxes stay on while these income sources have taxes ticked. Untick them "
 "first:"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d member"
+msgid_plural "%(num)d members"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(num)d pending invitation"
+msgid_plural "%(num)d pending invitations"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Manage members"
 msgstr ""
 
 msgid ""
@@ -15397,5 +15467,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Window: %(num)d months"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You cannot deactivate your own account"
+#~ " or remove your own administrator "
+#~ "role."
+#~ msgstr ""
+
+#~ msgid "Invite someone"
 #~ msgstr ""
 
