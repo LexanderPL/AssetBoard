@@ -250,6 +250,7 @@ def test_an_incomplete_portfolio_point_is_dashed_and_noted() -> None:
     assert "Incomplete: an instrument has no price or FX rate." in view.rows[0].notes
     assert any("undated legacy transaction" in note for note in view.notes)
     assert any("chart point is incomplete" in note for note in view.notes)
+    assert view.chart is not None
     assert view.chart["value"] == [None]
 
 

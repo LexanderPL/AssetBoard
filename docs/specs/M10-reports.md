@@ -126,6 +126,12 @@ conventions). Golden test against services.summary.month_summary; property tests
 - The chart is a new `report-bars` kind of the F2.7 chart module: grouped bars, ECharts' legend
   hides a series, server-formatted labels, token colours, and an sr-only table with a
   “Show as table” control. User guide: [Reports](../reports.md).
+- **As built (F11.8, 2026-11-20):** a range with no ledger data shows one actionable empty state
+  instead of zero/dash tables; the filters use the shared phone disclosure with an active-filter
+  count; a compact section nav links every visible section; the net-worth “items had no value”
+  warning appears once at section level (chart tooltips keep the per-point detail); portfolio
+  gains use the success/danger colours; and a non-base-only net-worth or undated-only portfolio
+  series keeps its section with the explanatory note instead of disappearing.
 
 ---
 
@@ -236,8 +242,9 @@ multi-select and the savings option, and the category x period table. Property t
   The report reuses that service rather than reading `NetWorthSnapshot`; stored snapshots are
   legacy archive data.
 - Base currency only, as the derived service already is. Non-base, valueless and unavailable
-  linked items stay excluded; the report omits the per-period warning notes, while the Net worth
-  Summary keeps the breakdown.
+  linked items stay excluded; a non-base-only series keeps the section with its warning, while
+  an excluded-only series is absent. Each distinct warning appears once at section level; chart
+  tooltips keep the per-point detail, and estimated-value notes stay in the tooltips.
 - Periods without a derived point are gaps, never interpolated.
 
 **Agent prompt**
@@ -252,9 +259,9 @@ service (last point per period, gaps not interpolated), hidden when there are no
 window plus a carry-forward anchor, drops dates before the first recorded value, and keeps the
 last point of each report month/year. The `/reports` section
 reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
-the chart and accessible table, with the per-period not-counted/estimated notes suppressed. The
-section is absent without values or outside the base currency. Tests cover year/month selection,
-the base-currency rule and the empty workspace.
+the chart and accessible table, with each distinct not-counted warning once at section level and
+the per-point detail in the tooltips. A non-base-only series keeps the section; an excluded-only
+series is absent. Tests cover year/month selection, the base-currency rule and the empty workspace.
 
 ---
 

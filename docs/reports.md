@@ -80,7 +80,7 @@ The table below the chart has the same figures: period, earned, spent, saved and
 total row for the range. Each monthly row links to that month's page (`/m/YYYY-MM`); each yearly
 row links to the Year overview focused on that year. With JavaScript the table is visually hidden
 beside the drawn chart; **Show as table** reveals it. Without JavaScript the table stays visible
-in place of the chart. An empty range shows an empty state and a table of zeros.
+in place of the chart. An empty range shows one actionable empty state instead of a zero table.
 
 The same date links are used throughout the page: month labels open the month page, and year
 labels (including year-overview column headings and year-over-year rows) open the Year overview
@@ -203,12 +203,14 @@ in the report range. It reuses the same derived history as the Net worth Summary
 values, linked items and prices are calculated on read, and the last point of each period is
 shown. There is no interpolation between periods.
 
-The section appears only when the workspace has net-worth values and the selected currency is
-the workspace base currency. It is absent otherwise. The chart and table carry the same figures;
-the data table is collapsed behind **Show as table** with JavaScript and stays visible without
-JavaScript. Period rows link to the month page or the focused Year overview. The report does not
-repeat the per-period “not counted” and “estimated values” notes; the Net worth Summary keeps
-that detail in its breakdown.
+The section appears when the workspace has counted net-worth history, or a non-base series
+with a warning. A series whose only items are in another currency keeps the section with the
+existing “not counted” warning. If the
+report currency is not the workspace base currency, a page note says net worth and portfolio are
+base-currency only. The chart and table carry the same figures; the data table is collapsed
+behind **Show as table** with JavaScript and stays visible without JavaScript. Period rows link
+to the month page or the focused Year overview. Each distinct “not counted” warning appears once
+at section level; chart tooltips keep the per-point detail and the estimated-value notes.
 
 ## Portfolio value over time
 

@@ -347,7 +347,11 @@ document.addEventListener("htmx:load", (event) => {
 // never overridden later.
 const FILTER_PHONE = window.matchMedia("(max-width: 639.98px)");
 document.querySelectorAll("details[data-filter-disclosure]").forEach((details) => {
-  if (details instanceof HTMLDetailsElement && FILTER_PHONE.matches) details.open = false;
+  if (!(details instanceof HTMLDetailsElement) || !FILTER_PHONE.matches) return;
+  // A refused filter must stay visible: the alert lives inside the disclosure, so collapsing it
+  // would strand the visitor on a blank page with no explanation.
+  if (details.querySelector("[role=alert], [data-report-invalid]")) return;
+  details.open = false;
 });
 
 // Popovers: a <details data-popover> whose content floats over the page (the user menu, the

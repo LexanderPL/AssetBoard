@@ -97,6 +97,8 @@ class ReportFilters:
     savings: bool = False
     year: int = 0
     trend_months: int = TREND_MONTHS_DEFAULT
+    range_is_default: bool = True
+    year_is_default: bool = True
     errors: Mapping[str, FilterError] = field(default_factory=dict[str, FilterError])
 
 
@@ -123,10 +125,12 @@ class ReportsData:
     yoy: YearOverYearTable
     plan_accuracy: PlanAccuracy
     available_currencies: tuple[str, ...]
+    base_currency: str
     show_currency_selector: bool
     future_count: int
     other_currency_count: int
     has_data: bool
+    active_filter_count: int
     today: date
     series_start: date | None
     series_end: date | None
@@ -207,9 +211,9 @@ def _resolve_filters(
     # kept when it is explicitly requested, so an old bookmark still opens.
     in_range = [year for year in data_years if start_year <= year <= end_year]
     default_year = max(in_range) if in_range else min(end_year, current_year)
-    year = _parse_year(raw_year) if raw_year.strip() else default_year
-    if year is None:
-        year = default_year
+    parsed_year = _parse_year(raw_year) if raw_year.strip() else None
+    year_is_default = parsed_year is None
+    year = parsed_year if parsed_year is not None else default_year
     trend_months = int(raw_trend) if raw_trend in ("3", "12") else TREND_MONTHS_DEFAULT
     return ReportFilters(
         start_year=start_year,
@@ -220,6 +224,8 @@ def _resolve_filters(
         to_text=raw_to.strip() or str(end_year),
         year=year,
         trend_months=trend_months,
+        range_is_default=start_year == default_from and end_year == default_to,
+        year_is_default=year_is_default,
         errors=errors,
     )
 
@@ -246,6 +252,21 @@ def _parse_category_ids(raw: Iterable[str]) -> tuple[UUID, ...]:
 
 def _category_blocks(include_savings: bool) -> set[str]:
     return {"expense", "saved"} if include_savings else {"expense"}
+
+
+def _active_filter_count(filters: ReportFilters, base_currency: str) -> int:
+    """The number of filters that differ from the page defaults (for the phone badge)."""
+    return sum(
+        (
+            not filters.range_is_default,
+            filters.step != _default_step(filters.start_year, filters.end_year),
+            bool(filters.category_ids),
+            filters.savings,
+            filters.currency != base_currency,
+            not filters.year_is_default,
+            filters.trend_months != TREND_MONTHS_DEFAULT,
+        )
+    )
 
 
 def _range_year_options(data_years: tuple[int, ...], filters: ReportFilters) -> tuple[int, ...]:
@@ -356,7 +377,10 @@ def net_worth_report(
     if not dates:
         return None
     data = networth_history(factory, ctx, "all", dates=dates)
-    if not data.points or not data.has_values:
+    # A workspace whose only items are non-base still has recorded history worth explaining;
+    # keep the section so its warning is visible (UX-15). No-value-only items have no recorded
+    # history and stay absent.
+    if not data.points or not data.has_recorded_values:
         return None
     return data
 
@@ -412,7 +436,9 @@ def portfolio_report(
     if not dates:
         return None
     page = performance_page(factory, ctx, range_code="all", with_periods=False, dates=dates)
-    if not page.chart:
+    # Undated legacy lots produce no chart point but do produce an explanatory note; keep the
+    # section so the note is visible (UX-15).
+    if not page.chart and not page.undated_count:
         return None
     return replace(
         page,
@@ -480,10 +506,15 @@ def reports_data(
                 yoy=YearOverYearTable((), Money(0, base_currency), Money(0, base_currency)),
                 plan_accuracy=PlanAccuracy((), 0, 0, None),
                 available_currencies=(base_currency,),
+                base_currency=base_currency,
                 show_currency_selector=False,
                 future_count=0,
                 other_currency_count=0,
                 has_data=False,
+                active_filter_count=_active_filter_count(
+                    replace(filters, currency=base_currency, savings=include_savings),
+                    base_currency,
+                ),
                 today=today,
                 series_start=None,
                 series_end=None,
@@ -655,10 +686,12 @@ def reports_data(
         ),
         plan_accuracy=plan_accuracy(accuracy_series, plans, categories),
         available_currencies=available,
+        base_currency=base_currency,
         show_currency_selector=len(available) > 1,
         future_count=stats.future,
         other_currency_count=stats.other_currency,
         has_data=stats.counted > 0 and bool(series),
+        active_filter_count=_active_filter_count(filters, base_currency),
         today=today,
         series_start=series_start if series else None,
         series_end=series_end if series else None,
