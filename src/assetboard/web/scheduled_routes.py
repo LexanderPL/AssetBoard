@@ -332,6 +332,7 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
             "has_items": bool(shown),
             "format_day": format_day,
             "can_edit": has_role(ctx, Role.EDITOR),
+            "taxes_enabled": ctx.workspace.taxes_enabled,
             "notice": (
                 gettext(ACTION_NOTICES[notice], locale) if notice in ACTION_NOTICES else None
             ),
