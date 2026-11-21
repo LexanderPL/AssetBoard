@@ -6,6 +6,10 @@ with the one before, how closely actual spending followed the plan, and how net 
 portfolio moved over the same range. Every member of a workspace, viewers included, can open the
 page: it only reads what they can already see in the ledger.
 
+A section navigation under the filters links every visible section on the page. It wraps onto
+more lines on narrow screens instead of scrolling sideways, so every link stays reachable on a
+phone and on a desktop.
+
 Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
 [desktop dark](assets/screenshots/desktop/dark/reports.jpg) ·
 [phone light](assets/screenshots/phone/light/reports.jpg) ·
@@ -14,7 +18,16 @@ Screenshots: [desktop light](assets/screenshots/desktop/light/reports.jpg) ·
 ## Filters
 
 The filters are a plain GET form, so every view is a bookmarkable address and works without
-JavaScript. Unknown query parameters are ignored.
+JavaScript. Unknown query parameters are ignored. The filter panel is closed by default; it opens
+automatically when a field has an error, so the message is never hidden.
+
+The page remembers the last settings in a one-year browser cookie (`HttpOnly`, `SameSite=Lax`,
+no amounts). A request with any report query parameter wins: it opens exactly that view and
+refreshes the remembered settings. A bare `/reports` opens the remembered settings, or the current
+defaults when there is no valid cookie. A malformed or invalid cookie is ignored. The cookie is
+scoped to the browser, not the account or workspace; category ids from another workspace are
+ignored when the page resolves them. **Clear filters** deletes the remembered settings and
+redirects to the clean `/reports` URL, so the defaults and bookmark link stay exact.
 
 | Filter | Values | Default |
 | --- | --- | --- |
@@ -147,11 +160,15 @@ and open months count alike; entries dated after today are not charted.
 The grid follows the category rules above: regular expenses only, plus expense categories with
 the `savings` treatment when **Include saved / invested** is on. Income, withdrawals and transfers
 never appear. Without a category filter every such category is shown; with a filter exactly the
-chosen categories appear (including a zero row). A category's swatch uses its colour. Stronger red
-means more spending in that month: the shading uses the same red scale as a large expense on
-Transactions and follows the light and dark themes. Zero months stay unshaded.
+chosen categories appear (including a zero row). A category's swatch uses its colour.
 
-The month column headings link to that month's page. The **Report year** selector in this panel
+Heat follows the Transactions rule (T-1) separately for each category row: **the comparison group
+is the category's non-zero months**. A row needs at least three non-zero months before anything is
+shaded, and a month must be at least twice the row's median to be eligible. Eligible months then
+use the same four-step max-relative scale as a large expense on Transactions: relative to the
+row's largest non-zero month. This uses the same red shades and follows the light and dark themes.
+Zero months stay unshaded, and a row with one or two large months stays neutral. The month column
+headings link to that month's page. The **Report year** selector in this panel
 changes only the grid; changing it reloads the page with the other filters preserved.
 
 ## Category trends
@@ -232,14 +249,14 @@ in the report range. It reuses the same derived history as the Net worth Summary
 values, linked items and prices are calculated on read, and the last point of each period is
 shown. There is no interpolation between periods.
 
-The section appears when the workspace has counted net-worth history, or a non-base series
-with a warning. A series whose only items are in another currency keeps the section with the
-existing “not counted” warning. If the
-report currency is not the workspace base currency, a page note says net worth and portfolio are
-base-currency only. The chart and table carry the same figures; the data table is collapsed
-behind **Show as table** with JavaScript and stays visible without JavaScript. Period rows link
-to the month page or the focused Year overview. Each distinct “not counted” warning appears once
-at section level; chart tooltips keep the per-point detail and the estimated-value notes.
+The section appears when the workspace has counted net-worth history. A series whose only items
+are in another currency has nothing to chart and no section. If the report currency is not the
+workspace base currency, a page note says net worth and portfolio are base-currency only. The
+chart and table carry the same figures; the data table is collapsed behind **Show as table** with
+JavaScript and stays visible without JavaScript. Period rows link to the month page or the focused
+Year overview. Warnings about items that were not counted or valued stay in the chart tooltips;
+the Net worth Summary page keeps its per-point detail. The Reports section itself has no
+not-counted note.
 
 ## Portfolio value over time
 

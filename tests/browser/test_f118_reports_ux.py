@@ -333,3 +333,88 @@ def test_the_series_table_is_visible_without_javascript(tmp_path: Path) -> None:
         expect(series.locator("[data-chart-table-toggle]")).to_be_hidden()
         context.close()
         browser.close()
+
+
+def test_the_section_nav_wraps_without_sideways_scrolling(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    port = _serve(app)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(color_scheme="light", viewport={"width": 390, "height": 844})
+        page = context.new_page()
+        base = f"http://127.0.0.1:{port}"
+        _sign_in(page, base, app)
+        _seed(app)
+        for width, height in ((390, 844), (1440, 900)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.goto(f"{base}/reports?from=2024&to=2026&step=year", wait_until="networkidle")
+            nav = page.locator("[data-report-nav]")
+            expect(nav).to_be_visible()
+            nav.scroll_into_view_if_needed()
+            geometry = page.evaluate(
+                """() => {
+                  const nav = document.querySelector("[data-report-nav]");
+                  const links = [...nav.querySelectorAll("a")];
+                  const box = nav.getBoundingClientRect();
+                  return {
+                    overflowX: getComputedStyle(nav).overflowX,
+                    scrollWidth: nav.scrollWidth,
+                    clientWidth: nav.clientWidth,
+                    linkCount: links.length,
+                    inside: links.every((link) => {
+                      const rect = link.getBoundingClientRect();
+                      return rect.left >= box.left - 1 && rect.right <= box.right + 1
+                        && rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1;
+                    }),
+                    rows: new Set(links.map((link) =>
+                      Math.round(link.getBoundingClientRect().top))).size,
+                    pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
+                  };
+                }"""
+            )
+            assert geometry["linkCount"] == 9
+            assert geometry["inside"], (width, geometry)
+            assert geometry["overflowX"] not in {"auto", "scroll"}
+            assert geometry["scrollWidth"] <= geometry["clientWidth"] + 1
+            assert not geometry["pageOverflow"], width
+            if width == 390:
+                assert geometry["rows"] >= 2
+        context.close()
+        browser.close()
+
+
+def test_filters_are_remembered_and_can_be_cleared(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    port = _serve(app)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(color_scheme="light", viewport={"width": 1440, "height": 900})
+        page = context.new_page()
+        base = f"http://127.0.0.1:{port}"
+        _sign_in(page, base, app)
+        _seed(app)
+
+        page.goto(f"{base}/reports?from=2026&to=2026&step=month", wait_until="networkidle")
+        details = page.locator("details[data-filter-disclosure]")
+        expect(details).not_to_have_attribute("open", "")
+        details.locator(":scope > summary").click()
+        page.locator("#report-step").select_option("year")
+        page.locator('#report-filters input[name="savings"]').check()
+        page.locator("#report-filters button.btn-primary").click()
+        page.wait_for_url("**step=year**")
+        assert "savings=1" in page.url
+
+        page.goto(f"{base}/reports", wait_until="networkidle")
+        expect(details).not_to_have_attribute("open", "")
+        details.locator(":scope > summary").click()
+        expect(page.locator("#report-step")).to_have_value("year")
+        expect(page.locator('#report-filters input[name="savings"]')).to_be_checked()
+
+        page.locator('#report-filters button[name="clear"]').click()
+        page.wait_for_url(f"{base}/reports")
+        expect(details).not_to_have_attribute("open", "")
+        details.locator(":scope > summary").click()
+        expect(page.locator("#report-step")).to_have_value("month")
+        expect(page.locator('#report-filters input[name="savings"]')).not_to_be_checked()
+        context.close()
+        browser.close()

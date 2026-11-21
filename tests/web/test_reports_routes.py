@@ -13,6 +13,7 @@ from sqlalchemy import insert, select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
+from assetboard.web.security import report_filters_cookie_name
 from tests.conftest import OwnerApp
 
 NOW = "2026-10-14T12:00:00+00:00"
@@ -689,6 +690,126 @@ def test_the_filters_are_a_phone_disclosure_with_an_active_count(reports: OwnerA
     assert "Filters" in summary.group(0)
     assert "3 filters" in summary.group(0)  # range, category, savings
     assert 'class="btn-primary"' in panel.group(0)
+    assert "Clear filters" in panel.group(0)
+
+
+def test_the_filter_panel_is_closed_by_default_and_opens_on_errors(reports: OwnerApp) -> None:
+    _tx(reports, _category(reports, "Panel Food"), date(2026, 3, 5), 1_000)
+    valid = _page(reports, "from=2026&to=2026&step=month")
+    assert '<details class="panel" data-filter-disclosure>' in valid
+    assert '<details class="panel" data-filter-disclosure open>' not in valid
+
+    invalid = _page(reports, "from=2026&to=2025")
+    assert '<details class="panel" data-filter-disclosure open>' in invalid
+    assert "data-report-invalid" in invalid
+
+
+def _report_cookie(reports: OwnerApp) -> str:
+    return report_filters_cookie_name(reports.app.state.settings)
+
+
+def test_the_filter_cookie_remembers_every_resolved_field(reports: OwnerApp) -> None:
+    food = _category(reports, "Cookie Food")
+    _tx(reports, food, date(2024, 3, 5), 1_000)
+    _tx(reports, food, date(2025, 3, 5), 2_000)
+    _tx(reports, food, date(2026, 3, 5), 3_000)
+
+    response = reports.client.get(
+        f"/reports?from=2024&to=2026&step=year&savings=1&year=2025&trend=12&category={food}"
+    )
+    assert response.status_code == 200
+    name = _report_cookie(reports)
+    cookie = next(
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.startswith(f"{name}=")
+    )
+    for flag in ("HttpOnly", "SameSite=lax", "Path=/", "Max-Age=31536000"):
+        assert flag in cookie
+    value = reports.client.cookies[name]
+    assert "from=2024" in value and "to=2026" in value
+    assert "step=year" in value and "savings=1" in value
+    assert "year=2025" in value and "trend=12" in value and f"category={food}" in value
+
+    html = _page(reports)
+    assert "data-report-range>2024 – 2026<" in html
+    assert '<option value="year" selected>Yearly</option>' in html
+    assert 'name="savings" value="1" checked' in html
+    assert '<option value="2025" selected>2025</option>' in html
+    assert '<option value="12" selected>12-month average</option>' in html
+    assert f'value="{food}" checked' in html
+
+
+def test_an_explicit_report_url_overrides_and_refreshes_the_cookie(reports: OwnerApp) -> None:
+    food = _category(reports, "Override Food")
+    for year in (2024, 2025, 2026):
+        _tx(reports, food, date(year, 3, 5), 1_000)
+    reports.client.get("/reports?from=2024&to=2026&step=year&savings=1&year=2025")
+
+    html = _page(reports, "from=2024&to=2026&step=month")
+    assert "data-report-range>2024 – 2026<" in html
+    assert '<option value="month" selected>Monthly</option>' in html
+    assert 'name="savings" value="1" checked' not in html
+    value = reports.client.cookies[_report_cookie(reports)]
+    assert "step=month" in value and "savings=1" not in value
+    # The refreshed preference is what the next bare request sees.
+    assert '<option value="month" selected>Monthly</option>' in _page(reports)
+
+
+def test_an_invalid_explicit_url_does_not_refresh_the_cookie(reports: OwnerApp) -> None:
+    food = _category(reports, "Invalid Cookie Food")
+    for year in (2024, 2025, 2026):
+        _tx(reports, food, date(year, 3, 5), 1_000)
+    reports.client.get("/reports?from=2024&to=2026&step=year&savings=1")
+    before = reports.client.cookies[_report_cookie(reports)]
+
+    invalid = reports.client.get("/reports?from=2026&to=2025")
+    assert invalid.status_code == 200
+    assert "data-report-invalid" in invalid.text
+    assert reports.client.cookies[_report_cookie(reports)] == before
+    assert '<option value="year" selected>Yearly</option>' in _page(reports)
+
+
+def test_clear_filters_deletes_the_cookie_and_redirects_clean(reports: OwnerApp) -> None:
+    food = _category(reports, "Clear Food")
+    for year in (2024, 2025, 2026):
+        _tx(reports, food, date(year, 3, 5), 1_000)
+    reports.client.get("/reports?from=2024&to=2024&step=year")
+    name = _report_cookie(reports)
+    assert name in reports.client.cookies
+
+    response = reports.client.get("/reports?clear=1", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/reports"
+    cleared = next(
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.startswith(f"{name}=")
+    )
+    assert "Max-Age=0" in cleared
+    assert name not in reports.client.cookies
+
+    html = _page(reports)
+    assert "data-report-range>2024 – 2026<" in html
+    assert '<option value="month" selected>Monthly</option>' in html
+
+
+def test_an_invalid_cookie_falls_back_to_the_current_defaults(reports: OwnerApp) -> None:
+    food = _category(reports, "Fallback Food")
+    for year in (2024, 2025, 2026):
+        _tx(reports, food, date(year, 3, 5), 1_000)
+    name = _report_cookie(reports)
+    reports.client.cookies.set(name, "from=2026&to=2025&step=year")
+
+    html = _page(reports)
+    assert "data-report-invalid" not in html
+    assert '<details class="panel" data-filter-disclosure>' in html
+    assert "data-report-range>2024 – 2026<" in html
+    assert '<option value="month" selected>Monthly</option>' in html
+
+    reports.client.cookies.set(name, "x=" + "a" * 5_000)
+    oversized = _page(reports)
+    assert "data-report-range>2024 – 2026<" in oversized
 
 
 def test_a_non_base_currency_filter_explains_the_hidden_module_sections(
@@ -708,6 +829,9 @@ def test_the_section_nav_links_each_visible_section(reports: OwnerApp) -> None:
     html = _page(reports)
     nav = re.search(r"<nav[^>]*data-report-nav.*?</nav>", html, re.DOTALL)
     assert nav is not None
+    assert "overflow-x-auto" not in nav.group(0)
+    assert "whitespace-nowrap" not in nav.group(0)
+    assert "flex flex-wrap" in nav.group(0)
     for anchor in (
         "reports-chart-heading",
         "reports-rate-heading",
@@ -810,12 +934,17 @@ def test_the_year_overview_grid_has_twelve_months_totals_and_heat(reports: Owner
     assert totals is not None
     assert _cells(totals.group(0))[:2] == ["€1,020.00", "€130.00"]
     assert _cells(totals.group(0))[-1] == "€1,150.00"
-    assert "bg-danger-tint" in re.search(
+    assert "bg-danger-tint" not in re.search(
         r'<td class="([^"]*)" data-report-grid-cell>€900\.00</td>', html
     ).group(1)  # type: ignore[union-attr]
-    assert "bg-danger-shade-1" in re.search(
+    assert "bg-danger-shade-1" not in re.search(
         r'<td class="([^"]*)" data-report-grid-cell>€120\.00</td>', html
     ).group(1)  # type: ignore[union-attr]
+    # Sparse rows (two and one non-zero months) stay neutral under the Transactions gate.
+    assert all(
+        "bg-danger-" not in value
+        for value in re.findall(r'<td class="([^"]*)" data-report-grid-cell>', html)
+    )
     zero_classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>€0\.00</td>', food)
     assert zero_classes and all("bg-danger-" not in value for value in zero_classes)
     assert "heat-" not in html
@@ -845,19 +974,53 @@ def test_the_year_overview_csv_endpoint_is_gone(reports: OwnerApp) -> None:
     assert reports.client.get("/reports/year-overview.csv").status_code == 404
 
 
-def test_the_year_overview_heat_steps_are_monotonic(reports: OwnerApp) -> None:
-    food = _category(reports, "Heat Food")
-    for month, minor in ((1, 10_000), (2, 30_000), (3, 50_000), (4, 90_000)):
-        _tx(reports, food, date(2026, month, 10), minor)
+def test_the_year_overview_heat_uses_the_transactions_gate_per_category_row(
+    reports: OwnerApp,
+) -> None:
+    scale = _category(reports, "Heat Scale")
+    for month, minor in (
+        (1, 100),
+        (2, 100),
+        (3, 100),
+        (4, 100),
+        (5, 200),
+        (6, 300),
+        (7, 450),
+        (8, 600),
+    ):
+        _tx(reports, scale, date(2026, month, 10), minor)
+    sparse = _category(reports, "Heat Sparse")
+    _tx(reports, sparse, date(2026, 1, 10), 100)
+    _tx(reports, sparse, date(2026, 2, 10), 1_000)
+    small = _category(reports, "Heat Small")
+    for month, minor in ((1, 1), (2, 1), (3, 1), (4, 4)):
+        _tx(reports, small, date(2026, month, 10), minor)
+
     html = _page(reports, "from=2026&to=2026&step=month&year=2026")
-    row = _grid_row(html, "Heat Food")
-    classes = re.findall(r'<td class="([^"]*)" data-report-grid-cell>', row)
-    assert len(classes) == 12
-    assert "bg-danger-shade-1" in classes[0]
-    assert "bg-danger-shade-2" in classes[1]
-    assert "bg-danger-shade-3" in classes[2]
-    assert "bg-danger-tint" in classes[3]
-    assert all("bg-danger-" not in value for value in classes[4:])
+    scale_classes = re.findall(
+        r'<td class="([^"]*)" data-report-grid-cell>',
+        _grid_row(html, "Heat Scale"),
+    )
+    assert len(scale_classes) == 12
+    assert all("bg-danger-" not in value for value in scale_classes[:5])
+    assert "bg-danger-shade-2" in scale_classes[5]
+    assert "bg-danger-shade-3" in scale_classes[6]
+    assert "bg-danger-tint" in scale_classes[7]
+    assert all("bg-danger-" not in value for value in scale_classes[8:])
+
+    sparse_classes = re.findall(
+        r'<td class="([^"]*)" data-report-grid-cell>',
+        _grid_row(html, "Heat Sparse"),
+    )
+    assert all("bg-danger-" not in value for value in sparse_classes)
+
+    # The scale is row-local: a tiny row's outlier still stands out.
+    small_classes = re.findall(
+        r'<td class="([^"]*)" data-report-grid-cell>',
+        _grid_row(html, "Heat Small"),
+    )
+    assert "bg-danger-tint" in small_classes[3]
+    assert all("bg-danger-" not in value for value in small_classes[:3])
 
 
 def test_category_trends_show_three_and_twelve_month_windows(reports: OwnerApp) -> None:
@@ -1113,6 +1276,7 @@ def test_the_f92_sections_render_in_polish(reports: OwnerApp) -> None:
     assert "Zmiana wydatków" in html
     assert "Zmiana oszczędności" in html
     assert "Przekroczenie %" in html
+    assert "Wyczyść filtry" in html
 
 
 def test_plan_accuracy_is_empty_without_plans(reports: OwnerApp) -> None:

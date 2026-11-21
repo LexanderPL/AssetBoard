@@ -25,6 +25,12 @@ the M4 archive.
   viewers included, can open it (it shows what they can already read); the services check the
   role like every other read.
 - **Filters** (a plain GET form, so a view is a bookmarkable URL; works without JavaScript):
+  - **Remembered settings.** The last resolved filters (years, granularity, currency, categories,
+    savings, report year and trend window) are kept in a one-year browser cookie (`HttpOnly`,
+    `SameSite=Lax`; no amounts). Any explicit report query parameter wins and refreshes it; a
+    bare `/reports` reads it; an invalid cookie falls back to the current defaults. `clear=1`
+    deletes it and redirects to the clean page. The filter panel is closed by default and opens
+    automatically when a field has a validation error.
   - **Year range** `from=YYYY&to=YYYY`, inclusive; default: the last three years that have
     transactions (the current year when there are none); at most 30 years; `from > to`,
     malformed or out-of-range values are marked on the form and show no charts. The dropdowns
@@ -128,11 +134,12 @@ conventions). Golden test against services.summary.month_summary; property tests
   hides a series, server-formatted labels, token colours, and an sr-only table with a
   “Show as table” control. User guide: [Reports](../reports.md).
 - **As built (F11.8, 2026-11-20):** a range with no ledger data shows one actionable empty state
-  instead of zero/dash tables; the filters use the shared phone disclosure with an active-filter
-  count; a compact section nav links every visible section; the net-worth “items had no value”
-  warning appears once at section level (chart tooltips keep the per-point detail); portfolio
-  gains use the success/danger colours; and a non-base-only net-worth or undated-only portfolio
-  series keeps its section with the explanatory note instead of disappearing.
+  instead of zero/dash tables; the filters use the shared disclosure with an active-filter
+  count; a compact section nav links every visible section; portfolio gains use the
+  success/danger colours; and an undated-only portfolio series keeps its section with the
+  explanatory note instead of disappearing. (Reports polish 2 removed the net-worth
+  section-level notes and closed the filter panel by default; a chartless net-worth series now has
+  no section.)
 
 ---
 
@@ -243,9 +250,10 @@ multi-select and the savings option, and the category x period table. Property t
   The report reuses that service rather than reading `NetWorthSnapshot`; stored snapshots are
   legacy archive data.
 - Base currency only, as the derived service already is. Non-base, valueless and unavailable
-  linked items stay excluded; a non-base-only series keeps the section with its warning, while
-  an excluded-only series is absent. Each distinct warning appears once at section level; chart
-  tooltips keep the per-point detail, and estimated-value notes stay in the tooltips.
+  linked items stay excluded; a series with nothing to chart is absent (including one whose only
+  items are in another currency). The Reports section shows no not-counted note: chart tooltips
+  keep the per-point detail and estimated-value notes, and the Net worth Summary page keeps its
+  warning. (Owner decision, 2026-11-21: the section-level notes were removed.)
 - Periods without a derived point are gaps, never interpolated.
 
 **Agent prompt**
@@ -255,14 +263,15 @@ Implement F10.4 from docs/specs/M10-reports.md: net worth over time on /reports 
 service (last point per period, gaps not interpolated), hidden when there are no values. Do not read stored snapshots.
 ```
 
-**As built (2026-11-19, bounded 2026-11-20).** `services.reports.net_worth_report` calls F5.9's
+**As built (2026-11-19, bounded 2026-11-20; notes revised 2026-11-21).** `services.reports.net_worth_report` calls F5.9's
 `networth_history(dates=...)` with the report period ends. The service reads only the report
 window plus a carry-forward anchor, drops dates before the first recorded value, and keeps the
 last point of each report month/year. The `/reports` section
 reuses `web.networth_history.build_trend_view` for the chart, and one shared series macro renders
-the chart and accessible table, with each distinct not-counted warning once at section level and
-the per-point detail in the tooltips. A non-base-only series keeps the section; an excluded-only
-series is absent. Tests cover year/month selection, the base-currency rule and the empty workspace.
+the chart and accessible table. The section shows no not-counted notes; the per-point detail stays
+in the chart tooltips and on the Net worth Summary page. A series with no chart (including a
+non-base-only one) is absent. Tests cover year/month selection, the base-currency rule and the
+empty workspace.
 
 ---
 
@@ -287,6 +296,31 @@ portfolio_series, hidden without investment data. No new portfolio math.
 with explicit report period-end dates (month/year end, capped at today); `web.charts.build_performance_chart` supplies the same chart JSON as the Performance page and Home widget.
 The section is absent without investment transactions or outside the base currency. Tests cover
 year/month selection, the base-currency rule and the empty workspace.
+
+---
+
+## Reports polish 2 (2026-11-21, owner request)
+
+**As built (2026-11-21).** No migration and no new dependency.
+
+- **Section navigation:** the links panel wraps with a flex row instead of scrolling sideways
+  (`panel` kept, `overflow-x-auto` and `whitespace-nowrap` removed). It works at 390 px and
+  1440 px; every visible section is reachable.
+- **Filters:** the shared `filter_panel` macro gained `open=true`; Reports passes `false` unless
+  the view has validation errors. The last resolved filters (from, to, step, currency,
+  categories, savings, year, trend) are kept in a one-year `HttpOnly`, `SameSite=Lax` browser
+  cookie. Any explicit report parameter wins and refreshes it; a bare `/reports` reads it; an
+  invalid or oversized cookie falls back to the current defaults. `clear=1` deletes it and
+  redirects to the clean URL. A **Clear filters** button submits that action inside the GET form.
+  URLs stay bookmarkable and no-JS.
+- **Year overview heat:** each category row now follows the Transactions T-1 gate. The comparison
+  group is the category's non-zero months: at least three are needed, a month must be at least
+  twice the row median, and the four steps then use the existing max-relative scale against the
+  row's largest non-zero month. `domain/shading.py`'s `large_gates`, `maxima` and `shade` are
+  reused; zero and low months stay neutral.
+- **Net worth section:** the section-level “items had no value / another currency / unavailable”
+  notes are gone. Chart tooltips keep the per-point detail and estimated-value notes, and the
+  Net worth Summary page keeps its warning. A series with no chart has no section.
 
 ---
 
