@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 from urllib.parse import urlencode
 from uuid import UUID
@@ -14,17 +15,19 @@ from assetboard.domain.money import Money
 from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.recurrence import Frequency, MonthDay, RecurrenceRule, WeekendPolicy
 from assetboard.domain.scheduled import AmountMode, ItemAction
+from assetboard.domain.taxes import TaxKind
 from assetboard.domain.transactions import TransactionDirection, amount_minor
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, month_names
+from assetboard.i18n.dates import format_day, format_day_of_month, month_names
 from assetboard.i18n.numbers import format_amount_input, parse_amount
-from assetboard.services import scheduled
-from assetboard.services.categories import list_categories
+from assetboard.services import income, scheduled, taxes
+from assetboard.services.categories import CategoryView, list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.rendering import render_template
 from assetboard.web.schedule_text import describe_rule
 from assetboard.web.security import require_csrf
+from assetboard.web.tax_routes import rate_label
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -307,9 +310,58 @@ async def _form(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class IncomeSourceRow:
+    """A read-only income source listed in the Recurring page's Income table."""
+
+    source: income.IncomeSourceView
+    category: CategoryView | None
+    next_due: date | None
+
+
+@dataclass(frozen=True, slots=True)
+class TaxRuleRow:
+    """A read-only income tax rule listed in the Recurring page's Expenses table."""
+
+    rule: taxes.TaxRuleView
+    category: CategoryView | None
+    next_due: date | None
+
+
+def _next_tax_payment(
+    rule: taxes.TaxRuleView, sources: list[income.IncomeSourceView]
+) -> date | None:
+    """The earliest planned payment of ``rule`` across the given (non-archived) income sources.
+
+    The payment dates come from the sources' previews, so only future payments are considered.
+    A withheld tax has nothing to pay; an attachment with planning switched off is skipped.
+    """
+    if rule.kind == TaxKind.PAYER_WITHHELD:
+        return None
+    dates: list[date] = []
+    for source in sources:
+        for attachment in source.attachments:
+            if attachment.tax_rule_id != rule.id or not attachment.generate_payment:
+                continue
+            for preview in source.preview:
+                paid = preview.payment_dates.get(str(attachment.id))
+                if paid is not None:
+                    dates.append(paid)
+    return min(dates, default=None)
+
+
 @router.get("/recurring", name="scheduled_items")
 async def items(request: Request, ctx: CurrentContext) -> Response:
-    rows = await run_in_threadpool(scheduled.list_items, request.app.state.session_factory, ctx)
+    factory = request.app.state.session_factory
+    taxes_enabled = ctx.workspace.taxes_enabled
+    rows, sources, categories, rules = await run_in_threadpool(
+        lambda: (
+            scheduled.list_items(factory, ctx),
+            income.list_sources(factory, ctx),
+            list_categories(factory, ctx),
+            taxes.list_rules(factory, ctx) if taxes_enabled else [],
+        )
+    )
     error = request.query_params.get("error")
     notice = request.query_params.get("notice")
     locale = request.state.locale
@@ -317,6 +369,34 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
     # One-time items live on the Upcoming page; archived items are history only (their
     # transactions stay), so neither is listed here.
     shown = [row for row in rows if row.values.rule.freq != Frequency.ONCE and not row.archived]
+    # Income sources and income tax rules are configured on their own pages but listed here
+    # read-only, mixed into the existing tables (archived ones stay hidden).
+    categories_by_id = {
+        category.id: category
+        for category in (*categories.income, *categories.expense, *categories.archived)
+    }
+    active_sources = [source for source in sources if not source.archived]
+    income_rows = [
+        IncomeSourceRow(
+            source=source,
+            category=categories_by_id.get(source.category_id),
+            next_due=source.preview[0].due_date if source.preview else None,
+        )
+        for source in active_sources
+    ]
+    tax_rows = [
+        TaxRuleRow(
+            rule=rule,
+            category=(
+                categories_by_id.get(rule.payment_category_id)
+                if rule.payment_category_id is not None
+                else None
+            ),
+            next_due=_next_tax_payment(rule, active_sources),
+        )
+        for rule in rules
+        if not rule.archived
+    ]
     return render_template(
         request,
         "scheduled/list.html",
@@ -332,8 +412,13 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
                 )
                 for direction in (TransactionDirection.EXPENSE, TransactionDirection.INCOME)
             ],
-            "has_items": bool(shown),
+            "income_source_rows": income_rows,
+            "tax_rule_rows": tax_rows,
+            "has_items": bool(shown) or bool(income_rows) or bool(tax_rows),
+            "taxes_enabled": taxes_enabled,
             "format_day": format_day,
+            "format_day_of_month": format_day_of_month,
+            "rate_label": rate_label,
             "can_edit": has_role(ctx, Role.EDITOR),
             "notice": (
                 gettext(ACTION_NOTICES[notice], locale) if notice in ACTION_NOTICES else None
