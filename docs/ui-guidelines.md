@@ -140,14 +140,15 @@ Rules:
 - Required is the default; mark optional fields “(optional)”.
 - Two columns maximum on desktop; one column below `sm`. A create form with more than five
   fields should be a dialog or a guided page, not a block at the bottom of a list.
-- Disable fields that do not apply to the current mode and keep them visible, so the form does
-  not jump and the available choices stay discoverable:
+- Hide fields that do not apply to the current mode:
   - notification digest time is irrelevant when delivery is “one message per reminder”;
-  - payment schedule is irrelevant for a payer-withheld tax;
-  - investment dividend fields are irrelevant for a buy, and trade fields for a dividend or split.
-  Alternative inputs for one choice (the investment form's “Amounts in” groups) may still be
-  hidden, and a control the server omitted from a fixed-context form (the investment form's FX
-  field on a base-currency instrument) does not need to be shown disabled.
+  - payment schedule is irrelevant for a payer-withheld tax.
+- The **investment transaction form** is the current exception: it keeps every type-specific
+  field visible and disables the ones that do not apply, so switching Buy / Dividend / Split
+  does not reflow the dialog. Only its alternative “Amounts in” groups switch visibility, and a
+  fixed-context form (instrument page, inline edit row) may omit the FX field on a
+  base-currency instrument. Bringing the notification and tax forms to the same pattern is a
+  follow-up; their behaviour is unchanged.
 - Use a segmented control (radio cards) for two or three mutually exclusive choices
   (expense/income, repeat frequency, tax kind). Use a select for longer lists.
 - Validate on the server. On refusal, focus the first invalid field and show its message next to

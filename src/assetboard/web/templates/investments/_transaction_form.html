@@ -2,13 +2,15 @@
 
 {# A refused field is marked invalid, points at its message, and takes the focus after the swap
    (app.js focuses [data-autofocus]), which also scrolls it into view: the error is never off
-   screen. The service reports one field at a time. #}
-{% macro invalid(errors, name, id) -%}
-{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ id }}-error" data-autofocus{% endif %}
+   screen. The service reports one field at a time. ``enabled`` keeps the marker on the field
+   that belongs to the chosen type: the same error name is shared by the trade, dividend and
+   split controls, so the disabled copies must not claim it. #}
+{% macro invalid(errors, name, id, enabled=True) -%}
+{% if enabled and errors.get(name) %} aria-invalid="true" aria-describedby="{{ id }}-error" data-autofocus{% endif %}
 {%- endmacro %}
 
-{% macro field_error(errors, name, id) -%}
-{% if errors.get(name) %}<p id="{{ id }}-error" class="text-sm text-danger" data-field-error="{{ name }}">{{ errors.get(name) }}</p>{% endif %}
+{% macro field_error(errors, name, id, enabled=True) -%}
+{% if enabled and errors.get(name) %}<p id="{{ id }}-error" class="text-sm text-danger" data-field-error="{{ name }}">{{ errors.get(name) }}</p>{% endif %}
 {%- endmacro %}
 
 {# Fields that do not apply to the chosen type stay visible but disabled, so the form never
@@ -25,6 +27,7 @@
 {% set dividend_enabled = kind == "dividend" %}
 {% set split_enabled = kind == "split" %}
 {% set record_income_checked = values.get("record_income") %}
+{% set income_category_enabled = dividend_enabled and record_income_checked %}
 {# F6.2a: "Amounts in" quote | base. Both amount groups are rendered so a saved row can switch
    modes with its values pre-filled; investments.js shows only the chosen group. #}
 {% set ns = namespace(quote_code="") %}
@@ -70,15 +73,15 @@
   </div>
   <div class="space-y-1.5" data-dividend-field>
     <label for="transaction-dividend-gross" class="block text-sm font-medium">{{ _("Gross amount") }}</label>
-    <input id="transaction-dividend-gross" name="dividend_gross" type="text" inputmode="decimal" value="{{ values.dividend_gross }}" class="form-control w-full"{{ disabled_attr(dividend_enabled) }}>
+    <input id="transaction-dividend-gross" name="dividend_gross" type="text" inputmode="decimal" value="{{ values.dividend_gross }}" class="form-control w-full"{{ invalid(errors, "unit_price", "transaction-dividend-gross", enabled=dividend_enabled) }}{{ disabled_attr(dividend_enabled) }}>
     <p class="text-xs text-muted">{{ _("In the instrument's quote currency.") }}</p>
-    {{ field_error(errors, "unit_price", "transaction-dividend-gross") }}
+    {{ field_error(errors, "unit_price", "transaction-dividend-gross", enabled=dividend_enabled) }}
   </div>
   <div class="space-y-1.5" data-dividend-field>
     <label for="transaction-dividend-withholding" class="block text-sm font-medium">{{ _("Withholding") }}</label>
-    <input id="transaction-dividend-withholding" name="dividend_withholding" type="text" inputmode="decimal" value="{{ values.dividend_withholding or '0' }}" class="form-control w-full"{{ disabled_attr(dividend_enabled) }}>
+    <input id="transaction-dividend-withholding" name="dividend_withholding" type="text" inputmode="decimal" value="{{ values.dividend_withholding or '0' }}" class="form-control w-full"{{ invalid(errors, "fee", "transaction-dividend-withholding", enabled=dividend_enabled) }}{{ disabled_attr(dividend_enabled) }}>
     <p class="text-xs text-muted">{{ _("Optional tax withheld; it is stored on the dividend and not posted as an expense.") }}</p>
-    {{ field_error(errors, "fee", "transaction-dividend-withholding") }}
+    {{ field_error(errors, "fee", "transaction-dividend-withholding", enabled=dividend_enabled) }}
   </div>
   <div class="space-y-1.5" data-dividend-field>
     <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="record_income" value="true"{% if values.record_income %} checked{% endif %}{{ disabled_attr(dividend_enabled) }}> {{ _("Record as income") }}</label>
@@ -87,30 +90,30 @@
   <div class="space-y-1.5" data-dividend-field data-income-category-field>
     <label for="transaction-income-category" class="block text-sm font-medium">{{ _("Income category") }}</label>
     {% set chosen_income = values.income_category_id or default_income_category_id %}
-    <select id="transaction-income-category" name="income_category_id" class="form-select w-full"{{ disabled_attr(dividend_enabled and record_income_checked) }}>
+    <select id="transaction-income-category" name="income_category_id" class="form-select w-full"{{ invalid(errors, "income_category", "transaction-income-category", enabled=income_category_enabled) }}{{ disabled_attr(income_category_enabled) }}>
       <option value="">{{ _("Choose an income category") }}</option>
       {% for category_id, name in income_categories %}
       <option value="{{ category_id }}"{% if chosen_income == category_id %} selected{% endif %}>{{ name }}</option>
       {% endfor %}
     </select>
-    {{ field_error(errors, "income_category", "transaction-income-category") }}
+    {{ field_error(errors, "income_category", "transaction-income-category", enabled=income_category_enabled) }}
   </div>
   <div class="space-y-1.5" data-split-field>
     <label for="transaction-split-new" class="block text-sm font-medium">{{ _("New units") }}</label>
-    <input id="transaction-split-new" name="split_new" type="text" inputmode="decimal" value="{{ values.split_new }}" class="form-control w-full"{{ disabled_attr(split_enabled) }}>
+    <input id="transaction-split-new" name="split_new" type="text" inputmode="decimal" value="{{ values.split_new }}" class="form-control w-full"{{ invalid(errors, "quantity", "transaction-split-new", enabled=split_enabled) }}{{ disabled_attr(split_enabled) }}>
     <p class="text-xs text-muted">{{ _("For a 2-for-1 split enter 2 new units and 1 old unit.") }}</p>
-    {{ field_error(errors, "quantity", "transaction-split-new") }}
+    {{ field_error(errors, "quantity", "transaction-split-new", enabled=split_enabled) }}
   </div>
   <div class="space-y-1.5" data-split-field>
     <label for="transaction-split-old" class="block text-sm font-medium">{{ _("Old units") }}</label>
-    <input id="transaction-split-old" name="split_old" type="text" inputmode="decimal" value="{{ values.split_old }}" class="form-control w-full"{{ disabled_attr(split_enabled) }}>
+    <input id="transaction-split-old" name="split_old" type="text" inputmode="decimal" value="{{ values.split_old }}" class="form-control w-full"{{ invalid(errors, "unit_price", "transaction-split-old", enabled=split_enabled) }}{{ disabled_attr(split_enabled) }}>
     <p class="text-xs text-muted">{{ _("For a 1-for-10 reverse split enter 1 new unit and 10 old units.") }}</p>
-    {{ field_error(errors, "unit_price", "transaction-split-old") }}
+    {{ field_error(errors, "unit_price", "transaction-split-old", enabled=split_enabled) }}
   </div>
   <div class="space-y-1.5" data-trade-field>
     <label for="transaction-quantity" class="block text-sm font-medium">{{ _("Quantity") }}</label>
-    <input id="transaction-quantity" name="quantity" type="text" inputmode="decimal" value="{{ values.quantity }}" required class="form-control w-full"{{ invalid(errors, "quantity", "transaction-quantity") }}{{ disabled_attr(trade_enabled) }}>
-    {{ field_error(errors, "quantity", "transaction-quantity") }}
+    <input id="transaction-quantity" name="quantity" type="text" inputmode="decimal" value="{{ values.quantity }}" required class="form-control w-full"{{ invalid(errors, "quantity", "transaction-quantity", enabled=trade_enabled) }}{{ disabled_attr(trade_enabled) }}>
+    {{ field_error(errors, "quantity", "transaction-quantity", enabled=trade_enabled) }}
   </div>
   {% if show_amounts %}
   <fieldset class="space-y-1.5 sm:col-span-2" data-amounts-choice data-trade-field>
@@ -120,43 +123,43 @@
       <label class="inline-flex items-center gap-2"><input type="radio" name="amounts" value="base"{% if amounts == "base" %} checked{% endif %} data-amounts-radio{{ disabled_attr(trade_enabled) }}> <span>{{ base_currency }}</span></label>
     </div>
     <p class="text-xs text-muted">{{ _("Choose %(currency)s when your broker shows only %(currency)s amounts: the unit price and fee are then in %(currency)s and the FX rate converts them.", currency=base_currency) }}</p>
-    {{ field_error(errors, "amounts", "transaction-amounts") }}
+    {{ field_error(errors, "amounts", "transaction-amounts", enabled=trade_enabled) }}
   </fieldset>
   {% else %}<input type="hidden" name="amounts" value="quote">{% endif %}
   <div class="space-y-1.5" data-transaction-price-field data-amounts-group="quote" data-trade-field>
     <label for="transaction-price" class="block text-sm font-medium">{{ _("Unit price") }}</label>
     {% set price_value = "1" if fixed and fixed.type == "currency" else values.unit_price %}
-    <input id="transaction-price" name="unit_price" type="text" inputmode="decimal" value="{{ price_value }}"{% if fixed and fixed.type == "currency" %} readonly{% endif %} class="form-control w-full" data-transaction-price{{ invalid(errors, "unit_price", "transaction-price") }}{{ disabled_attr(trade_enabled) }}>
+    <input id="transaction-price" name="unit_price" type="text" inputmode="decimal" value="{{ price_value }}"{% if fixed and fixed.type == "currency" %} readonly{% endif %} class="form-control w-full" data-transaction-price{{ invalid(errors, "unit_price", "transaction-price", enabled=trade_enabled) }}{{ disabled_attr(trade_enabled) }}>
     <p class="text-xs text-muted">{{ _("In the instrument's quote currency. A currency instrument is always priced at 1.") }}</p>
     {% if fixed and fixed.type == "bond_model" %}<p class="text-xs text-muted" data-bond-price-help>{{ _("What you paid per bond (cost basis). Face value is the nominal the interest accrues on, e.g. 99.90 paid for a 100 bond on a rollover.") }}</p>{% endif %}
-    {{ field_error(errors, "unit_price", "transaction-price") }}
+    {{ field_error(errors, "unit_price", "transaction-price", enabled=trade_enabled) }}
   </div>
   <div class="space-y-1.5" data-amounts-group="quote" data-trade-field>
     <label for="transaction-fee" class="block text-sm font-medium">{{ _("Fee") }}</label>
-    <input id="transaction-fee" name="fee" type="text" inputmode="decimal" value="{{ values.fee }}" class="form-control w-full"{{ invalid(errors, "fee", "transaction-fee") }}{{ disabled_attr(trade_enabled) }}>
-    {{ field_error(errors, "fee", "transaction-fee") }}
+    <input id="transaction-fee" name="fee" type="text" inputmode="decimal" value="{{ values.fee }}" class="form-control w-full"{{ invalid(errors, "fee", "transaction-fee", enabled=trade_enabled) }}{{ disabled_attr(trade_enabled) }}>
+    {{ field_error(errors, "fee", "transaction-fee", enabled=trade_enabled) }}
   </div>
   {% if show_amounts %}
   <div class="space-y-1.5" data-amounts-group="base" data-trade-field>
     <label for="transaction-base-price" class="block text-sm font-medium">{{ _("Unit price in %(currency)s", currency=base_currency) }}</label>
-    <input id="transaction-base-price" name="base_unit_price" type="text" inputmode="decimal" value="{{ values.get('base_unit_price', '') }}" class="form-control w-full"{{ invalid(errors, "base_unit_price", "transaction-base-price") }}{{ disabled_attr(trade_enabled) }}>
+    <input id="transaction-base-price" name="base_unit_price" type="text" inputmode="decimal" value="{{ values.get('base_unit_price', '') }}" class="form-control w-full"{{ invalid(errors, "base_unit_price", "transaction-base-price", enabled=trade_enabled) }}{{ disabled_attr(trade_enabled) }}>
     <p class="text-xs text-muted">{{ _("What you paid per unit in %(currency)s, as the broker shows it.", currency=base_currency) }}</p>
-    {{ field_error(errors, "base_unit_price", "transaction-base-price") }}
+    {{ field_error(errors, "base_unit_price", "transaction-base-price", enabled=trade_enabled) }}
   </div>
   <div class="space-y-1.5" data-amounts-group="base" data-trade-field>
     <label for="transaction-base-fee" class="block text-sm font-medium">{{ _("Fee in %(currency)s", currency=base_currency) }}</label>
-    <input id="transaction-base-fee" name="base_fee" type="text" inputmode="decimal" value="{{ values.get('base_fee', '0') }}" class="form-control w-full"{{ invalid(errors, "base_fee", "transaction-base-fee") }}{{ disabled_attr(trade_enabled) }}>
-    {{ field_error(errors, "base_fee", "transaction-base-fee") }}
+    <input id="transaction-base-fee" name="base_fee" type="text" inputmode="decimal" value="{{ values.get('base_fee', '0') }}" class="form-control w-full"{{ invalid(errors, "base_fee", "transaction-base-fee", enabled=trade_enabled) }}{{ disabled_attr(trade_enabled) }}>
+    {{ field_error(errors, "base_fee", "transaction-base-fee", enabled=trade_enabled) }}
   </div>
   {% endif %}
   {% if not (fixed and fixed.quote_currency == base_currency) %}
   {% set fx_enabled = (not split_enabled) and (not ns.quote_code or ns.quote_code != base_currency) %}
   <div class="space-y-1.5" data-transaction-fx>
     <label for="transaction-fx" class="block text-sm font-medium">{{ _("FX rate to %(currency)s", currency=base_currency) }}</label>
-    <input id="transaction-fx" name="fx_to_base" type="text" inputmode="decimal" value="{{ values.fx_to_base }}" data-fx-input data-prefilled="{{ fx_prefilled }}" class="form-control w-full"{{ invalid(errors, "fx_to_base", "transaction-fx") }}{{ disabled_attr(fx_enabled) }}>
+    <input id="transaction-fx" name="fx_to_base" type="text" inputmode="decimal" value="{{ values.fx_to_base }}" data-fx-input data-prefilled="{{ fx_prefilled }}" class="form-control w-full"{{ invalid(errors, "fx_to_base", "transaction-fx", enabled=fx_enabled) }}{{ disabled_attr(fx_enabled) }}>
     <p class="text-xs text-muted">{{ _("Required when the instrument is quoted in another currency.") }}</p>
     {% if prefill_date %}<p class="{% if not fx_prefilled %}hidden {% endif %}text-xs text-muted" data-fx-hint>{{ _("Stored rate for %(date)s", date=prefill_date) }}</p>{% endif %}
-    {{ field_error(errors, "fx_to_base", "transaction-fx") }}
+    {{ field_error(errors, "fx_to_base", "transaction-fx", enabled=fx_enabled) }}
   </div>
   {% else %}<input type="hidden" name="fx_to_base" value="1">{% endif %}
   <div class="space-y-1.5 sm:col-span-2">
@@ -167,7 +170,7 @@
   {% if errors.get("form") %}<p class="text-sm text-danger sm:col-span-2">{{ errors.get("form") }}</p>{% endif %}
   <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
     <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ submit_label }}</button>
-    {% if cancel_href %}<a href="{{ cancel_href }}" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
+    {% if cancel_href %}<a href="{{ cancel_href }}" data-dialog-close class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
   </div>
 </form>
 {%- endmacro %}
