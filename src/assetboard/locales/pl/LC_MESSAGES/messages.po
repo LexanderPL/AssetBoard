@@ -13232,6 +13232,15 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
+msgid "Next:"
+msgstr "Najbliższy:"
+
+msgid "No next date"
+msgstr "Brak najbliższego terminu"
+
+msgid "No category"
+msgstr "Brak kategorii"
+
 msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 "Powtarzające się rachunki i przychody. Każda pozycja sama planuje kolejne"
@@ -13246,12 +13255,6 @@ msgstr "wstrzymana"
 msgid "From loan"
 msgstr "Z kredytu"
 
-msgid "Next:"
-msgstr "Najbliższy:"
-
-msgid "No next date"
-msgstr "Brak najbliższego terminu"
-
 msgid "Resume"
 msgstr "Wznów"
 
@@ -13265,6 +13268,9 @@ msgid ""
 msgstr ""
 "Usunąć pozycję cykliczną %(name)s? Jej planowane terminy zostaną "
 "usunięte. Płatności już zapisane lub pominięte zostaną w historii."
+
+msgid "From income"
+msgstr "Z przychodu"
 
 msgid "No recurring expenses yet."
 msgstr "Nie ma jeszcze cyklicznych wydatków."

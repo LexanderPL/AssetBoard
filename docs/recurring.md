@@ -9,9 +9,20 @@ The page has two sections, **Expenses** and **Income**. Each item is one row: it
 amount (marked **estimate** when the amount varies), the schedule as a sentence such as
 "Monthly on the 10th", "Every 3 months on the 15th, from January 2027", "Yearly on 31 March"
 or "Weekly on Monday, until Dec 1, 2027", the next date, and the category. A paused item is
-marked **paused** and has no next date. Editors see **Edit**, **Pause** (or **Resume**) and
+marked **paused** and has no next date. An expense whose amount comes from a loan shows
+**From loan** as a link to that loan. Editors see **Edit**, **Pause** (or **Resume**) and
 **Delete** on each row and a **New recurring item** button at the top. On a phone each item is
 shown as a small card.
+
+The same tables also list related schedules that are configured elsewhere. Income sources that
+are not archived appear at the end of the **Income** table as read-only rows: the name opens the
+source card on **Income**, and the row shows the fixed amount, or the rate per unit with an
+**estimate** chip, the payday sentence, the next pay date and the income category. While Taxes
+are on, every non-archived income tax rule appears once at the end of the **Expenses** table:
+the name opens the rule on **Taxes**, and the row shows the rate with a **From income** chip, the
+payment sentence, the earliest planned tax payment across its income sources, and the payment
+category. Archived sources and rules are hidden. These rows have no **Edit**, **Pause** or
+**Delete**: change an income source on **Income** and a tax rule on **Taxes**.
 
 Archived items are not listed. Their payments stay in your transactions and history.
 

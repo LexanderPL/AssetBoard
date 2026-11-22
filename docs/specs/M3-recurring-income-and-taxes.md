@@ -127,6 +127,19 @@ owner decision of 2026-11-04):**
   already recorded or skipped stay in your history". There is no link to Upcoming (owner rule:
   no buttons or links to other sections). Empty state: one "New recurring item" button; with
   items, the same primary button sits at the top.
+- **Read-only related rows (owner decision of 2026-11-22).** The page mixes related schedules
+  into the two existing tables: non-archived income sources at the end of **Income** (their name
+  links to the source card on Income — `#income-source-<id>` — with the fixed amount, or the
+  rate per unit plus an estimate chip, the payday sentence, the next pay date and the income
+  category) and, while Taxes are on, one row per non-archived income tax rule at the end of
+  **Expenses** (its name links to the rule card on Taxes through the new `#tax-<id>` anchor, with
+  the current rate plus a "From income" chip, the rule's payment sentence, the earliest planned
+  tax payment across its non-archived income sources with planning on, and its payment
+  category). These rows are read-only (no Edit, Pause or Delete; configuration stays on Income
+  and Taxes), count for the page and section empty states, and archived sources and rules stay
+  hidden. A `from_loan` item's **From loan** links to the loan detail (installment plans
+  redirect there). The top related-links row of #456 is not used: the rows are mixed into the
+  tables, not added above them.
 - The schedule sentence is `web/schedule_text.describe_rule(rule, locale, today)` (gettext
   words, CLDR month and date names): "Monthly on the 10th", "Every 3 months on the 15th, from
   January 2027", "Yearly on 31 March", "Weekly on Monday", ", until December 2027",
@@ -308,8 +321,8 @@ effect/`record_as` model above.
   this tax only); `/taxes/calculator` redirects to `/taxes`. The warning box is replaced by an
   intro line; `users.tax_warning_dismissed` stays but is unused.
 - `workspaces.taxes_enabled` (Workspace settings → Menu, owners) hides the Taxes menu item, the
-  tax pages (404) and the tax parts of income; it cannot be turned off while a non-archived
-  income source has a tax attached.
+  tax pages (404), the tax parts of income and the Recurring page's income tax rule rows; it
+  cannot be turned off while a non-archived income source has a tax attached.
 - "Other taxes" are `scheduled_items.is_tax` recurring items created on the Taxes page.
 
 **Agent prompt**

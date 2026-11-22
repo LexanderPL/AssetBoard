@@ -12019,6 +12019,15 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
+msgid "Next:"
+msgstr ""
+
+msgid "No next date"
+msgstr ""
+
+msgid "No category"
+msgstr ""
+
 msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 
@@ -12031,12 +12040,6 @@ msgstr ""
 msgid "From loan"
 msgstr ""
 
-msgid "Next:"
-msgstr ""
-
-msgid "No next date"
-msgstr ""
-
 msgid "Resume"
 msgstr ""
 
@@ -12047,6 +12050,9 @@ msgstr ""
 msgid ""
 "Delete the recurring item %(name)s? Its planned dates are removed. "
 "Payments already recorded or skipped stay in your history."
+msgstr ""
+
+msgid "From income"
 msgstr ""
 
 msgid "No recurring expenses yet."
