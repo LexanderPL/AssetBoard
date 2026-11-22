@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.9](https://github.com/LexanderPL/AssetBoard/compare/v0.8.8...v0.8.9) (2026-11-22)
+
+
+### Features
+
+* **recurring:** show income sources and tax rules read-only ([#465](https://github.com/LexanderPL/AssetBoard/issues/465)) ([49e3ab4](https://github.com/LexanderPL/AssetBoard/commit/49e3ab40126bffe2f720723f40bbfec020bd1c6f))
+
+
+### Bug Fixes
+
+* **investments:** move the instrument transaction form into a dialog ([#464](https://github.com/LexanderPL/AssetBoard/issues/464)) ([41d0e27](https://github.com/LexanderPL/AssetBoard/commit/41d0e2787ad6d00d99a0af034909d1472e153c00))
+* **reports:** close the filter follow-ups from [#459](https://github.com/LexanderPL/AssetBoard/issues/459) ([#462](https://github.com/LexanderPL/AssetBoard/issues/462)) ([d05b1e2](https://github.com/LexanderPL/AssetBoard/commit/d05b1e2e00f6b6ab9ff87185aa753593b2902c8d))
+
 ## [0.8.8](https://github.com/LexanderPL/AssetBoard/compare/v0.8.7...v0.8.8) (2026-11-21)
 
 
