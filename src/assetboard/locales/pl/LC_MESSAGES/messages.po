@@ -9669,6 +9669,9 @@ msgstr "Wagi muszą sumować się dokładnie do 100%%."
 msgid "Save instrument"
 msgstr "Zapisz instrument"
 
+msgid "Add a transaction"
+msgstr "Dodaj transakcję"
+
 msgid "Back to instruments"
 msgstr "Wróć do instrumentów"
 
@@ -9680,9 +9683,6 @@ msgstr "Podstawa kosztu"
 
 msgid "Realized P&L"
 msgstr "Zrealizowany zysk/strata"
-
-msgid "Add a transaction"
-msgstr "Dodaj transakcję"
 
 msgid "Add transaction"
 msgstr "Dodaj transakcję"

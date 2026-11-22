@@ -8783,6 +8783,9 @@ msgstr ""
 msgid "Save instrument"
 msgstr ""
 
+msgid "Add a transaction"
+msgstr ""
+
 msgid "Back to instruments"
 msgstr ""
 
@@ -8793,9 +8796,6 @@ msgid "Cost basis"
 msgstr ""
 
 msgid "Realized P&L"
-msgstr ""
-
-msgid "Add a transaction"
 msgstr ""
 
 msgid "Add transaction"
