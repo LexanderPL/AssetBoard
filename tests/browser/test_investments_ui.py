@@ -154,6 +154,10 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
                         )
                     )
             page.goto(f"{base}/investments/instruments/{instrument_id}", wait_until="networkidle")
+            instrument_dialog = page.locator("#transaction-dialog")
+            expect(instrument_dialog).to_be_hidden()
+            page.locator("[data-add-transaction]").click()
+            expect(instrument_dialog).to_be_visible()
             fx = page.locator("#transaction-fx")
             hint = page.locator("[data-fx-hint]")
             expect(fx).to_have_value("0.9")
@@ -166,14 +170,75 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(fx).to_have_value("")
             expect(hint).to_be_hidden()
             page.reload(wait_until="networkidle")
+            page.locator("[data-add-transaction]").click()
             expect(fx).to_have_value("0.9")
             fx.fill("0.95")
             expect(hint).to_be_hidden()
             page.locator("#transaction-date").fill("2001-02-05")
             expect(fx).to_have_value("0.95")
 
+            # Every type-specific field stays in place; switching the type only enables and
+            # disables controls, and the income category follows "Record as income".
+            form = instrument_dialog.locator("[data-transaction-form]")
+            type_select = form.get_by_label("Type")
+            quantity = form.get_by_label("Quantity")
+            gross = form.get_by_label("Gross amount")
+            withholding = form.get_by_label("Withholding")
+            record_income = form.get_by_label("Record as income")
+            category = form.get_by_label("Income category")
+            split_new = form.get_by_label("New units")
+            split_old = form.get_by_label("Old units")
+            expect(quantity).to_be_enabled()
+            expect(gross).to_be_disabled()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+
+            type_select.select_option("dividend")
+            expect(quantity).to_be_visible()
+            expect(quantity).to_be_disabled()
+            expect(gross).to_be_visible()
+            expect(gross).to_be_enabled()
+            expect(withholding).to_be_enabled()
+            expect(record_income).to_be_enabled()
+            expect(category).to_be_disabled()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+            record_income.check()
+            expect(category).to_be_enabled()
+
+            type_select.select_option("split")
+            expect(split_new).to_be_visible()
+            expect(split_new).to_be_enabled()
+            expect(split_old).to_be_enabled()
+            expect(quantity).to_be_disabled()
+            expect(gross).to_be_disabled()
+            expect(record_income).to_be_disabled()
+            expect(category).to_be_disabled()
+            expect(fx).to_be_disabled()
+
+            type_select.select_option("dividend")
+            expect(gross).to_be_visible()
+            expect(gross).to_be_enabled()
+            expect(record_income).to_be_checked()
+            expect(category).to_be_enabled()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+            record_income.uncheck()
+            expect(category).to_be_disabled()
+
+            for width, height in ((390, 844), (1440, 900)):
+                page.set_viewport_size({"width": width, "height": height})
+                expect(instrument_dialog).to_be_visible()
+                box = instrument_dialog.bounding_box()
+                assert box is not None
+                assert box["x"] >= 0 and box["x"] + box["width"] <= width + 0.5
+                assert page.evaluate(
+                    "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+                )
+
             # The Transactions tab keeps both forms behind dialogs; a refused preview reopens
             # the bulk dialog as a modal.
+            page.set_viewport_size({"width": 1280, "height": 720})
             page.goto(f"{base}/investments/transactions", wait_until="networkidle")
             transaction_dialog = page.locator("#transaction-dialog")
             expect(transaction_dialog).to_be_hidden()

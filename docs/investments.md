@@ -122,8 +122,11 @@ them from the active list; restoring is refused if another active instrument has
 ## Transactions and holdings
 
 Open an instrument by clicking its name, or use the **Transactions** tab, to record a **buy** or
-**sell**. On the Transactions tab **Add a transaction** opens the form in a window (a click
-outside or Esc closes it); a refused save reopens it. The fields are:
+**sell**. **Add a transaction** opens the form in a window: in the instrument summary panel on an
+instrument page, and under the tabs on the Transactions tab. A click outside or Esc closes it; a
+refused save reopens it with everything you entered. Every type-specific field stays visible;
+the fields that do not apply to the chosen type are disabled instead of hidden, and only the
+alternative **Amounts in** groups switch visibility. The fields are:
 
 - **Date** — a trade date, not a plan. A date after today is refused.
 - **Quantity** — greater than zero, with up to 18 decimal places.
@@ -132,12 +135,13 @@ outside or Esc closes it); a refused save reopens it. The fields are:
 - **Fee** — in the same quote currency, with no more decimal places than the currency has. A
   sell's fee may be larger than its gross amount; the difference is a realized loss.
 - **FX rate to the base currency** — required when the instrument is quoted in another currency;
-  hidden and stored as 1 for a base-currency instrument. A new transaction starts with the
-  stored rate for its date (the latest manual or provider rate on or before that date, marked
-  "Stored rate for …") when one exists; you can change it. Changing the date re-fills a rate you
-  have not touched with the stored rate for the new date, or clears it when none is stored, so
-  a back-dated trade never keeps today's rate by accident; a rate you typed stays. Leaving it
-  empty shows an error on the field and keeps everything you entered.
+  disabled and stored as 1 for a base-currency instrument (an instrument page's form may also
+  leave the field out entirely when the quote currency is the base currency). A new transaction
+  starts with the stored rate for its date (the latest manual or provider rate on or before that
+  date, marked "Stored rate for …") when one exists; you can change it. Changing the date
+  re-fills a rate you have not touched with the stored rate for the new date, or clears it when
+  none is stored, so a back-dated trade never keeps today's rate by accident; a rate you typed
+  stays. Leaving it empty shows an error on the field and keeps everything you entered.
 - **Note** — optional, up to 200 characters.
 
 ### Amounts in the base currency
@@ -167,22 +171,24 @@ switching back keeps the derived quote values and drops the base amounts.
 
 ### Dividends, interest and splits
 
-Choose **Dividend / interest** to record investment income. Enter the **gross amount** in the
-instrument's quote currency and the optional **withholding** (tax withheld). The net amount is
-gross − withholding. Tick **Record as income** to add the net to the ledger as income and choose
-an income category: the form preselects the most recent dividend's category, otherwise the
-suggested **Interest** category when it is active. The ledger row is managed through the
-dividend — edit or delete it from the Investments transaction, not from the month page — and it
-shows a **from investment income** badge there. Recording income for a dividend in a closed
-month is refused; an unlinked dividend is not affected.
+Choose **Dividend / interest** to record investment income. The trade and split fields are
+disabled. Enter the **gross amount** in the instrument's quote currency and the optional
+**withholding** (tax withheld). The net amount is gross − withholding. Tick **Record as income**
+to add the net to the ledger as income and choose an income category: the category stays disabled
+until this is ticked, and is required once it is. The form preselects the most recent dividend's
+category, otherwise the suggested **Interest** category when it is active. The ledger row is
+managed through the dividend — edit or delete it from the Investments transaction, not from the
+month page — and it shows a **from investment income** badge there. Recording income for a
+dividend in a closed month is refused; an unlinked dividend is not affected.
 
 The **Income** tab shows gross, withholding, net and the number of payments per calendar year,
 newest first. Linked ledger rows are not counted twice. Undated legacy dividends are excluded
 from the years and noted.
 
-Choose **Split** for a split or reverse split and enter the **new units** and **old units**: a
-2-for-1 split is 2 and 1; a 1-for-10 reverse split is 1 and 10. The holding quantity scales and
-the cost basis stays the same. Splits are not available for currency or bond-model instruments.
+Choose **Split** for a split or reverse split; the trade and dividend fields are disabled and FX
+is not used. Enter the **new units** and **old units**: a 2-for-1 split is 2 and 1; a
+1-for-10 reverse split is 1 and 10. The holding quantity scales and the cost basis stays the
+same. Splits are not available for currency or bond-model instruments.
 A price observed before a split is multiplied by old/new when it is carried forward, so the
 value does not jump on the split date. Deleting or editing a split can leave a later sell
 overselling; that is refused, like any other oversell.
