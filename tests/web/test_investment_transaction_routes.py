@@ -91,6 +91,7 @@ def _tx(
     fee: str = "0",
     fx: str = "",
     note: str = "",
+    return_to: str = "",
 ) -> Any:
     return owner.post(
         TX,
@@ -103,6 +104,7 @@ def _tx(
             "fee": fee,
             "fx_to_base": fx,
             "note": note,
+            "return_to": return_to,
         },
         token_from=TX,
     )
@@ -123,6 +125,8 @@ def _dividend(
     withholding: str = "1",
     record_income: bool = True,
     category_id: UUID | None = None,
+    return_to: str = "",
+    fx: str = "",
 ) -> Any:
     return owner.post(
         TX,
@@ -133,8 +137,9 @@ def _dividend(
             "quantity": "",
             "unit_price": "",
             "fee": "0",
-            "fx_to_base": "",
+            "fx_to_base": fx,
             "note": "",
+            "return_to": return_to,
             "dividend_gross": gross,
             "dividend_withholding": withholding,
             "record_income": "true" if record_income else "",
@@ -144,6 +149,63 @@ def _dividend(
         },
         token_from=TX,
     )
+
+
+def _dialog(page: str) -> str:
+    match = re.search(r'<dialog id="transaction-dialog".*?</dialog>', page, re.S)
+    assert match is not None, "the instrument transaction dialog is missing"
+    return match.group(0)
+
+
+def _split(
+    owner: OwnerApp,
+    instrument_id: UUID,
+    *,
+    new: str,
+    old: str,
+    return_to: str = "",
+) -> Any:
+    return owner.post(
+        TX,
+        {
+            "instrument_id": str(instrument_id),
+            "type": "split",
+            "date": "2026-03-01",
+            "quantity": "",
+            "unit_price": "",
+            "fee": "0",
+            "fx_to_base": "",
+            "note": "",
+            "return_to": return_to,
+            "dividend_gross": "",
+            "dividend_withholding": "0",
+            "record_income": "",
+            "income_category_id": "",
+            "split_new": new,
+            "split_old": old,
+        },
+        token_from=TX,
+    )
+
+
+def _control(html: str, element_id: str) -> str:
+    match = re.search(rf'<(?:input|select|textarea)[^>]*\bid="{element_id}"[^>]*>', html)
+    assert match is not None, f"the control #{element_id} is missing"
+    return match.group(0)
+
+
+def _control_by_name(html: str, name: str) -> str:
+    match = re.search(rf'<input[^>]*\bname="{name}"[^>]*>', html)
+    assert match is not None, f"the control named {name} is missing"
+    return match.group(0)
+
+
+def _disabled(html: str, element_id: str) -> bool:
+    return " disabled" in _control(html, element_id)
+
+
+def _disabled_by_name(html: str, name: str) -> bool:
+    return " disabled" in _control_by_name(html, name)
 
 
 def _htmx(owner: OwnerApp, path: str, data: dict[str, str] | None = None) -> Any:
@@ -197,6 +259,279 @@ def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:
     assert refused.status_code == 400
     reopened = re.search(r'<dialog id="transaction-dialog"[^>]*>', refused.text)
     assert reopened is not None and " open" in reopened.group(0)
+
+
+def test_the_instrument_transaction_form_is_a_dialog_opened_from_the_summary(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "World ETF")
+    clean = f"{INSTRUMENTS}/{instrument}"
+    detail = owner.client.get(clean).text
+    summary = detail.split("data-holding-summary", 1)[0]
+    assert (
+        f'<a href="{clean}?form=transaction#transaction-dialog" '
+        'data-dialog-open="transaction-dialog"' in summary
+    )
+    assert ">Add a transaction</a>" in summary
+    opening = re.search(r'<dialog id="transaction-dialog"[^>]*>', detail)
+    assert opening is not None and " open" not in opening.group(0)
+    dialog = _dialog(detail)
+    assert "data-transaction-form" in dialog
+    assert 'data-instrument-type="etf"' in dialog
+    assert 'data-instrument-currency="EUR"' in dialog
+
+    opened = owner.client.get(f"{clean}?form=transaction")
+    assert opened.status_code == 200
+    opening = re.search(r'<dialog id="transaction-dialog"[^>]*>', opened.text)
+    assert opening is not None and " open" in opening.group(0)
+    assert f'href="{clean}" data-dialog-close' in opened.text
+    assert f'<a href="{clean}" data-dialog-close class="rounded-xl' in opened.text
+    assert ">Cancel</a>" in opened.text
+
+    refused = _tx(owner, instrument, quantity="0", return_to="instrument")
+    assert refused.status_code == 400
+    opening = re.search(r'<dialog id="transaction-dialog"[^>]*>', refused.text)
+    assert opening is not None and " open" in opening.group(0)
+    assert "Enter a quantity greater than zero." in refused.text
+
+
+def test_a_buy_form_disables_dividend_and_split_fields_without_hiding_them(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    form = _dialog(owner.client.get(f"{INSTRUMENTS}/{instrument}").text)
+    for element_id in (
+        "transaction-quantity",
+        "transaction-price",
+        "transaction-fee",
+        "transaction-fx",
+    ):
+        assert not _disabled(form, element_id), element_id
+    for element_id in (
+        "transaction-dividend-gross",
+        "transaction-dividend-withholding",
+        "transaction-income-category",
+        "transaction-split-new",
+        "transaction-split-old",
+    ):
+        assert _disabled(form, element_id), element_id
+    assert _disabled_by_name(form, "record_income")
+    # The groups stay in the document; only their controls are disabled.
+    assert "data-dividend-field" in form and "data-split-field" in form
+
+
+def test_a_refused_buy_shows_one_error_on_the_active_control(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    refused = _tx(owner, instrument, quantity="0", fx="1.08", return_to="instrument")
+    assert refused.status_code == 400
+    form = _dialog(refused.text)
+    assert form.count("data-field-error=") == 1
+    assert form.count('aria-invalid="true"') == 1
+    quantity = _control(form, "transaction-quantity")
+    assert 'aria-invalid="true"' in quantity
+    assert 'aria-describedby="transaction-quantity-error"' in quantity
+    assert "data-autofocus" in quantity
+    assert "aria-invalid" not in _control(form, "transaction-split-new")
+    assert "aria-invalid" not in _control(form, "transaction-price")
+    assert "aria-invalid" not in _control(form, "transaction-dividend-gross")
+
+
+def test_a_refused_dividend_form_enables_dividend_fields_and_disables_the_rest(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    refused = _dividend(
+        owner,
+        instrument,
+        gross="10",
+        withholding="1",
+        record_income=True,
+        category_id=None,
+        return_to="instrument",
+        fx="1.08",
+    )
+    assert refused.status_code == 400
+    form = _dialog(refused.text)
+    assert not _disabled(form, "transaction-dividend-gross")
+    assert not _disabled(form, "transaction-dividend-withholding")
+    assert not _disabled_by_name(form, "record_income")
+    assert not _disabled(form, "transaction-income-category")
+    assert not _disabled(form, "transaction-fx")
+    for element_id in (
+        "transaction-quantity",
+        "transaction-price",
+        "transaction-fee",
+        "transaction-split-new",
+        "transaction-split-old",
+    ):
+        assert _disabled(form, element_id), element_id
+    assert form.count("data-field-error=") == 1
+    assert form.count('aria-invalid="true"') == 1
+    category = _control(form, "transaction-income-category")
+    assert 'aria-invalid="true"' in category
+    assert 'aria-describedby="transaction-income-category-error"' in category
+    assert "data-autofocus" in category
+    assert "aria-invalid" not in _control(form, "transaction-quantity")
+    assert "aria-invalid" not in _control(form, "transaction-dividend-gross")
+
+    unrecorded = _dividend(
+        owner,
+        instrument,
+        gross="0",
+        withholding="0",
+        record_income=False,
+        return_to="instrument",
+    )
+    assert unrecorded.status_code == 400
+    form = _dialog(unrecorded.text)
+    assert _disabled(form, "transaction-income-category")
+    assert not _disabled(form, "transaction-dividend-gross")
+    assert not _disabled_by_name(form, "record_income")
+    assert form.count("data-field-error=") == 1
+    assert 'aria-invalid="true"' in _control(form, "transaction-dividend-gross")
+    assert "aria-invalid" not in _control(form, "transaction-income-category")
+
+
+def test_a_refused_split_form_disables_trade_dividend_and_fx_fields(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    refused = _split(owner, instrument, new="", old="1", return_to="instrument")
+    assert refused.status_code == 400
+    form = _dialog(refused.text)
+    assert not _disabled(form, "transaction-split-new")
+    assert not _disabled(form, "transaction-split-old")
+    for element_id in (
+        "transaction-quantity",
+        "transaction-price",
+        "transaction-fee",
+        "transaction-fx",
+        "transaction-dividend-gross",
+        "transaction-dividend-withholding",
+        "transaction-income-category",
+    ):
+        assert _disabled(form, element_id), element_id
+    assert _disabled_by_name(form, "record_income")
+    assert form.count("data-field-error=") == 1
+    assert form.count('aria-invalid="true"') == 1
+    split_new = _control(form, "transaction-split-new")
+    assert 'aria-invalid="true"' in split_new
+    assert 'aria-describedby="transaction-split-new-error"' in split_new
+    assert "data-autofocus" in split_new
+    assert "aria-invalid" not in _control(form, "transaction-quantity")
+    assert "aria-invalid" not in _control(form, "transaction-price")
+
+    different = _split(owner, instrument, new="1", old="1", return_to="instrument")
+    assert different.status_code == 400
+    form = _dialog(different.text)
+    assert form.count("data-field-error=") == 1
+    assert form.count('aria-invalid="true"') == 1
+    assert 'aria-invalid="true"' in _control(form, "transaction-split-old")
+    assert "aria-invalid" not in _control(form, "transaction-price")
+
+
+def test_the_transactions_tab_form_also_disables_inapplicable_fields(
+    owner: OwnerApp,
+) -> None:
+    _instrument(owner, "US fund", quote_currency="USD")
+    form = _dialog(owner.client.get(TX).text)
+    assert not _disabled(form, "transaction-quantity")
+    assert _disabled(form, "transaction-dividend-gross")
+    assert _disabled(form, "transaction-split-new")
+
+
+def test_the_list_form_renders_a_refused_dividend_and_split_with_their_groups(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    refused = _dividend(
+        owner,
+        instrument,
+        gross="10",
+        withholding="1",
+        record_income=True,
+        category_id=None,
+        fx="1.08",
+    )
+    assert refused.status_code == 400
+    form = _dialog(refused.text)
+    assert not _disabled(form, "transaction-dividend-gross")
+    assert not _disabled(form, "transaction-dividend-withholding")
+    assert not _disabled_by_name(form, "record_income")
+    assert not _disabled(form, "transaction-income-category")
+    assert not _disabled(form, "transaction-fx")
+    assert _disabled(form, "transaction-quantity")
+    assert _disabled(form, "transaction-price")
+    assert _disabled(form, "transaction-split-new")
+    assert form.count("data-field-error=") == 1
+    assert 'aria-invalid="true"' in _control(form, "transaction-income-category")
+
+    refused = _split(owner, instrument, new="", old="1")
+    assert refused.status_code == 400
+    form = _dialog(refused.text)
+    assert not _disabled(form, "transaction-split-new")
+    assert not _disabled(form, "transaction-split-old")
+    assert _disabled(form, "transaction-quantity")
+    assert _disabled(form, "transaction-price")
+    assert _disabled(form, "transaction-fx")
+    assert _disabled(form, "transaction-dividend-gross")
+    assert form.count("data-field-error=") == 1
+    assert 'aria-invalid="true"' in _control(form, "transaction-split-new")
+
+
+def test_a_base_currency_instrument_disables_the_list_form_fx_field(
+    owner: OwnerApp,
+) -> None:
+    _instrument(owner, "Home ETF", quote_currency="EUR")
+    form = _dialog(owner.client.get(TX).text)
+    assert _disabled(form, "transaction-fx")
+    assert "data-transaction-fx" in form  # disabled, not hidden
+
+
+def test_inline_edit_rows_render_the_disabled_groups(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "US fund", quote_currency="USD")
+    _tx(owner, instrument, fx="1.08")
+    with owner.db() as session:
+        from assetboard.db.models.investments import InvestmentTransaction
+
+        buy_id = session.scalars(select(InvestmentTransaction.id)).one()
+    buy_edit = owner.client.get(
+        f"{TX}/{buy_id}/edit?show_instrument=1&target=investment-transactions-body",
+        headers={"HX-Request": "true"},
+    ).text
+    assert "data-transaction-form" in buy_edit
+    assert not _disabled(buy_edit, "transaction-quantity")
+    assert not _disabled(buy_edit, "transaction-fx")
+    assert _disabled(buy_edit, "transaction-dividend-gross")
+    assert _disabled(buy_edit, "transaction-split-new")
+    assert _disabled_by_name(buy_edit, "record_income")
+
+    assert (
+        _dividend(
+            owner,
+            instrument,
+            gross="10",
+            withholding="1",
+            category_id=_interest_id(owner),
+            fx="1.08",
+        ).status_code
+        == 303
+    )
+    with owner.db() as session:
+        from assetboard.db.models.investments import InvestmentTransaction
+
+        dividend_id = session.scalars(
+            select(InvestmentTransaction.id).where(InvestmentTransaction.type == "dividend")
+        ).one()
+    dividend_edit = owner.client.get(
+        f"{TX}/{dividend_id}/edit?show_instrument=1&target=investment-transactions-body",
+        headers={"HX-Request": "true"},
+    ).text
+    assert not _disabled(dividend_edit, "transaction-dividend-gross")
+    assert not _disabled_by_name(dividend_edit, "record_income")
+    assert not _disabled(dividend_edit, "transaction-income-category")
+    assert _disabled(dividend_edit, "transaction-quantity")
+    assert _disabled(dividend_edit, "transaction-split-new")
 
 
 def test_create_a_buy_and_see_it_in_both_histories(owner: OwnerApp) -> None:
@@ -337,6 +672,9 @@ def test_an_archived_instrument_has_no_form_or_row_actions(owner: OwnerApp) -> N
     detail = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
     assert "This instrument is archived." in detail
     assert "Add a transaction" not in detail
+    assert "data-add-transaction" not in detail
+    assert 'id="transaction-dialog"' not in detail
+    assert "data-transaction-form" not in detail
     assert "Delete" not in detail
     global_page = owner.client.get(TX).text
     assert f"{TX}/" not in global_page.split("data-transaction=", 1)[0]  # no row actions

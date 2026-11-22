@@ -154,6 +154,10 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
                         )
                     )
             page.goto(f"{base}/investments/instruments/{instrument_id}", wait_until="networkidle")
+            instrument_dialog = page.locator("#transaction-dialog")
+            expect(instrument_dialog).to_be_hidden()
+            page.locator("[data-add-transaction]").click()
+            expect(instrument_dialog).to_be_visible()
             fx = page.locator("#transaction-fx")
             hint = page.locator("[data-fx-hint]")
             expect(fx).to_have_value("0.9")
@@ -166,19 +170,134 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(fx).to_have_value("")
             expect(hint).to_be_hidden()
             page.reload(wait_until="networkidle")
+            page.locator("[data-add-transaction]").click()
             expect(fx).to_have_value("0.9")
             fx.fill("0.95")
             expect(hint).to_be_hidden()
             page.locator("#transaction-date").fill("2001-02-05")
             expect(fx).to_have_value("0.95")
 
+            # Every type-specific field stays in place; switching the type only enables and
+            # disables controls, and the income category follows "Record as income".
+            form = instrument_dialog.locator("[data-transaction-form]")
+            type_select = form.get_by_label("Type")
+            quantity = form.get_by_label("Quantity")
+            gross = form.get_by_label("Gross amount")
+            withholding = form.get_by_label("Withholding")
+            record_income = form.get_by_label("Record as income")
+            category = form.get_by_label("Income category")
+            split_new = form.get_by_label("New units")
+            split_old = form.get_by_label("Old units")
+            expect(quantity).to_be_enabled()
+            expect(gross).to_be_disabled()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+
+            type_select.select_option("dividend")
+            expect(quantity).to_be_visible()
+            expect(quantity).to_be_disabled()
+            expect(gross).to_be_visible()
+            expect(gross).to_be_enabled()
+            expect(withholding).to_be_visible()
+            expect(withholding).to_be_enabled()
+            expect(record_income).to_be_visible()
+            expect(record_income).to_be_enabled()
+            expect(category).to_be_visible()
+            expect(category).to_be_disabled()
+            expect(split_new).to_be_visible()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+            record_income.check()
+            expect(category).to_be_visible()
+            expect(category).to_be_enabled()
+
+            type_select.select_option("split")
+            expect(split_new).to_be_visible()
+            expect(split_new).to_be_enabled()
+            expect(split_old).to_be_enabled()
+            expect(quantity).to_be_disabled()
+            expect(gross).to_be_disabled()
+            expect(record_income).to_be_disabled()
+            expect(category).to_be_disabled()
+            expect(fx).to_be_disabled()
+
+            type_select.select_option("dividend")
+            expect(gross).to_be_visible()
+            expect(gross).to_be_enabled()
+            expect(record_income).to_be_checked()
+            expect(category).to_be_visible()
+            expect(category).to_be_enabled()
+            expect(split_new).to_be_disabled()
+            expect(fx).to_be_enabled()
+            record_income.uncheck()
+            expect(category).to_be_disabled()
+
+            # A refused dividend reopens the dialog and marks and focuses the enabled active
+            # field; Enter does not leave the dialog closed. The category is the only error,
+            # even though the trade, dividend and split fields share the same error names.
+            record_income.check()
+            expect(category).to_be_enabled()
+            gross.fill("10")
+            withholding.fill("1")
+            category.select_option("")
+            gross.press("Enter")
+            page.wait_for_load_state("networkidle")
+            expect(instrument_dialog).to_be_visible()
+            expect(category).to_be_focused()
+            expect(category).to_have_attribute("aria-invalid", "true")
+            expect(category).to_have_attribute(
+                "aria-describedby", "transaction-income-category-error"
+            )
+            expect(form.locator("[data-field-error]")).to_have_count(1)
+            expect(form.locator('[aria-invalid="true"]')).to_have_count(1)
+
+            # The same for a refused split: an empty new-units field is the active error.
+            type_select.select_option("split")
+            expect(split_new).to_be_enabled()
+            split_new.fill("")
+            split_new.press("Enter")
+            page.wait_for_load_state("networkidle")
+            expect(instrument_dialog).to_be_visible()
+            expect(split_new).to_be_focused()
+            expect(split_new).to_have_attribute("aria-invalid", "true")
+            expect(split_new).to_have_attribute("aria-describedby", "transaction-split-new-error")
+            expect(form.locator("[data-field-error]")).to_have_count(1)
+            expect(form.locator('[aria-invalid="true"]')).to_have_count(1)
+
+            for width, height in ((390, 844), (1440, 900)):
+                page.set_viewport_size({"width": width, "height": height})
+                expect(instrument_dialog).to_be_visible()
+                box = instrument_dialog.bounding_box()
+                assert box is not None
+                assert box["x"] >= 0 and box["x"] + box["width"] <= width + 0.5
+                assert page.evaluate(
+                    "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+                )
+
+            # Cancel closes the dialog in place instead of navigating to the clean URL.
+            instrument_dialog.get_by_role("link", name="Cancel").click()
+            expect(instrument_dialog).to_be_hidden()
+            assert page.url.endswith(f"/investments/instruments/{instrument_id}")
+
             # The Transactions tab keeps both forms behind dialogs; a refused preview reopens
             # the bulk dialog as a modal.
+            page.set_viewport_size({"width": 1280, "height": 720})
             page.goto(f"{base}/investments/transactions", wait_until="networkidle")
             transaction_dialog = page.locator("#transaction-dialog")
             expect(transaction_dialog).to_be_hidden()
             page.locator("[data-add-transaction]").click()
             expect(transaction_dialog).to_be_visible()
+            # Choosing another instrument updates the shared form: a base-currency instrument
+            # disables FX, a foreign-quoted one enables it, and the type groups stay put.
+            tab_instrument = transaction_dialog.get_by_label("Instrument")
+            tab_fx = transaction_dialog.locator("#transaction-fx")
+            tab_instrument.select_option(label="World ETF")
+            expect(tab_fx).to_be_disabled()
+            expect(transaction_dialog.get_by_label("Quantity")).to_be_enabled()
+            expect(transaction_dialog.get_by_label("Gross amount")).to_be_disabled()
+            tab_instrument.select_option(label="US fund")
+            expect(tab_fx).to_be_enabled()
+            expect(transaction_dialog.get_by_label("Quantity")).to_be_enabled()
             page.mouse.click(5, 5)
             expect(transaction_dialog).to_be_hidden()
             bulk = page.locator("#investment-bulk-panel")

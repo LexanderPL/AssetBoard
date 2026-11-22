@@ -53,39 +53,54 @@ for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwa
 
 updateAllocationEditors();
 
-// F6.2: the global transaction form knows the selected instrument only after a change. Keep the
-// currency-instrument price at 1 and hide the FX field for base-currency instruments; the
-// server enforces both regardless of JavaScript.
-function updateTransactionForm(form) {
+// F6.2: the transaction form keeps every field visible and disables the ones that do not apply
+// to the chosen type, so switching Buy -> Dividend -> Split never makes the form jump. A fixed
+// form (an instrument page or an inline edit row) carries the instrument's type and currency as
+// data attributes; the global form reads the selected option. The server renders the same
+// disabled attributes, and this only keeps them in sync.
+function setGroupDisabled(form, selector, disabled) {
+  for (const field of form.querySelectorAll(selector)) {
+    for (const control of field.querySelectorAll("input, select, textarea")) {
+      if (control instanceof HTMLInputElement && control.type === "hidden") continue;
+      control.disabled = disabled;
+    }
+  }
+}
+
+function transactionInstrument(form) {
   const select = form.querySelector("[data-transaction-instrument]");
-  if (!select) return;
-  const option = select.selectedOptions[0];
-  const type = option ? option.dataset.type || "" : "";
-  const currency = option ? option.dataset.currency || "" : "";
+  if (select) {
+    const option = select.selectedOptions[0];
+    return { type: option?.dataset.type || "", currency: option?.dataset.currency || "" };
+  }
+  return {
+    type: form.dataset.instrumentType || "",
+    currency: form.dataset.instrumentCurrency || "",
+  };
+}
+
+function updateTransactionForm(form) {
+  const instrument = transactionInstrument(form);
   const kindField = form.querySelector("[name=type]");
   const kind = kindField ? kindField.value : "buy";
   const isTrade = kind === "buy" || kind === "sell";
-  for (const field of form.querySelectorAll("[data-trade-field]")) {
-    field.classList.toggle("hidden", !isTrade);
-  }
-  for (const field of form.querySelectorAll("[data-dividend-field]")) {
-    field.classList.toggle("hidden", kind !== "dividend");
-  }
-  for (const field of form.querySelectorAll("[data-split-field]")) {
-    field.classList.toggle("hidden", kind !== "split");
-  }
+  const isDividend = kind === "dividend";
+  const isSplit = kind === "split";
+  setGroupDisabled(form, "[data-trade-field]", !isTrade);
+  setGroupDisabled(form, "[data-dividend-field]", !isDividend);
+  const recordIncome = form.querySelector("[name=record_income]");
+  const wantsIncome = recordIncome instanceof HTMLInputElement && recordIncome.checked;
+  setGroupDisabled(form, "[data-income-category-field]", !isDividend || !wantsIncome);
+  setGroupDisabled(form, "[data-split-field]", !isSplit);
   const price = form.querySelector("[data-transaction-price]");
-  if (price) {
-    const isCurrency = type === "currency";
+  if (price instanceof HTMLInputElement) {
+    const isCurrency = instrument.type === "currency";
     price.readOnly = isCurrency;
     if (isCurrency) price.value = "1";
   }
-  const fx = form.querySelector("[data-transaction-fx]");
-  if (fx) {
-    fx.classList.toggle(
-      "hidden",
-      kind === "split" || currency === form.dataset.baseCurrency,
-    );
+  if (form.querySelector("[data-transaction-fx]")) {
+    const fxDisabled = isSplit || instrument.currency === form.dataset.baseCurrency;
+    setGroupDisabled(form, "[data-transaction-fx]", fxDisabled);
   }
 }
 
@@ -312,6 +327,7 @@ document.addEventListener("change", (event) => {
     updateTransactionForm(form);
     updateAmounts(form);
   }
+  if (target.matches("[name=record_income]")) updateTransactionForm(form);
 });
 
 for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {

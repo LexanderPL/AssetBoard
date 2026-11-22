@@ -13,7 +13,8 @@ contributors adding a page, a form, a table or an action. The audit in
    visible feedback in the current viewport. A flash message at the top of a long page is not
    enough.
 3. **Show only what the decision needs.** Required fields first. Optional, advanced or
-   mode-specific fields are hidden behind “More options”, a disclosure or a separate step.
+   mode-specific fields are hidden behind “More options”, a disclosure or a separate step, or
+   disabled in place when keeping them visible helps explain the choice.
 4. **Same concept, same control.** Expense/income, delete, cancel, back, filter, empty state and
    table action must look and behave the same on every page.
 5. **Dense but calm.** The app is a ledger, not a dashboard demo: square panels, thin rules,
@@ -141,8 +142,13 @@ Rules:
   fields should be a dialog or a guided page, not a block at the bottom of a list.
 - Hide fields that do not apply to the current mode:
   - notification digest time is irrelevant when delivery is “one message per reminder”;
-  - payment schedule is irrelevant for a payer-withheld tax;
-  - investment dividend fields are irrelevant for a buy.
+  - payment schedule is irrelevant for a payer-withheld tax.
+- The **investment transaction form** is the current exception: it keeps every type-specific
+  field visible and disables the ones that do not apply, so switching Buy / Dividend / Split
+  does not reflow the dialog. Only its alternative “Amounts in” groups switch visibility, and a
+  fixed-context form (instrument page, inline edit row) may omit the FX field on a
+  base-currency instrument. Bringing the notification and tax forms to the same pattern is a
+  follow-up; their behaviour is unchanged.
 - Use a segmented control (radio cards) for two or three mutually exclusive choices
   (expense/income, repeat frequency, tax kind). Use a select for longer lists.
 - Validate on the server. On refusal, focus the first invalid field and show its message next to
@@ -275,7 +281,8 @@ Rules:
       warnings, reports, copy/download results and no-JS undo.
 - [ ] Scroll, focus and open disclosures survive HTMX swaps.
 - [ ] Forms use the shared field/button components; no one-off button class strings.
-- [ ] Optional fields are hidden until needed; no field that is irrelevant to the chosen mode.
+- [ ] Optional fields are hidden until needed or disabled when they do not apply; no field that
+      is irrelevant to the chosen mode is submitted.
 - [ ] Row actions have adequate targets and meaningful accessible names.
 - [ ] User-menu pages use one `max-w-4xl` frame; panels have no narrower max widths.
 - [ ] Tables use `.sheet`; phone layout checked; no horizontal page scroll.

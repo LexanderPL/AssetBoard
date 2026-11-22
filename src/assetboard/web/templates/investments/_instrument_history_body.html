@@ -22,7 +22,12 @@
           {% if history.instrument.archived %}<span class="ml-2 rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong">{{ _("Archived") }}</span>{% endif %}
         </p>
       </div>
-      <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-sm font-medium text-primary-ink underline">{{ _("Back to instruments") }}</a>
+      <div class="flex flex-wrap items-center gap-2">
+        {% if can_edit and not history.instrument.archived %}
+        <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=history.instrument.id|string) }}?form=transaction#transaction-dialog" data-dialog-open="transaction-dialog" aria-haspopup="dialog" class="btn-primary" data-add-transaction>{{ _("Add a transaction") }}</a>
+        {% endif %}
+        <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-sm font-medium text-primary-ink underline">{{ _("Back to instruments") }}</a>
+      </div>
     </div>
     <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-holding-summary>
       <div class="border border-line bg-subtle p-4">
@@ -44,21 +49,28 @@
     </dl>
   </section>
 
+  {% if can_edit and not history.instrument.archived %}
+  {# The opener sits in the summary panel. Without JavaScript the link loads this page with the
+     dialog rendered open in the page flow; a refused form re-renders it open with the errors. #}
+  <dialog id="transaction-dialog" aria-labelledby="instrument-transaction-heading" data-dialog-modal data-transaction-create class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "transaction" %} open{% endif %}>
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="instrument-transaction-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
+      <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=history.instrument.id|string) }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
+    <div class="mt-4">
+      {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, fixed=history.instrument, submit_label=_("Add transaction"), cancel_href=scoped_url(request, 'investments_instrument', instrument_id=history.instrument.id|string), prefill_date=fx_prefill_date) }}
+    </div>
+   </div>
+  </dialog>
+  {% elif history.instrument.archived %}
+  <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("This instrument is archived. Restore it before adding or changing transactions.") }}</p>
+  {% endif %}
+
   {% if instrument.type == "bond_model" %}
   {% include "investments/_bond_terms_panel.html" %}
   {% else %}
   {% include "investments/_prices_panel.html" %}
-  {% endif %}
-
-  {% if can_edit and not history.instrument.archived %}
-  <section class="panel p-6 sm:p-7" aria-labelledby="instrument-transaction-heading" data-transaction-create>
-    <h2 id="instrument-transaction-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
-    <div class="mt-4">
-      {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, fixed=history.instrument, submit_label=_("Add transaction"), prefill_date=fx_prefill_date) }}
-    </div>
-  </section>
-  {% elif history.instrument.archived %}
-  <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("This instrument is archived. Restore it before adding or changing transactions.") }}</p>
   {% endif %}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="instrument-history-heading">
